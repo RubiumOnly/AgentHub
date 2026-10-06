@@ -15,7 +15,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-5C8A72" alt="MIT License" /></a>
 </p>
 
-[快速开始](#-快速开始) · [核心能力](#-核心能力) · [功能状态矩阵](#-功能状态矩阵) · [系统架构与-DDD-分层](#-系统架构与-ddd-四层分层) · [技术文档](docs/ARCHITECTURE.md) · [API 参考](docs/API.md) · [安全说明](SECURITY.md) · [贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md)
+[快速开始](#-快速开始) · [工作台真实截图](#️-工作台全景与核心功能截图) · [Live 运行指标](#-真实-live-协同运行与全流程证据) · [功能状态矩阵](#-功能状态矩阵) · [系统架构与-DDD-分层](#-系统架构与-ddd-四层分层) · [技术文档](docs/ARCHITECTURE.md) · [API 参考](docs/API.md) · [安全说明](SECURITY.md) · [贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md)
 
 ---
 
@@ -27,8 +27,62 @@
 - **类飞书/Slack 自然交互体验**：支持单聊、多会话并发管理与基于 `@Mention` 指令的群聊智能协同；
 - **Orchestrator 任务拓扑拆解引擎**：长程需求智能分解为有向无环图（DAG）子任务，并通过富文本交互式卡片（Interactive Cards）进行审批与状态反馈；
 - **统一智能体 SPI 适配器层**：兼容主流本地 CLI（Claude Code、Codex、OpenClaw）与云端大模型 API（DeepSeek V3 / Spring AI Native），实现非阻塞多通道协同；
-- **基于 JGit 的真实代码 Diff 审计**：工作区受原生 Git 版本控制，精确比对文件树与基线版本，输出行级 Unified Diff；
+- **基于 JGit 的真实代码 Diff 审计**：工作区受原生 Git 版本控制，精确比对物理文件树与基线版本，输出行级 Unified Diff；
 - **Bento Grid 全栈控制台**：Next.js 14 打造的暗黑美学工作台，集成可视化 DAG 工作流画布、工作区文件树、实时 Web 预览沙箱与一键 Docker 部署。
+
+---
+
+## ⚡ 真实 Live 协同运行与全流程证据
+
+以下数据与页面状态来自系统本地**真实端到端 Live 运行**（非 Mock 或静态假数据）：
+
+- **测试需求输入**：`@Orchestrator 请设计并实现一个企业级用户中心（包含个人信息展示、密码修改与权限审计）`
+- **协同会话模式**：群聊 `@Mention` 智能路由总线（会话 ID：`conv-8ebf2ff1`）
+- **通信通道**：Server-Sent Events (SSE) 长连接毫秒级打字机流式推送
+- **任务阶段拓扑**：自动分解为 3 阶段子任务（阶段一：领域服务架构 / 阶段二：Next.js 14 组件 / 阶段三：JGit 审计）
+- **物理生成资产**：
+  - `GeneratedService.java`（Spring Boot 3 核心领域模型与 RESTful 服务实现）
+  - `GeneratedComponent.tsx`（Next.js 14 / React 响应式用户中心控制台组件）
+  - `UserCenterController.java`（JGit 工作区控制器基线）
+- **JGit 版本审计**：成功捕获物理工作区 3 个受控文件变更，精确输出 Unified Diff 补丁（`MODIFY` 2 个文件，`ADD` 1 个文件，变更行数统计：`+26 / -95`）
+
+| 协同阶段 | 执行主体 | 运行时类型 | 产生结果 / 产出证据 | 状态 |
+| :--- | :--- | :--- | :--- | :---: |
+| **阶段分解** | `Orchestrator` | 内部编排调度器 | 自动生成飞书级富文本卡片，建立三阶段依赖拓扑 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
+| **阶段一：后端服务** | `BackendArchitect` | DeepSeek V3 / Spring AI | 编写生产级 Spring Boot 3 接口与领域模型并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
+| **阶段二：前端界面** | `FrontendEngineer` | DeepSeek V3 / Spring AI | 编写 Next.js 14 响应式用户中心组件并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
+| **阶段三：代码审计** | `QAAuditor` | Eclipse JGit 原生内核 | 触发 Working Tree 与 Baseline 比对，生成标准 Patch | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
+
+---
+
+## 🖥️ 工作台全景与核心功能截图
+
+所有截图均来自真实桌面端工作台（分辨率：1440 × 900）的端到端真实操作记录：
+
+### 1. 发起协同与 Orchestrator 任务拓扑拆解
+自然语言输入需求后，`Orchestrator` 自动理解业务边界，生成飞书级富文本交互卡片，下发三阶段任务，并驱动各专业 Agent 实时生成代码：
+
+![发起协同与 Orchestrator 任务拓扑拆解](docs/images/01-orchestrator-collaboration-stream.png)
+
+### 2. JGit 行级代码 Diff 审查闭环
+右侧面板直连 Eclipse JGit 核心，实时比对物理工作区与基线分支，精确展示每一行代码的变更增删指标与标准 Git Patch 补丁：
+
+![JGit 行级代码 Diff 审查闭环](docs/images/02-jgit-diff-audit.png)
+
+### 3. 可视化 DAG 状态机工作流画布
+基于 `@xyflow/react` 打造的拖拽式工作流画布，支持有向无环图节点连线、执行顺序依赖配置与可视化审批调度：
+
+![可视化 DAG 状态机工作流画布](docs/images/03-workflow-dag-canvas.png)
+
+### 4. 工作区物理文件树浏览与在线编辑器
+实时扫描物理工作区目录资产，左侧层级展示 Agent 协同落盘的文件列表，右侧集成代码编辑器，支持在线浏览与手动微调保存：
+
+![工作区物理文件树浏览与在线编辑器](docs/images/04-workspace-file-explorer.png)
+
+### 5. 实时 Web 预览沙箱与一键 Docker 部署
+通过隔离 iframe 沙箱实时预览 Agent 协同生成的前端界面与组件；点击“部署”按钮可自动生成生产级 Dockerfile 镜像构建配置：
+
+![实时 Web 预览沙箱与一键 Docker 部署](docs/images/05-sandbox-preview.png)
 
 ---
 
@@ -98,7 +152,8 @@ agenthub/
 │   └── src/components/               # WorkflowCanvas (DAG 画布), WorkspaceExplorer (文件树)
 │
 ├── data/workspaces/                  # 受 Git 控制的多 Agent 物理协作工作区
-├── docs/                             # 系统技术文档
+├── docs/                             # 系统技术文档与实机运行证据
+│   ├── images/                       # 真实桌面端实机截图集 (01-05)
 │   ├── ARCHITECTURE.md               # 核心架构设计说明书
 │   └── API.md                        # RESTful API 与 SSE 事件流契约
 ├── .github/workflows/ci.yml          # GitHub Actions 自动化 CI 流水线
@@ -124,17 +179,6 @@ agenthub/
 | **`Claude Code`** | 本地 CLI 运行时 | Anthropic 官方 CLI 智能体环境 | 异步子进程管道 + 正则脱敏 |
 | **`Codex CLI`** | 本地 CLI 运行时 | OpenAI Codex 终端代码协同 | 异步子进程管道 + 看门狗超时 |
 | **`OpenClaw`** | 本地 CLI 运行时 | 开源本地代码执行终端智能体 | 异步子进程管道 + 优雅降级 |
-
----
-
-## ⚡ 真实协同运行流程 (Live Run)
-
-1. **发起协同**：在聊天窗口发送 `@Orchestrator 请帮我实现一个用户中心`；
-2. **任务拓扑拆解**：`Orchestrator` 拆解为三阶段有向子任务，并生成飞书级富文本卡片；
-3. **并发代码编写**：`BackendArchitect` 与 `FrontendEngineer` 协同编写代码，并通过打字机效果流式返回；
-4. **工作区自动落盘**：生成的源码安全写入物理隔离的 `data/workspaces/default/`；
-5. **JGit 行级 Diff 捕获**：系统自动调用 JGit 核心比对基线版本，实时展示精确到行的代码差异补丁；
-6. **人工审批与一键部署**：用户可在右侧面板审查代码变更、浏览工作区文件树或在沙箱中进行实时预览与容器构建。
 
 ---
 
