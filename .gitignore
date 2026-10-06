@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+target/
+.next/
+dist/
+build/
+
+# IDE & System
+.idea/
+*.iml
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
+
+# Secrets & Local Configurations (STRICTLY FORBIDDEN IN GIT)
+.env
+.env.*
+!.env.example
+application-local.yml
+*application-local*.yml
+*application-local*.properties
+!*application-local*.example
+
+# Runtime Workspace Data
+data/workspaces/
+reference-shrimp-crab/
