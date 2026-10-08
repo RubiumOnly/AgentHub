@@ -8,7 +8,16 @@ public class FileDiffEntry implements Serializable {
     public enum ChangeType {
         ADD,
         MODIFY,
-        DELETE
+        DELETE,
+        RENAME,
+        COPY
+    }
+
+    public enum ReviewStatus {
+        PENDING,
+        ACCEPTED,
+        REJECTED,
+        REVERTED
     }
 
     private String oldPath;
@@ -17,6 +26,11 @@ public class FileDiffEntry implements Serializable {
     private String diffContent;
     private int linesAdded;
     private int linesDeleted;
+    private boolean binary;
+    private boolean rename;
+    private boolean hasConflict;
+    private ReviewStatus reviewStatus = ReviewStatus.PENDING;
+    private String checksum;
 
     public FileDiffEntry() {}
 
@@ -27,6 +41,26 @@ public class FileDiffEntry implements Serializable {
         this.diffContent = diffContent;
         this.linesAdded = linesAdded;
         this.linesDeleted = linesDeleted;
+        this.binary = false;
+        this.rename = (changeType == ChangeType.RENAME);
+        this.hasConflict = false;
+        this.reviewStatus = ReviewStatus.PENDING;
+    }
+
+    public FileDiffEntry(String oldPath, String newPath, ChangeType changeType, String diffContent,
+                         int linesAdded, int linesDeleted, boolean binary, boolean rename,
+                         boolean hasConflict, ReviewStatus reviewStatus, String checksum) {
+        this.oldPath = oldPath;
+        this.newPath = newPath;
+        this.changeType = changeType;
+        this.diffContent = diffContent;
+        this.linesAdded = linesAdded;
+        this.linesDeleted = linesDeleted;
+        this.binary = binary;
+        this.rename = rename;
+        this.hasConflict = hasConflict;
+        this.reviewStatus = reviewStatus != null ? reviewStatus : ReviewStatus.PENDING;
+        this.checksum = checksum;
     }
 
     public String getOldPath() { return oldPath; }
@@ -41,4 +75,14 @@ public class FileDiffEntry implements Serializable {
     public void setLinesAdded(int linesAdded) { this.linesAdded = linesAdded; }
     public int getLinesDeleted() { return linesDeleted; }
     public void setLinesDeleted(int linesDeleted) { this.linesDeleted = linesDeleted; }
+    public boolean isBinary() { return binary; }
+    public void setBinary(boolean binary) { this.binary = binary; }
+    public boolean isRename() { return rename; }
+    public void setRename(boolean rename) { this.rename = rename; }
+    public boolean isHasConflict() { return hasConflict; }
+    public void setHasConflict(boolean hasConflict) { this.hasConflict = hasConflict; }
+    public ReviewStatus getReviewStatus() { return reviewStatus; }
+    public void setReviewStatus(ReviewStatus reviewStatus) { this.reviewStatus = reviewStatus; }
+    public String getChecksum() { return checksum; }
+    public void setChecksum(String checksum) { this.checksum = checksum; }
 }
