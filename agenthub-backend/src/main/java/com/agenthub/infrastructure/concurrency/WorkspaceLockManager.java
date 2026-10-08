@@ -83,20 +83,21 @@ public class WorkspaceLockManager {
         if (workspacePath == null || workspacePath.isBlank()) {
             return "";
         }
+        String sanitized = workspacePath.replace('\\', '/');
         if (workspaceResolver != null) {
             try {
-                Path root = workspaceResolver.getWorkspaceRoot(workspacePath);
+                Path root = workspaceResolver.getWorkspaceRoot(sanitized);
                 return root.toAbsolutePath().normalize().toString()
                         .replace('\\', '/')
                         .toLowerCase(Locale.ROOT);
             } catch (Exception ignored) {}
         }
         try {
-            return Path.of(workspacePath).toAbsolutePath().normalize().toString()
+            return Path.of(sanitized).toAbsolutePath().normalize().toString()
                     .replace('\\', '/')
                     .toLowerCase(Locale.ROOT);
         } catch (Exception e) {
-            return workspacePath.replace('\\', '/').toLowerCase(Locale.ROOT);
+            return sanitized.toLowerCase(Locale.ROOT);
         }
     }
 

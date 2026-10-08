@@ -56,7 +56,10 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
         Path root = getWorkspaceRoot(workspaceIdOrPath);
         validateRelativePathString(relativePath);
 
-        Path candidate = root.resolve(relativePath).normalize();
+        String normalizedRel = relativePath.replace('\\', '/');
+        checkGitProtectionString(normalizedRel);
+
+        Path candidate = root.resolve(normalizedRel).normalize();
 
         // 1. Root containment check
         if (!candidate.startsWith(root)) {
@@ -78,7 +81,10 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
         Path root = getWorkspaceRoot(workspaceIdOrPath);
         validateRelativePathString(relativePath);
 
-        Path candidate = root.resolve(relativePath).normalize();
+        String normalizedRel = relativePath.replace('\\', '/');
+        checkGitProtectionString(normalizedRel);
+
+        Path candidate = root.resolve(normalizedRel).normalize();
 
         // 1. Root containment check
         if (!candidate.startsWith(root)) {
@@ -107,17 +113,18 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Illegal character sequence in workspace path");
         }
 
+        String sanitized = workspaceIdOrPath.replace('\\', '/');
         Path base = getBaseDir();
 
         // If repository is available, check if workspaceIdOrPath is a recorded workspace ID or project ID
         if (workspaceRepository != null) {
-            Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceIdOrPath);
+            Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(sanitized);
             if (wsOpt.isEmpty()) {
-                wsOpt = workspaceRepository.findByProjectId(workspaceIdOrPath);
+                wsOpt = workspaceRepository.findByProjectId(sanitized);
             }
             if (wsOpt.isPresent()) {
                 String relativeRoot = wsOpt.get().getRelativeRoot();
-                Path wsRoot = base.resolve(relativeRoot).normalize();
+                Path wsRoot = base.resolve(relativeRoot.replace('\\', '/')).normalize();
                 if (!wsRoot.startsWith(base)) {
                     throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
                             "Configured workspace relative root escapes base directory");
@@ -130,7 +137,7 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
         }
 
         // Fallback: Resolve as legacy path or direct directory name under baseDir
-        Path root = resolveLegacyPath(workspaceIdOrPath, false);
+        Path root = resolveLegacyPath(sanitized, false);
         ensureDirectoryExists(root);
         return root;
     }
@@ -147,12 +154,29 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Illegal character sequence in path");
         }
 
+        String normalized = clientPath.replace('\\', '/');
+
+        // Check git protection early on normalized string
+        checkGitProtectionString(normalized);
+
+        // Check reserved device names in client path
+        checkDeviceNames(normalized);
+
         Path base = getBaseDir();
         Path candidate;
+
+        boolean isWindowsDrive = normalized.matches("^[a-zA-Z]:(/.*)?$");
+        boolean isUnc = normalized.startsWith("//");
+
         try {
-            Path p = Path.of(clientPath);
+            Path p = Path.of(normalized);
             if (p.isAbsolute()) {
                 candidate = p.normalize();
+            } else if (isWindowsDrive || isUnc) {
+                // On Linux/Unix, Windows drive letters (C:/...) are not native absolute paths,
+                // but they represent external root file system traversal attempts.
+                throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
+                        "External absolute drive path outside workspace is strictly forbidden: " + clientPath);
             } else {
                 Path cwdCandidate = p.toAbsolutePath().normalize();
                 if (cwdCandidate.startsWith(base)) {
@@ -164,9 +188,6 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
         } catch (InvalidPathException e) {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Invalid workspace path format: " + e.getMessage());
         }
-
-        // Check reserved device names in client path
-        checkDeviceNames(clientPath);
 
         // Root containment against base directory
         if (!candidate.startsWith(base)) {
@@ -204,10 +225,11 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
         if (relPath.contains("::$DATA")) {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Illegal character sequence in relative path");
         }
-        if (relPath.startsWith("/") || relPath.startsWith("\\") || relPath.contains(":") || Path.of(relPath).isAbsolute()) {
+        String normalized = relPath.replace('\\', '/');
+        if (normalized.startsWith("/") || relPath.contains(":") || Path.of(normalized).isAbsolute() || normalized.matches("^[a-zA-Z]:(/.*)?$")) {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Absolute path or colon not allowed for relativePath: " + relPath);
         }
-        checkDeviceNames(relPath);
+        checkDeviceNames(normalized);
     }
 
     private void checkDeviceNames(String pathStr) {
@@ -219,6 +241,18 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
             if (RESERVED_DEVICE_PATTERN.matcher(trimmed).matches()) {
                 throw new BusinessException(ErrorCode.WORKSPACE_RESERVED_DEVICE_DENIED,
                         "Reserved system device name not allowed: " + trimmed);
+            }
+        }
+    }
+
+    private void checkGitProtectionString(String pathStr) {
+        String normalized = pathStr.replace('\\', '/');
+        String[] parts = normalized.split("/");
+        for (String part : parts) {
+            String trimmed = part.trim().toLowerCase(Locale.ROOT).replaceAll("\\.+$", "");
+            if (trimmed.equals(".git") || trimmed.matches("(?i)git~[0-9]+")) {
+                throw new BusinessException(ErrorCode.WORKSPACE_GIT_ACCESS_DENIED,
+                        "Direct read or modification of .git directory is forbidden");
             }
         }
     }
@@ -238,6 +272,8 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
                         "Direct read or modification of .git directory is forbidden");
             }
         }
+        checkGitProtectionString(candidate.toString());
+        checkGitProtectionString(relative.toString());
     }
 
     private void validateRealPathContainment(Path root, Path candidate) {
