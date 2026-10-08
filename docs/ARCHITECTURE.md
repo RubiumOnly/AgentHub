@@ -28,6 +28,7 @@ flowchart TD
     subgraph API [用户接口适配层 (Controllers)]
         AuthCtrl[AuthController]
         ProjCtrl[ProjectController]
+        ExecCtrl[ExecutionController]
         IMCtrl[IMController]
         WfCtrl[WorkflowAndDiffController]
         AgentCtrl[AgentRegistryController]

@@ -49,6 +49,12 @@
 - `POST /api/auth/login`：用户登录
   - Request: `{"email": "alice@agenthub.com", "password": "Password123!"}`
   - Response: `Result<AuthTokenView>`
+- `POST /api/auth/refresh`：刷新访问令牌并废弃旧令牌
+  - Header: `Authorization: Bearer <token>`
+  - Response: `Result<AuthTokenView>`
+- `POST /api/auth/logout`：退出注销并将当前令牌列入废止名单
+  - Header: `Authorization: Bearer <token>`
+  - Response: `Result<Void>`
 - `GET /api/auth/me`：获取当前登录用户的个人信息
   - Response: `Result<UserView>` (`{"id": "...", "username": "...", "email": "...", "status": "ACTIVE"}`)
 
@@ -76,17 +82,33 @@
 - `POST /api/im/conversations/{id}/messages`：发送消息与触发智能体路由（入参 `SendMessageCommand`）；
 - `GET /api/im/conversations/{id}/stream`：**SSE 实时事件流通道**。
 
-### 5. 工作区版本审计与执行 (Workspace & JGit Diff)
+### 5. 工作流执行引擎与事件回放 (Workflow Execution & Event Replay)
+- `POST /api/executions/runs`：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重）
+  - Request: `{"projectId": "proj-default", "definitionId": "def-default", "idempotencyKey": "idemp-uuid"}`
+  - Response: `Result<WorkflowRunView>`
+- `GET /api/executions/runs/{runId}`：查询指定工作流运行实例详情与执行状态
+  - Response: `Result<WorkflowRunView>`
+- `GET /api/executions/projects/{projectId}/runs`：获取项目下所有运行实例列表
+  - Response: `Result<List<WorkflowRunView>>`
+- `GET /api/executions/runs/{runId}/steps`：获取运行实例的各步骤节点（StepRun）状态与输出摘要
+  - Response: `Result<List<StepRunView>>`
+- `GET /api/executions/runs/{runId}/events`：支持基于 sequence 游标断点续传的事件回放流（`?afterSeq=<number>`）
+  - Response: `Result<List<RunEventView>>`
+- `POST /api/executions/runs/{runId}/events`：向运行实例追加持久化审计事件
+  - Request: `{"eventType": "STEP_COMPLETED", "payload": "..."}`
+  - Response: `Result<RunEventView>`
+
+### 6. 工作区版本审计与执行 (Workspace & JGit Diff)
 - `GET /api/workspace/diff`：基于 Eclipse JGit 计算受控工作区的 Unified Diff 列表（包含文件路径、变更行数统计与完整 diff patch）；
 - `GET /api/workspace/files`：获取受控工作区的文件与目录树结构；
 - `POST /api/workspace/files/save`：在线编辑并保存受控工作区代码；
 - `POST /api/workspace/workflow/execute`：触发 DAG 拓扑工作流引擎按序执行各阶段节点。
 
-### 6. 模版预览与部署清单生成 (Sandbox & Deploy)
+### 7. 模版预览与部署清单生成 (Sandbox & Deploy)
 - `GET /api/sandbox/preview/{id}`：挂载并实时预览 Agent 协同生成的 Web 静态模版页面；
 - `POST /api/sandbox/deploy/{id}`：自动化导出 Nginx Dockerfile 镜像构建配置与部署清单。
 
-### 7. 系统探针 (Health Check)
+### 8. 系统探针 (Health Check)
 - `GET /api/system/health`：获取系统状态、Java 运行时版本、操作系统与应用版本。
 
 ---

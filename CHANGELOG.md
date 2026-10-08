@@ -17,14 +17,20 @@
   - 落地 `V2__seed_system_baseline.sql` 初始系统基线数据；
   - 会话参会人淘汰逗号拼接，重构为 `conversation_participants` 关系表；消息流增加单调递增 `sequence_num` 与 `schema_version = "v1"` 结构定义；
 - **认证鉴权、水平越权防御与链路治理**：
-  - 实现基于 Token 认证体系（支持 HMAC-SHA256 与开发兼容模式）及 BCrypt 强哈希密码校验；
+  - 实现基于 Token 认证体系（包含 HMAC-SHA256 签名、随机 Nonce 防碰撞与登出黑名单机制）及 BCrypt 强哈希密码校验；
+  - 提供完整认证生命周期接口：`register`, `login`, `refresh`, `logout`, `me`；
+  - 彻底剔除未认证请求隐式降级至 `user-1` 的安全旁路漏洞，严格要求所有受控接口携带有效身份令牌；
   - 新增 `ResourceAccessGuard`，实施跨用户/跨租户资源归属强制鉴权（403 `FORBIDDEN`）；
   - 全链路集成 `RequestCorrelationFilter`，自动透传 `X-Request-ID` 与 `X-Correlation-ID`，并在统一响应体 `Result<T>` 中返回 `requestId`；
   - 全局配置 `spring.jpa.open-in-view: false`，规范事务边界；
-- **自动化架构守卫与 51 项防御性测试矩阵**：
-  - 引入 ArchUnit 架构自动化守护 (`ArchUnitArchitectureTest`)，强制约束 Controller 与 Repository 的调用隔离与分层归属；
-  - 新增 Flyway 迁移校验、鉴权与防越权测试、单调递增消息时序验证、执行引擎幂等持久化测试、事务边界隔离测试等 16 项高密度用例；
-  - 后端 51/51 项单元、集成与防御性测试矩阵 100% 绿灯通过；前端 Next.js 14 生产构建通过。
+- **执行引擎 RESTful 控制器与事件回放**：
+  - 新增 `ExecutionController`，对外暴露运行启动（幂等防重）、状态查询、步骤获取与事件断点续传（`afterSeq` 游标）；
+  - 执行引擎全链路校验目标项目的归属权，杜绝跨租户执行注入；
+- **自动化架构守卫与 60 项防御性测试矩阵**：
+  - 引入 ArchUnit 架构自动化守护 (`ArchUnitArchitectureTest`)，强制约束 Controller 与 Repository 的调用隔离、分层归属以及严禁直接泄露 JPA 实体对象；
+  - 修复 `GlobalExceptionHandler` 对领域业务异常 `BusinessException` 的捕获穿透缺陷，统一错误码字典；
+  - 新增 `RestApiSecurityAndMultiTenancyIntegrationTest`，对注册/登录/刷新/注销、无凭证访问拒绝、跨用户 Project/Workspace/IM 会话越权拦截进行真实 MockMvc HTTP 端到端检验；
+  - 后端 60/60 项单元、集成与防御性测试矩阵 100% 绿灯通过；前端 Next.js 14 生产构建通过。
 
 ---
 
