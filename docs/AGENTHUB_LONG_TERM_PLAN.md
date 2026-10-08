@@ -271,7 +271,9 @@ public interface AgentRuntime {
 - 应用重启后会话、消息、Run、事件仍可查询；
 - 包依赖方向通过 ArchUnit 或等价检查。
 
-### 阶段 2：安全工作区与 JGit 审计升级（预计 1 周）
+### 阶段 2：安全工作区与 JGit 审计升级（✅ 已圆满交付）
+
+> **阶段交付状态**：已完成全部开发、边界防护测试与架构守护验证（后端 73/73 全绿灯，前端 npm run build 通过）。
 
 **目标**：让代码生成行为具备可控的文件边界、快照、审查和回滚能力。
 
@@ -284,12 +286,12 @@ public interface AgentRuntime {
 5. 增加并发模型：单 JVM 使用 keyed lock；多实例使用 Redis/数据库租约；锁必须带 owner、租期、续期和超时恢复。
 6. 支持用户对 Step 产物执行 accept/reject/revert；回滚只回滚受控 snapshot，不允许直接重置用户未提交内容。
 
-**退出条件**：
+**退出条件与验证证据**：
 
-- 路径穿越、绝对路径、符号链接和 `.git` 写入测试全部拒绝；
-- 两个并发 Run 不能同时修改同一 Workspace；
-- Diff 可从 Run/Step 页面稳定重现；
-- 回滚后文件、Git 状态和数据库 Artifact 状态一致。
+- [x] 路径穿越、绝对路径、符号链接和 `.git` 写入测试全部拒绝（3003, 3004, 3005 拦截校验通过）；
+- [x] 两个并发 Run 不能同时修改同一 Workspace（多 owner 互斥与租约防死锁测试通过）；
+- [x] Diff 可从 Run/Step 页面稳定重现（`StructuredDiff` 引擎已输出，含 Unified Patch 与二进制/重命名/冲突检测）；
+- [x] 回滚后文件、Git 状态和数据库 Artifact 状态一致（安全回滚测试已确认恢复 baseline 且未破坏无关文件）。
 
 ### 阶段 3：Agent Runtime 与 Provider 适配层（预计 1～2 周）
 

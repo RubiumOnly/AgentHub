@@ -29,8 +29,15 @@
 - `1004` USER_ALREADY_EXISTS：该邮箱已被注册；
 - `2001` PROJECT_NOT_FOUND：目标项目不存在；
 - `3001` WORKSPACE_NOT_FOUND：目标工作区不存在；
-- `3004` DIRECTORY_TRAVERSAL_FORBIDDEN：工作区路径穿越违规；
+- `3002` WORKSPACE_LOCKED：工作区当前已被并发任务或租约锁定；
+- `3003` WORKSPACE_PATH_INVALID：工作区路径格式非法、包含空字节或命中系统保留设备名；
+- `3004` DIRECTORY_TRAVERSAL_FORBIDDEN：工作区路径穿越违规（含符号链接越权）；
 - `3005` GIT_DIRECTORY_MODIFICATION_FORBIDDEN：禁止直接读写 `.git` 内部文件；
+- `3007` WORKSPACE_FILE_TOO_LARGE：文件体积超过单文件上限（10MB 写入 / 2MB 预览）；
+- `3008` WORKSPACE_BINARY_PREVIEW_DENIED：二进制文件无法作为纯文本预览；
+- `3009` WORKSPACE_RESERVED_DEVICE_DENIED：命中了系统保留设备名；
+- `3010` ARTIFACT_NOT_FOUND：目标产物记录不存在；
+- `3011` ARTIFACT_REVIEW_INVALID：非法的产物审查或重复回滚操作；
 - `4001` CONVERSATION_NOT_FOUND：协同会话不存在；
 - `4003` CONVERSATION_PERMISSION_DENIED：非当前会话参与者；
 - `5001` AGENT_NOT_FOUND：智能体定义或实例不存在；
@@ -68,22 +75,34 @@
   - Response: `Result<ProjectView>`
 - `GET /api/projects/{id}/workspaces`：获取项目绑定的受控工作区列表
   - Response: `Result<List<WorkspaceView>>`
-- `GET /api/projects/{id}/workspaces/{workspaceId}/files`：安全提取工作区文件目录树
-  - Response: `Result<WorkspaceFileNode>`
+- `GET /api/projects/{id}/workspace`：获取项目主工作区详情
+  - Response: `Result<WorkspaceView>`
 
-### 3. 智能体注册表与实例 (Agent Registry & Instances)
+### 3. 受控工作区统一文件与租约 API (Controlled Workspace & Lock API)
+- `GET /api/workspaces/{workspaceId}/tree`：递归获取受控工作区文件树（支持相对子目录过滤 `?path=...`，严格忽略 `.git` 内部元数据）；
+- `GET /api/workspaces/{workspaceId}/file?path={relPath}`：读取文件详情（返回 `WorkspaceFileDetailView`，严格限制单文件 2MB 预览上限，提供二进制自动识别）；
+- `POST /api/workspaces/{workspaceId}/file`：写入或更新工作区文件（Body: `{"path":"...","content":"..."}`，严格限制单文件 10MB 写入上限，拦截系统保留设备名与路径穿越）；
+- `POST /api/workspaces/{workspaceId}/file/rename`：安全重命名文件或目录（Body: `{"oldPath":"...","newPath":"..."}`）；
+- `DELETE /api/workspaces/{workspaceId}/file?path={relPath}`：受控删除文件或目录；
+- `GET /api/workspaces/{workspaceId}/diff`：获取结构化 Diff 对象（`Result<StructuredDiff>`，包含变更文件数、增减行数、Unified Diff Patch、冲突与二进制状态）；
+- `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁（Body: `{"ownerId":"...","waitTimeoutMs":3000,"leaseTtlMs":60000}`，支持超时自动回收防死锁）；
+- `POST /api/workspaces/{workspaceId}/lock/renew`：为已持有的工作区租约锁续期（Body: `{"ownerId":"...","additionalTtlMs":60000}`）；
+- `POST /api/workspaces/{workspaceId}/lock/release`：主动释放工作区锁（Body: `{"ownerId":"..."}`）；
+- `GET /api/workspaces/{workspaceId}/lock/status`：查询工作区当前锁定状态与剩余租期。
+
+### 4. 智能体注册表与实例 (Agent Registry & Instances)
 - `GET /api/agents`：查询平台已注册的 Agent 能力定义清单与可用状态；
 - `GET /api/agents/instances`：查询当前可调度的智能体实例列表与运行时配置。
 
-### 4. 即时通讯协同总线 (IM & Collaboration)
+### 5. 即时通讯协同总线 (IM & Collaboration)
 - `GET /api/im/conversations`：获取协同会话列表（返回 `ConversationView`，含参会成员 `participantIds`）；
 - `POST /api/im/conversations`：创建会话（入参 `CreateConversationCommand`：title, type, participantIds）；
 - `GET /api/im/conversations/{id}/messages`：查询历史消息列表（返回 `MessageView`，具备单调递增 `sequenceNum` 与 `schemaVersion: "v1"`）；
 - `POST /api/im/conversations/{id}/messages`：发送消息与触发智能体路由（入参 `SendMessageCommand`）；
 - `GET /api/im/conversations/{id}/stream`：**SSE 实时事件流通道**。
 
-### 5. 工作流执行引擎与事件回放 (Workflow Execution & Event Replay)
-- `POST /api/executions/runs`：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重）
+### 6. 工作流执行引擎与事件回放 (Workflow Execution & Event Replay)
+- `POST /api/executions/runs`：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
   - Request: `{"projectId": "proj-default", "definitionId": "def-default", "idempotencyKey": "idemp-uuid"}`
   - Response: `Result<WorkflowRunView>`
 - `GET /api/executions/runs/{runId}`：查询指定工作流运行实例详情与执行状态
@@ -98,17 +117,25 @@
   - Request: `{"eventType": "STEP_COMPLETED", "payload": "..."}`
   - Response: `Result<RunEventView>`
 
-### 6. 工作区版本审计与执行 (Workspace & JGit Diff)
+### 7. 产物审计、审查与安全回滚 (Artifacts & Safe Rollback)
+- `GET /api/audit/artifacts/run/{runId}`：获取指定 Run 的所有交付物与快照记录；
+- `GET /api/audit/artifacts/{artifactId}`：获取产物详情、快照 commit 哈希与文件 SHA-256 清单；
+- `POST /api/audit/artifacts/{artifactId}/accept`：人工审查通过该 Step 产物（更新审查状态为 `ACCEPTED` 并记录审计事件）；
+- `POST /api/audit/artifacts/{artifactId}/reject`：人工审查拒绝产物（Body: `{"reason":"..."}`，更新审查状态为 `REJECTED`）；
+- `POST /api/audit/artifacts/{artifactId}/revert`：安全非破坏性回滚产物（严格还原目标 Step 所影响的文件至基线 commit，杜绝 `git reset --hard` 硬重置，生成可追踪 Revert Commit 并更新状态为 `REVERTED`）。
+
+### 8. 兼容工作区接口 (Legacy Workspace Endpoints)
 - `GET /api/workspace/diff`：基于 Eclipse JGit 计算受控工作区的 Unified Diff 列表（包含文件路径、变更行数统计与完整 diff patch）；
 - `GET /api/workspace/files`：获取受控工作区的文件与目录树结构；
-- `POST /api/workspace/files/save`：在线编辑并保存受控工作区代码；
+- `GET /api/workspace/file/content`：读取指定工作区文件内容；
+- `POST /api/workspace/file/save`：在线编辑并保存受控工作区代码；
 - `POST /api/workspace/workflow/execute`：触发 DAG 拓扑工作流引擎按序执行各阶段节点。
 
-### 7. 模版预览与部署清单生成 (Sandbox & Deploy)
+### 9. 模版预览与部署清单生成 (Sandbox & Deploy)
 - `GET /api/sandbox/preview/{id}`：挂载并实时预览 Agent 协同生成的 Web 静态模版页面；
 - `POST /api/sandbox/deploy/{id}`：自动化导出 Nginx Dockerfile 镜像构建配置与部署清单。
 
-### 8. 系统探针 (Health Check)
+### 10. 系统探针 (Health Check)
 - `GET /api/system/health`：获取系统状态、Java 运行时版本、操作系统与应用版本。
 
 ---

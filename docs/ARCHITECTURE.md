@@ -28,6 +28,8 @@ flowchart TD
     subgraph API [用户接口适配层 (Controllers)]
         AuthCtrl[AuthController]
         ProjCtrl[ProjectController]
+        WorkspaceCtrl[WorkspaceController]
+        ArtifactCtrl[ArtifactController]
         ExecCtrl[ExecutionController]
         IMCtrl[IMController]
         WfCtrl[WorkflowAndDiffController]
@@ -39,6 +41,7 @@ flowchart TD
     subgraph Application [应用服务层 (Application Services & Ports)]
         AuthApp[AuthApplication]
         ProjApp[ProjectApplication / WorkspaceApplication]
+        ArtifactApp[ArtifactApplication]
         ConvApp[ConversationApplication]
         ExecApp[ExecutionApplication]
         AgentApp[AgentApplication]
@@ -47,18 +50,18 @@ flowchart TD
 
     subgraph Domain [九大领域核心 (Domain Models & Ports)]
         Identity[identity: UserEntity, TokenProvider, PasswordEncoder]
-        Project[project: ProjectEntity, WorkspaceEntity, PathGuard]
+        Project[project: ProjectEntity, WorkspaceEntity, PathGuard, Keyed Lock]
         Agent[agent: AgentDefinition, AgentInstance, Provider]
         Conv[conversation: Conversation, Participant, Message(v1)]
         Orch[orchestration: WorkflowDefinition DSL]
         Exec[execution: WorkflowRun, StepRun, RunEvent, StateMachine]
-        Audit[audit: Artifact, JGit Baseline, Diff Engine]
+        Audit[audit: Artifact, JGit Baseline, Diff Engine, Safe Revert]
         Sandbox[sandbox: Deployment, Preview]
         Shared[shared: Result, RequestContext, ErrorCode, BusinessException]
     end
 
     subgraph Persistence [持久化与基础设施层]
-        Flyway[Flyway Migrations (V1 Schema / V2 Seed)]
+        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3 Audit & Locks)]
         H2MySQL[H2 (MySQL Mode) / MySQL 8.0]
         GitFS[JGit Repository / Controlled Workspaces]
     end
@@ -98,6 +101,7 @@ flowchart TD
 - **`V1__init_schema.sql`**：统一创建 18 张核心业务表，涵盖 `users`, `projects`, `workspaces`, `agent_definitions`, `agent_instances`, `providers`, `teams`, `team_members`, `conversations`, `conversation_participants`, `messages`, `workflow_definitions`, `workflow_runs`, `step_runs`, `run_events`, `artifacts`, `approvals`, `deployments`；
   - 核心索引：`idx_messages_conv_seq(conversation_id, sequence_num)`, `idx_run_events_run_seq(run_id, sequence_num)`, `idx_wf_runs_idemp(idempotency_key)`；
 - **`V2__seed_system_baseline.sql`**：注入系统初始安全基线数据（系统用户、默认项目、默认工作区、四大核心智能体定义：Orchestrator、BackendArchitect、FrontendEngineer、QAAuditor）；
+- **`V3__phase2_workspace_audit_artifacts.sql`**：新增产物人工审查状态字段（`review_status`, `reviewed_by`, `reviewed_at`, `review_comment`）以及工作区多实例租约锁持久表 `workspace_locks`；
 - **兼容性验证**：Schema DDL 经专门设计，100% 兼容 H2 (MySQL Mode) 本地快速回归测试与生产 MySQL 8.0 严苛验证；
 - **事务与查询边界**：生产与测试配置全面启用 `spring.jpa.open-in-view: false`，杜绝因延迟加载穿透导致的隐藏 N+1 查询与事务悬挂问题。
 
@@ -117,5 +121,40 @@ flowchart TD
 - 控制器不得越权直接注入或调用 JPA Repository 仓储；
 - 控制器必须收敛于 `adapter.web` 或 `*.api` 包路径下；
 - 应用服务必须收敛于 `*.application` 包路径下；
-- 51 项单元、领域逻辑与边界防御测试（含 `FlywayMigrationAndSchemaTest`、`AuthenticationAndResourceGuardTest`、`OpenInViewTransactionBoundaryTest` 等）在构建阶段全量绿灯执行。
+- 控制器严禁直接泄露 JPA 实体对象；
+- 73 项单元、领域逻辑与边界防御测试矩阵全量绿灯执行。
+
+---
+
+## 五、 受控工作区、JGit 审计与并发租约治理 (Phase 2 升级)
+
+### 1. 受控工作区路径沙箱解析 (`DefaultWorkspaceResolver`)
+- **受控身份体系**：核心文件访问严格基于 `workspaceId + relativePath`，彻底淘汰前端客户端传入绝对路径的越权风险；
+- **深层路径防御矩阵**：
+  - `Path.normalize()`、`toRealPath()` 与多级父目录 Containment 检验；
+  - 符号链接越权检测：禁止通过符号链接跳转至工作区外部目录，违规操作立即抛出 `3004 WORKSPACE_TRAVERSAL_DENIED`；
+  - 设备文件拒绝：严格匹配并拦截 Windows 保留设备名称（`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9` 及其变种文件扩展名）；
+  - `.git` 内部篡改拦截：大小写无关（`.GIT`, `.Git`）与尾随点变种防护；
+- **受控文件操作与配额保护**：
+  - 单文件写入上限硬约束为 10MB；
+  - 文本预览上限硬约束为 2MB，超出部分提供截断保护；
+  - 二进制文件探测机制（基于扩展名与首 4KB 空字节分析），杜绝乱码污染。
+
+### 2. 原生 JGit 审计引擎与结构化 Diff (`JGitWorkspaceManager`)
+- **Run 基线建立**：每次 WorkflowRun 启动时自动初始化工作区 Git 仓库，建立 `Baseline commit for Run <runId>` 并打上专属基线 Tag；
+- **Step 快照与 SHA-256 校验和**：节点产出物通过 `createStepSnapshot` 自动归档，记录变更文件清单、commit 哈希与 SHA-256 指纹；
+- **结构化 Diff 引擎**：向前端输出 `StructuredDiff`，精准提供文件变更类型（ADD, MODIFY, DELETE, RENAME, COPY）、增减行数、Unified Patch、二进制标识、重命名得分与冲突检测（`hasConflict`）。
+
+### 3. 工作区并发 Keyed Lock 与租约模型 (`WorkspaceLockManager`)
+- **锁身份与租期机制**：每个锁必须绑定工作区规范化 Key、执行主体的 `ownerId` 以及租约有效期（`leaseTtlMs`）；
+- **防死锁自动回收机制**：若原持有者进程异常崩溃或未能正常释放，超过租约 TTL 后，新请求到达时将自动触发死锁回收（Deadlock Auto-Recovery），保障工作区不会被永久锁死；
+- **自动续期与释放保护**：支持长程任务执行中通过 `renewLease` 延长锁租期，并严格校验仅持有者本人方可执行解锁操作。
+
+### 4. 产物审查与安全非破坏性回滚 (`ArtifactApplicationService`)
+- **三态审查流程**：支持对 Step 快照产物执行 `accept`、`reject` 与 `revert`，审查记录与决策意见全量归档；
+- **受控安全回滚**：
+  - 坚决杜绝直接执行破坏性的 `git reset --hard`；
+  - 回滚时利用 JGit 仅提取目标 Step 影响的文件还原至基线版本，新创建的文件安全删除，未受影响的文件完整保留；
+  - 自动生成明确的 `[Revert]` Commit，确保 Git 历史记录、工作区代码与数据库 Artifact 审查状态高度一致。
+
 

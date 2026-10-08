@@ -4,6 +4,38 @@
 
 ---
 
+## [v1.2.0] - 2026-10-08
+
+### 🌟 阶段 2：安全工作区与 JGit 审计升级 (Phase 2 Deliverables)
+- **深化受控工作区管理与多维沙箱防御**：
+  - `WorkspaceResolver` 升级为基于 `workspaceId` + `relativePath` 受控解析，自动绑定数据库工作区或受控根目录；
+  - 完善 `Path.normalize()`、`toRealPath()`、符号链接越权检测与根目录 Containment 校验；
+  - 严格拦截设备文件（Windows 保留字 `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9` 及其变种拓展名）；
+  - 严格拦截 `.git` 内部篡改、大小写变种（`.GIT`, `.Git`）与尾随点（`.git.`）；
+- **统一受控工作区文件操作 API**：
+  - 暴露标准 RESTful 控制器 `WorkspaceController`（`/api/workspaces/{workspaceId}/tree`, `/file`, `/file/rename`, `/file`, `/diff`, `/lock/*`）；
+  - 建立单文件 10MB 写入上限防御与 2MB 预览上限限制；
+  - 增加二进制文件检测引擎（扩展名 + 首 4KB 空字节探测），禁止直接返回乱码，提供安全截断与结构化视图；
+- **JGit 审计与快照治理**：
+  - 每次 Workflow Run 启动时自动建立 JGit 基线 commit（`Baseline commit for Run <runId>`）并打上基线 Tag；
+  - 每个重要 Step 完成时自动创建快照 commit（`[StepSnapshot]`）与 Tag，精确统计变更文件清单并计算 SHA-256 校验和落库；
+- **结构化 Diff 输出引擎**：
+  - JGit 模块输出结构化 Diff 对象（`StructuredDiff` 与升级版 `FileDiffEntry`），涵盖文件变更类型（ADD/MODIFY/DELETE/RENAME/COPY）、增减行数、标准 Unified Diff patch、是否二进制、是否重命名、冲突标记（`hasConflict`）及审查状态；
+- **工作区并发与租约治理 (Keyed Lock)**：
+  - 升级 `WorkspaceLockManager` 支持多 Owner 身份识别与租约超时（Lease TTL）模型；
+  - 实现基于 TTL 的租约续期机制与超时防死锁自动回收（Deadlock Auto-Recovery）；
+  - 保持与单 JVM 线程重入的 100% 向后兼容；
+- **产物审查与安全非破坏性回滚**：
+  - 实现 `ArtifactApplication` 与 `ArtifactController`，支持对 Step 产物执行 `accept`、`reject`、`revert`；
+  - 回滚必须严格限定在受控 snapshot 基线内，禁止硬重置工作区（杜绝 `git reset --hard` 清空用户未提交工作的风险），仅将目标 Step 影响的文件还原至基线并产生审计 Revert Commit；
+- **Flyway 数据库演进**：
+  - 落地 `V3__phase2_workspace_audit_artifacts.sql`，为 `artifacts` 表补充 `review_status`, `reviewed_by`, `reviewed_at`, `review_comment` 审查字段与分布式锁租约表 `workspace_locks`；
+- **全绿灯测试矩阵**：
+  - 新增 `WorkspaceSecurityAndJGitAuditIntegrationTest` 13 项边界防御测试用例；
+  - 后端 73/73 项单元、架构守卫与集成测试 100% 绿灯通过；前端 Next.js 14 生产构建 100% 绿灯。
+
+---
+
 ## [v1.1.0] - 2026-10-08
 
 ### 🌟 阶段 1：领域重构与持久化地基 (Phase 1 Deliverables)
