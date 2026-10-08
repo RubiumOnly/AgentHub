@@ -24,11 +24,11 @@ class FlywayMigrationAndSchemaTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("测试 Flyway 迁移成功执行且包含初始架构、种子基线与 Phase 5 Provider 路由架构演进脚本")
+    @DisplayName("测试 Flyway 迁移成功执行且包含初始架构、种子基线与 Phase 6 多 Agent 团队与消息总线架构演进脚本")
     void shouldSuccessfullyApplyFlywayMigrations() {
         MigrationInfo[] applied = flyway.info().applied();
         assertThat(applied).isNotEmpty();
-        assertThat(applied.length).isGreaterThanOrEqualTo(6);
+        assertThat(applied.length).isGreaterThanOrEqualTo(7);
 
         assertThat(applied[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(applied[0].getDescription()).contains("init schema");
@@ -41,6 +41,9 @@ class FlywayMigrationAndSchemaTest {
 
         assertThat(applied[5].getVersion().getVersion()).isEqualTo("6");
         assertThat(applied[5].getDescription()).contains("agent providers and routing");
+
+        assertThat(applied[6].getVersion().getVersion()).isEqualTo("7");
+        assertThat(applied[6].getDescription()).contains("multi agent teams and message bus");
     }
 
     @Test
@@ -95,5 +98,11 @@ class FlywayMigrationAndSchemaTest {
 
         Integer workspaceCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM workspaces WHERE id = 'ws-default'", Integer.class);
         assertThat(workspaceCount).isEqualTo(1);
+
+        Integer teamCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM teams WHERE id = 'team-dev-swarm'", Integer.class);
+        assertThat(teamCount).isEqualTo(1);
+
+        Integer memberCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM team_members WHERE team_id = 'team-dev-swarm'", Integer.class);
+        assertThat(memberCount).isEqualTo(4);
     }
 }

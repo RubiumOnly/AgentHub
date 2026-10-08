@@ -36,10 +36,16 @@ public enum ErrorCode {
     ARTIFACT_NOT_FOUND(3010, "Artifact not found"),
     ARTIFACT_REVIEW_INVALID(3011, "Invalid artifact review operation or status"),
 
-    // Conversation & IM
+    // Conversation, Team & Message Bus
     CONVERSATION_NOT_FOUND(4001, "Conversation not found"),
     CONVERSATION_ACCESS_DENIED(4003, "Access to conversation denied"),
     MESSAGE_NOT_FOUND(4004, "Message not found"),
+    TEAM_NOT_FOUND(4005, "Team not found"),
+    TEAM_MEMBER_NOT_FOUND(4006, "Team member not found"),
+    LOOP_DETECTED(4007, "Message loop or ping-pong oscillation detected"),
+    MAX_TURNS_EXCEEDED(4008, "Maximum conversation turns exceeded"),
+    MESSAGE_SEQUENCE_CONFLICT(4009, "Message sequence conflict"),
+    MESSAGE_RECIPIENT_NOT_FOUND(4010, "Message recipient not found"),
 
     // Agent & Provider
     AGENT_NOT_FOUND(5001, "Agent Not Found"),

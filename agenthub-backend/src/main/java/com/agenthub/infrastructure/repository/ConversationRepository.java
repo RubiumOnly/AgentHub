@@ -11,4 +11,5 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
     List<ConversationEntity> findAllByOrderByUpdatedAtDesc();
     List<ConversationEntity> findByOwnerIdOrderByUpdatedAtDesc(String ownerId);
     List<ConversationEntity> findByProjectIdOrderByUpdatedAtDesc(String projectId);
+    List<ConversationEntity> findByTeamIdOrderByUpdatedAtDesc(String teamId);
 }

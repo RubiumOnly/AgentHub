@@ -17,7 +17,17 @@ public enum ErrorCode {
     PROVIDER_RATE_LIMIT(1007, "LLM Provider Rate Limit Exceeded (429)"),
     PROVIDER_AUTHENTICATION_FAILED(1008, "LLM Provider Authentication Failed"),
     NO_AVAILABLE_PROVIDER(1009, "No Available Provider Satisfying Routing Constraints"),
-    
+    // Conversation, Team & Message Bus
+    CONVERSATION_NOT_FOUND(4001, "Conversation not found"),
+    CONVERSATION_ACCESS_DENIED(4003, "Access to conversation denied"),
+    MESSAGE_NOT_FOUND(4004, "Message not found"),
+    TEAM_NOT_FOUND(4005, "Team not found"),
+    TEAM_MEMBER_NOT_FOUND(4006, "Team member not found"),
+    LOOP_DETECTED(4007, "Message loop or ping-pong oscillation detected"),
+    MAX_TURNS_EXCEEDED(4008, "Maximum conversation turns exceeded"),
+    MESSAGE_SEQUENCE_CONFLICT(4009, "Message sequence conflict"),
+    MESSAGE_RECIPIENT_NOT_FOUND(4010, "Message recipient not found"),
+
     // Workflow Specific Codes
     WORKFLOW_INVALID(2001, "Workflow Definition Invalid or Cyclic"),
     WORKFLOW_EXECUTION_FAILED(2002, "Workflow Execution Failed"),

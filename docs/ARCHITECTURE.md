@@ -48,11 +48,12 @@ flowchart TD
         SandboxApp[SandboxApplication]
     end
 
-    subgraph Domain [九大领域核心 (Domain Models & Ports)]
+    subgraph Domain [十大领域核心 (Domain Models & Ports)]
         Identity[identity: UserEntity, TokenProvider, PasswordEncoder]
         Project[project: ProjectEntity, WorkspaceEntity, PathGuard, Keyed Lock]
         Agent[agent: AgentDefinition, AgentInstance, Provider]
-        Conv[conversation: Conversation, Participant, Message(v1)]
+        Team[team: TeamEntity, TeamMemberEntity, Topology Strategies]
+        Conv[conversation: Conversation, MessageBus, Monotonic Seq, Loop Detector]
         Orch[orchestration: WorkflowDefinition DSL]
         Exec[execution: WorkflowRun, StepRun, RunEvent, StateMachine]
         Audit[audit: Artifact, JGit Baseline, Diff Engine, Safe Revert]
@@ -61,7 +62,7 @@ flowchart TD
     end
 
     subgraph Persistence [持久化与基础设施层]
-        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3 Audit & Locks)]
+        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3-V7 Evolutions)]
         H2MySQL[H2 (MySQL Mode) / MySQL 8.0]
         GitFS[JGit Repository / Controlled Workspaces]
     end
@@ -73,12 +74,13 @@ flowchart TD
     Domain --> Persistence
 ```
 
-### 1. 九大核心领域模块分布 (`com.agenthub.*`)
+### 1. 十大核心领域模块分布 (`com.agenthub.*`)
 
 - **`identity`**：用户登录、注册、密码哈希（BCrypt）、Token 鉴权（HMAC-SHA256 与开发兼容模式）、跨租户资源归属校验（`ResourceAccessGuard`）；
 - **`project`**：项目边界（`ProjectEntity`）、受控代码工作区（`WorkspaceEntity`）、受控路径解析与目录树安全提取；
 - **`agent`**：智能体平台能力定义（`AgentDefinition`）、实例配置（`AgentInstance`）、模型提供商（`Provider`）；
-- **`conversation`**：即时通讯会话（`ConversationEntity`）、参会关系表（`ConversationParticipantEntity`，彻底淘汰逗号分割字符串）、版本化与单调递增序号的消息流（`MessageEntity`，支持 `schema_version = "v1"` 与 `sequence_num`）；
+- **`team`**：多智能体团队拓扑协作（`TeamEntity`、`TeamMemberEntity`），支持层级管理 (`HIERARCHICAL`)、对等协作 (`PEER_TO_PEER`) 与轮询流水线 (`ROUND_ROBIN`)，提供细粒度角色分工与委派控制；
+- **`conversation`**：即时通讯与消息总线（`ConversationEntity`、`ConversationParticipantEntity`、`MessageEntity`），具备细粒度严格单调递增序号（`sequence_num`）、点对点/广播/系统路由与可见性隔离、三层防循环震荡检测及上下文预算滑动压缩治理；
 - **`orchestration`**：任务编排引擎、版本化工作流 DSL 定义（`WorkflowDefinitionEntity`）；
 - **`execution`**：执行实例状态机（`WorkflowRunEntity`，支持幂等键防重）、节点执行（`StepRunEntity`）、可审计与可重放运行时事件（`RunEventEntity`，支持按序号游标拉取）；
 - **`audit`**：版本审计基线、JGit 原生 Diff 增删行统计器、交付物实体（`ArtifactEntity`）；
@@ -104,6 +106,8 @@ flowchart TD
 - **`V3__phase2_workspace_audit_artifacts.sql`**：新增产物人工审查状态字段（`review_status`, `reviewed_by`, `reviewed_at`, `review_comment`）以及工作区多实例租约锁持久表 `workspace_locks`；
 - **`V4__phase3_execution_kernel_and_state_machine.sql`**：扩展 `workflow_runs` 取消原因、时间戳，扩展 `step_runs` 开始/结束时间、耗时字段与链路追踪关联；
 - **`V5__phase4_workflow_dag_and_orchestration.sql`**：扩展 `workflow_definitions` (name, description, updated_at), `workflow_runs` (context_data_json), `step_runs` (inputs_json, outputs_json, requires_approval) 及 `approvals` 索引演进；
+- **`V6__phase5_agent_providers_and_routing.sql`**：扩展 `providers`（priority, weight, capabilities, cost_per_million_input, cost_per_million_output, circuit_status, avg_latency_ms）与 `agent_definitions` 表，新增 `token_usages` 审计表与多维高效查询复合索引；
+- **`V7__phase6_multi_agent_teams_and_message_bus.sql`**：扩展 `teams` 表（topology, leader_agent_id, max_turns, config_json, status），扩展 `team_members` 表（role_type, responsibilities, system_prompt_override, can_delegate），扩展 `conversations` 表（team_id, last_sequence_num, summary, token_count, status），扩展 `messages` 表（recipient_id, message_type, protocol_type, token_count, in_reply_to_id），新增 `idx_messages_recipient`, `idx_messages_type_proto`, `idx_team_members_role`, `idx_conversations_team` 复合索引，并预置 `team-dev-swarm` 经典开发团队种子基线数据；
 - **兼容性验证**：Schema DDL 经专门设计，100% 兼容 H2 (MySQL Mode) 本地快速回归测试与生产 MySQL 8.0 严苛验证；
 - **事务与查询边界**：生产与测试配置全面启用 `spring.jpa.open-in-view: false`，杜绝因延迟加载穿透导致的隐藏 N+1 查询与事务悬挂问题。
 
@@ -295,3 +299,59 @@ flowchart TD
 - **`token_usages` 数据库审计与平台汇总**：
   - 单次 LLM 调用持久化至 `token_usages` 审计表，包含模型、Token 计数、测量延迟与折算美元成本；
   - 提供 `GET /api/token-usages/summary` 与 `/api/token-usages/runs/{runId}` 实时查询端点。
+
+---
+
+## 九、 多智能体协同网络、消息总线与上下文治理体系 (Phase 6 升级)
+
+### 1. 多智能体团队协同拓扑与角色编排 (`TeamTopologyStrategy` & `TeamApplicationService`)
+- **三大核心团队协作拓扑**：
+  - **`HIERARCHICAL` (层级主从拓扑)**：由 Leader 智能体统一收口用户目标并派发子任务，非 Leader 成员产出默认汇报回传 Leader，防止无组织发散；
+  - **`PEER_TO_PEER` (对等去中心拓扑)**：团队成员平级协作，支持自主点对点协作及基于 @Mention 自由触发，无单一瓶颈；
+  - **`ROUND_ROBIN` (轮询流水线拓扑)**：智能体严格按照职责链路（如 Architect -> Coder -> Reviewer -> Tester）环形流转，保障软件交付生命周期标准化推进；
+- **细粒度角色分工与委派权限 (`TeamRole`)**：
+  - 标准化抽象 `ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`, `CUSTOM` 等角色；
+  - 支持成员级 `system_prompt_override`（动态覆盖专家提示词）与 `can_delegate` 权限控制（限制仅特定角色可发起委托或调用下游）。
+
+### 2. 会话消息总线与严格单调递增序号 (`ConversationSequenceManager`)
+- **细粒度无碰撞序号保证**：
+  - 彻底淘汰客户端或自增键随意并发赋值，采用基于 `conversationId` 锁池的细粒度重入锁 (`ReentrantLock`) 与数据库持久基线强一致结合；
+  - 严格保障同一会话内所有消息的 `sequence_num` 100% 连续且严格单调递增（1, 2, 3...），从物理层面根除并发写入时的时序颠倒与消息覆盖；
+  - 支持高并发压测下的并发消息原子分配与自动事务落库。
+
+### 3. 消息路由策略与可见性隔离机制 (`MessageVisibilityFilter`)
+- **多元消息路由类型 (`MessageType`)**：
+  - **`BROADCAST`**：全员广播消息，会话内所有成员（用户及参与智能体）均可见；
+  - **`DIRECT`**：点对点私聊消息，由发送方直接定向推送至 `recipient_id`，天然隔离旁路噪音；
+  - **`SYSTEM`**：系统/通知级事件消息，用于声明会话状态变更、拓扑流转或门禁告警；
+- **智能可见性过滤矩阵 (`MessageVisibilityFilter`)**：
+  - 严格防御私聊泄露：非接收方且非发送方的第三方智能体查询消息流时，自动过滤 P2P 私聊；
+  - 发送者自身、目标接收方及管理员具有完整可追溯审计视野。
+
+### 4. 跨智能体协议与三层死循环熔断检测 (`LoopDetector`)
+- **标准化交互协议 (`MessageProtocolType`)**：
+  - **`REQUEST_REPLY`**：标准请求-响应协作，通过 `in_reply_to_id` 显式关联上下文；
+  - **`HANDOFF`**：工作交接协议，实现跨角色控制权让渡；
+  - **`SUMMARIZE`**：总结汇报协议，将阶段性结论上报；
+- **三层递进式防死循环与震荡熔断防御矩阵**：
+  - **第 1 层：最大轮次阈值截断 (`maxTurns`)**：根据团队配置 `maxTurns`（默认 20 轮），达到上限立即阻断流转并抛出 `4008 CONVERSATION_MAX_TURNS_EXCEEDED`；
+  - **第 2 层：高频内容哈希碰撞检测 (`Duplicate Content Collision`)**：对连续发言内容提取规范化哈希指纹，检测到连续重复复读即刻触发循环警报；
+  - **第 3 层：短周期 Ping-Pong 震荡检测 (`Short-cycle Oscillation`)**：实时检测 A -> B -> A -> B 交互序列，识别无意义往返乒乓对射，及时熔断死循环消耗。
+
+### 5. 智能上下文窗口治理与滑动压缩 (`ContextWindowGovernance`)
+- **动态滑动窗口修剪 (`SlidingWindowContextTrimmer`)**：
+  - 优先保护系统核心指令（首条系统提示词）与最近 N 条交互高保真上下文；
+  - 对历史中间消息执行滑动修剪，输出裁剪统计（`trimmedCount`, `retainedCount`）；
+- **Token 预算受限压缩 (`TokenBudgetContextManager`)**：
+  - 支持基于最大 Token 预算（`maxBudgetTokens`）严格截断，避免超出大模型上下文硬限制导致调用崩溃；
+- **滚动摘要合成引擎 (`RollingSummaryService`)**：
+  - 当会话消息超出压缩阈值时，自动提取老旧消息合成为连贯摘要（Summary），持久化于 `conversations.summary`；
+  - 下游 Prompt 自动注入 `[Previous Conversation Summary]` + 滑动窗口最新活跃消息，在保留长期记忆的同时节约 70%+ 上下文 Token 成本。
+
+### 6. 会话实时 SSE 事件总线与断点补发 (`ConversationEventBroadcaster`)
+- **全生命周期会话事件广播**：
+  - 统一推送 `MESSAGE_CREATED`, `MEMBER_JOINED`, `MEMBER_LEFT`, `LOOP_DETECTED`, `CONTEXT_TRIMMED`, `STATUS_CHANGED`, `HEARTBEAT` 等领域事件；
+- **基于 Last-Event-ID 的断点续传**：
+  - 客户端携带 `Last-Event-ID` 头部或参数重连时，系统基于 `sequence_num` 游标自动从数据库补齐重连期间缺失的所有历史消息事件后再平滑接入实时流；
+  - 内置保活心跳（Heartbeat），杜绝网关空闲断联。
+

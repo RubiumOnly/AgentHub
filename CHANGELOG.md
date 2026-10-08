@@ -4,6 +4,52 @@
 
 ---
 
+## [v1.6.0] - 2026-10-08
+
+### 🌟 阶段 6：多智能体协同网络、消息总线与对话系统 (Phase 6 Deliverables)
+- **多智能体团队协同拓扑与角色编排 (`com.agenthub.team`)**：
+  - 标准化落地团队协同拓扑策略接口 `TeamTopologyStrategy` 及工厂 `TeamTopologyStrategyFactory`；
+  - 落地三大核心协作模式：
+    - `HIERARCHICAL`：层级主从拓扑，Leader 智能体集中接收目标、拆解并下发任务，下级成员自动回传汇报，防无序发散；
+    - `PEER_TO_PEER`：对等去中心拓扑，全员平等协作，支持基于 @Mention 自主点对点交互；
+    - `ROUND_ROBIN`：轮询流水线拓扑，严格按角色链（Architect -> Coder -> Reviewer -> Tester）环形流转；
+  - 领域模型支持标准化团队角色 `TeamRole`（`ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`），支持成员级提示词覆盖 `system_prompt_override` 与委派权限 `can_delegate`；
+  - 暴露团队与成员管理及拓扑推演 REST API：`TeamController` (`/api/teams`)；
+- **会话消息总线与严格单调递增序号 (`ConversationSequenceManager`)**：
+  - 基于会话 ID 锁池设计细粒度重入锁 (`ReentrantLock`) 并结合数据库原子增量同步；
+  - 彻底杜绝并发写入时的序号冲突与消息乱序，确保同一会话内 `sequence_num` 100% 严格单调连续递增（1, 2, 3...）；
+  - 保障高并发压测下消息时序的绝对一致性与事件时间线确定性；
+- **消息路由策略与可见性隔离机制 (`MessageVisibilityFilter`)**：
+  - 标准化支持三大消息路由类型：`BROADCAST`（全员广播）、`DIRECT`（定向私聊）、`SYSTEM`（系统事件声明）；
+  - 落地智能可见性过滤器：第三方 Agent 无法窃视点对点私聊消息，同时保留发起者自身、接收目标与平台管理者的全局审计可见性；
+- **跨智能体协作协议与三层死循环熔断治理 (`LoopDetector`)**：
+  - 规范化跨智能体交互协议 `MessageProtocolType`（`REQUEST_REPLY`, `HANDOFF`, `SUMMARIZE`），通过 `in_reply_to_id` 构建结构化对话依赖树；
+  - 建立三层递进防御熔断矩阵：
+    - 第 1 层：最大轮次硬阈值截断（超出 `maxTurns` 抛出 `4008 CONVERSATION_MAX_TURNS_EXCEEDED`）；
+    - 第 2 层：内容哈希指纹碰撞检测（防复读死循环）；
+    - 第 3 层：短周期 Ping-Pong 震荡检测（防 A-B 往复无效震荡）；
+- **智能上下文窗口治理与滑动压缩 (`ContextWindowGovernance`)**：
+  - `SlidingWindowContextTrimmer`：优先锚定保留系统初始提示词与最近 N 条交互高保真上下文，滑动修剪中间历史；
+  - `TokenBudgetContextManager`：基于最大 Token 预算（`maxBudgetTokens`）严格限制上下文膨胀；
+  - `RollingSummaryService`：消息超阈值时自动生成连贯滚动摘要（Summary）持久化落库（`conversations.summary`），在下游 Prompt 中注入 `[Previous Conversation Summary]`，节省 70%+ 上下文开销；
+- **实时 SSE 事件总线与断点续传重放 (`ConversationEventBroadcaster`)**：
+  - 全生命周期推送领域事件（`MESSAGE_CREATED`, `MEMBER_JOINED`, `MEMBER_LEFT`, `LOOP_DETECTED`, `CONTEXT_TRIMMED`, `STATUS_CHANGED`, `HEARTBEAT`）；
+  - 客户端通过 `Last-Event-ID` 头部或 query 参数断点重连时，系统基于 `sequence_num` 自动从数据库补齐历史事件后再平滑接入实时广播；
+  - 内置 20 秒周期性心跳机制防网关断联；
+- **Flyway 数据库版本演进 (`V7__phase6_multi_agent_teams_and_message_bus.sql`)**：
+  - 扩展 `teams` 表（topology, leader_agent_id, max_turns, config_json, status）；
+  - 扩展 `team_members` 表（role_type, responsibilities, system_prompt_override, can_delegate）；
+  - 扩展 `conversations` 表（team_id, last_sequence_num, summary, token_count, status）；
+  - 扩展 `messages` 表（recipient_id, message_type, protocol_type, token_count, in_reply_to_id）；
+  - 新增复合索引 `idx_messages_recipient`, `idx_messages_type_proto`, `idx_team_members_role`, `idx_conversations_team`，并预置 `team-dev-swarm` 经典开发团队种子基线数据；
+- **全绿灯防御测试矩阵与架构守护**：
+  - 新增 7 大测试套件：`TeamTopologyAndCoordinationTest`、`ConversationMonotonicSequenceAndConcurrencyTest`、`MessageRoutingAndVisibilityIsolationTest`、`CrossAgentProtocolAndLoopDetectionTest`、`ContextWindowAndRollingSummaryTest`、`ConversationSseStreamAndReconnectionTest` 与 `TeamAndConversationControllerIntegrationTest`；
+  - 更新 `FlywayMigrationAndSchemaTest`，验证 V7 迁移后 19 张核心领域表；
+  - 加固 Controller 安全鉴权与水平越权防御，更新 `ErrorCode` 规范定义 `4005-4010`；
+  - 后端 183/183 项测试 100% 绿灯全通；前端 Next.js 14 生产构建 100% 成功。
+
+---
+
 ## [v1.5.0] - 2026-10-08
 
 ### 🌟 阶段 5：Agent 统一接入层、多 Provider 与动态路由 (Phase 5 Deliverables)

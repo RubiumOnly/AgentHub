@@ -40,6 +40,13 @@
 - `3011` ARTIFACT_REVIEW_INVALID：非法的产物审查或重复回滚操作；
 - `4001` CONVERSATION_NOT_FOUND：协同会话不存在；
 - `4003` CONVERSATION_PERMISSION_DENIED：非当前会话参与者；
+- `4004` MESSAGE_NOT_FOUND：指定消息记录不存在；
+- `4005` TEAM_NOT_FOUND：协同团队不存在；
+- `4006` TEAM_MEMBER_NOT_FOUND：团队成员不存在；
+- `4007` LOOP_DETECTED：检测到死循环或短周期振荡碰撞，已触发熔断保护；
+- `4008` MAX_TURNS_EXCEEDED：达到最大协作轮次阈值；
+- `4009` MESSAGE_SEQUENCE_CONFLICT：消息定序版本冲突；
+- `4010` MESSAGE_RECIPIENT_NOT_FOUND：点对点私聊目标接收者不存在；
 - `5001` AGENT_NOT_FOUND：智能体定义或实例不存在；
 - `5005` PROVIDER_NOT_FOUND：大模型或 CLI 提供商不存在；
 - `5006` PROVIDER_UNAVAILABLE：提供商不可用或当前处于熔断状态；
@@ -168,16 +175,38 @@
 - `GET /api/token-usages/steps/{stepRunId}`：按 StepRun 节点查询单次调用审计明细；
 - `GET /api/token-usages/summary`：获取平台全局累计 Token 消耗（Prompt、Completion、Total）与总美元成本计量汇总。
 
+### 13. 多智能体团队与协同拓扑 (Multi-Agent Teams & Coordination Topologies)
+- `POST /api/teams`：创建多智能体协同团队（支持 `HIERARCHICAL` 主从层级、`PEER_TO_PEER` 对等协商、`ROUND_ROBIN` 轮询轮转拓扑，指定 leaderAgentId 与 maxTurns 阈值）；
+- `GET /api/teams`：获取项目或全局团队列表（支持 `?projectId=...` 过滤）；
+- `GET /api/teams/{id}`：获取团队详情（包含所有 TeamMember 成员角色、职责范围与系统提示词覆盖）；
+- `POST /api/teams/{id}/members`：向团队动态新增成员；
+- `DELETE /api/teams/{id}/members/{memberId}`：从团队中移除成员；
+- `POST /api/teams/{id}/coordinate`：依据当前团队拓扑策略（Hierarchical / P2P / Round-Robin）推演下一协作发言人决策（返回 `NextSpeakerDecision`: CONTINUE, HANDOFF, SUMMARIZE, TERMINATE）。
+
+### 14. 对话消息总线与上下文治理 (Conversation Message Bus & Context Governance)
+- `POST /api/im/conversations` 与 `POST /api/conversations`：创建协同会话（支持绑定 `teamId`、单聊/群聊 `type` 与参与者）；
+- `GET /api/im/conversations` 与 `GET /api/conversations`：获取会话列表（按最近更新排序）；
+- `GET /api/im/conversations/{id}` 与 `GET /api/conversations/{id}`：获取会话详情（包含滚动历史摘要与累计 Token 消耗）；
+- `GET /api/im/conversations/{id}/messages` 与 `GET /api/conversations/{id}/messages`：查询会话消息历史（支持游标增量查询 `?sinceSeq=...` 与私信隔离过滤 `?viewerId=...`）；
+- `POST /api/im/conversations/{id}/messages` 与 `POST /api/conversations/{id}/messages`：发送消息（支持 `messageType: BROADCAST / DIRECT / SYSTEM`、`protocolType: NORMAL / REQUEST_REPLY / HANDOFF / SUMMARIZE` 与严格单调递增 `sequence_num`，内置死循环检测拦截）；
+- `GET /api/im/conversations/{id}/context` 与 `GET /api/conversations/{id}/context`：获取经过滑动窗口 (`windowSize`) 与 Token 预算控制 (`maxTokens`) 裁剪后的上下文窗口 `ContextWindowView`；
+- `POST /api/im/conversations/{id}/summarize` 与 `POST /api/conversations/{id}/summarize`：手动或自动触发滚动历史摘要浓缩，将老消息压缩为紧凑前情要点；
+- `POST /api/im/conversations/{id}/coordinate` 与 `POST /api/conversations/{id}/coordinate`：驱动团队拓扑执行下一协作轮次。
+
 ---
 
 ## 三、 SSE 事件类型定义
 
-### 1. IM 协同会话流 (`/api/im/conversations/{id}/stream`)
+### 1. IM 协同会话流 (`/api/im/conversations/{id}/stream` 或 `/api/conversations/{id}/stream` / `/events`)
+支持 `Last-Event-ID` 请求头或 `?sinceSeq=...` 参数进行断点续传历史补发：
 | 事件名称 | 数据载荷格式 | 场景说明 |
 | :--- | :--- | :--- |
 | `connected` | `{"conversationId": "...", "status": "ready"}` | 客户端握手建立连接时发送 |
-| `message` | `MessageView` 完整 JSON 结构（包含 `sequenceNum` 与 `schemaVersion`） | 收到新消息、Orchestrator 交互卡片或阶段完成通知 |
+| `message` | `MessageView` 完整 JSON 结构（包含 `sequenceNum`, `messageType`, `protocolType`） | 收到新消息、Orchestrator 交互卡片或系统通知 |
 | `message_delta` | `{"sender": "BackendArchitect", "delta": "..."}` | 智能体实时打字机流式 Token 增量 |
+| `handoff` | `{"fromAgent":"...","toAgent":"...","reason":"..."}` | 智能体之间触发任务委托交接 |
+| `loop_detected` | `{"conversationId":"...","loopType":"...","reason":"..."}` | 检测到死循环或短周期振荡碰撞，触发自动熔断保护 |
+| `summary_generated`| `{"conversationId":"...","summary":"..."}` | 滚动历史摘要生成并更新 |
 | `heartbeat` | `{"timestamp": 179128...}` | 保持长连接活性的周期心跳包 |
 
 ### 2. 工作流执行流 (`/api/executions/runs/{runId}/stream`)

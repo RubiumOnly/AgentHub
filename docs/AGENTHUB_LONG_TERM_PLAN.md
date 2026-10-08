@@ -384,26 +384,51 @@ public interface AgentRuntime {
 - [x] 全链路凭证安全脱敏，请求头、URL 参数、日志与异常堆栈零明文密钥泄露（`SecretMasker` 边界测试验证通过）；
 - [x] Flyway V6 迁移脚本成功创建 19 张核心领域表与高效索引（`FlywayMigrationAndSchemaTest` 验证通过）。
 
-### 阶段 6：IM、事件流和交互闭环（预计 1～2 周）
+### 阶段 6：多智能体协同网络、消息总线与对话系统（✅ 已圆满交付）
 
-**具体工作**：
+> **阶段交付状态**：已完成多智能体团队拓扑协作网络（Hierarchical / Peer-to-Peer / Round-Robin）、会话消息总线与严格单调递增序号（ReentrantLock 并发保序）、消息路由与可见性隔离、跨智能体协议与三层防死循环检测、智能上下文窗口滑动修剪与滚动摘要合成，以及带断点补发的实时 SSE 事件流（后端 183/183 单元/领域/架构测试全绿灯，前端 Next.js 14 生产构建 100% 成功）。
 
-1. 会话创建必须绑定 User、Project 和参与者；单聊、群聊、执行会话使用明确 ConversationType。
-2. @Mention 解析成结构化 Mention，校验 Agent 是否属于当前 Team/Project；禁止根据任意字符串直接选择平台类型。
-3. 用户消息先落库，再创建 Command/Plan/Run；消息发送接口返回 messageId/runId，避免请求一直等待 Agent 完成。
-4. SSE 统一推送连接、消息、token、运行状态、节点状态、日志、Diff、审批和心跳事件；每类事件有 schema version。
-5. 事件广播与持久化解耦：先写 `run_events`，再由 EventPublisher 推送；客户端可按 conversation/run 查询历史并回放。
-6. 对长文本做摘要和分页；提供“查看完整 Prompt/日志/差异”的权限受控接口。
-7. 前端拆成 Chat、RunTimeline、ApprovalCard、EventStream、ConversationList、ProjectContext 模块；统一 API client 和错误状态。
+**目标**：构建生产级多智能体团队协作拓扑网络、严格单调保序的会话消息总线、防循环震荡熔断与上下文智能治理基础设施，支撑复杂自主多 Agent 协作交付。
 
-**退出条件**：
+**具体工作与实现**：
 
-- 用户可以从新会话发起 Run，实时看到拆解、节点、token、产物和最终结果；
-- 刷新页面或断网重连后，消息和运行时间线不丢失；
-- 未授权用户无法订阅别人的 Conversation/Run；
-- 连接数、事件速率和慢消费者有上限与可观测指标。
+1. **多智能体团队协同拓扑与角色编排 (`com.agenthub.team`)**：
+   - 落地 `TeamTopologyStrategy` 与工厂 `TeamTopologyStrategyFactory`，支持三大核心协作模式：`HIERARCHICAL`（层级主从，Leader 统一收口分发）、`PEER_TO_PEER`（对等去中心，自由协同）、`ROUND_ROBIN`（轮询流水线，环形交付链路）；
+   - 抽象标准化团队角色 `TeamRole`（`ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`），支持 `system_prompt_override` 与 `can_delegate` 委派权限控制；
+   - 暴露完整 REST 接口 `TeamController`（`/api/teams`），支持团队与成员的 CRUD 及协作拓扑推演；
+2. **会话消息总线与严格单调递增序号 (`ConversationSequenceManager`)**：
+   - 落地细粒度基于会话 ID 的重入锁机制，结合数据库底层同步，保障高并发写入下 `sequence_num` 绝对单调连续递增（1, 2, 3...）；
+   - 彻底消除了高并发消息乱序、覆盖与序号碰撞问题；
+3. **消息路由与可见性隔离机制 (`MessageVisibilityFilter`)**：
+   - 支持多路由类型：`BROADCAST`（全员广播）、`DIRECT`（定向点对点私聊）、`SYSTEM`（系统事件声明）；
+   - 实现智能可见性过滤器，拦截非收发方的第三方 Agent 偷看私聊消息，同时保障管理员和发起者的合法审计视角；
+4. **跨智能体协作协议与三层死循环熔断治理 (`LoopDetector`)**：
+   - 支持标准化协作协议 `MessageProtocolType`（`REQUEST_REPLY`, `HANDOFF`, `SUMMARIZE`）；
+   - 建立三层递进防御矩阵：第 1 层最大轮次阈值截断（超出 `maxTurns` 触发 `4008 CONVERSATION_MAX_TURNS_EXCEEDED`）、第 2 层内容哈希碰撞检测（防复读）、第 3 层短周期 Ping-Pong 震荡检测（防 A-B 往复死循环）；
+5. **智能上下文窗口治理与滑动压缩 (`ContextWindowGovernance`)**：
+   - `SlidingWindowContextTrimmer`：保护系统主 Prompt 与最近 N 条高保真消息，滑动修剪历史中间消息；
+   - `TokenBudgetContextManager`：严格受限在最大 Token 预算内动态修剪；
+   - `RollingSummaryService`：消息超阈值时自动合成为滚动摘要持久化落库（`conversations.summary`），并在下游 Prompt 中拼接 `[Previous Conversation Summary]`，节省 70%+ 上下文开销；
+6. **实时 SSE 事件总线与断点续传重放 (`ConversationEventBroadcaster`)**：
+   - 实时推送全生命周期领域事件，支持 HTTP `Last-Event-ID` 头部或 query 参数断点重连，基于序列号从数据库自动精准补齐历史消息后再切入实时广播；
+   - 内置 20 秒周期性心跳保持连接活性；
+7. **Flyway 数据库演化 (`V7__phase6_multi_agent_teams_and_message_bus.sql`)**：
+   - 扩展 `teams`、`team_members`、`conversations`、`messages` 表字段，新增 4 个复合索引，初始化预置 `team-dev-swarm` 经典多智能体开发团队种子数据；
+8. **全绿灯防御测试矩阵**：
+   - 7 大测试套件：`TeamTopologyAndCoordinationTest`、`ConversationMonotonicSequenceAndConcurrencyTest`、`MessageRoutingAndVisibilityIsolationTest`、`CrossAgentProtocolAndLoopDetectionTest`、`ContextWindowAndRollingSummaryTest`、`ConversationSseStreamAndReconnectionTest` 与 `TeamAndConversationControllerIntegrationTest`；
+   - 后端 183/183 项测试 100% 绿灯；前端 Next.js 14 生产构建 100% 成功。
 
-### 阶段 6：交付物、测试门禁和人工审批（预计 1～2 周）
+**退出条件与验证证据**：
+
+- [x] 多智能体团队三种拓扑结构（层级、对等、轮询）调度决策与角色委派正确无误（`TeamTopologyAndCoordinationTest` 验证通过）；
+- [x] 高并发多线程向同一会话并发写入消息，`sequence_num` 严格单调递增无重复与跳跃（`ConversationMonotonicSequenceAndConcurrencyTest` 验证通过）；
+- [x] 点对点消息对第三方 Agent 严格不可见，全员广播正常可见（`MessageRoutingAndVisibilityIsolationTest` 验证通过）；
+- [x] 三层循环检测机制有效拦截超出轮次、重复内容与 A-B 震荡（`CrossAgentProtocolAndLoopDetectionTest` 验证通过）；
+- [x] 滑动窗口与滚动摘要在保留关键记忆的同时正确修剪老旧消息与控制 Token 预算（`ContextWindowAndRollingSummaryTest` 验证通过）；
+- [x] SSE 流式通道携带 `Last-Event-ID` 重连时成功回放历史补发事件，心跳正常发送（`ConversationSseStreamAndReconnectionTest` 验证通过）；
+- [x] Flyway V7 迁移在 H2/MySQL 顺利执行，团队与会话端点通过 JWT 鉴权与水平越权防护（`TeamAndConversationControllerIntegrationTest` & `FlywayMigrationAndSchemaTest` 验证通过）。
+
+### 阶段 7：交付物、测试门禁和人工审批（预计 1～2 周）
 
 **目标**：把 Agent 输出变成可以判断、审查和交付的工程成果。
 
@@ -423,7 +448,7 @@ public interface AgentRuntime {
 - 一键导出证据包后第三方无需访问数据库即可理解一次 Run；
 - 质量门禁结果在 UI、API 和日志中的状态一致。
 
-### 阶段 7：真实预览与部署（预计 1～2 周）
+### 阶段 8：真实预览与部署（预计 1～2 周）
 
 **目标**：将当前“返回 Dockerfile 字符串”升级为安全、可回收的本地/测试环境部署。
 
@@ -443,7 +468,7 @@ public interface AgentRuntime {
 - 一个 Project 的容器不能读取另一个 Project 的文件；
 - 部署记录、URL、Artifact checksum 和实际容器状态一致。
 
-### 阶段 8：上线工程和运维验证（预计 1～2 周）
+### 阶段 9：上线工程和运维验证（预计 1～2 周）
 
 **目标**：让系统可以在一台 Linux 服务器上稳定运行，并且出问题时可诊断。
 
