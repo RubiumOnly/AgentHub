@@ -25,6 +25,16 @@ class OpenInViewTransactionBoundaryTest {
     @Autowired
     private ConversationApplication conversationApplication;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        com.agenthub.shared.context.RequestContext.get().setUserId("user-1");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        com.agenthub.shared.context.RequestContext.clear();
+    }
+
     @Test
     @DisplayName("验证 open-in-view 严格关闭，杜绝长事务与连接池泄漏隐患")
     void shouldVerifyOpenInViewIsExplicitlyDisabled() {

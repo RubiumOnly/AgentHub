@@ -48,4 +48,13 @@ class ArchUnitArchitectureTest {
                 .because("Application Services orchestrating use cases must reside within application packages")
                 .check(importedClasses);
     }
+
+    @Test
+    @DisplayName("架构守护 4：所有 RestController 控制器严禁直接依赖或暴露 JPA 实体 Entity 类")
+    void controllersShouldNotDependOnEntities() {
+        noClasses().that().areAnnotatedWith(RestController.class)
+                .should().dependOnClassesThat().resideInAnyPackage("..entity..")
+                .because("Controllers must only exchange command/query/view DTOs and must never leak JPA entities")
+                .check(importedClasses);
+    }
 }

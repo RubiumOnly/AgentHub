@@ -117,4 +117,61 @@ class AuthenticationAndResourceGuardTest {
         ProjectView readByAdmin = projectApplication.getProjectById(projA.getId());
         assertThat(readByAdmin.getId()).isEqualTo(projA.getId());
     }
+
+    @Test
+    @DisplayName("测试 Token 刷新机制：成功轮转签发新令牌并废弃旧令牌")
+    void shouldRefreshTokenAndInvalidateOldToken() {
+        String email = "refresh_" + System.currentTimeMillis() + "@agenthub.local";
+        AuthTokenView reg = authApplication.register(new RegisterCommand(email, "Password123", "RefreshTester"));
+        String originalToken = reg.getToken();
+
+        // Refresh token
+        AuthTokenView refreshed = authApplication.refreshToken(originalToken);
+        assertThat(refreshed.getToken()).isNotEmpty();
+        assertThat(refreshed.getToken()).isNotEqualTo(originalToken);
+        assertThat(refreshed.getUser().getEmail()).isEqualTo(email);
+
+        // Old token must be invalidated
+        TokenProvider.TokenClaims oldClaims = tokenProvider.parseAndValidateToken(originalToken);
+        assertThat(oldClaims).isNull();
+
+        // New token must be valid
+        TokenProvider.TokenClaims newClaims = tokenProvider.parseAndValidateToken(refreshed.getToken());
+        assertThat(newClaims).isNotNull();
+        assertThat(newClaims.getEmail()).isEqualTo(email);
+    }
+
+    @Test
+    @DisplayName("测试用户退出登出：废止当前令牌并阻断后续凭证重用")
+    void shouldLogoutAndBlockInvalidatedToken() {
+        String email = "logout_" + System.currentTimeMillis() + "@agenthub.local";
+        AuthTokenView reg = authApplication.register(new RegisterCommand(email, "Password123", "LogoutTester"));
+        String token = reg.getToken();
+
+        // Confirm token initially valid
+        assertThat(tokenProvider.parseAndValidateToken(token)).isNotNull();
+
+        // Perform logout
+        authApplication.logout(token);
+
+        // Token must now be rejected
+        assertThat(tokenProvider.parseAndValidateToken(token)).isNull();
+    }
+
+    @Test
+    @DisplayName("测试未认证上下文防御：严禁无凭证请求默认降级至 user-1 导致越权漏洞")
+    void shouldRejectUnauthenticatedAccessWithoutUser1Fallback() {
+        // Context is clear (unauthenticated)
+        RequestContext.clear();
+
+        // Calling protected getCurrentUser must throw UNAUTHORIZED
+        assertThatThrownBy(() -> authApplication.getCurrentUser())
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED));
+
+        // Calling protected createProject must throw UNAUTHORIZED
+        assertThatThrownBy(() -> projectApplication.createProject(new CreateProjectCommand("Ghost Project", "Desc", "ghost")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED));
+    }
 }

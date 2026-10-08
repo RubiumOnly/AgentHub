@@ -29,6 +29,16 @@ class ConversationEntityRelationAndMessageSchemaTest {
     @Autowired
     private ConversationParticipantRepository participantRepository;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        com.agenthub.shared.context.RequestContext.get().setUserId("user-1");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        com.agenthub.shared.context.RequestContext.clear();
+    }
+
     @Test
     @DisplayName("测试会话参与者关系表持久化：彻底弃用逗号字符串，多Agent参与者入库 conversation_participants")
     void shouldPersistConversationParticipantsInRelationalTable() {

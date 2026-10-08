@@ -22,6 +22,16 @@ class ExecutionEnginePersistenceAndReplayTest {
     @Autowired
     private ExecutionApplication executionApplication;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        com.agenthub.shared.context.RequestContext.get().setUserId("user-1");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        com.agenthub.shared.context.RequestContext.clear();
+    }
+
     @Test
     @DisplayName("测试 WorkflowRun 持久化与幂等键防御：重复提交同一幂等键不产生新 Run")
     void shouldPersistRunAndEnforceIdempotency() {
