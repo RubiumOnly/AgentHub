@@ -1,5 +1,9 @@
 package com.agenthub.execution.application;
 
+import com.agenthub.audit.infrastructure.entity.ArtifactEntity;
+import com.agenthub.audit.infrastructure.repository.ArtifactRepository;
+import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
+import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.execution.dto.RunEventView;
 import com.agenthub.execution.dto.StartRunCommand;
 import com.agenthub.execution.dto.StepRunView;
@@ -13,12 +17,16 @@ import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
 import com.agenthub.project.infrastructure.entity.ProjectEntity;
 import com.agenthub.project.infrastructure.repository.ProjectRepository;
+import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -28,21 +36,35 @@ import java.util.stream.Collectors;
 @Service
 public class ExecutionApplicationService implements ExecutionApplication {
 
+    private static final Logger log = LoggerFactory.getLogger(ExecutionApplicationService.class);
+
     private final WorkflowRunRepository workflowRunRepository;
     private final StepRunRepository stepRunRepository;
     private final RunEventRepository runEventRepository;
     private final ProjectRepository projectRepository;
+    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceResolver workspaceResolver;
+    private final JGitWorkspaceManager gitManager;
+    private final ArtifactRepository artifactRepository;
     private final ResourceAccessGuard accessGuard;
 
     public ExecutionApplicationService(WorkflowRunRepository workflowRunRepository,
                                       StepRunRepository stepRunRepository,
                                       RunEventRepository runEventRepository,
                                       ProjectRepository projectRepository,
+                                      WorkspaceRepository workspaceRepository,
+                                      WorkspaceResolver workspaceResolver,
+                                      JGitWorkspaceManager gitManager,
+                                      ArtifactRepository artifactRepository,
                                       ResourceAccessGuard accessGuard) {
         this.workflowRunRepository = workflowRunRepository;
         this.stepRunRepository = stepRunRepository;
         this.runEventRepository = runEventRepository;
         this.projectRepository = projectRepository;
+        this.workspaceRepository = workspaceRepository;
+        this.workspaceResolver = workspaceResolver;
+        this.gitManager = gitManager;
+        this.artifactRepository = artifactRepository;
         this.accessGuard = accessGuard;
     }
 
@@ -78,6 +100,28 @@ public class ExecutionApplicationService implements ExecutionApplication {
 
         // Record initial event
         appendEvent(runId, "RUN_STARTED", "Workflow execution started");
+
+        // Establish JGit baseline commit if workspace exists
+        workspaceRepository.findByProjectId(cmd.getProjectId()).ifPresent(ws -> {
+            try {
+                Path root = workspaceResolver.getWorkspaceRoot(ws.getId());
+                String author = RequestContext.get().getUserId();
+                String baselineHash = gitManager.createBaseline(root.toFile(), runId, author);
+                ws.setGitBaselineCommit(baselineHash);
+                workspaceRepository.save(ws);
+
+                String artId = "art-base-" + UUID.randomUUID().toString().substring(0, 8);
+                ArtifactEntity baselineArtifact = new ArtifactEntity(
+                        artId, runId, null, "BASELINE", baselineHash, baselineHash,
+                        "{\"baselineCommit\":\"" + baselineHash + "\"}"
+                );
+                baselineArtifact.setReviewStatus("ACCEPTED");
+                artifactRepository.save(baselineArtifact);
+                log.info("Established JGit baseline commit [{}] for run [{}] in workspace [{}]", baselineHash, runId, ws.getId());
+            } catch (Exception e) {
+                log.warn("Failed to initialize git baseline for run {}: {}", runId, e.getMessage());
+            }
+        });
 
         return toRunView(run);
     }

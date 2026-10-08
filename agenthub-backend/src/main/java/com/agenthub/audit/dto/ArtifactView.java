@@ -1,52 +1,27 @@
-package com.agenthub.audit.infrastructure.entity;
+package com.agenthub.audit.dto;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "artifacts")
-public class ArtifactEntity {
-
-    @Id
-    @Column(length = 64)
+public class ArtifactView {
     private String id;
-
-    @Column(name = "run_id", nullable = false, length = 64)
     private String runId;
-
-    @Column(name = "step_run_id", length = 64)
     private String stepRunId;
-
-    @Column(name = "artifact_type", nullable = false, length = 64)
     private String artifactType;
-
-    @Column(name = "path_or_ref", nullable = false, length = 512)
     private String pathOrRef;
-
-    @Column(length = 64)
     private String checksum;
-
-    @Column(name = "metadata_json", columnDefinition = "TEXT")
     private String metadataJson;
-
-    @Column(name = "review_status", nullable = false, length = 32)
-    private String reviewStatus = "PENDING";
-
-    @Column(name = "reviewed_by", length = 64)
+    private String reviewStatus;
     private String reviewedBy;
-
-    @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
-
-    @Column(name = "review_comment", length = 512)
     private String reviewComment;
-
-    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    public ArtifactEntity() {}
+    public ArtifactView() {}
 
-    public ArtifactEntity(String id, String runId, String stepRunId, String artifactType, String pathOrRef, String checksum, String metadataJson) {
+    public ArtifactView(String id, String runId, String stepRunId, String artifactType,
+                        String pathOrRef, String checksum, String metadataJson,
+                        String reviewStatus, String reviewedBy, LocalDateTime reviewedAt,
+                        String reviewComment, LocalDateTime createdAt) {
         this.id = id;
         this.runId = runId;
         this.stepRunId = stepRunId;
@@ -54,8 +29,11 @@ public class ArtifactEntity {
         this.pathOrRef = pathOrRef;
         this.checksum = checksum;
         this.metadataJson = metadataJson;
-        this.reviewStatus = "PENDING";
-        this.createdAt = LocalDateTime.now();
+        this.reviewStatus = reviewStatus;
+        this.reviewedBy = reviewedBy;
+        this.reviewedAt = reviewedAt;
+        this.reviewComment = reviewComment;
+        this.createdAt = createdAt;
     }
 
     public String getId() { return id; }
