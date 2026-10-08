@@ -28,6 +28,13 @@ public enum ErrorCode {
     WORKSPACE_TRAVERSAL_DENIED(3004, "Directory traversal outside workspace is strictly forbidden"),
     WORKSPACE_GIT_ACCESS_DENIED(3005, "Direct read or modification of .git directory is forbidden"),
     WORKSPACE_GIT_ERROR(3006, "Git Workspace Operation Failed"),
+    WORKSPACE_FILE_TOO_LARGE(3007, "File size exceeds allowed limit"),
+    WORKSPACE_BINARY_PREVIEW_DENIED(3008, "Binary file cannot be previewed as text"),
+    WORKSPACE_RESERVED_DEVICE_DENIED(3009, "Device file name is not allowed"),
+
+    // Audit & Artifacts
+    ARTIFACT_NOT_FOUND(3010, "Artifact not found"),
+    ARTIFACT_REVIEW_INVALID(3011, "Invalid artifact review operation or status"),
 
     // Conversation & IM
     CONVERSATION_NOT_FOUND(4001, "Conversation not found"),

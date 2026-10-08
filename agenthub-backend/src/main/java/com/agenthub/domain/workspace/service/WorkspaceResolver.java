@@ -23,6 +23,8 @@ public interface WorkspaceResolver {
 
     /**
      * Resolves a client-supplied legacy path or relative path safely within the configured base directory.
+     * @deprecated Use resolvePathForRead / resolvePathForWrite with workspaceId + relativePath instead.
      */
+    @Deprecated
     Path resolveLegacyPath(String clientPath, boolean isWrite);
 }

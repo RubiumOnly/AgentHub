@@ -2,6 +2,9 @@ package com.agenthub.domain.workspace.service;
 
 import com.agenthub.adapter.common.BusinessException;
 import com.agenthub.adapter.common.ErrorCode;
+import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
+import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -10,17 +13,31 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Service
 public class DefaultWorkspaceResolver implements WorkspaceResolver {
 
+    private static final Pattern RESERVED_DEVICE_PATTERN = Pattern.compile(
+            "^(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?$"
+    );
+
     @Value("${agenthub.workspace.base-dir:./data/workspaces}")
     private String baseDirString;
+
+    @Autowired(required = false)
+    private WorkspaceRepository workspaceRepository;
 
     public DefaultWorkspaceResolver() {}
 
     public DefaultWorkspaceResolver(String baseDirString) {
         this.baseDirString = baseDirString;
+    }
+
+    public DefaultWorkspaceResolver(String baseDirString, WorkspaceRepository workspaceRepository) {
+        this.baseDirString = baseDirString;
+        this.workspaceRepository = workspaceRepository;
     }
 
     private Path getBaseDir() {
@@ -41,16 +58,16 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
 
         Path candidate = root.resolve(relativePath).normalize();
 
-        // Stage 3: Root containment check
+        // 1. Root containment check
         if (!candidate.startsWith(root)) {
             throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
                     "Directory traversal outside workspace is strictly forbidden");
         }
 
-        // Stage 5: Case-insensitive .git protection
+        // 2. Case-insensitive .git protection
         checkGitProtection(root, candidate);
 
-        // Stage 4: Real path containment check
+        // 3. Real path containment & symlink check
         validateRealPathContainment(root, candidate);
 
         return candidate;
@@ -63,16 +80,16 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
 
         Path candidate = root.resolve(relativePath).normalize();
 
-        // Stage 3: Root containment check
+        // 1. Root containment check
         if (!candidate.startsWith(root)) {
             throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
                     "Directory traversal outside workspace is strictly forbidden");
         }
 
-        // Stage 5: Case-insensitive .git protection
+        // 2. Case-insensitive .git protection
         checkGitProtection(root, candidate);
 
-        // Stage 4: Real path containment check (deepest existing parent)
+        // 3. Real path containment check (deepest existing parent)
         validateRealPathContainment(root, candidate);
 
         return candidate;
@@ -86,15 +103,35 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
         if (workspaceIdOrPath.indexOf('\0') >= 0) {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Null byte detected in workspace path");
         }
-
-        Path root = resolveLegacyPath(workspaceIdOrPath, false);
-        try {
-            if (!Files.exists(root)) {
-                Files.createDirectories(root);
-            }
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Failed to create workspace directory: " + e.getMessage());
+        if (workspaceIdOrPath.contains("::$DATA")) {
+            throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Illegal character sequence in workspace path");
         }
+
+        Path base = getBaseDir();
+
+        // If repository is available, check if workspaceIdOrPath is a recorded workspace ID or project ID
+        if (workspaceRepository != null) {
+            Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceIdOrPath);
+            if (wsOpt.isEmpty()) {
+                wsOpt = workspaceRepository.findByProjectId(workspaceIdOrPath);
+            }
+            if (wsOpt.isPresent()) {
+                String relativeRoot = wsOpt.get().getRelativeRoot();
+                Path wsRoot = base.resolve(relativeRoot).normalize();
+                if (!wsRoot.startsWith(base)) {
+                    throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
+                            "Configured workspace relative root escapes base directory");
+                }
+                checkGitProtection(base, wsRoot);
+                ensureDirectoryExists(wsRoot);
+                validateRealPathContainment(base, wsRoot);
+                return wsRoot;
+            }
+        }
+
+        // Fallback: Resolve as legacy path or direct directory name under baseDir
+        Path root = resolveLegacyPath(workspaceIdOrPath, false);
+        ensureDirectoryExists(root);
         return root;
     }
 
@@ -128,19 +165,33 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Invalid workspace path format: " + e.getMessage());
         }
 
-        // Stage 3: Root containment against base directory
+        // Check reserved device names in client path
+        checkDeviceNames(clientPath);
+
+        // Root containment against base directory
         if (!candidate.startsWith(base)) {
             throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
                     "Directory traversal outside workspace is strictly forbidden");
         }
 
-        // Stage 5: .git directory protection
+        // .git directory protection
         checkGitProtection(base, candidate);
 
-        // Stage 4: Real path containment against base directory
+        // Real path containment against base directory
         validateRealPathContainment(base, candidate);
 
         return candidate;
+    }
+
+    private void ensureDirectoryExists(Path dir) {
+        try {
+            if (!Files.exists(dir)) {
+                Files.createDirectories(dir);
+            }
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID,
+                    "Failed to create workspace directory: " + e.getMessage());
+        }
     }
 
     private void validateRelativePathString(String relPath) {
@@ -155,6 +206,20 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
         }
         if (relPath.startsWith("/") || relPath.startsWith("\\") || relPath.contains(":") || Path.of(relPath).isAbsolute()) {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Absolute path or colon not allowed for relativePath: " + relPath);
+        }
+        checkDeviceNames(relPath);
+    }
+
+    private void checkDeviceNames(String pathStr) {
+        String normalized = pathStr.replace('\\', '/');
+        String[] parts = normalized.split("/");
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
+            if (RESERVED_DEVICE_PATTERN.matcher(trimmed).matches()) {
+                throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID,
+                        "Reserved system device name not allowed: " + trimmed);
+            }
         }
     }
 
@@ -186,6 +251,20 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
             throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Unable to resolve workspace real path: " + e.getMessage());
         }
 
+        // 1. Direct check on candidate if it exists
+        if (Files.exists(candidate)) {
+            try {
+                Path realCandidate = candidate.toRealPath();
+                if (!realCandidate.startsWith(realRoot)) {
+                    throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
+                            "Symbolic link or directory traversal escapes workspace root: " + candidate);
+                }
+            } catch (IOException e) {
+                throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID, "Unable to resolve candidate real path: " + e.getMessage());
+            }
+        }
+
+        // 2. Check all existing parent directories
         Path p = candidate;
         while (p != null && !Files.exists(p)) {
             p = p.getParent();

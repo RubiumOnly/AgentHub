@@ -23,6 +23,13 @@ public enum ErrorCode {
     WORKSPACE_PATH_INVALID(3003, "Invalid workspace path format or illegal characters"),
     WORKSPACE_TRAVERSAL_DENIED(3004, "Directory traversal outside workspace is strictly forbidden"),
     WORKSPACE_GIT_ACCESS_DENIED(3005, "Direct read or modification of .git directory is forbidden"),
+    WORKSPACE_FILE_TOO_LARGE(3007, "File size exceeds allowed limit"),
+    WORKSPACE_BINARY_PREVIEW_DENIED(3008, "Binary file cannot be previewed as text"),
+    WORKSPACE_RESERVED_DEVICE_DENIED(3009, "Device file name is not allowed"),
+
+    // Audit and Artifact Codes
+    ARTIFACT_NOT_FOUND(3010, "Artifact not found"),
+    ARTIFACT_REVIEW_INVALID(3011, "Invalid artifact review operation or status"),
     
     // System Error
     INTERNAL_SERVER_ERROR(500, "Internal Server Error");
