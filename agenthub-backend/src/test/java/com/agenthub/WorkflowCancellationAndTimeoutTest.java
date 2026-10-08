@@ -149,4 +149,27 @@ class WorkflowCancellationAndTimeoutTest {
         List<RunEventView> events = executionApplication.listEvents(runId, null);
         assertThat(events.stream().anyMatch(e -> "RUN_CANCELLED".equals(e.getEventType()))).isTrue();
     }
+
+    @Test
+    @DisplayName("测试 CancelToken 对注册的操作系统子进程及其进程树强平回收")
+    void shouldForciblyKillRegisteredSubprocessOnCancellation() throws Exception {
+        String runId = "run-proc-" + UUID.randomUUID().toString().substring(0, 6);
+        CancelToken token = cancelTokenRegistry.getOrCreate(runId);
+
+        // Launch a harmless sleeping subprocess
+        boolean isWin = System.getProperty("os.name", "").toLowerCase().contains("win");
+        ProcessBuilder pb = isWin
+                ? new ProcessBuilder("cmd.exe", "/c", "ping -n 30 127.0.0.1 > nul")
+                : new ProcessBuilder("sh", "-c", "sleep 30");
+
+        Process proc = pb.start();
+        token.registerProcess(proc);
+        assertThat(proc.isAlive()).isTrue();
+
+        // Cancel token -> process must be forcibly killed
+        token.cancel("Abort active CLI subprocess");
+        proc.waitFor(3, TimeUnit.SECONDS);
+
+        assertThat(proc.isAlive()).isFalse();
+    }
 }

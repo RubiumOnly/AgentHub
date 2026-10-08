@@ -35,16 +35,19 @@ public class ExecutionStateMachine {
     private final WorkflowRunRepository workflowRunRepository;
     private final StepRunRepository stepRunRepository;
     private final RunEventRepository runEventRepository;
+    private final RunEventBroadcaster broadcaster;
     private final ObjectMapper objectMapper;
     private final Map<String, ReentrantLock> runLocks = new ConcurrentHashMap<>();
 
     public ExecutionStateMachine(WorkflowRunRepository workflowRunRepository,
                                  StepRunRepository stepRunRepository,
                                  RunEventRepository runEventRepository,
+                                 RunEventBroadcaster broadcaster,
                                  ObjectMapper objectMapper) {
         this.workflowRunRepository = workflowRunRepository;
         this.stepRunRepository = stepRunRepository;
         this.runEventRepository = runEventRepository;
+        this.broadcaster = broadcaster;
         this.objectMapper = objectMapper;
     }
 
@@ -97,8 +100,15 @@ public class ExecutionStateMachine {
                 run.setCorrelationId(correlationId);
             }
 
-            if (targetStatus == WorkflowRunStatus.RUNNING && run.getStartedAt() == null) {
-                run.setStartedAt(now);
+            if (targetStatus == WorkflowRunStatus.RUNNING) {
+                if (run.getStartedAt() == null) {
+                    run.setStartedAt(now);
+                }
+                if (currentStatus == WorkflowRunStatus.FAILED || currentStatus == WorkflowRunStatus.TIMED_OUT) {
+                    run.setFinishedAt(null);
+                    run.setCancelledAt(null);
+                    run.setCancelReason(null);
+                }
             } else if (targetStatus.isTerminal()) {
                 if (run.getFinishedAt() == null) {
                     run.setFinishedAt(now);
@@ -114,9 +124,8 @@ public class ExecutionStateMachine {
 
             WorkflowRunEntity saved = workflowRunRepository.save(run);
 
-            // Persist transition audit event to run_events
+            // Publish transition audit event through broadcaster with monotonic sequence and SSE push
             try {
-                long nextSeq = runEventRepository.countByRunId(runId) + 1;
                 Map<String, Object> payloadMap = Map.of(
                         "runId", runId,
                         "fromStatus", currentStatus.name(),
@@ -127,8 +136,7 @@ public class ExecutionStateMachine {
                         "timestamp", now.toString()
                 );
                 String payloadJson = objectMapper.writeValueAsString(payloadMap);
-                String eventId = "evt-" + UUID.randomUUID().toString().substring(0, 8);
-                runEventRepository.save(new RunEventEntity(eventId, runId, nextSeq, "RUN_STATE_CHANGED", payloadJson));
+                broadcaster.publishEvent(runId, "RUN_STATE_CHANGED", payloadJson);
             } catch (Exception e) {
                 log.warn("Failed to serialize or record state transition event for run {}: {}", runId, e.getMessage());
             }
@@ -197,7 +205,7 @@ public class ExecutionStateMachine {
                 if (targetStatus == StepRunStatus.FAILED && reason != null) {
                     step.setErrorMessage(reason);
                 }
-            } else if (targetStatus == StepRunStatus.PENDING && currentStatus == StepRunStatus.FAILED) {
+            } else if (targetStatus == StepRunStatus.PENDING && (currentStatus == StepRunStatus.FAILED || currentStatus == StepRunStatus.TIMED_OUT)) {
                 // Retry attempt
                 step.setAttempt(step.getAttempt() + 1);
                 step.setErrorMessage(null);
@@ -208,9 +216,8 @@ public class ExecutionStateMachine {
 
             StepRunEntity saved = stepRunRepository.save(step);
 
-            // Persist transition audit event to run_events
+            // Publish transition audit event through broadcaster with monotonic sequence and SSE push
             try {
-                long nextSeq = runEventRepository.countByRunId(step.getRunId()) + 1;
                 Map<String, Object> payloadMap = Map.of(
                         "runId", step.getRunId(),
                         "stepRunId", stepRunId,
@@ -224,8 +231,7 @@ public class ExecutionStateMachine {
                         "timestamp", now.toString()
                 );
                 String payloadJson = objectMapper.writeValueAsString(payloadMap);
-                String eventId = "evt-" + UUID.randomUUID().toString().substring(0, 8);
-                runEventRepository.save(new RunEventEntity(eventId, step.getRunId(), nextSeq, "STEP_STATE_CHANGED", payloadJson));
+                broadcaster.publishEvent(step.getRunId(), "STEP_STATE_CHANGED", payloadJson);
             } catch (Exception e) {
                 log.warn("Failed to serialize or record state transition event for step {}: {}", stepRunId, e.getMessage());
             }
@@ -236,6 +242,15 @@ public class ExecutionStateMachine {
             return saved;
         } finally {
             lock.unlock();
+        }
+    }
+
+    /**
+     * Clean up internal lock state for completed run to avoid memory leak.
+     */
+    public void cleanupRun(String runId) {
+        if (runId != null) {
+            runLocks.remove(runId);
         }
     }
 }

@@ -33,10 +33,23 @@ public class AuthFilter implements Filter {
                     context.setUsername(claims.getEmail());
                 }
             } else {
-                // If X-User-Id header is passed (for service-to-service or dev convenience)
-                String userIdHeader = httpRequest.getHeader("X-User-Id");
-                if (userIdHeader != null && !userIdHeader.isBlank()) {
-                    RequestContext.get().setUserId(userIdHeader);
+                String tokenParam = httpRequest.getParameter("token");
+                if (tokenParam == null || tokenParam.isBlank()) {
+                    tokenParam = httpRequest.getParameter("accessToken");
+                }
+                if (tokenParam != null && !tokenParam.isBlank()) {
+                    TokenProvider.TokenClaims claims = tokenProvider.parseAndValidateToken(tokenParam.trim());
+                    if (claims != null) {
+                        RequestContext context = RequestContext.get();
+                        context.setUserId(claims.getUserId());
+                        context.setUsername(claims.getEmail());
+                    }
+                } else {
+                    // If X-User-Id header is passed (for service-to-service or dev convenience)
+                    String userIdHeader = httpRequest.getHeader("X-User-Id");
+                    if (userIdHeader != null && !userIdHeader.isBlank()) {
+                        RequestContext.get().setUserId(userIdHeader);
+                    }
                 }
             }
         }

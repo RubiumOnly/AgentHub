@@ -79,16 +79,9 @@ public class CancelToken {
                 }
             }
 
-            // 2. Forcibly destroy registered subprocesses
+            // 2. Forcibly destroy registered subprocesses and their descendant trees
             for (Process p : registeredProcesses) {
-                try {
-                    if (p != null && p.isAlive()) {
-                        p.destroyForcibly();
-                        log.debug("Forcibly destroyed process for cancelled run [{}]", runId);
-                    }
-                } catch (Exception e) {
-                    log.warn("Error destroying process for run [{}]: {}", runId, e.getMessage());
-                }
+                destroyProcessTree(p);
             }
 
             // 3. Interrupt registered worker threads
@@ -122,11 +115,7 @@ public class CancelToken {
     public void registerProcess(Process process) {
         if (process == null) return;
         if (cancelled.get()) {
-            try {
-                if (process.isAlive()) {
-                    process.destroyForcibly();
-                }
-            } catch (Exception ignored) {}
+            destroyProcessTree(process);
         } else {
             registeredProcesses.add(process);
         }
@@ -142,6 +131,30 @@ public class CancelToken {
             } catch (Exception ignored) {}
         } else {
             registeredThreads.add(thread);
+        }
+    }
+
+    private void destroyProcessTree(Process p) {
+        if (p == null || !p.isAlive()) {
+            return;
+        }
+        try {
+            p.toHandle().descendants().forEach(h -> {
+                try {
+                    h.destroyForcibly();
+                } catch (Exception ignored) {}
+            });
+            p.destroyForcibly();
+            if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+                try {
+                    long pid = p.pid();
+                    new ProcessBuilder("taskkill", "/PID", String.valueOf(pid), "/T", "/F")
+                            .start().waitFor(1, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (Exception ignored) {}
+            }
+            log.debug("Forcibly destroyed process tree for cancelled run [{}]", runId);
+        } catch (Exception e) {
+            log.warn("Error destroying process tree for run [{}]: {}", runId, e.getMessage());
         }
     }
 }

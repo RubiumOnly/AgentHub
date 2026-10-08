@@ -9,7 +9,9 @@ import java.util.List;
 @Repository
 public interface RunEventRepository extends JpaRepository<RunEventEntity, String> {
     List<RunEventEntity> findByRunIdOrderBySequenceNumAsc(String runId);
+    List<RunEventEntity> findByRunIdOrderBySequenceNumAsc(String runId, org.springframework.data.domain.Pageable pageable);
     List<RunEventEntity> findByRunIdAndSequenceNumGreaterThanOrderBySequenceNumAsc(String runId, Long sequenceNum);
+    List<RunEventEntity> findByRunIdAndSequenceNumGreaterThanOrderBySequenceNumAsc(String runId, Long sequenceNum, org.springframework.data.domain.Pageable pageable);
     long countByRunId(String runId);
 
     @org.springframework.data.jpa.repository.Query("SELECT MAX(e.sequenceNum) FROM RunEventEntity e WHERE e.runId = :runId")

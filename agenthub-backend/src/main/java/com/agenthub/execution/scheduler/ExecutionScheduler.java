@@ -45,8 +45,18 @@ public class ExecutionScheduler {
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkspaceLockManager lockManager;
 
-    private final ScheduledExecutorService watchdogScheduler = Executors.newScheduledThreadPool(2);
-    private final ExecutorService executionPool = Executors.newCachedThreadPool();
+    private final ScheduledExecutorService watchdogScheduler = Executors.newScheduledThreadPool(
+            2,
+            new org.springframework.scheduling.concurrent.CustomizableThreadFactory("exec-watchdog-")
+    );
+    private final ExecutorService executionPool = new ThreadPoolExecutor(
+            4,
+            32,
+            60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(500),
+            new org.springframework.scheduling.concurrent.CustomizableThreadFactory("exec-scheduler-"),
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
 
     public ExecutionScheduler(ExecutionStateMachine stateMachine,
                               CancelTokenRegistry cancelTokenRegistry,
@@ -169,6 +179,8 @@ public class ExecutionScheduler {
             } finally {
                 timeoutWatchdog.cancel(false);
                 cancelTokenRegistry.remove(runId);
+                stateMachine.cleanupRun(runId);
+                broadcaster.evictRun(runId);
                 if (workspacePath != null) {
                     lockManager.unlock(workspacePath);
                 }
@@ -290,5 +302,20 @@ public class ExecutionScheduler {
                   .replace("\"", "\\\"")
                   .replace("\n", "\\n")
                   .replace("\r", "\\r");
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
+        log.info("Gracefully shutting down ExecutionScheduler thread pools...");
+        watchdogScheduler.shutdownNow();
+        executionPool.shutdown();
+        try {
+            if (!executionPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                executionPool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executionPool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }

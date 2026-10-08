@@ -30,7 +30,7 @@ public enum StepRunStatus {
                 SUCCEEDED, Collections.emptySet(),
                 FAILED, EnumSet.of(PENDING, RUNNING), // Allows retry
                 CANCELLED, Collections.emptySet(),
-                TIMED_OUT, Collections.emptySet()
+                TIMED_OUT, EnumSet.of(PENDING, RUNNING) // Allows retry after timeout
         );
     }
 

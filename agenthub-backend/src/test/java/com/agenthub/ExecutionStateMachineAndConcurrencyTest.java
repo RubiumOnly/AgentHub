@@ -213,4 +213,92 @@ class ExecutionStateMachineAndConcurrencyTest {
         assertThat(successCount.get()).isGreaterThanOrEqualTo(1);
         assertThat(successCount.get() + rejectedCount.get()).isEqualTo(threadCount);
     }
+
+    @Test
+    @DisplayName("测试状态机流转事件实时通过 SSE 广播且保证全局严格单调递增序号（杜绝序号碰撞与遗漏）")
+    void shouldBroadcastStateTransitionsViaSseAndMaintainMonotonicSequences() {
+        WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", "def-default", null));
+        String runId = run.getId();
+
+        // 1. Initial event is seq 1 (RUN_STARTED)
+        // 2. Append custom event
+        RunEventView e2 = executionApplication.appendEvent(runId, "TOKEN", "{\"token\":\"tok-1\"}");
+        assertThat(e2.getSequenceNum()).isEqualTo(2L);
+
+        // 3. State transition via stateMachine -> must produce seq 3 (RUN_STATE_CHANGED)
+        stateMachine.transitionRun(runId, WorkflowRunStatus.PAUSED, "Paused for manual check");
+
+        // 4. Create a step and transition it -> must produce seq 4 (STEP_STATE_CHANGED)
+        String stepRunId = "step-test-" + UUID.randomUUID().toString().substring(0, 6);
+        StepRunEntity step = new StepRunEntity(stepRunId, runId, "node-1", "PENDING");
+        stepRunRepository.save(step);
+        stateMachine.transitionStep(stepRunId, StepRunStatus.RUNNING, "Starting step");
+
+        // 5. Append another event -> must produce seq 5 (NOT seq 3 or collision!)
+        RunEventView e5 = executionApplication.appendEvent(runId, "TOKEN", "{\"token\":\"tok-2\"}");
+        assertThat(e5.getSequenceNum()).isEqualTo(5L);
+
+        // 6. Verify all events strictly monotonic from 1 to 5
+        List<RunEventView> allEvents = executionApplication.listEvents(runId, null);
+        assertThat(allEvents).hasSize(5);
+        for (int i = 0; i < allEvents.size(); i++) {
+            assertThat(allEvents.get(i).getSequenceNum()).isEqualTo((long) (i + 1));
+        }
+
+        // Verify event types
+        assertThat(allEvents.get(0).getEventType()).isEqualTo("RUN_STARTED");
+        assertThat(allEvents.get(1).getEventType()).isEqualTo("TOKEN");
+        assertThat(allEvents.get(2).getEventType()).isEqualTo("RUN_STATE_CHANGED");
+        assertThat(allEvents.get(3).getEventType()).isEqualTo("STEP_STATE_CHANGED");
+        assertThat(allEvents.get(4).getEventType()).isEqualTo("TOKEN");
+    }
+
+    @Test
+    @DisplayName("测试 TIMED_OUT 单步支持重试（retryStep），状态流转回 PENDING，递增 attempt 并清空历史超时信息")
+    void shouldAllowStepRetryAfterTimeout() {
+        WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", "def-default", null));
+        String runId = run.getId();
+
+        String stepRunId = "step-to-" + UUID.randomUUID().toString().substring(0, 6);
+        StepRunEntity step = new StepRunEntity(stepRunId, runId, "node-timeout", "RUNNING");
+        step.setStartedAt(java.time.LocalDateTime.now().minusSeconds(10));
+        stepRunRepository.save(step);
+
+        // Transition step to TIMED_OUT
+        stateMachine.transitionStep(stepRunId, StepRunStatus.TIMED_OUT, "Step exceeded SLA limit of 10s");
+        StepRunEntity timedOutStep = stepRunRepository.findById(stepRunId).orElseThrow();
+        assertThat(timedOutStep.getStatus()).isEqualTo("TIMED_OUT");
+        assertThat(timedOutStep.getFinishedAt()).isNotNull();
+
+        // Retry the timed out step via executionApplication
+        com.agenthub.execution.dto.StepRunView retriedStep = executionApplication.retryStep(stepRunId);
+        assertThat(retriedStep.getStatus()).isEqualTo("PENDING");
+        assertThat(retriedStep.getAttempt()).isEqualTo(2);
+        assertThat(retriedStep.getErrorMessage()).isNull();
+        assertThat(retriedStep.getStartedAt()).isNull();
+        assertThat(retriedStep.getFinishedAt()).isNull();
+        assertThat(retriedStep.getDurationMs()).isNull();
+    }
+
+    @Test
+    @DisplayName("测试 TIMED_OUT 工作流支持重启为 RUNNING，并自动清空旧的 finishedAt 与 cancelReason")
+    void shouldAllowWorkflowRestartAfterTimeout() {
+        WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", "def-default", null));
+        String runId = run.getId();
+
+        // Transition to TIMED_OUT
+        stateMachine.transitionRun(runId, WorkflowRunStatus.TIMED_OUT, "watchdog", "Global workflow timeout", "corr-to");
+        WorkflowRunEntity timedOut = workflowRunRepository.findById(runId).orElseThrow();
+        assertThat(timedOut.getStatus()).isEqualTo("TIMED_OUT");
+        assertThat(timedOut.getFinishedAt()).isNotNull();
+        assertThat(timedOut.getCancelReason()).isEqualTo("Global workflow timeout");
+        assertThat(timedOut.getCancelledAt()).isNotNull();
+
+        // Restart workflow
+        WorkflowRunEntity restarted = stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "Restarting failed workflow");
+        assertThat(restarted.getStatus()).isEqualTo("RUNNING");
+        assertThat(restarted.getFinishedAt()).isNull();
+        assertThat(restarted.getCancelledAt()).isNull();
+        assertThat(restarted.getCancelReason()).isNull();
+    }
 }

@@ -165,32 +165,34 @@ flowchart TD
 - **八大标准生命周期状态**：
   `PENDING`, `RUNNING`, `PAUSED`, `WAITING_APPROVAL`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `TIMED_OUT`。
 - **非法状态转移拦截矩阵**：
-  - 终态防御：`SUCCEEDED`, `CANCELLED`, `TIMED_OUT` 为不可逆终态，任何逆向或跨态跃迁严格拦截并抛出 `6007 INVALID_STATE_TRANSITION`；
-  - 步骤重试：支持从 `FAILED` 状态通过重试指令重新转移至 `PENDING`，递增 `attempt` 并清除旧错误；
-  - 全并发线程安全：使用基于 `runId` 的细粒度锁保障并发转移互斥与幂等一致性；
-  - 审计留痕：每次状态流转严格记录 `fromStatus`, `toStatus`, `actor`, `reason`, `correlationId`, `timestamp` 并持久化落库。
+  - 终态防御：`SUCCEEDED`, `CANCELLED`, `TIMED_OUT` 为不可逆终态（除重试/重启指令外），任何非法跨态跃迁严格拦截并抛出 `6007 INVALID_STATE_TRANSITION`；
+  - 步骤重试：支持从 `FAILED` 与 `TIMED_OUT` 状态通过 `retryStep` 指令重新转移至 `PENDING`，自动递增 `attempt` 并清空旧错误与耗时；
+  - 工作流重启：支持工作流从 `FAILED` / `TIMED_OUT` 重启为 `RUNNING`，自动清除旧的 `finishedAt`、`cancelledAt` 与 `cancelReason`；
+  - 状态广播归一：状态机内部转移事件全量委托 `RunEventBroadcaster` 发布，确保 `RUN_STATE_CHANGED` 与 `STEP_STATE_CHANGED` 实时直推 SSE，杜绝序号碰撞与失序；
+  - 全并发线程安全：使用基于 `runId` 的细粒度锁保障并发转移互斥与幂等一致性，并在执行结束后提供生命周期内存清理。
 
 ### 2. 工作流取消与中断协作机制 (`CancelToken` & `CancelTokenRegistry`)
 - **协作取消模型**：通过 `CancelToken` 提供非阻塞式取消信号检测（`isCancelled()`, `checkCancelled()` 抛出 `RunCancelledException`）；
 - **级联终止协作**：
   - 优雅终止：支持注册自定义清理与回滚回调函数；
-  - 强平终止：注册的执行子进程自动调用 `destroyForcibly()` 杀除进程树，注册的工作线程自动调用 `interrupt()`；
+  - 跨平台进程树递归强平：结合 `ProcessHandle.descendants()` 递归回收与 Windows `taskkill /PID <pid> /T /F` 双层防御，彻底杜绝孤儿进程残留；
+  - 线程级安全中断：对注册的工作线程自动触发 `interrupt()`；
   - 看门狗超时：配置执行超时预算，超出阈值自动触发强平看门狗并将状态收敛为 `TIMED_OUT`。
 
 ### 3. 真实执行解耦与 Runtime SPI (`AgentRuntime` & `ExecutionScheduler`)
 - **调度与执行分离**：
-  - 调度器 `ExecutionScheduler` 专注于节点拓扑编排、状态流转、重试策略、超时看门狗与事件沉淀；
+  - 调度器 `ExecutionScheduler` 专注于节点拓扑编排、状态流转、重试策略、超时看门狗与事件沉淀，杜绝无界线程池 OOM 隐患，采用具名有界线程池及 `@PreDestroy` 优雅停机回收；
   - 实际调用由 `AgentRuntime` SPI 接口完成，彻底解除核心业务对底层大模型或 CLI 命令的具体依赖；
 - **多运行时适配矩阵**：
   - `MockAgentRuntime`：离线确定性模拟、测试守护与极速冒烟验证（明确标记 `simulated = true`）；
-  - `OpenAiCompatibleRuntime`：兼容 DeepSeek、OpenAI、Moonshot 等大模型标准 HTTP 流式接口，含密钥脱敏；
+  - `OpenAiCompatibleRuntime`：兼容 DeepSeek、OpenAI、Moonshot 等大模型标准 HTTP 流式接口，含密钥脱敏与推理内容解析防御；
   - `CliAgentRuntime`：子进程原生运行 Codex CLI / Claude Code / OpenClaw，结合进程树销毁与超时控制；
   - `AgentRuntimeRegistry`：提供运行时动态路由、自动降级与健康检查。
 
 ### 4. 实时 SSE 事件流与 Last-Event-ID 断点重连 (`RunEventBroadcaster`)
 - **真流式事件输出**：提供专属端点 `GET /api/executions/runs/{runId}/stream` 与 `GET /api/runs/{runId}/stream`，彻底淘汰无状态长轮询假实时；
 - **严格单调递增 Sequence**：每个事件均分配唯一的单调递增 `sequenceNum`，并在 `run_events` 表持久化落库；
-- **断点补发机制**：客户端携带 `Last-Event-ID` 头部或 `?lastEventId=` 参数重连时，系统自动从数据库按序号精准补齐遗漏的历史事件后再切入实时广播；
-- **长连接保活心跳**：内置每 20 秒自动化发送 `:heartbeat` 注释包，防御代理与网关超时断联。
+- **断点补发机制**：客户端携带 `Last-Event-ID` 头部或 `?lastEventId=` 参数重连时，系统自动从数据库按序号精准补齐遗漏的历史事件后再切入实时广播，具备 `MAX_REPLAY_LIMIT (2000)` 上限防 OOM 保护；
+- **认证兼容与长连接保活心跳**：`AuthFilter` 支持标准浏览器 `EventSource` URL Token 参数鉴权；内置每 20 秒自动化发送 `:heartbeat` 注释包，防御代理与网关超时断联。
 
 

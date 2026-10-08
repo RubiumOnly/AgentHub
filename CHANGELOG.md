@@ -10,28 +10,30 @@
 - **严格 Run/Step 状态机 (`ExecutionStateMachine`)**：
   - 落地 `WorkflowRunStatus` 与 `StepRunStatus` 8 大核心生命周期状态（`PENDING`, `RUNNING`, `PAUSED`, `WAITING_APPROVAL`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `TIMED_OUT`）；
   - 严格定义并拦截非法状态跃迁（终态不可逆，非法跳转抛出专用错误码 `6007 INVALID_STATE_TRANSITION`）；
-  - 支持步骤重试（`FAILED` 节点通过指令重置为 `PENDING` 并递增 `attempt` 次数）；
-  - 基于 `runId` 的细粒度重入锁确保高并发竞态下的转移互斥，所有状态变更全量记录 `actor`, `reason`, `correlationId`, `timestamp` 审计日志；
+  - 完善步骤与工作流重试机制：支持 `FAILED` 与 `TIMED_OUT` 单步通过 `retryStep` 重置为 `PENDING` 并递增 `attempt` 次数，工作流重启为 `RUNNING` 时自动清空旧的终止态与超时时间戳；
+  - 状态机流转事件全量委托 `RunEventBroadcaster` 统一发布，保障 `RUN_STATE_CHANGED` / `STEP_STATE_CHANGED` 实时直推 SSE，彻底消除了直接绕过广播器导致的序号失序与碰撞问题；
+  - 基于 `runId` 的细粒度重入锁确保高并发竞态下的转移互斥，并在完成执行后提供安全的内存状态回收方法；
 - **工作流取消与中断协作机制 (`CancelToken` & `CancelTokenRegistry`)**：
   - 实现非阻塞 `CancelToken` 信号机制，支持优雅终止回调注册；
-  - 支持子进程强平（`destroyForcibly()` 杀除进程树）与工作线程中断（`interrupt()`）；
+  - 跨平台进程树递归强杀：结合 `ProcessHandle.descendants()` 递归回收与 Windows `taskkill /PID <pid> /T /F` 双层防御，彻底杜绝包装脚本下的孤儿进程残留；
   - 提供看门狗超时监控调度器，执行超时时自动触发强平看门狗并将 Run 收敛为 `TIMED_OUT`；
   - 级联取消所有待执行与活跃 Step，并持久化 `RUN_CANCELLED` / `RUN_TIMED_OUT` 事件；
 - **真实执行解耦与 Runtime SPI (`AgentRuntime` & `ExecutionScheduler`)**：
-  - 调度器 `ExecutionScheduler` 专注于节点拓扑编排、状态流转、重试策略、超时监控与事件沉淀，不耦合底层模型或 CLI 细节；
+  - 调度器 `ExecutionScheduler` 专注于节点拓扑编排、状态流转、重试策略、超时监控与事件沉淀，杜绝无界线程池 OOM 隐患，采用具名有界线程池及 `@PreDestroy` 优雅停机回收；
   - 抽象并落地 `AgentRuntime`、`ExecutionHandle`、`RuntimeDescriptor`、`RuntimeHealth` 与 `RuntimeEventSink` 标准接口；
-  - 落地 `MockAgentRuntime`（测试与确定性离线模拟，明确标记 `simulated = true`）、`OpenAiCompatibleRuntime`（标准 HTTP 流式 API 与密钥脱敏）、`CliAgentRuntime`（本地子进程与超时回收）；
+  - 落地 `MockAgentRuntime`（测试与确定性离线模拟，明确标记 `simulated = true`）、`OpenAiCompatibleRuntime`（标准 HTTP 流式 API、推理内容容错与密钥脱敏）、`CliAgentRuntime`（本地子进程树与超时回收）；
   - 提供 `AgentRuntimeRegistry` 动态路由器，支持健康检查与降级处理；
 - **实时 SSE 流式输出与 Last-Event-ID 断点重连 (`RunEventBroadcaster`)**：
   - 提供真实 SSE 流式输出端点 `GET /api/executions/runs/{runId}/stream` 与 `GET /api/runs/{runId}/stream`，彻底淘汰无状态长轮询假实时；
   - 每个事件具备单调递增 `sequenceId` 并持久化落库；
-  - 完整实现 `Last-Event-ID` 请求头与 `lastEventId` 查询参数的断点续传重放，客户端断线重连精准补齐遗漏的历史事件；
+  - 完整实现 `Last-Event-ID` 请求头与 `lastEventId` 查询参数的断点续传重放，并增加 `PageRequest` 2000 条上限安全保护，防范海量事件回放 OOM；
+  - `AuthFilter` 增强支持标准浏览器 `EventSource` 的 URL Token 查询参数认证；
   - 提供自动化 20 秒 `:heartbeat` 心跳保活机制，防止网络代理断开；
 - **Flyway 数据库演进**：
   - 落地 `V4__phase3_execution_kernel_and_state_machine.sql`，为 `workflow_runs` 添加 `cancel_reason`, `cancelled_at`, `correlation_id`，为 `step_runs` 添加 `started_at`, `finished_at`, `duration_ms`, `correlation_id`，并建立状态查询高效索引；
 - **全绿灯测试矩阵**：
-  - 新增 `ExecutionStateMachineAndConcurrencyTest`、`WorkflowCancellationAndTimeoutTest`、`ExecutionSseStreamAndReconnectionTest` 与 `ExecutionSchedulerAndRuntimeIntegrationTest` 15 项集成测试用例；
-  - 后端 94/94 项单元、架构守卫与集成测试 100% 绿灯通过；前端 Next.js 14 生产构建 100% 绿灯。
+  - 新增 `ExecutionStateMachineAndConcurrencyTest`、`WorkflowCancellationAndTimeoutTest`、`ExecutionSseStreamAndReconnectionTest` 与 `ExecutionSchedulerAndRuntimeIntegrationTest` 20 项集成测试用例；
+  - 后端 99/99 项单元、架构守卫与集成测试 100% 绿灯通过；前端 Next.js 14 生产构建 100% 绿灯。
 
 ---
 

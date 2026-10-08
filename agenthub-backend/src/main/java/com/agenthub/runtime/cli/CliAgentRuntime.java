@@ -106,13 +106,13 @@ public class CliAgentRuntime implements AgentRuntime {
                 streamReader.join(1000);
 
                 if (!completed) {
-                    process.destroyForcibly();
+                    destroyProcessTree(process);
                     sink.onStepFailed(runId, stepRunId, "CLI process timed out after " + timeoutSec + "s", null);
                     return;
                 }
 
                 if (cancelToken != null && cancelToken.isCancelled()) {
-                    process.destroyForcibly();
+                    destroyProcessTree(process);
                     sink.onStepFailed(runId, stepRunId, "CLI execution cancelled: " + cancelToken.getReason(), null);
                     return;
                 }
@@ -143,5 +143,28 @@ public class CliAgentRuntime implements AgentRuntime {
     private String resolveExecutable() {
         String cmd = IS_WINDOWS ? "claude.cmd" : "claude";
         return CliProcessAdapter.resolveCommand(cmd);
+    }
+
+    private void destroyProcessTree(Process p) {
+        if (p == null || !p.isAlive()) {
+            return;
+        }
+        try {
+            p.toHandle().descendants().forEach(h -> {
+                try {
+                    h.destroyForcibly();
+                } catch (Exception ignored) {}
+            });
+            p.destroyForcibly();
+            if (IS_WINDOWS) {
+                try {
+                    long pid = p.pid();
+                    new ProcessBuilder("taskkill", "/PID", String.valueOf(pid), "/T", "/F")
+                            .start().waitFor(1, TimeUnit.SECONDS);
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            log.warn("Error destroying CLI process tree: {}", e.getMessage());
+        }
     }
 }

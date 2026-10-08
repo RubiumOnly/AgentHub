@@ -40,6 +40,9 @@ class ExecutionSseStreamAndReconnectionTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private com.agenthub.identity.infrastructure.security.TokenProvider tokenProvider;
+
     @BeforeEach
     void setUp() {
         RequestContext.get().setUserId("user-1");
@@ -153,5 +156,23 @@ class ExecutionSseStreamAndReconnectionTest {
         assertThat(responseContent).contains("event:CHUNK_3");
         // Should contain stream opened handshake
         assertThat(responseContent).contains("event:connected");
+    }
+
+    @Test
+    @DisplayName("测试浏览器 EventSource 通过 URL query 参数 token 认证连接 SSE 流")
+    void shouldAuthenticateBrowserSseStreamViaTokenQueryParam() throws Exception {
+        WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", "def-default", null));
+        String runId = run.getId();
+
+        String jwt = tokenProvider.generateToken("user-1", "user-1@agenthub.com");
+
+        // Clear RequestContext to simulate incoming unauthenticated request in filter
+        RequestContext.clear();
+
+        mockMvc.perform(get("/api/executions/runs/" + runId + "/stream")
+                        .param("token", jwt)
+                        .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", org.hamcrest.Matchers.startsWith(MediaType.TEXT_EVENT_STREAM_VALUE)));
     }
 }

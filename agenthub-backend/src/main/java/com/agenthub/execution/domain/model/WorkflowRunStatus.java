@@ -30,7 +30,7 @@ public enum WorkflowRunStatus {
                 SUCCEEDED, Collections.emptySet(),
                 FAILED, EnumSet.of(RUNNING), // Allows explicit restart/retry of a failed run
                 CANCELLED, Collections.emptySet(),
-                TIMED_OUT, Collections.emptySet()
+                TIMED_OUT, EnumSet.of(RUNNING) // Allows restart/retry after timeout
         );
     }
 

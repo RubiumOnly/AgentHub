@@ -144,13 +144,32 @@ public class OpenAiCompatibleRuntime implements AgentRuntime {
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         if (response.statusCode() == 200) {
             JsonNode root = objectMapper.readTree(response.body());
-            JsonNode choices = root.get("choices");
-            if (choices != null && choices.isArray() && !choices.isEmpty()) {
-                String content = choices.get(0).get("message").get("content").asText();
-                String sanitized = CliProcessAdapter.sanitizeOutput(content);
-                sink.onToken(runId, stepRunId, sanitized);
-                return sanitized;
+            if (root != null) {
+                if (root.has("error")) {
+                    throw new RuntimeException("API error: " + root.get("error").toString());
+                }
+                JsonNode choices = root.get("choices");
+                if (choices != null && choices.isArray() && !choices.isEmpty()) {
+                    JsonNode choice0 = choices.get(0);
+                    JsonNode messageNode = choice0.get("message");
+                    String content = null;
+                    if (messageNode != null) {
+                        if (messageNode.hasNonNull("content")) {
+                            content = messageNode.get("content").asText();
+                        } else if (messageNode.hasNonNull("reasoning_content")) {
+                            content = messageNode.get("reasoning_content").asText();
+                        }
+                    } else if (choice0.hasNonNull("text")) {
+                        content = choice0.get("text").asText();
+                    }
+                    if (content != null) {
+                        String sanitized = CliProcessAdapter.sanitizeOutput(content);
+                        sink.onToken(runId, stepRunId, sanitized);
+                        return sanitized;
+                    }
+                }
             }
+            throw new RuntimeException("API returned unexpected response structure without content: " + response.body());
         }
         throw new RuntimeException("API returned HTTP " + response.statusCode() + ": " + response.body());
     }

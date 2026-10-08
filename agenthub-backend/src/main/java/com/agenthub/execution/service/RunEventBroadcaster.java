@@ -24,6 +24,7 @@ public class RunEventBroadcaster {
 
     private static final Logger log = LoggerFactory.getLogger(RunEventBroadcaster.class);
     private static final long SSE_TIMEOUT_MS = 180_000L; // 3 minutes timeout
+    private static final int MAX_REPLAY_LIMIT = 2000; // Cap replay query to protect memory
 
     private final RunEventRepository runEventRepository;
     private final Map<String, List<SseEmitter>> activeEmitters = new ConcurrentHashMap<>();
@@ -42,7 +43,7 @@ public class RunEventBroadcaster {
 
     /**
      * Subscribe to real-time execution events for a Run.
-     * If lastEventId is provided, immediately replays all historical events missed after that cursor.
+     * If lastEventId is provided, immediately replays all historical events missed after that cursor (bounded by MAX_REPLAY_LIMIT).
      */
     public SseEmitter subscribe(String runId, Long lastEventId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
@@ -52,14 +53,15 @@ public class RunEventBroadcaster {
         emitter.onTimeout(() -> removeEmitter(runId, emitter));
         emitter.onError((e) -> removeEmitter(runId, emitter));
 
-        // 1. Replay missed events if Last-Event-ID cursor provided
+        // 1. Replay missed events if Last-Event-ID cursor provided (bounded by PageRequest)
         int replayedCount = 0;
         if (lastEventId != null && lastEventId >= 0) {
+            org.springframework.data.domain.Pageable limit = org.springframework.data.domain.PageRequest.of(0, MAX_REPLAY_LIMIT);
             List<RunEventEntity> missedEvents;
             if (lastEventId == 0) {
-                missedEvents = runEventRepository.findByRunIdOrderBySequenceNumAsc(runId);
+                missedEvents = runEventRepository.findByRunIdOrderBySequenceNumAsc(runId, limit);
             } else {
-                missedEvents = runEventRepository.findByRunIdAndSequenceNumGreaterThanOrderBySequenceNumAsc(runId, lastEventId);
+                missedEvents = runEventRepository.findByRunIdAndSequenceNumGreaterThanOrderBySequenceNumAsc(runId, lastEventId, limit);
             }
 
             for (RunEventEntity event : missedEvents) {
@@ -159,5 +161,22 @@ public class RunEventBroadcaster {
     public int getActiveSubscriberCount(String runId) {
         List<SseEmitter> list = activeEmitters.get(runId);
         return list != null ? list.size() : 0;
+    }
+
+    /**
+     * Evict memory state for completed or cancelled run.
+     */
+    public void evictRun(String runId) {
+        if (runId != null) {
+            runSequenceCounters.remove(runId);
+            List<SseEmitter> emitters = activeEmitters.remove(runId);
+            if (emitters != null) {
+                for (SseEmitter emitter : emitters) {
+                    try {
+                        emitter.complete();
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
     }
 }
