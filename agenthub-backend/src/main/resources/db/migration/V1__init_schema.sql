@@ -100,6 +100,8 @@ CREATE TABLE conversations (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
+CREATE INDEX idx_conversations_owner ON conversations(owner_id);
+CREATE INDEX idx_conversations_proj ON conversations(project_id);
 
 CREATE TABLE conversation_participants (
     id VARCHAR(64) NOT NULL PRIMARY KEY,

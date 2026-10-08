@@ -37,13 +37,13 @@ public class AuthFilter implements Filter {
                 String userIdHeader = httpRequest.getHeader("X-User-Id");
                 if (userIdHeader != null && !userIdHeader.isBlank()) {
                     RequestContext.get().setUserId(userIdHeader);
-                } else if (RequestContext.get().getUserId() == null) {
-                    // Default fallback to user-1 for local development compatibility
-                    RequestContext.get().setUserId("user-1");
-                    RequestContext.get().setUsername("admin@agenthub.local");
                 }
             }
         }
-        chain.doFilter(request, response);
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            RequestContext.clear();
+        }
     }
 }

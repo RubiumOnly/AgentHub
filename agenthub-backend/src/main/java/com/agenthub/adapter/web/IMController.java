@@ -39,6 +39,13 @@ public class IMController {
 
     @PostMapping("/conversations")
     public Result<ConversationView> createConversation(@RequestBody CreateConversationRequest req) {
+        String currentUserId = com.agenthub.shared.context.RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new com.agenthub.shared.exception.BusinessException(
+                    com.agenthub.shared.exception.ErrorCode.UNAUTHORIZED,
+                    "Authentication required to create conversation"
+            );
+        }
         CreateConversationCommand cmd = new CreateConversationCommand(
                 req.title,
                 req.type != null ? req.type : ConversationType.DIRECT_CHAT,
@@ -51,6 +58,13 @@ public class IMController {
 
     @GetMapping("/conversations")
     public Result<List<ConversationView>> listConversations() {
+        String currentUserId = com.agenthub.shared.context.RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new com.agenthub.shared.exception.BusinessException(
+                    com.agenthub.shared.exception.ErrorCode.UNAUTHORIZED,
+                    "Authentication required to list conversations"
+            );
+        }
         return Result.ok(conversationApplication.listConversations());
     }
 
@@ -66,8 +80,15 @@ public class IMController {
 
     @PostMapping("/conversations/{id}/messages")
     public Result<MessageView> sendMessage(@PathVariable("id") String id, @RequestBody SendMessageRequest req) {
+        String currentUserId = com.agenthub.shared.context.RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new com.agenthub.shared.exception.BusinessException(
+                    com.agenthub.shared.exception.ErrorCode.UNAUTHORIZED,
+                    "Authentication required to send message"
+            );
+        }
         SendMessageCommand cmd = new SendMessageCommand(
-                req.senderId != null ? req.senderId : "user-1",
+                req.senderId != null ? req.senderId : currentUserId,
                 req.senderType != null ? req.senderType : SenderType.USER,
                 req.content
         );

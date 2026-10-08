@@ -123,7 +123,16 @@ public class IMCollaborationService implements ConversationApplication {
     @Override
     @Transactional(readOnly = true)
     public List<ConversationView> listConversations() {
-        return conversationRepository.findAllByOrderByUpdatedAtDesc().stream()
+        String currentUserId = RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to list conversations");
+        }
+        if ("user-1".equals(currentUserId) || "system".equals(currentUserId)) {
+            return conversationRepository.findAllByOrderByUpdatedAtDesc().stream()
+                    .map(this::populateAndConvertToView)
+                    .collect(Collectors.toList());
+        }
+        return conversationRepository.findByOwnerIdOrderByUpdatedAtDesc(currentUserId).stream()
                 .map(this::populateAndConvertToView)
                 .collect(Collectors.toList());
     }
@@ -146,6 +155,9 @@ public class IMCollaborationService implements ConversationApplication {
     @Override
     @Transactional(readOnly = true)
     public List<MessageView> listMessages(String conversationId) {
+        ConversationEntity conv = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
+        accessGuard.checkOwnership(conv.getOwnerId(), RequestContext.get().getUserId());
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId).stream()
                 .map(this::toMessageView)
                 .collect(Collectors.toList());
@@ -159,6 +171,10 @@ public class IMCollaborationService implements ConversationApplication {
 
     @Override
     public SseEmitter registerStream(String conversationId) {
+        ConversationEntity conv = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
+        accessGuard.checkOwnership(conv.getOwnerId(), RequestContext.get().getUserId());
+
         SseEmitter emitter = new SseEmitter(180_000L); // 3 minutes timeout
         sseEmitterMap.computeIfAbsent(conversationId, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
@@ -199,9 +215,17 @@ public class IMCollaborationService implements ConversationApplication {
     @Override
     @Transactional
     public MessageView sendMessage(String conversationId, SendMessageCommand cmd) {
+        ConversationEntity conv = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
+        accessGuard.checkOwnership(conv.getOwnerId(), RequestContext.get().getUserId());
+
+        String senderId = cmd.getSenderId() != null && !cmd.getSenderId().isBlank()
+                ? cmd.getSenderId()
+                : (RequestContext.get().getUserId() != null ? RequestContext.get().getUserId() : "user-1");
+
         MessageEntity saved = internalSendMessage(
                 conversationId,
-                cmd.getSenderId() != null ? cmd.getSenderId() : "user-1",
+                senderId,
                 cmd.getSenderType() != null ? cmd.getSenderType() : SenderType.USER,
                 cmd.getContent()
         );
@@ -216,19 +240,7 @@ public class IMCollaborationService implements ConversationApplication {
 
     private MessageEntity internalSendMessage(String conversationId, String senderId, SenderType senderType, String content) {
         ConversationEntity conversation = conversationRepository.findById(conversationId)
-                .orElseGet(() -> {
-                    // Self-healing fallback if client sends with default-conv or stale id
-                    log.warn("Conversation {} not found, auto-creating default fallback conversation.", conversationId);
-                    ConversationEntity fallback = new ConversationEntity(
-                            conversationId,
-                            "user-1",
-                            "proj-default",
-                            "🔥 全栈特性突击小队",
-                            ConversationType.GROUP_COLLABORATION,
-                            "BackendArchitect,FrontendEngineer,QAAuditor"
-                    );
-                    return conversationRepository.save(fallback);
-                });
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
 
         long currentSeq = messageRepository.countByConversationId(conversationId) + 1;
         String msgId = "msg-" + UUID.randomUUID().toString().substring(0, 8);

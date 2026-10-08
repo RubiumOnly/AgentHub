@@ -8,6 +8,8 @@ import com.agenthub.identity.dto.UserView;
 public interface AuthApplication {
     AuthTokenView register(RegisterCommand cmd);
     AuthTokenView login(LoginCommand cmd);
+    AuthTokenView refreshToken(String oldToken);
+    void logout(String token);
     UserView getCurrentUser();
     UserView getUserById(String userId);
 }

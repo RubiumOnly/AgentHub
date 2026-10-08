@@ -42,4 +42,10 @@ public class ProjectController {
         WorkspaceView view = projectApplication.getWorkspaceByProjectId(projectId);
         return Result.ok(view);
     }
+
+    @GetMapping("/{projectId}/workspaces")
+    public Result<List<WorkspaceView>> getWorkspaces(@PathVariable("projectId") String projectId) {
+        WorkspaceView view = projectApplication.getWorkspaceByProjectId(projectId);
+        return Result.ok(List.of(view));
+    }
 }

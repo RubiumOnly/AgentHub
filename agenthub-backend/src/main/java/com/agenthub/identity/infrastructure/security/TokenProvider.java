@@ -1,5 +1,7 @@
 package com.agenthub.identity.infrastructure.security;
 
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -9,12 +11,15 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class TokenProvider {
 
     private final String secretKey;
     private final long tokenValiditySeconds;
+    private final Set<String> invalidatedTokens = ConcurrentHashMap.newKeySet();
 
     public TokenProvider(
             @Value("${agenthub.auth.secret:AgentHub-Secure-JWT-Secret-Key-Phase1-2026-SuperStrong}") String secretKey,
@@ -41,15 +46,31 @@ public class TokenProvider {
     }
 
     public String generateToken(String userId, String email) {
+        String tokenId = java.util.UUID.randomUUID().toString().replace("-", "");
         long expiresAt = Instant.now().getEpochSecond() + tokenValiditySeconds;
-        String payload = userId + ":" + email + ":" + expiresAt;
+        String payload = tokenId + ":" + userId + ":" + email + ":" + expiresAt;
         String signature = sign(payload);
         String rawToken = payload + ":" + signature;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(rawToken.getBytes(StandardCharsets.UTF_8));
     }
 
+    public void invalidateToken(String token) {
+        if (token != null && !token.isBlank()) {
+            invalidatedTokens.add(token);
+        }
+    }
+
+    public String refreshToken(String oldToken) {
+        TokenClaims claims = parseAndValidateToken(oldToken);
+        if (claims == null) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, "Invalid or expired token for refresh");
+        }
+        invalidateToken(oldToken);
+        return generateToken(claims.getUserId(), claims.getEmail());
+    }
+
     public TokenClaims parseAndValidateToken(String token) {
-        if (token == null || token.isBlank()) {
+        if (token == null || token.isBlank() || invalidatedTokens.contains(token)) {
             return null;
         }
 
@@ -63,25 +84,42 @@ public class TokenProvider {
             byte[] decoded = Base64.getUrlDecoder().decode(token);
             String raw = new String(decoded, StandardCharsets.UTF_8);
             String[] parts = raw.split(":");
-            if (parts.length != 4) {
-                return null;
-            }
+            if (parts.length == 5) {
+                String tokenId = parts[0];
+                String userId = parts[1];
+                String email = parts[2];
+                long expiresAt = Long.parseLong(parts[3]);
+                String providedSignature = parts[4];
 
-            String userId = parts[0];
-            String email = parts[1];
-            long expiresAt = Long.parseLong(parts[2]);
-            String providedSignature = parts[3];
+                String expectedSignature = sign(tokenId + ":" + userId + ":" + email + ":" + expiresAt);
+                if (!MessageDigest.isEqual(providedSignature.getBytes(StandardCharsets.UTF_8), expectedSignature.getBytes(StandardCharsets.UTF_8))) {
+                    return null;
+                }
 
-            String expectedSignature = sign(userId + ":" + email + ":" + expiresAt);
-            if (!MessageDigest.isEqual(providedSignature.getBytes(StandardCharsets.UTF_8), expectedSignature.getBytes(StandardCharsets.UTF_8))) {
-                return null;
-            }
+                TokenClaims claims = new TokenClaims(userId, email, expiresAt);
+                if (claims.isExpired()) {
+                    return null;
+                }
+                return claims;
+            } else if (parts.length == 4) {
+                // Backward-compatibility for legacy 4-part tokens
+                String userId = parts[0];
+                String email = parts[1];
+                long expiresAt = Long.parseLong(parts[2]);
+                String providedSignature = parts[3];
 
-            TokenClaims claims = new TokenClaims(userId, email, expiresAt);
-            if (claims.isExpired()) {
-                return null;
+                String expectedSignature = sign(userId + ":" + email + ":" + expiresAt);
+                if (!MessageDigest.isEqual(providedSignature.getBytes(StandardCharsets.UTF_8), expectedSignature.getBytes(StandardCharsets.UTF_8))) {
+                    return null;
+                }
+
+                TokenClaims claims = new TokenClaims(userId, email, expiresAt);
+                if (claims.isExpired()) {
+                    return null;
+                }
+                return claims;
             }
-            return claims;
+            return null;
         } catch (Exception e) {
             return null;
         }

@@ -14,10 +14,16 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(com.agenthub.shared.exception.BusinessException.class)
+    public Result<Void> handleSharedBusinessException(com.agenthub.shared.exception.BusinessException ex) {
+        log.warn("Business exception occurred: code={}, message={}", ex.getErrorCode().getCode(), ex.getMessage());
+        return Result.fail(ex.getErrorCode().getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException ex) {
         log.warn("Business exception occurred: code={}, message={}", ex.getErrorCode().getCode(), ex.getMessage());
-        return Result.fail(ex.getErrorCode(), ex.getMessage());
+        return Result.fail(ex.getErrorCode().getCode(), ex.getMessage());
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})

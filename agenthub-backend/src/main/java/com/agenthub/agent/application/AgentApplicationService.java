@@ -65,7 +65,7 @@ public class AgentApplicationService implements AgentApplication {
     public List<AgentInstanceView> listCurrentUserInstances() {
         String userId = RequestContext.get().getUserId();
         if (userId == null || userId.isBlank()) {
-            userId = "user-1";
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to list agent instances");
         }
         return instanceRepository.findByOwnerId(userId).stream()
                 .map(this::toView)
@@ -80,7 +80,7 @@ public class AgentApplicationService implements AgentApplication {
         }
         String userId = RequestContext.get().getUserId();
         if (userId == null || userId.isBlank()) {
-            userId = "user-1";
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to create agent instance");
         }
         String id = "inst-" + UUID.randomUUID().toString().substring(0, 8);
         AgentInstanceEntity entity = new AgentInstanceEntity(
@@ -101,7 +101,7 @@ public class AgentApplicationService implements AgentApplication {
     public List<ProviderView> listCurrentUserProviders() {
         String userId = RequestContext.get().getUserId();
         if (userId == null || userId.isBlank()) {
-            userId = "user-1";
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to list providers");
         }
         return providerRepository.findByOwnerId(userId).stream()
                 .map(this::toView)

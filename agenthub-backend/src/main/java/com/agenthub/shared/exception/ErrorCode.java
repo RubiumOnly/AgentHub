@@ -6,51 +6,51 @@ package com.agenthub.shared.exception;
 public enum ErrorCode {
     SUCCESS(0, "Operation Successful"),
     PARAM_ERROR(400, "Invalid Request Parameters"),
-    UNAUTHORIZED(401, "Authentication Required"),
-    FORBIDDEN(403, "Access Forbidden"),
+    UNAUTHORIZED(1001, "Authentication Required"),
+    FORBIDDEN(1002, "Access Forbidden"),
     NOT_FOUND(404, "Requested Resource Not Found"),
     CONFLICT(409, "Resource Conflict"),
-    INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
+    INTERNAL_SERVER_ERROR(9001, "Internal Server Error"),
 
     // Identity & Authentication
-    AUTH_FAILED(1101, "Invalid username, email or password"),
-    AUTH_TOKEN_EXPIRED(1102, "Authentication token has expired"),
-    AUTH_TOKEN_INVALID(1103, "Invalid authentication token"),
-    USER_ALREADY_EXISTS(1104, "User with given email or username already exists"),
-    USER_NOT_FOUND(1105, "User not found"),
-
-    // Agent & Provider
-    AGENT_NOT_FOUND(1001, "Agent Not Found"),
-    AGENT_CLI_UNAVAILABLE(1002, "Agent CLI Runtime Not Available"),
-    AGENT_EXECUTION_TIMEOUT(1003, "Agent Execution Timed Out"),
-    AGENT_EXECUTION_FAILED(1004, "Agent Execution Failed"),
-    PROVIDER_NOT_FOUND(1005, "LLM or CLI Provider not found"),
+    AUTH_FAILED(1003, "Invalid email or password"),
+    USER_ALREADY_EXISTS(1004, "User with given email or username already exists"),
+    USER_NOT_FOUND(1005, "User not found"),
+    AUTH_TOKEN_EXPIRED(1006, "Authentication token has expired"),
+    AUTH_TOKEN_INVALID(1007, "Invalid authentication token"),
 
     // Project & Workspace
-    PROJECT_NOT_FOUND(1201, "Project not found"),
-    PROJECT_ACCESS_DENIED(1202, "Access to project denied"),
-    WORKSPACE_NOT_FOUND(1203, "Workspace not found"),
-    WORKSPACE_LOCKED(3001, "Workspace is Currently Locked by Another Task"),
-    WORKSPACE_GIT_ERROR(3002, "Git Workspace Operation Failed"),
+    PROJECT_NOT_FOUND(2001, "Project not found"),
+    PROJECT_ACCESS_DENIED(2002, "Access to project denied"),
+    WORKSPACE_NOT_FOUND(3001, "Workspace not found"),
+    WORKSPACE_LOCKED(3002, "Workspace is Currently Locked by Another Task"),
     WORKSPACE_PATH_INVALID(3003, "Invalid workspace path format or illegal characters"),
     WORKSPACE_TRAVERSAL_DENIED(3004, "Directory traversal outside workspace is strictly forbidden"),
     WORKSPACE_GIT_ACCESS_DENIED(3005, "Direct read or modification of .git directory is forbidden"),
+    WORKSPACE_GIT_ERROR(3006, "Git Workspace Operation Failed"),
 
     // Conversation & IM
-    CONVERSATION_NOT_FOUND(1301, "Conversation not found"),
-    CONVERSATION_ACCESS_DENIED(1302, "Access to conversation denied"),
-    MESSAGE_NOT_FOUND(1303, "Message not found"),
+    CONVERSATION_NOT_FOUND(4001, "Conversation not found"),
+    CONVERSATION_ACCESS_DENIED(4003, "Access to conversation denied"),
+    MESSAGE_NOT_FOUND(4004, "Message not found"),
+
+    // Agent & Provider
+    AGENT_NOT_FOUND(5001, "Agent Not Found"),
+    AGENT_CLI_UNAVAILABLE(5002, "Agent CLI Runtime Not Available"),
+    AGENT_EXECUTION_TIMEOUT(5003, "Agent Execution Timed Out"),
+    AGENT_EXECUTION_FAILED(5004, "Agent Execution Failed"),
+    PROVIDER_NOT_FOUND(5005, "LLM or CLI Provider not found"),
 
     // Workflow & Execution
-    WORKFLOW_INVALID(2001, "Workflow Definition Invalid or Cyclic"),
-    WORKFLOW_EXECUTION_FAILED(2002, "Workflow Execution Failed"),
-    RUN_NOT_FOUND(2003, "Workflow run instance not found"),
-    STEP_RUN_NOT_FOUND(2004, "Workflow step run instance not found"),
-    APPROVAL_NOT_FOUND(2005, "Approval request not found"),
-    IDEMPOTENCY_CONFLICT(2006, "Concurrent run with same idempotency key already exists"),
+    WORKFLOW_INVALID(6001, "Workflow Definition Invalid or Cyclic"),
+    RUN_NOT_FOUND(6002, "Workflow run instance not found"),
+    STEP_RUN_NOT_FOUND(6003, "Workflow step run instance not found"),
+    APPROVAL_NOT_FOUND(6004, "Approval request not found"),
+    IDEMPOTENCY_CONFLICT(6005, "Concurrent run with same idempotency key already exists"),
+    WORKFLOW_EXECUTION_FAILED(6006, "Workflow Execution Failed"),
 
     // Sandbox & Deployment
-    DEPLOYMENT_NOT_FOUND(1401, "Deployment record not found");
+    DEPLOYMENT_NOT_FOUND(7001, "Deployment record not found");
 
     private final int code;
     private final String message;

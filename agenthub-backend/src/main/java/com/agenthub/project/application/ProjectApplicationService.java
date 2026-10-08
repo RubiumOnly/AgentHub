@@ -42,7 +42,7 @@ public class ProjectApplicationService implements ProjectApplication {
 
         String currentUserId = RequestContext.get().getUserId();
         if (currentUserId == null || currentUserId.isBlank()) {
-            currentUserId = "user-1";
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to create project");
         }
 
         String projectId = "proj-" + UUID.randomUUID().toString().substring(0, 8);
@@ -76,7 +76,7 @@ public class ProjectApplicationService implements ProjectApplication {
     public List<ProjectView> listCurrentUserProjects() {
         String currentUserId = RequestContext.get().getUserId();
         if (currentUserId == null || currentUserId.isBlank()) {
-            currentUserId = "user-1";
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to list projects");
         }
         return listUserProjects(currentUserId);
     }

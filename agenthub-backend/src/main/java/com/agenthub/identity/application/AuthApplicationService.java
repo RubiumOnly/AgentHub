@@ -73,11 +73,33 @@ public class AuthApplicationService implements AuthApplication {
     }
 
     @Override
+    public AuthTokenView refreshToken(String oldToken) {
+        if (oldToken == null || oldToken.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Token must not be blank");
+        }
+        String newToken = tokenProvider.refreshToken(oldToken);
+        TokenProvider.TokenClaims claims = tokenProvider.parseAndValidateToken(newToken);
+        if (claims == null) {
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, "Failed to validate refreshed token");
+        }
+        UserView userView = getUserById(claims.getUserId());
+        return new AuthTokenView(newToken, "Bearer", tokenProvider.getTokenValiditySeconds(), userView);
+    }
+
+    @Override
+    public void logout(String token) {
+        if (token != null && !token.isBlank()) {
+            tokenProvider.invalidateToken(token);
+        }
+        RequestContext.clear();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public UserView getCurrentUser() {
         String currentUserId = RequestContext.get().getUserId();
         if (currentUserId == null || currentUserId.isBlank()) {
-            currentUserId = "user-1"; // dev default fallback
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required");
         }
         return getUserById(currentUserId);
     }
