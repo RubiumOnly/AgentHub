@@ -29,7 +29,7 @@
   - 新增与丰富 `workflow_definitions` (name, description, updated_at), `workflow_runs` (context_data_json), `step_runs` (inputs_json, outputs_json, requires_approval) 以及 `approvals` 表索引与审计字段；
 - **全绿灯测试矩阵**：
   - 新增 6 大测试套件：`WorkflowDslValidationAndCycleDetectionTest`、`SafeExpressionEvaluatorAndDataFlowTest`、`WorkflowDagSchedulingAndParallelExecutionTest`、`WorkflowBranchingAndSkipPruningTest`、`HumanInTheLoopApprovalIntegrationTest` 与 `WorkflowDefinitionAndApprovalControllerIntegrationTest`；
-  - 后端 121/121 项单元测试、集成测试与架构守卫规则 100% 绿灯通过；前端 Next.js 14 生产构建 100% 成功。
+  - 后端 127/127 项单元测试、集成测试与架构守卫规则 100% 绿灯通过；前端 Next.js 14 生产构建 100% 成功。
 
 ---
 
