@@ -44,6 +44,9 @@ public class WorkflowRunEntity {
     @Column(name = "correlation_id", length = 64)
     private String correlationId;
 
+    @Column(name = "context_data_json", columnDefinition = "TEXT")
+    private String contextDataJson;
+
     public WorkflowRunEntity() {}
 
     public WorkflowRunEntity(String id, String projectId, String definitionId, String status, String idempotencyKey) {
@@ -80,4 +83,6 @@ public class WorkflowRunEntity {
     public void setCancelledAt(LocalDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
     public String getCorrelationId() { return correlationId; }
     public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
+    public String getContextDataJson() { return contextDataJson; }
+    public void setContextDataJson(String contextDataJson) { this.contextDataJson = contextDataJson; }
 }

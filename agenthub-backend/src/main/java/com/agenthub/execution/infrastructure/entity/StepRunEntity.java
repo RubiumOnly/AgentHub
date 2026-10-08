@@ -50,6 +50,15 @@ public class StepRunEntity {
     @Column(name = "correlation_id", length = 64)
     private String correlationId;
 
+    @Column(name = "inputs_json", columnDefinition = "TEXT")
+    private String inputsJson;
+
+    @Column(name = "outputs_json", columnDefinition = "TEXT")
+    private String outputsJson;
+
+    @Column(name = "requires_approval")
+    private Boolean requiresApproval = false;
+
     public StepRunEntity() {}
 
     public StepRunEntity(String id, String runId, String nodeId, String status) {
@@ -90,4 +99,10 @@ public class StepRunEntity {
     public void setDurationMs(Long durationMs) { this.durationMs = durationMs; }
     public String getCorrelationId() { return correlationId; }
     public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
+    public String getInputsJson() { return inputsJson; }
+    public void setInputsJson(String inputsJson) { this.inputsJson = inputsJson; }
+    public String getOutputsJson() { return outputsJson; }
+    public void setOutputsJson(String outputsJson) { this.outputsJson = outputsJson; }
+    public Boolean getRequiresApproval() { return requiresApproval; }
+    public void setRequiresApproval(Boolean requiresApproval) { this.requiresApproval = requiresApproval; }
 }

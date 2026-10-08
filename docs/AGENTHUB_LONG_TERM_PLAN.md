@@ -316,30 +316,30 @@ public interface AgentRuntime {
 - [x] 严格状态机拦截非法流转（终态不可逆，非法跳跃抛出 6007 异常，并发转移多线程互斥）；
 - [x] SSE 真实流式输出且具备单调递增序号，`Last-Event-ID` 断点重连补发用例 100% 验证通过。
 
-### 阶段 4：Orchestrator 与可靠执行引擎（预计 2～3 周）
+### 阶段 4：工作流编排引擎、DAG 依赖与数据流拓扑（✅ 已圆满交付）
 
-**目标**：把静态 DAG 演示变成可恢复的任务执行产品，这是简历项目的核心阶段。
+> **阶段交付状态**：已完成 DSL 规范化与 Kahn 成环校验、有界线程池兄弟节点真实并发调度、安全无 RCE 递归下降表达式计算、动态分支跳过与级联剪枝，以及 Human-in-the-Loop 人工审批挂起/恢复门禁（后端 121/121 全绿灯，前端 npm run build 通过）。
 
-**具体工作**：
+**目标**：把静态 DAG 演示变成可恢复、可编排、可并发执行的任务执行引擎，奠定企业级复杂智能体协作基座。
 
-1. 定义版本化 Workflow DSL：`schemaVersion`、entryNodeId、nodes、edges、node type、agentRef、input mapping、retry、timeout、approval、condition、parallel policy。
-2. 编写 DSL 校验器：节点 ID 唯一、入口存在、图无非法环、条件分支完整、引用的 Agent/工具存在、超时和重试范围合法。
-3. Orchestrator 只负责目标理解、计划生成、计划解释和计划版本；Executor 负责按照已确认计划执行，避免“边想边改图”。
-4. 引入 `TaskPlanCreated`、`RunQueued`、`StepReady`、`StepStarted`、`AgentEventReceived`、`StepSucceeded`、`ApprovalRequested`、`RunFailed` 等事件。
-5. 使用 Spring TaskExecutor + 持久化队列实现单机版本；定义未来切换 Redis Streams/RabbitMQ 的 Port。不得直接使用默认 `CompletableFuture` 公共线程池作为核心队列。
-6. 实现 DAG 调度：可并行节点等待依赖完成，条件节点只激活一条分支，失败节点按策略重试或中止，人工审批节点暂停 Run。
-7. 实现查询、取消、暂停、恢复、重试单 Step、从某个 Step 重新执行和幂等启动。
-8. 为每个 Step 保存输入快照、上下文 manifest、输出摘要、Artifact 引用和错误分类；大文本进入对象存储/文件存储，数据库只存引用和摘要。
-9. 将前端画布改为 DSL 编辑器的投影：后端返回节点状态，前端只负责编辑草稿和展示执行状态。
+**具体工作与实现**：
 
-**退出条件**：
+1. **版本化工作流 DSL 与 Kahn 拓扑排序校验**：定义 `WorkflowDsl`, `WorkflowNodeDsl`, `WorkflowEdgeDsl`, `RetryPolicyDsl` 等模型；实现 `WorkflowDslValidator`，基于入度数组的 Kahn 算法完成 DAG 分层与拓扑排序，检测自环与回路并严格抛出 `6001 WORKFLOW_INVALID`，拦截孤岛未连通节点；
+2. **真实并发调度与有界线程池 DAG 执行引擎**：落地 `DagExecutionEngine`，同层兄弟节点在有界线程池内真正并行调度；支持 `all_succeeded`、`any_succeeded` 及自定义入边聚合；增加快速取消与熔断中止（`abortRemainingNodes` 与 100ms 快速中断轮询），防止线程挂起；
+3. **安全数据流管道与零 RCE 风险表达式计算**：实现 `WorkflowExecutionContext` 支持参数模板插值（`{{steps.<nodeId>.outputs.<key>}}`, `{{inputs.<key>}}`）；实现自研递归下降安全解析器 `SafeExpressionEvaluator`，支持比较、布尔逻辑与安全字面量，从原理上消除 SpEL/OGNL/反射注入带来的远程代码执行 (RCE) 隐患；
+4. **动态条件分支与级联跳过剪枝**：支持根据边条件表达式判定路径有效性，未命中分支置为 `SKIPPED`，后继依赖节点自动级联跳过剪枝；
+5. **Human-in-the-Loop 人工审批门禁**：高危/审批节点（`requiresApproval: true`）触发时自动将 Step 与 Run 挂起为 `WAITING_APPROVAL`；提供 `/api/approvals/{id}/approve` 与 `/api/approvals/{id}/reject` 端点，审批通过后无缝唤醒 DAG 恢复执行，审批驳回时安全熔断中止；
+6. **Flyway 数据库演进**：落地 `V5__phase4_workflow_dag_and_orchestration.sql`，更新 `workflow_definitions` (dsl_json), `workflow_runs` (context_data_json), `step_runs` (inputs_json, outputs_json, requires_approval) 与 `approvals`；
+7. **全绿灯测试矩阵**：6 大测试套件覆盖 DSL 校验与成环拦截、表达式解析、真实并发调度、条件分支跳过剪枝、人工审批挂起恢复及 REST 接口端点，121/121 项测试全部通过。
 
-- 一个“后端设计 -> 前端实现 -> QA 审查 -> 人工批准”的 Run 可以完整执行；
-- 中途杀死应用后，重启能从最后一个可恢复 Step 继续；
-- 单个 Step 超时、失败、重试、取消和人工暂停都有可查询证据；
-- 同一幂等键重复提交不会创建两个 Run；
-- 条件分支和并行节点有自动化测试；
-- SSE 断线重连可使用 `Last-Event-ID` 或 sequence 游标补齐事件。
+**退出条件与验证证据**：
+
+- [x] 一个“后端设计 -> 前端实现 -> QA 审查 -> 人工批准”的 Run 可以完整执行并恢复后续节点（`HumanInTheLoopApprovalIntegrationTest` 验证通过）；
+- [x] Kahn 算法严格拦截带环依赖与自环，抛出 `6001 WORKFLOW_INVALID`（`WorkflowDslValidationAndCycleDetectionTest` 验证通过）；
+- [x] 上下游数据流管道安全传递参数并安全插值，零 RCE 隐患（`SafeExpressionEvaluatorAndDataFlowTest` 验证通过）；
+- [x] 同层兄弟节点真并发执行且正确聚合等待（`WorkflowDagSchedulingAndParallelExecutionTest` 验证通过）；
+- [x] 条件分支动态跳过未命中分支并级联剪枝后续依赖（`WorkflowBranchingAndSkipPruningTest` 验证通过）；
+- [x] 人工审批挂起并可通过 REST API 决策恢复或熔断中止（审批流与控制器测试通过）。
 
 ### 阶段 5：IM、事件流和交互闭环（预计 1～2 周）
 

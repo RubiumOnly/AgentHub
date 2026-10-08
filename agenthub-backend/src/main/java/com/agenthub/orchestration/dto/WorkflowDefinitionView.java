@@ -1,62 +1,36 @@
-package com.agenthub.orchestration.infrastructure.entity;
+package com.agenthub.orchestration.dto;
 
-import jakarta.persistence.*;
+import com.agenthub.orchestration.domain.dsl.WorkflowDsl;
+
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "workflow_definitions")
-public class WorkflowDefinitionEntity {
-
-    @Id
-    @Column(length = 64)
+public class WorkflowDefinitionView {
     private String id;
-
-    @Column(length = 128)
     private String name;
-
-    @Column(length = 512)
     private String description;
-
-    @Column(nullable = false, length = 32)
     private String version;
-
-    @Column(name = "schema_version", nullable = false, length = 16)
     private String schemaVersion;
-
-    @Column(name = "dsl_json", nullable = false, columnDefinition = "TEXT")
     private String dslJson;
-
-    @Column(length = 64)
+    private WorkflowDsl dsl;
     private String checksum;
-
-    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public WorkflowDefinitionEntity() {}
+    public WorkflowDefinitionView() {}
 
-    public WorkflowDefinitionEntity(String id, String version, String schemaVersion, String dslJson, String checksum) {
-        this.id = id;
-        this.version = version != null ? version : "1.0.0";
-        this.schemaVersion = schemaVersion != null ? schemaVersion : "v1";
-        this.dslJson = dslJson;
-        this.checksum = checksum;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    public WorkflowDefinitionEntity(String id, String name, String description, String version, String schemaVersion, String dslJson, String checksum) {
+    public WorkflowDefinitionView(String id, String name, String description, String version,
+                                  String schemaVersion, String dslJson, WorkflowDsl dsl,
+                                  String checksum, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.name = name;
         this.description = description;
-        this.version = version != null ? version : "1.0.0";
-        this.schemaVersion = schemaVersion != null ? schemaVersion : "v1";
+        this.version = version;
+        this.schemaVersion = schemaVersion;
         this.dslJson = dslJson;
+        this.dsl = dsl;
         this.checksum = checksum;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     public String getId() { return id; }
@@ -71,6 +45,8 @@ public class WorkflowDefinitionEntity {
     public void setSchemaVersion(String schemaVersion) { this.schemaVersion = schemaVersion; }
     public String getDslJson() { return dslJson; }
     public void setDslJson(String dslJson) { this.dslJson = dslJson; }
+    public WorkflowDsl getDsl() { return dsl; }
+    public void setDsl(WorkflowDsl dsl) { this.dsl = dsl; }
     public String getChecksum() { return checksum; }
     public void setChecksum(String checksum) { this.checksum = checksum; }
     public LocalDateTime getCreatedAt() { return createdAt; }

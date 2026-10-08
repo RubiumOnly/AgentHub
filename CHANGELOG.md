@@ -4,6 +4,35 @@
 
 ---
 
+## [v1.4.0] - 2026-10-08
+
+### 🌟 阶段 4：工作流编排引擎、DAG 依赖与数据流拓扑 (Phase 4 Deliverables)
+- **版本化工作流 DSL 与 Kahn 拓扑排序校验 (`WorkflowDslValidator`)**：
+  - 规范化定义 `WorkflowDsl`, `WorkflowNodeDsl`, `WorkflowEdgeDsl`, `RetryPolicyDsl` 等核心模型；
+  - 基于 Kahn 算法实现确定性有向无环图 (DAG) 拓扑排序分层与成环检测（Cycle Detection），非法成环与自环检测严格抛出专用业务异常 `6001 WORKFLOW_INVALID`；
+  - 覆盖孤岛节点孤立检测与入口节点/出口节点合法性严格校验；
+- **真实并发调度与有界线程池 DAG 执行引擎 (`DagExecutionEngine`)**：
+  - 调度引擎基于有界受控线程池调度兄弟节点真实并发执行，支持 `all_succeeded`、`any_succeeded` 以及自定义前置条件动态收敛；
+  - 严格协同阶段 3 的底层状态机 `ExecutionStateMachine`，保障节点间状态转换原子性与细粒度锁安全性；
+  - 优化全局快速响应中止与取消感知机制（`abortRemainingNodes` 与 100ms 快速中断轮询），彻底消除依赖中止与人工拒绝场景下的线程挂起与超时悬挂问题；
+- **安全数据流管道与零 RCE 风险表达式计算 (`WorkflowExecutionContext` & `SafeExpressionEvaluator`)**：
+  - 实现了线程安全的工作流上下文数据管线，支持动态参数插值与跨节点上下文字段提取（`{{steps.<nodeId>.outputs.<key>}}` 与 `{{inputs.<key>}}`）；
+  - 彻底摈弃危险的 SpEL / 反射执行机制，自研递归下降安全表达式求值引擎，支持安全比较（`==`, `!=`, `>`, `<`, `>=`, `<=`）、逻辑组合（`&&`, `||`, `!`）与空安全解析，从根源杜绝远程代码执行 (RCE) 漏洞；
+- **动态条件分支与级联跳过剪枝 (Dynamic Branching & Cascade Skip Pruning)**：
+  - 智能评估边上的 `condition` 表达式，未命中分支对应的节点状态优雅收敛为 `SKIPPED`；
+  - 下游依赖于未执行前置节点的后续分支自动触发级联跳过剪枝，避免任务悬挂与脏执行；
+- **人工审批门禁 (Human-in-the-Loop) 与中断/恢复机制 (`ApprovalApplication`)**：
+  - 支持 `requiresApproval: true` 的关键质量门禁与高危操作节点，执行至此时挂起当前 Step 与 Run 为 `WAITING_APPROVAL`；
+  - 提供标准 REST 接口（`/api/approvals/{id}/approve` 与 `/api/approvals/{id}/reject`）及全流程事件审计；
+  - 审批通过后无缝恢复后续 DAG 拓扑节点执行，审批驳回时优雅将 Step 标记为 `FAILED` 并级联熔断中止整个 Run，全程 SSE 实时直推；
+- **Flyway 数据库演化 (`V5__phase4_workflow_dag_and_orchestration.sql`)**：
+  - 新增与丰富 `workflow_definitions` (name, description, updated_at), `workflow_runs` (context_data_json), `step_runs` (inputs_json, outputs_json, requires_approval) 以及 `approvals` 表索引与审计字段；
+- **全绿灯测试矩阵**：
+  - 新增 6 大测试套件：`WorkflowDslValidationAndCycleDetectionTest`、`SafeExpressionEvaluatorAndDataFlowTest`、`WorkflowDagSchedulingAndParallelExecutionTest`、`WorkflowBranchingAndSkipPruningTest`、`HumanInTheLoopApprovalIntegrationTest` 与 `WorkflowDefinitionAndApprovalControllerIntegrationTest`；
+  - 后端 121/121 项单元测试、集成测试与架构守卫规则 100% 绿灯通过；前端 Next.js 14 生产构建 100% 成功。
+
+---
+
 ## [v1.3.0] - 2026-10-08
 
 ### 🌟 阶段 3：执行内核、状态机与 SSE 流式事件 (Phase 3 Deliverables)

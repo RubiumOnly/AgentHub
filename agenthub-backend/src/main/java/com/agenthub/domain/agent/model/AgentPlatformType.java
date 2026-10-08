@@ -32,4 +32,16 @@ public enum AgentPlatformType {
         }
         return OPENCLAW;
     }
+
+    public static AgentPlatformType fromString(String val) {
+        if (val == null || val.isBlank()) {
+            return SPRING_AI_API;
+        }
+        for (AgentPlatformType type : values()) {
+            if (type.name().equalsIgnoreCase(val) || type.code.equalsIgnoreCase(val)) {
+                return type;
+            }
+        }
+        return SPRING_AI_API;
+    }
 }

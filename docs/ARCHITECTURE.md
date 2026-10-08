@@ -102,6 +102,8 @@ flowchart TD
   - 核心索引：`idx_messages_conv_seq(conversation_id, sequence_num)`, `idx_run_events_run_seq(run_id, sequence_num)`, `idx_wf_runs_idemp(idempotency_key)`；
 - **`V2__seed_system_baseline.sql`**：注入系统初始安全基线数据（系统用户、默认项目、默认工作区、四大核心智能体定义：Orchestrator、BackendArchitect、FrontendEngineer、QAAuditor）；
 - **`V3__phase2_workspace_audit_artifacts.sql`**：新增产物人工审查状态字段（`review_status`, `reviewed_by`, `reviewed_at`, `review_comment`）以及工作区多实例租约锁持久表 `workspace_locks`；
+- **`V4__phase3_execution_kernel_and_state_machine.sql`**：扩展 `workflow_runs` 取消原因、时间戳，扩展 `step_runs` 开始/结束时间、耗时字段与链路追踪关联；
+- **`V5__phase4_workflow_dag_and_orchestration.sql`**：扩展 `workflow_definitions` (name, description, updated_at), `workflow_runs` (context_data_json), `step_runs` (inputs_json, outputs_json, requires_approval) 及 `approvals` 索引演进；
 - **兼容性验证**：Schema DDL 经专门设计，100% 兼容 H2 (MySQL Mode) 本地快速回归测试与生产 MySQL 8.0 严苛验证；
 - **事务与查询边界**：生产与测试配置全面启用 `spring.jpa.open-in-view: false`，杜绝因延迟加载穿透导致的隐藏 N+1 查询与事务悬挂问题。
 
@@ -122,7 +124,7 @@ flowchart TD
 - 控制器必须收敛于 `adapter.web` 或 `*.api` 包路径下；
 - 应用服务必须收敛于 `*.application` 包路径下；
 - 控制器严禁直接泄露 JPA 实体对象；
-- 73 项单元、领域逻辑与边界防御测试矩阵全量绿灯执行。
+- 121 项单元、领域逻辑、集成演练与边界防御测试矩阵全量绿灯执行。
 
 ---
 
@@ -194,5 +196,55 @@ flowchart TD
 - **严格单调递增 Sequence**：每个事件均分配唯一的单调递增 `sequenceNum`，并在 `run_events` 表持久化落库；
 - **断点补发机制**：客户端携带 `Last-Event-ID` 头部或 `?lastEventId=` 参数重连时，系统自动从数据库按序号精准补齐遗漏的历史事件后再切入实时广播，具备 `MAX_REPLAY_LIMIT (2000)` 上限防 OOM 保护；
 - **认证兼容与长连接保活心跳**：`AuthFilter` 支持标准浏览器 `EventSource` URL Token 参数鉴权；内置每 20 秒自动化发送 `:heartbeat` 注释包，防御代理与网关超时断联。
+
+---
+
+## 七、 工作流编排引擎、DAG 依赖拓扑与数据流调度 (Phase 4 升级)
+
+### 1. 版本化工作流 DSL 与严苛图拓扑校验 (`WorkflowDslValidator`)
+- **领域规范与核心模型**：
+  - `WorkflowDsl`：包含版本标识 (`version`, `schemaVersion`)、全局超时 (`timeoutSeconds`)、入口节点 (`entryNodeId`)、节点集合 (`nodes`) 与有向依赖边集合 (`edges`)；
+  - `WorkflowNodeDsl`：节点类型 (`START`, `AGENT`, `CONDITION`, `APPROVAL`, `JOIN`, `END`)、引用智能体 (`agentRef`)、输入映射 (`inputs`)、分支汇聚策略 (`joinPolicy`) 与重试策略 (`RetryPolicyDsl`)；
+  - `WorkflowEdgeDsl`：源节点 (`fromNodeId`)、目标节点 (`toNodeId`) 以及动态条件求值表达式 (`condition`)。
+- **Kahn 算法拓扑排序与成环检测 (Cycle Detection)**：
+  - 基于入度统计的 Kahn 算法实现有向无环图 (DAG) 拓扑分层与环路检测；
+  - 严格检测并拦截自环 (Self-loop) 以及多节点回路依赖，违规立即抛出专用业务异常 `6001 WORKFLOW_INVALID` 并附带清晰的成环说明；
+  - 孤岛节点与入口节点合法性检验：禁止孤立未连通的游离节点存在，确保所有图结构连通且语义完整。
+
+### 2. 有界线程池真实并发调度内核 (`DagExecutionEngine`)
+- **同层兄弟节点真并发**：
+  - 调度引擎基于具备容量限制的有界线程池执行兄弟节点，杜绝无界线程池导致的 OOM 风险；
+  - 支持多依赖汇聚策略：
+    - `all_succeeded`：所有前置入边依赖必须全部成功方可触发当前节点；
+    - `any_succeeded`：任一前置依赖完成即满足触发条件；
+    - `custom_condition`：结合前置节点输出通过动态表达式判定触发条件；
+- **响应式熔断与快速退出机制**：
+  - 针对子任务失败、人工拒绝审批或用户主动取消场景，通过 `abortRemainingNodes` 级联熔断后续所有未启动节点；
+  - 主循环采用 100ms 快速中断轮询感知机制，彻底消除了下游节点悬挂等待引发的整体任务超时假死。
+
+### 3. 上下游数据流管道与安全无 RCE 表达式解析 (`SafeExpressionEvaluator`)
+- **工作流数据管道与上下文隔离 (`WorkflowExecutionContext`)**：
+  - 提供线程安全的工作流运行时上下文映射；
+  - 动态参数解析管道：支持模板占位符自动解析与点号深度嵌套提取（如 `{{steps.<nodeId>.outputs.<key>}}`、`{{inputs.<key>}}`）；
+  - 单节点入参（`inputs_json`）与出参快照（`outputs_json`）结构化持久化落库，保障执行过程完全可观测与可审计。
+- **零反射递归下降安全求值引擎 (`SafeExpressionEvaluator`)**：
+  - 彻底杜绝使用危险的 Spring EL (SpEL)、OGNL 或 JVM 反射机制，自研基于递归下降（Recursive Descent）词法与语法的 AST 求值引擎；
+  - 严格支持布尔与数值比较（`==`, `!=`, `>`, `<`, `>=`, `<=`）、逻辑运算（`&&`, `||`, `!`）及字符串常量安全提取；
+  - 内置空指针防御与类型自动转换，从根源消除远程代码执行 (RCE) 与表达式注入隐患。
+
+### 4. 动态条件分支与级联跳过剪枝 (Dynamic Branching & Cascade Skip Pruning)
+- **智能条件决策**：在边流转或条件节点求值时，根据上下文变量动态计算 `condition`；
+- **未命中分支优雅跳过**：未命中的边所指向的分支节点，由状态机统一标记为 `SKIPPED` 终态；
+- **下游级联剪枝**：当节点的必要前置依赖全部被跳过或无法满足激活策略时，引擎自动对所有后继受累节点执行级联剪枝（Cascade Skip），防止任务死锁与悬挂。
+
+### 5. 人工确认门禁与挂起恢复机制 (`Human-in-the-Loop Approval`)
+- **敏感/高危节点挂起门禁**：
+  - 当节点标记 `requiresApproval: true` 或节点类型为 `APPROVAL` 时，执行调度自动挂起当前 Step 与 Run，状态收敛为 `WAITING_APPROVAL`；
+  - 自动向 `approvals` 门禁表插入待审批记录，并通过 SSE 实时广播 `APPROVAL_REQUESTED` 领域事件；
+- **REST 审批接口与决策恢复**：
+  - 暴露标准接口：`POST /api/approvals/{id}/approve` 与 `POST /api/approvals/{id}/reject`；
+  - 审批通过后无缝解冻调度器，恢复下游拓扑节点继续执行；
+  - 审批驳回时立即将 Step 状态收敛为 `FAILED`，并级联中止后续节点执行，全链路持久化审查人与驳回意见。
+
 
 

@@ -60,6 +60,8 @@ public enum ErrorCode {
     RUN_CANCELLED(6009, "Workflow run was cancelled"),
     RUN_TIMED_OUT(6010, "Workflow run execution timed out"),
     STEP_RETRY_EXCEEDED(6011, "Step retry limit exceeded"),
+    WORKFLOW_DEFINITION_NOT_FOUND(6012, "Workflow definition not found"),
+    APPROVAL_ALREADY_DECIDED(6013, "Approval request has already been decided"),
 
     // Sandbox & Deployment
     DEPLOYMENT_NOT_FOUND(7001, "Deployment record not found");

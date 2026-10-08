@@ -29,9 +29,18 @@ import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import com.agenthub.orchestration.domain.dsl.WorkflowDsl;
+import com.agenthub.orchestration.infrastructure.entity.WorkflowDefinitionEntity;
+import com.agenthub.orchestration.infrastructure.repository.WorkflowDefinitionRepository;
+import com.agenthub.orchestration.scheduler.DagExecutionEngine;
+import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
 
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -42,6 +51,15 @@ import java.util.stream.Collectors;
 
 @Service
 public class ExecutionApplicationService implements ExecutionApplication {
+
+    @Autowired(required = false)
+    private WorkflowDefinitionRepository workflowDefinitionRepository;
+
+    @Autowired(required = false)
+    private DagExecutionEngine dagExecutionEngine;
+
+    @Autowired(required = false)
+    private ObjectMapper objectMapper;
 
     private static final Logger log = LoggerFactory.getLogger(ExecutionApplicationService.class);
 
@@ -142,6 +160,37 @@ public class ExecutionApplicationService implements ExecutionApplication {
                 log.warn("Failed to initialize git baseline for run {}: {}", runId, e.getMessage());
             }
         });
+
+        // If workflow DSL or saved definition is provided, trigger DAG execution
+        if (dagExecutionEngine != null) {
+            WorkflowDsl dslToRun = null;
+            if (cmd.getWorkflowDsl() != null) {
+                dslToRun = cmd.getWorkflowDsl();
+            } else if (cmd.getDefinitionId() != null && workflowDefinitionRepository != null) {
+                Optional<WorkflowDefinitionEntity> defOpt = workflowDefinitionRepository.findById(cmd.getDefinitionId());
+                if (defOpt.isPresent() && objectMapper != null) {
+                    try {
+                        dslToRun = objectMapper.readValue(defOpt.get().getDslJson(), WorkflowDsl.class);
+                    } catch (Exception e) {
+                        log.warn("Failed to parse DSL JSON for run [{}]: {}", runId, e.getMessage());
+                    }
+                }
+            }
+            if (dslToRun != null) {
+                String wsPath = null;
+                Optional<WorkspaceEntity> wsOpt = workspaceRepository.findByProjectId(cmd.getProjectId());
+                if (wsOpt.isPresent()) {
+                    try {
+                        wsPath = workspaceResolver.getWorkspaceRoot(wsOpt.get().getId()).toAbsolutePath().toString();
+                    } catch (Exception ignored) {}
+                }
+                final WorkflowDsl finalDsl = dslToRun;
+                final String finalWsPath = wsPath;
+                final Map<String, Object> finalInputs = cmd.getInputs();
+                long timeout = finalDsl.getTimeoutSeconds() != null && finalDsl.getTimeoutSeconds() > 0 ? finalDsl.getTimeoutSeconds() : 120;
+                dagExecutionEngine.executeDag(runId, finalDsl, finalWsPath, finalInputs, timeout);
+            }
+        }
 
         return toRunView(run);
     }

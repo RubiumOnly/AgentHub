@@ -28,13 +28,16 @@ class FlywayMigrationAndSchemaTest {
     void shouldSuccessfullyApplyFlywayMigrations() {
         MigrationInfo[] applied = flyway.info().applied();
         assertThat(applied).isNotEmpty();
-        assertThat(applied.length).isGreaterThanOrEqualTo(2);
+        assertThat(applied.length).isGreaterThanOrEqualTo(5);
 
         assertThat(applied[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(applied[0].getDescription()).contains("init schema");
 
         assertThat(applied[1].getVersion().getVersion()).isEqualTo("2");
         assertThat(applied[1].getDescription()).contains("seed system baseline");
+
+        assertThat(applied[4].getVersion().getVersion()).isEqualTo("5");
+        assertThat(applied[4].getDescription()).contains("workflow dag and orchestration");
     }
 
     @Test

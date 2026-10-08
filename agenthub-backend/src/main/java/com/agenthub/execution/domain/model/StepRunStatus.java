@@ -17,25 +17,27 @@ public enum StepRunStatus {
     SUCCEEDED,
     FAILED,
     CANCELLED,
-    TIMED_OUT;
+    TIMED_OUT,
+    SKIPPED;
 
     private static final Map<StepRunStatus, Set<StepRunStatus>> ALLOWED_TRANSITIONS;
 
     static {
         ALLOWED_TRANSITIONS = Map.of(
-                PENDING, EnumSet.of(RUNNING, CANCELLED),
-                RUNNING, EnumSet.of(PAUSED, WAITING_APPROVAL, SUCCEEDED, FAILED, CANCELLED, TIMED_OUT),
+                PENDING, EnumSet.of(RUNNING, CANCELLED, SKIPPED, WAITING_APPROVAL),
+                RUNNING, EnumSet.of(PAUSED, WAITING_APPROVAL, SUCCEEDED, FAILED, CANCELLED, TIMED_OUT, SKIPPED),
                 PAUSED, EnumSet.of(RUNNING, CANCELLED),
-                WAITING_APPROVAL, EnumSet.of(RUNNING, CANCELLED, FAILED),
+                WAITING_APPROVAL, EnumSet.of(RUNNING, CANCELLED, FAILED, SUCCEEDED),
                 SUCCEEDED, Collections.emptySet(),
                 FAILED, EnumSet.of(PENDING, RUNNING), // Allows retry
                 CANCELLED, Collections.emptySet(),
-                TIMED_OUT, EnumSet.of(PENDING, RUNNING) // Allows retry after timeout
+                TIMED_OUT, EnumSet.of(PENDING, RUNNING), // Allows retry after timeout
+                SKIPPED, Collections.emptySet()
         );
     }
 
     public boolean isTerminal() {
-        return this == SUCCEEDED || this == FAILED || this == CANCELLED || this == TIMED_OUT;
+        return this == SUCCEEDED || this == FAILED || this == CANCELLED || this == TIMED_OUT || this == SKIPPED;
     }
 
     public boolean canTransitionTo(StepRunStatus target) {
@@ -54,7 +56,7 @@ public enum StepRunStatus {
             return PENDING;
         }
         if ("SKIPPED".equals(normalized)) {
-            return SUCCEEDED;
+            return SKIPPED;
         }
         try {
             return StepRunStatus.valueOf(normalized);
