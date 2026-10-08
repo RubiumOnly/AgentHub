@@ -193,9 +193,9 @@ public class JGitWorkspaceManager {
         String baselineHash = "";
         String headHash = "";
 
-        try (Git git = Git.open(workspaceDir);
-             Repository repo = git.getRepository();
-             ObjectReader reader = repo.newObjectReader()) {
+        try (Git git = Git.open(workspaceDir)) {
+            Repository repo = git.getRepository();
+            try (ObjectReader reader = repo.newObjectReader()) {
 
             ObjectId headId = repo.resolve("HEAD");
             if (headId != null) {
@@ -266,6 +266,7 @@ public class JGitWorkspaceManager {
                 }
             }
         }
+    }
 
         return new StructuredDiff(
                 workspaceDir.getName(),
@@ -284,28 +285,40 @@ public class JGitWorkspaceManager {
 
     public void revertStepFiles(File workspaceDir, String baselineCommitHash, List<String> filePaths, String authorEmail) throws Exception {
         initWorkspace(workspaceDir);
-        try (Git git = Git.open(workspaceDir);
-             Repository repo = git.getRepository()) {
+        try (Git git = Git.open(workspaceDir)) {
+            Repository repo = git.getRepository();
+            ObjectId baselineId = repo.resolve(baselineCommitHash);
+            if (baselineId == null || !repo.hasObject(baselineId)) {
+                throw new IllegalArgumentException("Baseline commit hash not found in repository: " + baselineCommitHash);
+            }
 
             String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
+            Path wsPath = workspaceDir.toPath().toAbsolutePath().normalize();
 
-            for (String relPath : filePaths) {
-                if (relPath == null || relPath.isBlank() || relPath.contains(".git")) continue;
-                String normalizedPath = relPath.replace('\\', '/').replaceAll("^/+", "");
-
-                byte[] baselineContent = readFileAtCommit(repo, baselineCommitHash, normalizedPath);
-                File fileOnDisk = new File(workspaceDir, normalizedPath);
-
-                if (baselineContent != null) {
-                    if (fileOnDisk.getParentFile() != null && !fileOnDisk.getParentFile().exists()) {
-                        fileOnDisk.getParentFile().mkdirs();
+            if (filePaths != null) {
+                for (String relPath : filePaths) {
+                    if (relPath == null || relPath.isBlank() || relPath.contains(".git")) continue;
+                    String normalizedPath = relPath.replace('\\', '/').replaceAll("^/+", "");
+                    Path targetPath = wsPath.resolve(normalizedPath).normalize();
+                    if (!targetPath.startsWith(wsPath)) {
+                        log.warn("Path traversal detected in revertStepFiles, skipping: {}", relPath);
+                        continue;
                     }
-                    Files.write(fileOnDisk.toPath(), baselineContent);
-                    log.info("Restored file [{}] to baseline commit [{}]", normalizedPath, baselineCommitHash);
-                } else {
-                    if (fileOnDisk.exists()) {
-                        fileOnDisk.delete();
-                        log.info("Deleted newly added file [{}] on revert", normalizedPath);
+
+                    byte[] baselineContent = readFileAtCommit(repo, baselineCommitHash, normalizedPath);
+                    File fileOnDisk = targetPath.toFile();
+
+                    if (baselineContent != null) {
+                        if (fileOnDisk.getParentFile() != null && !fileOnDisk.getParentFile().exists()) {
+                            fileOnDisk.getParentFile().mkdirs();
+                        }
+                        Files.write(fileOnDisk.toPath(), baselineContent);
+                        log.info("Restored file [{}] to baseline commit [{}]", normalizedPath, baselineCommitHash);
+                    } else {
+                        if (fileOnDisk.exists()) {
+                            fileOnDisk.delete();
+                            log.info("Deleted newly added file [{}] on revert", normalizedPath);
+                        }
                     }
                 }
             }
@@ -320,6 +333,38 @@ public class JGitWorkspaceManager {
                         .setAuthor(DEFAULT_AUTHOR, author)
                         .call();
                 log.info("Committed revert to baseline {} in workspace {}", baselineCommitHash, workspaceDir.getAbsolutePath());
+            }
+        }
+    }
+
+    public List<String> getChangedFilesInCommit(File workspaceDir, String commitHash) throws Exception {
+        initWorkspace(workspaceDir);
+        try (Git git = Git.open(workspaceDir)) {
+            Repository repo = git.getRepository();
+            ObjectId commitId = repo.resolve(commitHash);
+            if (commitId == null) {
+                return Collections.emptyList();
+            }
+            try (RevWalk rw = new RevWalk(repo)) {
+                RevCommit commit = rw.parseCommit(commitId);
+                RevCommit parent = commit.getParentCount() > 0 ? rw.parseCommit(commit.getParent(0).getId()) : null;
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try (DiffFormatter df = new DiffFormatter(out)) {
+                    df.setRepository(repo);
+                    List<DiffEntry> diffs = (parent != null)
+                            ? df.scan(parent.getTree(), commit.getTree())
+                            : df.scan(null, commit.getTree());
+                    List<String> files = new ArrayList<>();
+                    for (DiffEntry d : diffs) {
+                        String p = d.getNewPath();
+                        if (p != null && !"/dev/null".equals(p)) {
+                            files.add(p);
+                        } else if (d.getOldPath() != null) {
+                            files.add(d.getOldPath());
+                        }
+                    }
+                    return files;
+                }
             }
         }
     }

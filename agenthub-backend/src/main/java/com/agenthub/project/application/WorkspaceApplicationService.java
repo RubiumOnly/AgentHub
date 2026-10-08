@@ -11,11 +11,19 @@ import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.project.dto.WorkspaceFileDetailView;
 import com.agenthub.project.dto.WorkspaceFileNode;
+import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
+import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
+import com.agenthub.project.infrastructure.entity.ProjectEntity;
+import com.agenthub.project.infrastructure.repository.ProjectRepository;
+import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import com.agenthub.shared.context.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +32,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 public class WorkspaceApplicationService implements WorkspaceApplication {
@@ -38,17 +49,51 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     private final JGitWorkspaceManager gitManager;
     private final WorkflowEngineService workflowEngineService;
     private final WorkspaceResolver workspaceResolver;
+    private final WorkspaceRepository workspaceRepository;
+    private final ProjectRepository projectRepository;
+    private final ResourceAccessGuard accessGuard;
 
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
                                       WorkflowEngineService workflowEngineService,
                                       WorkspaceResolver workspaceResolver) {
+        this(gitManager, workflowEngineService, workspaceResolver, null, null, null);
+    }
+
+    @Autowired
+    public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
+                                      WorkflowEngineService workflowEngineService,
+                                      WorkspaceResolver workspaceResolver,
+                                      @Autowired(required = false) WorkspaceRepository workspaceRepository,
+                                      @Autowired(required = false) ProjectRepository projectRepository,
+                                      @Autowired(required = false) ResourceAccessGuard accessGuard) {
         this.gitManager = gitManager;
         this.workflowEngineService = workflowEngineService;
         this.workspaceResolver = workspaceResolver;
+        this.workspaceRepository = workspaceRepository;
+        this.projectRepository = projectRepository;
+        this.accessGuard = accessGuard;
+    }
+
+    private void checkWorkspaceAccess(String workspaceIdOrPath) {
+        if (workspaceRepository != null && projectRepository != null && accessGuard != null) {
+            String currentUserId = RequestContext.get().getUserId();
+            if (currentUserId != null && !currentUserId.isBlank()) {
+                Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceIdOrPath);
+                if (wsOpt.isEmpty()) {
+                    wsOpt = workspaceRepository.findByProjectId(workspaceIdOrPath);
+                }
+                if (wsOpt.isPresent()) {
+                    projectRepository.findById(wsOpt.get().getProjectId()).ifPresent(project -> {
+                        accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
+                    });
+                }
+            }
+        }
     }
 
     @Override
     public StructuredDiff computeStructuredDiff(String workspaceIdOrPath) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
         Path safeDir = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
         return gitManager.computeStructuredDiff(safeDir.toFile());
     }
@@ -65,6 +110,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public List<WorkspaceFileNode> listFiles(String workspaceIdOrPath, String relativeDirectoryPath) {
+        checkWorkspaceAccess(workspaceIdOrPath);
         Path root = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
         Path targetDir = root;
         if (relativeDirectoryPath != null && !relativeDirectoryPath.isBlank()) {
@@ -101,6 +147,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public String getFileContent(String workspaceIdOrPath, String relativePath) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
         Path safeFile = workspaceResolver.resolvePathForRead(workspaceIdOrPath, relativePath);
         File file = safeFile.toFile();
         if (!file.exists() || file.isDirectory()) {
@@ -119,6 +166,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public WorkspaceFileDetailView getFileDetail(String workspaceIdOrPath, String relativePath) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
         Path safeFile = workspaceResolver.resolvePathForRead(workspaceIdOrPath, relativePath);
         File file = safeFile.toFile();
         if (!file.exists() || file.isDirectory()) {
@@ -160,6 +208,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public void saveFile(String workspaceIdOrPath, String relativePath, String content) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
         validateWriteSize(content);
         Path safeFile = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, relativePath);
         if (safeFile.getParent() != null && !Files.exists(safeFile.getParent())) {
@@ -170,6 +219,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public void renameFile(String workspaceIdOrPath, String oldRelativePath, String newRelativePath) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
         Path src = workspaceResolver.resolvePathForRead(workspaceIdOrPath, oldRelativePath);
         Path dest = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, newRelativePath);
 
@@ -188,6 +238,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public void deleteFile(String workspaceIdOrPath, String relativePath) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
         Path target = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, relativePath);
         if (!Files.exists(target)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + relativePath);
@@ -203,6 +254,42 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
             Files.delete(target);
         }
         log.info("Deleted file in workspace [{}]: [{}]", workspaceIdOrPath, relativePath);
+    }
+
+    @Override
+    public byte[] downloadFile(String workspaceIdOrPath, String relativePath) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
+        Path safeFile = workspaceResolver.resolvePathForRead(workspaceIdOrPath, relativePath);
+        File file = safeFile.toFile();
+        if (!file.exists() || file.isDirectory()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + relativePath);
+        }
+        if (file.length() > MAX_WRITE_BYTES) {
+            throw new BusinessException(ErrorCode.WORKSPACE_FILE_TOO_LARGE,
+                    "File size exceeds maximum download limit of 10MB: " + file.length() + " bytes");
+        }
+        return Files.readAllBytes(safeFile);
+    }
+
+    @Override
+    public byte[] archiveWorkspace(String workspaceIdOrPath) throws Exception {
+        checkWorkspaceAccess(workspaceIdOrPath);
+        Path root = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            try (var stream = Files.walk(root)) {
+                for (Path path : stream.toList()) {
+                    if (Files.isDirectory(path)) continue;
+                    Path rel = root.relativize(path);
+                    String relStr = rel.toString().replace('\\', '/');
+                    if (relStr.startsWith(".git/") || relStr.equals(".git")) continue;
+                    zos.putNextEntry(new ZipEntry(relStr));
+                    Files.copy(path, zos);
+                    zos.closeEntry();
+                }
+            }
+        }
+        return baos.toByteArray();
     }
 
     @Override

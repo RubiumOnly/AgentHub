@@ -80,12 +80,14 @@
 
 ### 3. 受控工作区统一文件与租约 API (Controlled Workspace & Lock API)
 - `GET /api/workspaces/{workspaceId}/tree`：递归获取受控工作区文件树（支持相对子目录过滤 `?path=...`，严格忽略 `.git` 内部元数据）；
-- `GET /api/workspaces/{workspaceId}/file?path={relPath}`：读取文件详情（返回 `WorkspaceFileDetailView`，严格限制单文件 2MB 预览上限，提供二进制自动识别）；
-- `POST /api/workspaces/{workspaceId}/file`：写入或更新工作区文件（Body: `{"path":"...","content":"..."}`，严格限制单文件 10MB 写入上限，拦截系统保留设备名与路径穿越）；
+- `GET /api/workspaces/{workspaceId}/file?path={relPath}`：读取文件详情（返回 `WorkspaceFileDetailView`，严格限制单文件 2MB 预览上限，提供二进制自动识别与截断标识）；
+- `POST /api/workspaces/{workspaceId}/file`：写入或更新工作区文件（Body: `{"path":"...","content":"..."}`，严格限制单文件 10MB 写入上限，拦截系统保留设备名、NTFS 8.3短名与路径穿越）；
 - `POST /api/workspaces/{workspaceId}/file/rename`：安全重命名文件或目录（Body: `{"oldPath":"...","newPath":"..."}`）；
 - `DELETE /api/workspaces/{workspaceId}/file?path={relPath}`：受控删除文件或目录；
+- `GET /api/workspaces/{workspaceId}/download?path={relPath}`：受控下载单文件二进制流或文本内容；
+- `GET /api/workspaces/{workspaceId}/archive`：将工作区受控文件归档打包为 ZIP 压缩包下载（自动排除 `.git` 元数据）；
 - `GET /api/workspaces/{workspaceId}/diff`：获取结构化 Diff 对象（`Result<StructuredDiff>`，包含变更文件数、增减行数、Unified Diff Patch、冲突与二进制状态）；
-- `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁（Body: `{"ownerId":"...","waitTimeoutMs":3000,"leaseTtlMs":60000}`，支持超时自动回收防死锁）；
+- `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁（Body: `{"ownerId":"...","waitTimeoutMs":3000,"leaseTtlMs":60000}`，支持多节点 DB 表 `workspace_locks` 同步与超时自动回收防死锁）；
 - `POST /api/workspaces/{workspaceId}/lock/renew`：为已持有的工作区租约锁续期（Body: `{"ownerId":"...","additionalTtlMs":60000}`）；
 - `POST /api/workspaces/{workspaceId}/lock/release`：主动释放工作区锁（Body: `{"ownerId":"..."}`）；
 - `GET /api/workspaces/{workspaceId}/lock/status`：查询工作区当前锁定状态与剩余租期。

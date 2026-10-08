@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 public class DefaultWorkspaceResolver implements WorkspaceResolver {
 
     private static final Pattern RESERVED_DEVICE_PATTERN = Pattern.compile(
-            "^(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?$"
+            "^(?i)(CON|PRN|AUX|NUL|CONIN\\$|CONOUT\\$|COM[0-9]|LPT[0-9])(\\..*)?$"
     );
 
     @Value("${agenthub.workspace.base-dir:./data/workspaces}")
@@ -217,7 +217,7 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
             String trimmed = part.trim();
             if (trimmed.isEmpty()) continue;
             if (RESERVED_DEVICE_PATTERN.matcher(trimmed).matches()) {
-                throw new BusinessException(ErrorCode.WORKSPACE_PATH_INVALID,
+                throw new BusinessException(ErrorCode.WORKSPACE_RESERVED_DEVICE_DENIED,
                         "Reserved system device name not allowed: " + trimmed);
             }
         }
@@ -233,7 +233,7 @@ public class DefaultWorkspaceResolver implements WorkspaceResolver {
 
         for (Path segment : relative) {
             String seg = segment.toString().toLowerCase(Locale.ROOT).strip().replaceAll("\\.+$", "");
-            if (seg.equals(".git")) {
+            if (seg.equals(".git") || seg.matches("(?i)git~[0-9]+")) {
                 throw new BusinessException(ErrorCode.WORKSPACE_GIT_ACCESS_DENIED,
                         "Direct read or modification of .git directory is forbidden");
             }

@@ -36,5 +36,9 @@ public interface WorkspaceApplication {
 
     void deleteFile(String workspaceIdOrPath, String relativePath) throws Exception;
 
+    byte[] downloadFile(String workspaceIdOrPath, String relativePath) throws Exception;
+
+    byte[] archiveWorkspace(String workspaceIdOrPath) throws Exception;
+
     WorkflowExecutionResult executeWorkflow(WorkflowDefinition workflow, String workspacePath, String taskPrompt);
 }

@@ -10,29 +10,34 @@
 - **深化受控工作区管理与多维沙箱防御**：
   - `WorkspaceResolver` 升级为基于 `workspaceId` + `relativePath` 受控解析，自动绑定数据库工作区或受控根目录；
   - 完善 `Path.normalize()`、`toRealPath()`、符号链接越权检测与根目录 Containment 校验；
-  - 严格拦截设备文件（Windows 保留字 `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9` 及其变种拓展名）；
-  - 严格拦截 `.git` 内部篡改、大小写变种（`.GIT`, `.Git`）与尾随点（`.git.`）；
-- **统一受控工作区文件操作 API**：
-  - 暴露标准 RESTful 控制器 `WorkspaceController`（`/api/workspaces/{workspaceId}/tree`, `/file`, `/file/rename`, `/file`, `/diff`, `/lock/*`）；
+  - 严格拦截设备文件（包含 Windows 保留字 `CON`, `PRN`, `AUX`, `NUL`, `CONIN$`, `CONOUT$`, `COM0-9`, `LPT0-9` 及其变种拓展名，专用错误码 3009）；
+  - 严格拦截 `.git` 内部篡改、大小写变种（`.GIT`, `.Git`）、尾随点（`.git.`）及 Windows NTFS 8.3 短名称（`git~1` / `GIT~1`）；
+  - `WorkspaceApplicationService` 严格接入跨租户归属权校验，全面防御 IDOR 水平越权；
+- **统一受控工作区文件操作 API 与下载归档导出**：
+  - 暴露标准 RESTful 控制器 `WorkspaceController`（`/api/workspaces/{workspaceId}/tree`, `/file`, `/file/rename`, `/file`, `/diff`, `/download`, `/archive`, `/lock/*`）；
   - 建立单文件 10MB 写入上限防御与 2MB 预览上限限制；
   - 增加二进制文件检测引擎（扩展名 + 首 4KB 空字节探测），禁止直接返回乱码，提供安全截断与结构化视图；
+  - 提供单文件安全二进制流下载（`GET /{workspaceId}/download`）与整工作区排除 `.git` 的 ZIP 归档打包导出（`GET /{workspaceId}/archive`）；
 - **JGit 审计与快照治理**：
   - 每次 Workflow Run 启动时自动建立 JGit 基线 commit（`Baseline commit for Run <runId>`）并打上基线 Tag；
   - 每个重要 Step 完成时自动创建快照 commit（`[StepSnapshot]`）与 Tag，精确统计变更文件清单并计算 SHA-256 校验和落库；
+  - 修复 JGit Repository 在 try-with-resources 下 close() 双重调用的底层警告；
 - **结构化 Diff 输出引擎**：
   - JGit 模块输出结构化 Diff 对象（`StructuredDiff` 与升级版 `FileDiffEntry`），涵盖文件变更类型（ADD/MODIFY/DELETE/RENAME/COPY）、增减行数、标准 Unified Diff patch、是否二进制、是否重命名、冲突标记（`hasConflict`）及审查状态；
-- **工作区并发与租约治理 (Keyed Lock)**：
+- **工作区并发与租约治理 (Keyed Lock & DB Lease Sync)**：
   - 升级 `WorkspaceLockManager` 支持多 Owner 身份识别与租约超时（Lease TTL）模型；
-  - 实现基于 TTL 的租约续期机制与超时防死锁自动回收（Deadlock Auto-Recovery）；
-  - 保持与单 JVM 线程重入的 100% 向后兼容；
+  - 实现基于 `workspaceResolver` 的 Key 归一化，彻底消除 `workspaceId` 与物理文件路径之间的锁冲突不一致漏洞；
+  - 落地与数据库 `workspace_locks` 租约表的持久化双写与跨实例协同，支持租约续期与超时防死锁自动回收（Deadlock Auto-Recovery）；
+  - 引入锁释放时的无等待线程安全淘汰机制，彻底根除长期运行下的 `ConcurrentHashMap` 内存泄漏风险；
 - **产物审查与安全非破坏性回滚**：
   - 实现 `ArtifactApplication` 与 `ArtifactController`，支持对 Step 产物执行 `accept`、`reject`、`revert`；
   - 回滚必须严格限定在受控 snapshot 基线内，禁止硬重置工作区（杜绝 `git reset --hard` 清空用户未提交工作的风险），仅将目标 Step 影响的文件还原至基线并产生审计 Revert Commit；
+  - 支持快照元数据缺失时自动通过 Git Commit Diff 反向推导变更文件清单，并增加回滚路径越权与无效基线提交检查；
 - **Flyway 数据库演进**：
   - 落地 `V3__phase2_workspace_audit_artifacts.sql`，为 `artifacts` 表补充 `review_status`, `reviewed_by`, `reviewed_at`, `review_comment` 审查字段与分布式锁租约表 `workspace_locks`；
 - **全绿灯测试矩阵**：
-  - 新增 `WorkspaceSecurityAndJGitAuditIntegrationTest` 13 项边界防御测试用例；
-  - 后端 73/73 项单元、架构守卫与集成测试 100% 绿灯通过；前端 Next.js 14 生产构建 100% 绿灯。
+  - 新增 `WorkspaceSecurityAndJGitAuditIntegrationTest` 19 项边界防御与深层功能测试用例（覆盖设备名拦截、NTFS 短名保护、下载与 ZIP 归档、数据库租约表协同、ID 与路径锁归一化、跨租户越权拦截、快照自动推导与安全回滚）；
+  - 后端 79/79 项单元、架构守卫与集成测试 100% 绿灯通过；前端 Next.js 14 生产构建 100% 绿灯。
 
 ---
 

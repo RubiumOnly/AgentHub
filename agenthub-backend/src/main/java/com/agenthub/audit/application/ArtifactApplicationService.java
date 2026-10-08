@@ -40,6 +40,7 @@ public class ArtifactApplicationService implements ArtifactApplication {
     private final JGitWorkspaceManager gitManager;
     private final RunEventRepository runEventRepository;
     private final ResourceAccessGuard accessGuard;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public ArtifactApplicationService(ArtifactRepository artifactRepository,
                                     WorkflowRunRepository workflowRunRepository,
@@ -49,6 +50,20 @@ public class ArtifactApplicationService implements ArtifactApplication {
                                     JGitWorkspaceManager gitManager,
                                     RunEventRepository runEventRepository,
                                     ResourceAccessGuard accessGuard) {
+        this(artifactRepository, workflowRunRepository, projectRepository, workspaceRepository,
+                workspaceResolver, gitManager, runEventRepository, accessGuard, new com.fasterxml.jackson.databind.ObjectMapper());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ArtifactApplicationService(ArtifactRepository artifactRepository,
+                                    WorkflowRunRepository workflowRunRepository,
+                                    ProjectRepository projectRepository,
+                                    WorkspaceRepository workspaceRepository,
+                                    WorkspaceResolver workspaceResolver,
+                                    JGitWorkspaceManager gitManager,
+                                    RunEventRepository runEventRepository,
+                                    ResourceAccessGuard accessGuard,
+                                    @org.springframework.beans.factory.annotation.Autowired(required = false) com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.artifactRepository = artifactRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.projectRepository = projectRepository;
@@ -57,6 +72,7 @@ public class ArtifactApplicationService implements ArtifactApplication {
         this.gitManager = gitManager;
         this.runEventRepository = runEventRepository;
         this.accessGuard = accessGuard;
+        this.objectMapper = (objectMapper != null) ? objectMapper : new com.fasterxml.jackson.databind.ObjectMapper();
     }
 
     @Override
@@ -167,8 +183,12 @@ public class ArtifactApplicationService implements ArtifactApplication {
 
         // Parse changed files from metadata
         List<String> targetFiles = extractFilesFromMetadata(entity.getMetadataJson());
-        if (targetFiles.isEmpty() && entity.getPathOrRef() != null && !entity.getPathOrRef().contains("/")) {
-            // If pathOrRef is commit hash, extract changes from git or revert all
+        if (targetFiles.isEmpty() && entity.getPathOrRef() != null && !entity.getPathOrRef().isBlank()) {
+            try {
+                targetFiles = gitManager.getChangedFilesInCommit(workspaceRoot.toFile(), entity.getPathOrRef());
+            } catch (Exception e) {
+                log.warn("Failed to extract changed files from commit {}: {}", entity.getPathOrRef(), e.getMessage());
+            }
         }
 
         if (baselineCommit == null || baselineCommit.isBlank()) {
@@ -229,25 +249,22 @@ public class ArtifactApplicationService implements ArtifactApplication {
 
     private List<String> extractFilesFromMetadata(String metadataJson) {
         List<String> files = new ArrayList<>();
-        if (metadataJson == null || !metadataJson.contains("\"files\"")) {
+        if (metadataJson == null || metadataJson.isBlank()) {
             return files;
         }
         try {
-            int filesIdx = metadataJson.indexOf("\"files\":[");
-            if (filesIdx >= 0) {
-                int endIdx = metadataJson.indexOf("]", filesIdx);
-                if (endIdx > filesIdx) {
-                    String sub = metadataJson.substring(filesIdx + 9, endIdx);
-                    String[] tokens = sub.split(",");
-                    for (String t : tokens) {
-                        String clean = t.replace("\"", "").trim();
-                        if (!clean.isEmpty()) {
-                            files.add(clean);
-                        }
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(metadataJson);
+            com.fasterxml.jackson.databind.JsonNode filesNode = root.get("files");
+            if (filesNode != null && filesNode.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode f : filesNode) {
+                    if (f.isTextual() && !f.asText().isBlank()) {
+                        files.add(f.asText().trim());
                     }
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            log.warn("Failed to parse files from artifact metadata JSON: {}", e.getMessage());
+        }
         return files;
     }
 

@@ -31,6 +31,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.agenthub.shared.context.RequestContext;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +45,8 @@ import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -82,6 +88,9 @@ public class WorkspaceSecurityAndJGitAuditIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
 
     private String testProjectId;
     private String testWorkspaceId;
@@ -142,24 +151,24 @@ public class WorkspaceSecurityAndJGitAuditIntegrationTest {
     }
 
     @Test
-    @DisplayName("边界防御 2：Windows 保留设备文件 (CON, PRN, AUX, NUL, COM1-9) 被严格拦截 (3003)")
+    @DisplayName("边界防御 2：Windows 保留设备文件 (CON, PRN, AUX, NUL, COM0-9, LPT0-9, CONIN$, CONOUT$) 被严格拦截 (3009)")
     void testReservedDeviceNamesForbidden() {
-        String[] reservedDevices = {"CON", "con.txt", "PRN", "aux.json", "nul", "COM1", "COM9.log", "LPT1.txt", "subdir/aux/code.py"};
+        String[] reservedDevices = {"CON", "con.txt", "PRN", "aux.json", "nul", "COM0", "COM1", "COM9.log", "LPT1.txt", "CONIN$", "conout$.dat", "subdir/aux/code.py"};
         for (String dev : reservedDevices) {
             assertThatThrownBy(() -> workspaceResolver.resolvePathForWrite(testWorkspaceId, dev))
                     .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode().getCode()).isEqualTo(3003));
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode().getCode()).isEqualTo(3009));
 
             assertThatThrownBy(() -> workspaceResolver.resolvePathForRead(testWorkspaceId, dev))
                     .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode().getCode()).isEqualTo(3003));
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode().getCode()).isEqualTo(3009));
         }
     }
 
     @Test
-    @DisplayName("边界防御 3：.git 目录大小写和变种读取与写入被严格阻断 (3005)")
+    @DisplayName("边界防御 3：.git 目录大小写、变种与 NTFS 8.3 短名称 (git~1) 读取与写入被严格阻断 (3005)")
     void testGitProtectionVariations() {
-        String[] gitPaths = {".git/config", ".git/hooks/pre-commit", ".GIT/HEAD", ".git\\config", "sub/.git/config"};
+        String[] gitPaths = {".git/config", ".git/hooks/pre-commit", ".GIT/HEAD", ".git\\config", "sub/.git/config", "git~1/config", "GIT~1/HEAD"};
         for (String gitPath : gitPaths) {
             assertThatThrownBy(() -> workspaceResolver.resolvePathForRead(testWorkspaceId, gitPath))
                     .isInstanceOf(BusinessException.class)
@@ -495,5 +504,203 @@ public class WorkspaceSecurityAndJGitAuditIntegrationTest {
                         .content("{\"ownerId\":\"web-test\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(true));
+    }
+
+    // =========================================================================
+    // 7. 受控工作区文件下载与归档 (Download & Archive) 接口测试
+    // =========================================================================
+
+    @Test
+    @DisplayName("受控工作区 API 5：文件下载与整工作区 ZIP 归档导出测试")
+    void testDownloadAndArchiveLifecycle() throws Exception {
+        // 1. Create text file and binary file
+        workspaceApplication.saveFile(testWorkspaceId, "docs/manual.txt", "Manual Content Here");
+        Path binPath = testWorkspaceDir.resolve("assets/icon.png");
+        Files.createDirectories(binPath.getParent());
+        Files.write(binPath, new byte[]{0x00, 0x01, 0x02, 0x03});
+
+        // 2. Download via Service
+        byte[] textBytes = workspaceApplication.downloadFile(testWorkspaceId, "docs/manual.txt");
+        assertThat(new String(textBytes, StandardCharsets.UTF_8)).isEqualTo("Manual Content Here");
+
+        byte[] binBytes = workspaceApplication.downloadFile(testWorkspaceId, "assets/icon.png");
+        assertThat(binBytes).containsExactly(0x00, 0x01, 0x02, 0x03);
+
+        // 3. Download via REST API
+        mockMvc.perform(get("/api/workspaces/" + testWorkspaceId + "/download").param("path", "docs/manual.txt"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).isEqualTo("Manual Content Here"));
+
+        // 4. Archive workspace via Service & REST API
+        byte[] zipData = workspaceApplication.archiveWorkspace(testWorkspaceId);
+        assertThat(zipData).isNotEmpty();
+
+        // Verify ZIP contents: must contain manual.txt and icon.png, must NOT contain .git
+        List<String> entryNames = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipData))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                entryNames.add(entry.getName().replace('\\', '/'));
+            }
+        }
+        assertThat(entryNames).contains("docs/manual.txt", "assets/icon.png");
+        assertThat(entryNames.stream().noneMatch(e -> e.startsWith(".git"))).isTrue();
+
+        // 5. REST Archive Endpoint
+        mockMvc.perform(get("/api/workspaces/" + testWorkspaceId + "/archive"))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getContentAsByteArray()).isNotEmpty());
+    }
+
+    // =========================================================================
+    // 8. 数据库租约持久化表 (workspace_locks) 与跨实例锁协调测试
+    // =========================================================================
+
+    @Test
+    @DisplayName("并发治理 3：数据库 workspace_locks 租约表持久化与释放同步测试")
+    void testDatabaseWorkspaceLocksRegistry() {
+        if (jdbcTemplate == null) return;
+
+        String owner = "db-node-worker-1";
+        boolean acquired = lockManager.tryAcquireLock(testWorkspaceId, owner, 200, 5000);
+        assertThat(acquired).isTrue();
+
+        // Verify DB row exists in workspace_locks
+        String normKey = lockManager.normalizeKey(testWorkspaceId);
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM workspace_locks WHERE owner_id = ?",
+                Integer.class, owner
+        );
+        assertThat(count).isGreaterThanOrEqualTo(1);
+
+        // Renew lease
+        boolean renewed = lockManager.renewLease(testWorkspaceId, owner, 10000);
+        assertThat(renewed).isTrue();
+
+        // Release lock
+        boolean released = lockManager.releaseLock(testWorkspaceId, owner);
+        assertThat(released).isTrue();
+
+        // Verify DB row removed
+        Integer countAfter = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM workspace_locks WHERE owner_id = ?",
+                Integer.class, owner
+        );
+        assertThat(countAfter).isEqualTo(0);
+    }
+
+    // =========================================================================
+    // 9. 工作区 Lock Key 归一化互斥一致性测试 (workspaceId 与目录绝对路径)
+    // =========================================================================
+
+    @Test
+    @DisplayName("并发治理 4：workspaceId 与绝对文件路径指向同一工作区时的锁归一化互斥测试")
+    void testLockKeyNormalizationBetweenWorkspaceIdAndPath() {
+        String owner1 = "worker-by-id";
+        String owner2 = "worker-by-path";
+
+        // Owner 1 acquires lock using workspaceId ("ws-test-xxx")
+        boolean locked1 = lockManager.tryAcquireLock(testWorkspaceId, owner1, 100, 5000);
+        assertThat(locked1).isTrue();
+
+        // Owner 2 attempts to acquire lock using physical path -> MUST BE MUTUALLY EXCLUSIVE!
+        boolean locked2 = lockManager.tryAcquireLock(testWorkspaceDir.toString(), owner2, 100, 5000);
+        assertThat(locked2).isFalse();
+
+        // Owner 1 releases lock via workspaceId
+        lockManager.releaseLock(testWorkspaceId, owner1);
+
+        // Owner 2 can now acquire lock via physical path
+        boolean locked2After = lockManager.tryAcquireLock(testWorkspaceDir.toString(), owner2, 100, 5000);
+        assertThat(locked2After).isTrue();
+        lockManager.releaseLock(testWorkspaceDir.toString(), owner2);
+    }
+
+    // =========================================================================
+    // 10. 跨租户 IDOR 访问拦截测试
+    // =========================================================================
+
+    @Test
+    @DisplayName("安全边界：跨租户越权读取与修改受控工作区被严格拦截 (1002 FORBIDDEN)")
+    void testCrossTenantWorkspaceAccessForbidden() throws Exception {
+        workspaceApplication.saveFile(testWorkspaceId, "private.txt", "Alice Private Code");
+
+        try {
+            // Bob attempts to read Alice's workspace file
+            RequestContext.get().setUserId("user-bob-attacker");
+
+            assertThatThrownBy(() -> workspaceApplication.getFileContent(testWorkspaceId, "private.txt"))
+                    .isInstanceOf(com.agenthub.shared.exception.BusinessException.class)
+                    .satisfies(e -> assertThat(((com.agenthub.shared.exception.BusinessException) e).getErrorCode().getCode()).isEqualTo(1002));
+
+            assertThatThrownBy(() -> workspaceApplication.saveFile(testWorkspaceId, "malicious.txt", "hacked"))
+                    .isInstanceOf(com.agenthub.shared.exception.BusinessException.class)
+                    .satisfies(e -> assertThat(((com.agenthub.shared.exception.BusinessException) e).getErrorCode().getCode()).isEqualTo(1002));
+        } finally {
+            RequestContext.clear();
+        }
+    }
+
+    // =========================================================================
+    // 11. Git Commit 自动回滚推导与越权防御测试
+    // =========================================================================
+
+    @Test
+    @DisplayName("JGit 审计 2：快照元数据缺失 files 列表时自动从 Commit 提取变更文件并安全回滚")
+    void testRevertArtifactAutomaticCommitFileExtraction() throws Exception {
+        File wsDir = testWorkspaceDir.toFile();
+        String runId = "run-auto-revert-" + UUID.randomUUID().toString().substring(0, 6);
+        String stepId = "step-auto-revert-" + UUID.randomUUID().toString().substring(0, 6);
+
+        WorkflowRunEntity run = new WorkflowRunEntity(runId, testProjectId, "def-default", "RUNNING", "idemp-" + runId);
+        workflowRunRepository.save(run);
+
+        // 1. Baseline
+        workspaceApplication.saveFile(testWorkspaceId, "auto-target.txt", "Initial Target Content");
+        String baselineHash = gitManager.createBaseline(wsDir, runId, "admin@agenthub.local");
+
+        WorkspaceEntity wsEntity = workspaceRepository.findById(testWorkspaceId).get();
+        wsEntity.setGitBaselineCommit(baselineHash);
+        workspaceRepository.save(wsEntity);
+
+        // 2. Step modifies file
+        workspaceApplication.saveFile(testWorkspaceId, "auto-target.txt", "Modified by Step");
+        JGitWorkspaceManager.StepSnapshotResult snap = gitManager.createStepSnapshot(
+                wsDir, runId, stepId, "Feature step", "dev@agenthub.local"
+        );
+
+        // Record artifact with EMPTY metadata JSON (no "files" key)
+        String artId = "art-empty-meta-" + UUID.randomUUID().toString().substring(0, 6);
+        ArtifactEntity artEntity = new ArtifactEntity(
+                artId, runId, stepId, "SNAPSHOT", snap.getCommitHash(), snap.getCommitHash(), "{}"
+        );
+        artEntity.setReviewStatus("PENDING");
+        artifactRepository.save(artEntity);
+
+        // 3. User reverts artifact
+        ArtifactView reverted = artifactApplication.revertArtifact(artId, "user-1");
+        assertThat(reverted.getReviewStatus()).isEqualTo("REVERTED");
+
+        // 4. Verify file was restored via fallback commit diff
+        String content = Files.readString(testWorkspaceDir.resolve("auto-target.txt"));
+        assertThat(content).isEqualTo("Initial Target Content");
+    }
+
+    @Test
+    @DisplayName("JGit 审计 3：revertStepFiles 越权路径穿越防护与无效 Baseline 提交保护")
+    void testRevertStepFilesPathTraversalAndInvalidBaseline() throws Exception {
+        File wsDir = testWorkspaceDir.toFile();
+        String baselineHash = gitManager.createBaseline(wsDir, "run-guard", "admin@agenthub.local");
+
+        // 1. Path traversal attempt in revertStepFiles is safely ignored
+        gitManager.revertStepFiles(wsDir, baselineHash, List.of("../../outside-file.txt"), "admin@agenthub.local");
+
+        // 2. Invalid baseline hash must throw IllegalArgumentException and NOT delete existing files
+        workspaceApplication.saveFile(testWorkspaceId, "keep-me.txt", "Crucial Data");
+        assertThatThrownBy(() -> gitManager.revertStepFiles(wsDir, "0000000000000000000000000000000000000000",
+                List.of("keep-me.txt"), "admin@agenthub.local"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(Files.exists(testWorkspaceDir.resolve("keep-me.txt"))).isTrue();
     }
 }

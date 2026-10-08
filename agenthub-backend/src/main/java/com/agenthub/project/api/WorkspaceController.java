@@ -88,6 +88,28 @@ public class WorkspaceController {
         return Result.ok();
     }
 
+    @GetMapping("/{workspaceId}/download")
+    public org.springframework.http.ResponseEntity<byte[]> downloadFile(
+            @PathVariable("workspaceId") String workspaceId,
+            @RequestParam("path") String path) throws Exception {
+        byte[] data = workspaceApplication.downloadFile(workspaceId, path);
+        String filename = java.nio.file.Path.of(path).getFileName().toString();
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                .body(data);
+    }
+
+    @GetMapping("/{workspaceId}/archive")
+    public org.springframework.http.ResponseEntity<byte[]> archiveWorkspace(
+            @PathVariable("workspaceId") String workspaceId) throws Exception {
+        byte[] zipBytes = workspaceApplication.archiveWorkspace(workspaceId);
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + workspaceId + ".zip\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/zip"))
+                .body(zipBytes);
+    }
+
     @GetMapping("/{workspaceId}/diff")
     public Result<StructuredDiff> getStructuredDiff(
             @PathVariable("workspaceId") String workspaceId) throws Exception {
