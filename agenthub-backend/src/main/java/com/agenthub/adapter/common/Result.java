@@ -10,9 +10,11 @@ public class Result<T> implements Serializable {
     private String message;
     private T data;
     private long timestamp;
+    private String requestId;
 
     public Result() {
         this.timestamp = Instant.now().toEpochMilli();
+        this.requestId = com.agenthub.shared.context.RequestContext.get().getRequestId();
     }
 
     public Result(int code, String message, T data) {
@@ -20,6 +22,7 @@ public class Result<T> implements Serializable {
         this.message = message;
         this.data = data;
         this.timestamp = Instant.now().toEpochMilli();
+        this.requestId = com.agenthub.shared.context.RequestContext.get().getRequestId();
     }
 
     public static <T> Result<T> ok() {
@@ -72,5 +75,13 @@ public class Result<T> implements Serializable {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 }

@@ -2,29 +2,36 @@ package com.agenthub.domain.sandbox.service;
 
 import com.agenthub.domain.sandbox.model.DeploymentManifest;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
+import com.agenthub.sandbox.application.SandboxApplication;
+import com.agenthub.sandbox.infrastructure.entity.DeploymentEntity;
+import com.agenthub.sandbox.infrastructure.repository.DeploymentRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 
 @Service
-public class PreviewSandboxService {
+public class PreviewSandboxService implements SandboxApplication {
 
     @Value("${agenthub.workspace.base-dir:./data/workspaces}")
     private String workspaceBaseDir;
 
     private final WorkspaceResolver workspaceResolver;
+    private final DeploymentRepository deploymentRepository;
 
-    public PreviewSandboxService(WorkspaceResolver workspaceResolver) {
+    public PreviewSandboxService(WorkspaceResolver workspaceResolver,
+                                 DeploymentRepository deploymentRepository) {
         this.workspaceResolver = workspaceResolver;
+        this.deploymentRepository = deploymentRepository;
     }
 
+    @Override
     public String renderPreviewHtml(String projectId) {
-        Path projectDir = workspaceResolver.getWorkspaceRoot(projectId);
+        workspaceResolver.getWorkspaceRoot(projectId);
         try {
             Path indexHtml = workspaceResolver.resolvePathForRead(projectId, "index.html");
             if (Files.exists(indexHtml) && !Files.isDirectory(indexHtml)) {
@@ -56,6 +63,8 @@ public class PreviewSandboxService {
                 "</html>";
     }
 
+    @Override
+    @Transactional
     public DeploymentManifest deployProject(String projectId) {
         workspaceResolver.getWorkspaceRoot(projectId);
         String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
@@ -66,6 +75,17 @@ public class PreviewSandboxService {
                 "CMD [\"nginx\", \"-g\", \"daemon off;\"]\n";
 
         String previewUrl = "http://localhost:8080/api/sandbox/preview/" + projectId;
+
+        DeploymentEntity deployment = new DeploymentEntity(
+                deployId,
+                projectId,
+                "art-" + deployId,
+                "DEPLOYED",
+                "DOCKER_NGINX",
+                previewUrl
+        );
+        deploymentRepository.save(deployment);
+
         return new DeploymentManifest(deployId, projectId, previewUrl, dockerfile);
     }
 }

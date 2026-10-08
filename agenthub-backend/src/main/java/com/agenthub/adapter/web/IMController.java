@@ -1,11 +1,13 @@
 package com.agenthub.adapter.web;
 
 import com.agenthub.adapter.common.Result;
-import com.agenthub.application.service.IMCollaborationService;
+import com.agenthub.conversation.application.ConversationApplication;
+import com.agenthub.conversation.dto.ConversationView;
+import com.agenthub.conversation.dto.CreateConversationCommand;
+import com.agenthub.conversation.dto.MessageView;
+import com.agenthub.conversation.dto.SendMessageCommand;
 import com.agenthub.domain.conversation.model.ConversationType;
 import com.agenthub.domain.conversation.model.SenderType;
-import com.agenthub.infrastructure.repository.entity.ConversationEntity;
-import com.agenthub.infrastructure.repository.entity.MessageEntity;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -16,16 +18,17 @@ import java.util.List;
 @RequestMapping("/api/im")
 public class IMController {
 
-    private final IMCollaborationService imService;
+    private final ConversationApplication conversationApplication;
 
-    public IMController(IMCollaborationService imService) {
-        this.imService = imService;
+    public IMController(ConversationApplication conversationApplication) {
+        this.conversationApplication = conversationApplication;
     }
 
     public static class CreateConversationRequest {
         public String title;
         public ConversationType type;
         public List<String> agentIds;
+        public String projectId;
     }
 
     public static class SendMessageRequest {
@@ -35,38 +38,45 @@ public class IMController {
     }
 
     @PostMapping("/conversations")
-    public Result<ConversationEntity> createConversation(@RequestBody CreateConversationRequest req) {
-        ConversationEntity entity = imService.createConversation(
+    public Result<ConversationView> createConversation(@RequestBody CreateConversationRequest req) {
+        CreateConversationCommand cmd = new CreateConversationCommand(
                 req.title,
                 req.type != null ? req.type : ConversationType.DIRECT_CHAT,
-                req.agentIds
+                req.agentIds,
+                req.projectId != null ? req.projectId : "proj-default"
         );
-        return Result.ok(entity);
+        ConversationView view = conversationApplication.createConversation(cmd);
+        return Result.ok(view);
     }
 
     @GetMapping("/conversations")
-    public Result<List<ConversationEntity>> listConversations() {
-        return Result.ok(imService.listConversations());
+    public Result<List<ConversationView>> listConversations() {
+        return Result.ok(conversationApplication.listConversations());
+    }
+
+    @GetMapping("/conversations/{id}")
+    public Result<ConversationView> getConversation(@PathVariable("id") String id) {
+        return Result.ok(conversationApplication.getConversationById(id));
     }
 
     @GetMapping("/conversations/{id}/messages")
-    public Result<List<MessageEntity>> getMessages(@PathVariable("id") String id) {
-        return Result.ok(imService.getMessages(id));
+    public Result<List<MessageView>> getMessages(@PathVariable("id") String id) {
+        return Result.ok(conversationApplication.listMessages(id));
     }
 
     @PostMapping("/conversations/{id}/messages")
-    public Result<MessageEntity> sendMessage(@PathVariable("id") String id, @RequestBody SendMessageRequest req) {
-        MessageEntity message = imService.sendMessage(
-                id,
+    public Result<MessageView> sendMessage(@PathVariable("id") String id, @RequestBody SendMessageRequest req) {
+        SendMessageCommand cmd = new SendMessageCommand(
                 req.senderId != null ? req.senderId : "user-1",
                 req.senderType != null ? req.senderType : SenderType.USER,
                 req.content
         );
+        MessageView message = conversationApplication.sendMessage(id, cmd);
         return Result.ok(message);
     }
 
     @GetMapping(value = "/conversations/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@PathVariable("id") String id) {
-        return imService.registerStream(id);
+        return conversationApplication.registerStream(id);
     }
 }

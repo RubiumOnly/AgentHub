@@ -1,48 +1,37 @@
 package com.agenthub.adapter.web;
 
 import com.agenthub.adapter.common.Result;
+import com.agenthub.agent.application.AgentApplication;
+import com.agenthub.agent.dto.AgentDefinitionView;
 import com.agenthub.domain.agent.model.AgentExecutionRequest;
 import com.agenthub.domain.agent.model.AgentExecutionResult;
-import com.agenthub.domain.agent.model.AgentPlatformType;
-import com.agenthub.domain.agent.service.AgentAdapterFactory;
-import com.agenthub.domain.agent.spi.UnifiedAgentAdapter;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/agents")
 public class AgentRegistryController {
 
-    private final AgentAdapterFactory adapterFactory;
+    private final AgentApplication agentApplication;
 
-    public AgentRegistryController(AgentAdapterFactory adapterFactory) {
-        this.adapterFactory = adapterFactory;
+    public AgentRegistryController(AgentApplication agentApplication) {
+        this.agentApplication = agentApplication;
+    }
+
+    @GetMapping
+    public Result<List<AgentDefinitionView>> listDefinitions() {
+        return Result.ok(agentApplication.listDefinitions());
     }
 
     @GetMapping("/platforms")
     public Result<List<Map<String, Object>>> getSupportedPlatforms() {
-        Map<AgentPlatformType, Boolean> availability = adapterFactory.checkAllPlatformAvailability();
-        List<Map<String, Object>> result = availability.entrySet().stream()
-                .map(entry -> {
-                    UnifiedAgentAdapter adapter = adapterFactory.getAdapter(entry.getKey());
-                    return Map.<String, Object>of(
-                            "code", entry.getKey().getCode(),
-                            "name", entry.getKey().getDescription(),
-                            "available", entry.getValue(),
-                            "version", adapter != null ? adapter.checkVersion() : "N/A"
-                    );
-                })
-                .collect(Collectors.toList());
-        return Result.ok(result);
+        return Result.ok(agentApplication.getSupportedPlatforms());
     }
 
     @PostMapping("/execute")
     public Result<AgentExecutionResult> execute(@RequestBody AgentExecutionRequest request) {
-        UnifiedAgentAdapter adapter = adapterFactory.getAdapter(request.getPlatformType());
-        AgentExecutionResult executionResult = adapter.execute(request);
-        return Result.ok(executionResult);
+        return Result.ok(agentApplication.execute(request));
     }
 }
