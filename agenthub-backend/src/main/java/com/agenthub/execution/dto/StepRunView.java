@@ -13,10 +13,18 @@ public class StepRunView {
     private String errorMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime startedAt;
+    private LocalDateTime finishedAt;
+    private Long durationMs;
+    private String correlationId;
 
     public StepRunView() {}
 
     public StepRunView(String id, String runId, String nodeId, String status, Integer attempt, String inputRef, String outputRef, String errorMessage, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this(id, runId, nodeId, status, attempt, inputRef, outputRef, errorMessage, createdAt, updatedAt, null, null, null, null);
+    }
+
+    public StepRunView(String id, String runId, String nodeId, String status, Integer attempt, String inputRef, String outputRef, String errorMessage, LocalDateTime createdAt, LocalDateTime updatedAt, LocalDateTime startedAt, LocalDateTime finishedAt, Long durationMs, String correlationId) {
         this.id = id;
         this.runId = runId;
         this.nodeId = nodeId;
@@ -27,6 +35,10 @@ public class StepRunView {
         this.errorMessage = errorMessage;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.startedAt = startedAt;
+        this.finishedAt = finishedAt;
+        this.durationMs = durationMs;
+        this.correlationId = correlationId;
     }
 
     public String getId() { return id; }
@@ -49,4 +61,12 @@ public class StepRunView {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public LocalDateTime getStartedAt() { return startedAt; }
+    public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
+    public LocalDateTime getFinishedAt() { return finishedAt; }
+    public void setFinishedAt(LocalDateTime finishedAt) { this.finishedAt = finishedAt; }
+    public Long getDurationMs() { return durationMs; }
+    public void setDurationMs(Long durationMs) { this.durationMs = durationMs; }
+    public String getCorrelationId() { return correlationId; }
+    public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
 }

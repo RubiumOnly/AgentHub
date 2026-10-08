@@ -35,13 +35,22 @@ public class WorkflowRunEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "cancel_reason", length = 512)
+    private String cancelReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "correlation_id", length = 64)
+    private String correlationId;
+
     public WorkflowRunEntity() {}
 
     public WorkflowRunEntity(String id, String projectId, String definitionId, String status, String idempotencyKey) {
         this.id = id;
         this.projectId = projectId;
         this.definitionId = definitionId;
-        this.status = status != null ? status : "QUEUED";
+        this.status = status != null ? status : "PENDING";
         this.idempotencyKey = idempotencyKey;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -65,4 +74,10 @@ public class WorkflowRunEntity {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getCancelReason() { return cancelReason; }
+    public void setCancelReason(String cancelReason) { this.cancelReason = cancelReason; }
+    public LocalDateTime getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(LocalDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
+    public String getCorrelationId() { return correlationId; }
+    public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
 }

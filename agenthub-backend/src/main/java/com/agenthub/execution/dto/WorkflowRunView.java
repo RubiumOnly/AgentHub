@@ -12,10 +12,17 @@ public class WorkflowRunView {
     private LocalDateTime finishedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String cancelReason;
+    private LocalDateTime cancelledAt;
+    private String correlationId;
 
     public WorkflowRunView() {}
 
     public WorkflowRunView(String id, String projectId, String definitionId, String status, String idempotencyKey, LocalDateTime startedAt, LocalDateTime finishedAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this(id, projectId, definitionId, status, idempotencyKey, startedAt, finishedAt, createdAt, updatedAt, null, null, null);
+    }
+
+    public WorkflowRunView(String id, String projectId, String definitionId, String status, String idempotencyKey, LocalDateTime startedAt, LocalDateTime finishedAt, LocalDateTime createdAt, LocalDateTime updatedAt, String cancelReason, LocalDateTime cancelledAt, String correlationId) {
         this.id = id;
         this.projectId = projectId;
         this.definitionId = definitionId;
@@ -25,6 +32,9 @@ public class WorkflowRunView {
         this.finishedAt = finishedAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.cancelReason = cancelReason;
+        this.cancelledAt = cancelledAt;
+        this.correlationId = correlationId;
     }
 
     public String getId() { return id; }
@@ -45,4 +55,10 @@ public class WorkflowRunView {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public String getCancelReason() { return cancelReason; }
+    public void setCancelReason(String cancelReason) { this.cancelReason = cancelReason; }
+    public LocalDateTime getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(LocalDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
+    public String getCorrelationId() { return correlationId; }
+    public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
 }

@@ -4,6 +4,9 @@ import com.agenthub.audit.infrastructure.entity.ArtifactEntity;
 import com.agenthub.audit.infrastructure.repository.ArtifactRepository;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
+import com.agenthub.execution.domain.model.CancelTokenRegistry;
+import com.agenthub.execution.domain.model.StepRunStatus;
+import com.agenthub.execution.domain.model.WorkflowRunStatus;
 import com.agenthub.execution.dto.RunEventView;
 import com.agenthub.execution.dto.StartRunCommand;
 import com.agenthub.execution.dto.StepRunView;
@@ -14,6 +17,9 @@ import com.agenthub.execution.infrastructure.entity.WorkflowRunEntity;
 import com.agenthub.execution.infrastructure.repository.RunEventRepository;
 import com.agenthub.execution.infrastructure.repository.StepRunRepository;
 import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
+import com.agenthub.execution.scheduler.ExecutionScheduler;
+import com.agenthub.execution.service.ExecutionStateMachine;
+import com.agenthub.execution.service.RunEventBroadcaster;
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
 import com.agenthub.project.infrastructure.entity.ProjectEntity;
 import com.agenthub.project.infrastructure.repository.ProjectRepository;
@@ -25,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -47,16 +54,24 @@ public class ExecutionApplicationService implements ExecutionApplication {
     private final JGitWorkspaceManager gitManager;
     private final ArtifactRepository artifactRepository;
     private final ResourceAccessGuard accessGuard;
+    private final ExecutionStateMachine stateMachine;
+    private final CancelTokenRegistry cancelTokenRegistry;
+    private final RunEventBroadcaster broadcaster;
+    private final ExecutionScheduler executionScheduler;
 
     public ExecutionApplicationService(WorkflowRunRepository workflowRunRepository,
-                                      StepRunRepository stepRunRepository,
-                                      RunEventRepository runEventRepository,
-                                      ProjectRepository projectRepository,
-                                      WorkspaceRepository workspaceRepository,
-                                      WorkspaceResolver workspaceResolver,
-                                      JGitWorkspaceManager gitManager,
-                                      ArtifactRepository artifactRepository,
-                                      ResourceAccessGuard accessGuard) {
+                                       StepRunRepository stepRunRepository,
+                                       RunEventRepository runEventRepository,
+                                       ProjectRepository projectRepository,
+                                       WorkspaceRepository workspaceRepository,
+                                       WorkspaceResolver workspaceResolver,
+                                       JGitWorkspaceManager gitManager,
+                                       ArtifactRepository artifactRepository,
+                                       ResourceAccessGuard accessGuard,
+                                       ExecutionStateMachine stateMachine,
+                                       CancelTokenRegistry cancelTokenRegistry,
+                                       RunEventBroadcaster broadcaster,
+                                       ExecutionScheduler executionScheduler) {
         this.workflowRunRepository = workflowRunRepository;
         this.stepRunRepository = stepRunRepository;
         this.runEventRepository = runEventRepository;
@@ -66,6 +81,10 @@ public class ExecutionApplicationService implements ExecutionApplication {
         this.gitManager = gitManager;
         this.artifactRepository = artifactRepository;
         this.accessGuard = accessGuard;
+        this.stateMachine = stateMachine;
+        this.cancelTokenRegistry = cancelTokenRegistry;
+        this.broadcaster = broadcaster;
+        this.executionScheduler = executionScheduler;
     }
 
     @Override
@@ -96,10 +115,11 @@ public class ExecutionApplicationService implements ExecutionApplication {
                 cmd.getIdempotencyKey()
         );
         run.setStartedAt(LocalDateTime.now());
+        run.setCorrelationId(RequestContext.get().getCorrelationId());
         workflowRunRepository.save(run);
 
-        // Record initial event
-        appendEvent(runId, "RUN_STARTED", "Workflow execution started");
+        // Record initial event through broadcaster (produces sequence 1)
+        broadcaster.publishEvent(runId, "RUN_STARTED", "Workflow execution started");
 
         // Establish JGit baseline commit if workspace exists
         workspaceRepository.findByProjectId(cmd.getProjectId()).ifPresent(ws -> {
@@ -170,10 +190,7 @@ public class ExecutionApplicationService implements ExecutionApplication {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
         accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
 
-        long nextSeq = runEventRepository.countByRunId(runId) + 1;
-        String eventId = "evt-" + UUID.randomUUID().toString().substring(0, 8);
-        RunEventEntity event = new RunEventEntity(eventId, runId, nextSeq, eventType, payload);
-        runEventRepository.save(event);
+        RunEventEntity event = broadcaster.publishEvent(runId, eventType, payload);
         return toEventView(event);
     }
 
@@ -195,6 +212,91 @@ public class ExecutionApplicationService implements ExecutionApplication {
         return events.stream().map(this::toEventView).collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public WorkflowRunView cancelRun(String runId, String reason) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+
+        String cancelReason = reason != null && !reason.isBlank() ? reason : "User cancelled execution";
+
+        // Signal CancelToken
+        cancelTokenRegistry.cancel(runId, cancelReason);
+
+        // Cancel running and pending steps
+        List<StepRunEntity> steps = stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId);
+        for (StepRunEntity step : steps) {
+            StepRunStatus status = StepRunStatus.fromString(step.getStatus());
+            if (!status.isTerminal()) {
+                stateMachine.transitionStep(step.getId(), StepRunStatus.CANCELLED, cancelReason);
+            }
+        }
+
+        // Transition run state
+        WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.CANCELLED, cancelReason);
+        broadcaster.publishEvent(runId, "RUN_CANCELLED", "{\"reason\":\"" + cancelReason + "\"}");
+
+        return toRunView(updated);
+    }
+
+    @Override
+    @Transactional
+    public WorkflowRunView pauseRun(String runId) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+
+        WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.PAUSED, "Paused by user");
+        broadcaster.publishEvent(runId, "RUN_PAUSED", "{\"reason\":\"Paused by user\"}");
+        return toRunView(updated);
+    }
+
+    @Override
+    @Transactional
+    public WorkflowRunView resumeRun(String runId) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+
+        WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "Resumed by user");
+        broadcaster.publishEvent(runId, "RUN_RESUMED", "{\"reason\":\"Resumed by user\"}");
+        return toRunView(updated);
+    }
+
+    @Override
+    @Transactional
+    public StepRunView retryStep(String stepRunId) {
+        StepRunEntity step = stepRunRepository.findById(stepRunId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STEP_RUN_NOT_FOUND, "Step run not found: " + stepRunId));
+        WorkflowRunEntity run = workflowRunRepository.findById(step.getRunId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + step.getRunId()));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+
+        StepRunEntity updated = stateMachine.transitionStep(stepRunId, StepRunStatus.PENDING, "Retry requested by user");
+        broadcaster.publishEvent(run.getId(), "STEP_RETRY_INITIATED", "{\"stepRunId\":\"" + stepRunId + "\"}");
+        return toStepView(updated);
+    }
+
+    @Override
+    public SseEmitter subscribeRunStream(String runId, Long lastEventId) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+
+        return broadcaster.subscribe(runId, lastEventId);
+    }
+
     private WorkflowRunView toRunView(WorkflowRunEntity entity) {
         return new WorkflowRunView(
                 entity.getId(),
@@ -205,7 +307,10 @@ public class ExecutionApplicationService implements ExecutionApplication {
                 entity.getStartedAt(),
                 entity.getFinishedAt(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getCancelReason(),
+                entity.getCancelledAt(),
+                entity.getCorrelationId()
         );
     }
 
@@ -220,7 +325,11 @@ public class ExecutionApplicationService implements ExecutionApplication {
                 entity.getOutputRef(),
                 entity.getErrorMessage(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getStartedAt(),
+                entity.getFinishedAt(),
+                entity.getDurationMs(),
+                entity.getCorrelationId()
         );
     }
 

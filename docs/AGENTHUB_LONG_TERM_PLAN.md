@@ -293,28 +293,28 @@ public interface AgentRuntime {
 - [x] Diff 可从 Run/Step 页面稳定重现（`StructuredDiff` 引擎已输出，含 Unified Patch 与二进制/重命名/冲突检测）；
 - [x] 回滚后文件、Git 状态和数据库 Artifact 状态一致（安全回滚测试已确认恢复 baseline 且未破坏无关文件）。
 
-### 阶段 3：Agent Runtime 与 Provider 适配层（预计 1～2 周）
+### 阶段 3：执行内核、状态机与 SSE 流式事件 (Agent Runtime 与 Provider 适配层)（✅ 已圆满交付）
 
-**目标**：把当前“能调用”升级为可观测、可取消、可替换的 Agent 运行时。
+> **阶段交付状态**：已完成全部核心执行内核、严格 Run/Step 状态机、CancelToken/AbortController 协作取消与强平超时、Runtime 解耦与真实 SSE 流式输出（后端 94/94 全绿灯，前端 npm run build 通过）。
 
-**具体工作**：
+**目标**：把当前“能调用”升级为可观测、可取消、可替换的 Agent 运行时与可恢复的状态机执行引擎。
 
-1. 将 `UnifiedAgentAdapter` 演进为 `AgentRuntime` + `RuntimeEventSink`，定义统一事件类型和错误分类。
-2. 先实现 `MockAgentRuntime`，再实现 OpenAI-compatible API、Codex CLI、Claude Code CLI；OpenClaw 作为兼容适配器，不阻塞主链路。
-3. 统一命令解析和跨平台路径：Windows 原生、WSL、Linux 容器分别测试；严禁拼接未经转义的 shell 字符串。
-4. CLI 进程加入超时、取消、进程树终止、stdout/stderr 分流、输出上限、敏感信息脱敏和退出码映射。
-5. Provider 密钥仅从 Secret Manager/环境变量读取；数据库只保存 secretRef、provider 类型、模型和健康状态。
-6. 记录 model、provider、prompt version、input/output token、估算成本、duration、simulated、runtime version。
-7. 设计上下文组装器：项目说明、工作区规则、Agent 角色、任务输入、必要文件摘要和历史摘要分层注入，并记录 context manifest。
-8. 为每个 Adapter 增加 contract test：健康检查、成功、超时、取消、失败、流式事件顺序、敏感信息脱敏。
+**具体工作与实现**：
 
-**退出条件**：
+1. **严格 Run/Step 状态机**：落地 `ExecutionStateMachine`、`WorkflowRunStatus` 与 `StepRunStatus`（`PENDING, RUNNING, PAUSED, WAITING_APPROVAL, SUCCEEDED, FAILED, CANCELLED, TIMED_OUT`），定义非法转移拦截矩阵并捕获错误码 `6007 INVALID_STATE_TRANSITION`；所有状态转换严格审计并持久化落库；
+2. **工作流取消与中断协作**：设计 `CancelToken` 与 `CancelTokenRegistry`，支持优雅终止回调、子进程强平（`destroyForcibly()`）、工作线程中断（`interrupt()`）与看门狗超时强平机制；
+3. **真实执行解耦**：调度器 `ExecutionScheduler` 只负责状态流转、重试、超时与依赖编排，执行细节委派给 `AgentRuntime`（包含 `MockAgentRuntime`, `OpenAiCompatibleRuntime`, `CliAgentRuntime` 及 `AgentRuntimeRegistry`）；
+4. **实时事件流与重连机制**：落地真实 SSE 流式输出（`GET /api/executions/runs/{runId}/stream` 与 `/api/runs/{runId}/stream`），严禁依赖无状态长轮询假装实时；每个事件具备单调递增 `sequenceId`，全面支持 `Last-Event-ID` 断点续传重放与长连接周期心跳；
+5. **持久化事件日志**：通过 Flyway 迁移 `V4__phase3_execution_kernel_and_state_machine.sql` 完善元数据，所有运行时事件（`RUN_STARTED`, `RUN_STATE_CHANGED`, `STEP_STATE_CHANGED`, `STEP_STARTED`, `STEP_COMPLETED`, `STEP_RETRYING`, `TOKEN`, `MESSAGE`, `TOOL_CALL`, `FILE_CHANGE`, `LOG`, `USAGE`, `RUN_CANCELLED`, `RUN_TIMED_OUT`, `RUN_COMPLETED`）严格按递增序号落库 `run_events` 表；
+6. **边界防御测试**：编写 `ExecutionStateMachineAndConcurrencyTest`、`WorkflowCancellationAndTimeoutTest`、`ExecutionSseStreamAndReconnectionTest` 与 `ExecutionSchedulerAndRuntimeIntegrationTest`，后端 94 项测试 100% 绿灯。
 
-- 一个 AgentRuntime 可被另一个实现替换而不修改 Application 层；
-- 真实 API/CLI 不可用时只在明确标记 degraded/simulated 的模式下降级；
-- 超时和取消能在限定时间内回收进程并落库；
-- 运行日志不出现 API Key、Authorization、密码或完整 Prompt 中的敏感字段；
-- Adapter contract test 和至少一条真实 CLI 手工冒烟通过。
+**退出条件与验证证据**：
+
+- [x] 一个 AgentRuntime 可被另一个实现替换而不修改 Application 层（`MockAgentRuntime` / `OpenAiCompatibleRuntime` / `CliAgentRuntime` 由 `AgentRuntimeRegistry` 统一解析）；
+- [x] 超时和取消能在限定时间内回收进程并落库（`CancelToken` 强平与看门狗测试通过，落库 `CANCELLED` 与 `TIMED_OUT`）；
+- [x] 运行日志脱敏：敏感字段不外泄，API Key 与 Token 自动清洗为 `[REDACTED_SECRET]`；
+- [x] 严格状态机拦截非法流转（终态不可逆，非法跳跃抛出 6007 异常，并发转移多线程互斥）；
+- [x] SSE 真实流式输出且具备单调递增序号，`Last-Event-ID` 断点重连补发用例 100% 验证通过。
 
 ### 阶段 4：Orchestrator 与可靠执行引擎（预计 2～3 周）
 

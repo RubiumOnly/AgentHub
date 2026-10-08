@@ -9,7 +9,9 @@ import com.agenthub.execution.dto.WorkflowRunView;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -26,6 +28,10 @@ public class ExecutionController {
     public static class AppendEventRequest {
         public String eventType;
         public String payload;
+    }
+
+    public static class CancelRunRequest {
+        public String reason;
     }
 
     @PostMapping("/runs")
@@ -74,5 +80,82 @@ public class ExecutionController {
         }
         RunEventView event = executionApplication.appendEvent(runId, req.eventType, req.payload);
         return Result.ok(event);
+    }
+
+    /**
+     * Real-time SSE streaming endpoint for workflow events with Last-Event-ID reconnection support.
+     */
+    @GetMapping(value = "/runs/{runId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamEvents(
+            @PathVariable("runId") String runId,
+            @RequestHeader(value = "Last-Event-ID", required = false) String lastEventIdHeader,
+            @RequestParam(value = "lastEventId", required = false) Long lastEventIdParam) {
+
+        Long cursor = null;
+        if (lastEventIdHeader != null && !lastEventIdHeader.isBlank()) {
+            try {
+                cursor = Long.parseLong(lastEventIdHeader.trim());
+            } catch (NumberFormatException ignored) {}
+        }
+        if (cursor == null) {
+            cursor = lastEventIdParam;
+        }
+
+        return executionApplication.subscribeRunStream(runId, cursor);
+    }
+
+    @PostMapping("/runs/{runId}/cancel")
+    public Result<WorkflowRunView> cancelRun(
+            @PathVariable("runId") String runId,
+            @RequestBody(required = false) CancelRunRequest req) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to cancel run");
+        }
+        String reason = req != null && req.reason != null ? req.reason : "User cancelled execution";
+        WorkflowRunView cancelled = executionApplication.cancelRun(runId, reason);
+        return Result.ok(cancelled);
+    }
+
+    @PostMapping("/runs/{runId}/pause")
+    public Result<WorkflowRunView> pauseRun(@PathVariable("runId") String runId) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to pause run");
+        }
+        WorkflowRunView paused = executionApplication.pauseRun(runId);
+        return Result.ok(paused);
+    }
+
+    @PostMapping("/runs/{runId}/resume")
+    public Result<WorkflowRunView> resumeRun(@PathVariable("runId") String runId) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to resume run");
+        }
+        WorkflowRunView resumed = executionApplication.resumeRun(runId);
+        return Result.ok(resumed);
+    }
+
+    @PostMapping("/runs/{runId}/steps/{stepRunId}/retry")
+    public Result<StepRunView> retryStep(
+            @PathVariable("runId") String runId,
+            @PathVariable("stepRunId") String stepRunId) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to retry step");
+        }
+        StepRunView step = executionApplication.retryStep(stepRunId);
+        return Result.ok(step);
+    }
+
+    @PostMapping("/steps/{stepRunId}/retry")
+    public Result<StepRunView> retryStepDirect(@PathVariable("stepRunId") String stepRunId) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to retry step");
+        }
+        StepRunView step = executionApplication.retryStep(stepRunId);
+        return Result.ok(step);
     }
 }

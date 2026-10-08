@@ -104,10 +104,10 @@
 - `GET /api/im/conversations/{id}/stream`：**SSE 实时事件流通道**。
 
 ### 6. 工作流执行引擎与事件回放 (Workflow Execution & Event Replay)
-- `POST /api/executions/runs`：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
+- `POST /api/executions/runs`（或 `POST /api/runs`）：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
   - Request: `{"projectId": "proj-default", "definitionId": "def-default", "idempotencyKey": "idemp-uuid"}`
   - Response: `Result<WorkflowRunView>`
-- `GET /api/executions/runs/{runId}`：查询指定工作流运行实例详情与执行状态
+- `GET /api/executions/runs/{runId}`（或 `GET /api/runs/{runId}`）：查询指定工作流运行实例详情与执行状态
   - Response: `Result<WorkflowRunView>`
 - `GET /api/executions/projects/{projectId}/runs`：获取项目下所有运行实例列表
   - Response: `Result<List<WorkflowRunView>>`
@@ -118,6 +118,15 @@
 - `POST /api/executions/runs/{runId}/events`：向运行实例追加持久化审计事件
   - Request: `{"eventType": "STEP_COMPLETED", "payload": "..."}`
   - Response: `Result<RunEventView>`
+- `GET /api/executions/runs/{runId}/stream`（或 `GET /api/runs/{runId}/stream`）：**Run 专属 SSE 实时事件流通道**
+  - 请求头：支持 `Last-Event-ID: <seq>`；亦支持查询参数 `?lastEventId=<seq>`；
+  - 特性：自动按单调递增 `sequenceNum` 补发断点遗漏事件，并持续流式推送运行过程中的实时事件。
+- `POST /api/executions/runs/{runId}/cancel`（或 `POST /api/runs/{runId}/cancel`）：取消运行实例
+  - Request: `{"reason": "用户手动终止"}`
+  - 级联触发 CancelToken，强平子进程与中断执行线程，将 Run 及未完成 Step 状态收敛为 `CANCELLED`。
+- `POST /api/executions/runs/{runId}/pause`：暂停运行实例
+- `POST /api/executions/runs/{runId}/resume`：恢复运行实例
+- `POST /api/executions/steps/{stepRunId}/retry`（或 `POST /api/executions/runs/{runId}/steps/{stepRunId}/retry`）：重试失败的 Step 节点
 
 ### 7. 产物审计、审查与安全回滚 (Artifacts & Safe Rollback)
 - `GET /api/audit/artifacts/run/{runId}`：获取指定 Run 的所有交付物与快照记录；
@@ -144,12 +153,32 @@
 
 ## 三、 SSE 事件类型定义
 
-通过 `GET /api/im/conversations/{id}/stream` 订阅后，服务端推送以下标准事件：
-
+### 1. IM 协同会话流 (`/api/im/conversations/{id}/stream`)
 | 事件名称 | 数据载荷格式 | 场景说明 |
 | :--- | :--- | :--- |
 | `connected` | `{"conversationId": "...", "status": "ready"}` | 客户端握手建立连接时发送 |
 | `message` | `MessageView` 完整 JSON 结构（包含 `sequenceNum` 与 `schemaVersion`） | 收到新消息、Orchestrator 交互卡片或阶段完成通知 |
 | `message_delta` | `{"sender": "BackendArchitect", "delta": "..."}` | 智能体实时打字机流式 Token 增量 |
 | `heartbeat` | `{"timestamp": 179128...}` | 保持长连接活性的周期心跳包 |
+
+### 2. 工作流执行流 (`/api/executions/runs/{runId}/stream`)
+每个事件严格附带单调递增 `id: <sequenceNum>`，支持 `Last-Event-ID` 断点续传重放：
+| 事件名称 | 数据载荷格式 | 场景说明 |
+| :--- | :--- | :--- |
+| `connected` | `{"runId": "...", "replayedCount": N, "status": "STREAM_OPENED"}` | 连接就绪握手 |
+| `RUN_STARTED` | `Workflow execution started` | 运行实例启动 |
+| `RUN_STATE_CHANGED` | `{"fromStatus":"...","toStatus":"...","actor":"...","reason":"..."}` | 运行状态机严格流转审计 |
+| `STEP_STATE_CHANGED` | `{"stepRunId":"...","fromStatus":"...","toStatus":"...","attempt":1}` | 步骤状态机严格流转审计 |
+| `STEP_STARTED` | `{"stepRunId":"...","nodeId":"...","attempt":1}` | 步骤执行开启 |
+| `TOKEN` | `{"token":"..."}` | 实时大模型 Token 输出流 |
+| `MESSAGE` | `{"sender":"...","content":"..."}` | 智能体运行过程消息 |
+| `TOOL_CALL` | `{"tool":"...","input":{...}}` | 工具调用行为 |
+| `FILE_CHANGE` | `{"path":"...","changeType":"CREATED"}` | 工作区文件受控变动 |
+| `LOG` | `{"level":"INFO","message":"..."}` | 结构化执行日志 |
+| `USAGE` | `{"promptTokens":120,"completionTokens":250,"cost":0.0004}` | Token 消耗与成本核算 |
+| `STEP_COMPLETED` | `{"stepRunId":"...","nodeId":"..."}` | 步骤成功完成 |
+| `STEP_RETRYING` | `{"stepRunId":"...","nextAttempt":2}` | 步骤失败触发重试治理 |
+| `RUN_CANCELLED` | `{"reason":"..."}` | 用户手动取消或协同终止 |
+| `RUN_TIMED_OUT` | `{"timeoutSeconds":60}` | 看门狗强平超时 |
+| `RUN_COMPLETED` | `{"status":"SUCCEEDED"}` | 工作流实例完成 |
 

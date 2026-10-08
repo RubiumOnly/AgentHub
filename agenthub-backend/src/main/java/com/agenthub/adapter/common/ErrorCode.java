@@ -16,6 +16,11 @@ public enum ErrorCode {
     // Workflow Specific Codes
     WORKFLOW_INVALID(2001, "Workflow Definition Invalid or Cyclic"),
     WORKFLOW_EXECUTION_FAILED(2002, "Workflow Execution Failed"),
+    INVALID_STATE_TRANSITION(6007, "Invalid state machine transition"),
+    RUN_ALREADY_FINISHED(6008, "Workflow run is already finished"),
+    RUN_CANCELLED(6009, "Workflow run was cancelled"),
+    RUN_TIMED_OUT(6010, "Workflow run execution timed out"),
+    STEP_RETRY_EXCEEDED(6011, "Step retry limit exceeded"),
     
     // Workspace Specific Codes
     WORKSPACE_LOCKED(3001, "Workspace is Currently Locked by Another Task"),

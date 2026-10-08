@@ -55,6 +55,11 @@ public enum ErrorCode {
     APPROVAL_NOT_FOUND(6004, "Approval request not found"),
     IDEMPOTENCY_CONFLICT(6005, "Concurrent run with same idempotency key already exists"),
     WORKFLOW_EXECUTION_FAILED(6006, "Workflow Execution Failed"),
+    INVALID_STATE_TRANSITION(6007, "Invalid state machine transition"),
+    RUN_ALREADY_FINISHED(6008, "Workflow run is already finished"),
+    RUN_CANCELLED(6009, "Workflow run was cancelled"),
+    RUN_TIMED_OUT(6010, "Workflow run execution timed out"),
+    STEP_RETRY_EXCEEDED(6011, "Step retry limit exceeded"),
 
     // Sandbox & Deployment
     DEPLOYMENT_NOT_FOUND(7001, "Deployment record not found");
