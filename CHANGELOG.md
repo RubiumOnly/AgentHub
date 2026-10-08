@@ -4,6 +4,18 @@
 
 ---
 
+## [v1.2.1] - 2026-10-08
+
+### 🐛 缺陷修复：跨平台 Linux/Windows 路径安全归一化与 CI 全绿修复
+- **Linux CI 跨平台路径解析逃逸修复**：
+  - 定位并修复 Ubuntu/Linux 下因反斜杠 `\` 不作为路径分隔符导致的目录遍历逃逸与 `.git` 拦截绕过问题；
+  - 在 `DefaultWorkspaceResolver` 入口处强制收敛并归一化客户端路径（将 `\` 统一为 `/`），补全早期字符串切片 `.git` 与 NTFS 短名双层防护；
+  - 增强跨平台 Windows 绝对驱动器盘符（如 `C:/...`）在 Linux 运行环境下的识别与拦截，确保统一抛出 `WORKSPACE_TRAVERSAL_DENIED (3004)`；
+  - 修复 `WorkspaceLockManager.normalizeKey` 在 Linux 下因反斜杠未归一化导致的锁键不一致问题；
+  - 远程 GitHub Actions CI 两个 Job（`Backend Tests & Build` 与 `Frontend Build & Typecheck`）全部成功通过（2/2 绿灯）。
+
+---
+
 ## [v1.2.0] - 2026-10-08
 
 ### 🌟 阶段 2：安全工作区与 JGit 审计升级 (Phase 2 Deliverables)
