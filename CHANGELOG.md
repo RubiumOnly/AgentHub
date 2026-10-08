@@ -4,6 +4,30 @@
 
 ---
 
+## [v1.1.0] - 2026-10-08
+
+### 🌟 阶段 1：领域重构与持久化地基 (Phase 1 Deliverables)
+- **九大核心业务领域划分与分层重构**：
+  - 建立 `identity`, `project`, `agent`, `conversation`, `orchestration`, `execution`, `runtime`, `audit`, `sandbox`, `shared` 模块包结构；
+  - 彻底解耦 Controller 与持久化 Repository，建立 Controller 仅依赖 `*Application` 契约体系；
+  - 建立 Command / Query / View DTO 传输层规范，消除 JPA Entity 直接对外暴露；
+- **Flyway 数据库版本演进与 18 张核心业务表迁移**：
+  - 落地 `V1__init_schema.sql`，建立 `users`, `projects`, `workspaces`, `agent_definitions`, `agent_instances`, `providers`, `teams`, `team_members`, `conversations`, `conversation_participants`, `messages`, `workflow_definitions`, `workflow_runs`, `step_runs`, `run_events`, `artifacts`, `approvals`, `deployments` 共 18 张核心业务表结构；
+  - 优化核心联合索引（`idx_messages_conv_seq`, `idx_run_events_run_seq`, `idx_wf_runs_idemp`），兼顾 H2 (MySQL Mode) 与 MySQL 8.0 双重适配；
+  - 落地 `V2__seed_system_baseline.sql` 初始系统基线数据；
+  - 会话参会人淘汰逗号拼接，重构为 `conversation_participants` 关系表；消息流增加单调递增 `sequence_num` 与 `schema_version = "v1"` 结构定义；
+- **认证鉴权、水平越权防御与链路治理**：
+  - 实现基于 Token 认证体系（支持 HMAC-SHA256 与开发兼容模式）及 BCrypt 强哈希密码校验；
+  - 新增 `ResourceAccessGuard`，实施跨用户/跨租户资源归属强制鉴权（403 `FORBIDDEN`）；
+  - 全链路集成 `RequestCorrelationFilter`，自动透传 `X-Request-ID` 与 `X-Correlation-ID`，并在统一响应体 `Result<T>` 中返回 `requestId`；
+  - 全局配置 `spring.jpa.open-in-view: false`，规范事务边界；
+- **自动化架构守卫与 51 项防御性测试矩阵**：
+  - 引入 ArchUnit 架构自动化守护 (`ArchUnitArchitectureTest`)，强制约束 Controller 与 Repository 的调用隔离与分层归属；
+  - 新增 Flyway 迁移校验、鉴权与防越权测试、单调递增消息时序验证、执行引擎幂等持久化测试、事务边界隔离测试等 16 项高密度用例；
+  - 后端 51/51 项单元、集成与防御性测试矩阵 100% 绿灯通过；前端 Next.js 14 生产构建通过。
+
+---
+
 ## [v1.0.0] - 2026-10-06
 
 ### 🌟 核心特性
