@@ -188,7 +188,8 @@ public class ExecutionApplicationService implements ExecutionApplication {
                 final String finalWsPath = wsPath;
                 final Map<String, Object> finalInputs = cmd.getInputs();
                 long timeout = finalDsl.getTimeoutSeconds() != null && finalDsl.getTimeoutSeconds() > 0 ? finalDsl.getTimeoutSeconds() : 120;
-                dagExecutionEngine.executeDag(runId, finalDsl, finalWsPath, finalInputs, timeout);
+                String currentUserId = RequestContext.get().getUserId();
+                dagExecutionEngine.executeDag(runId, finalDsl, finalWsPath, finalInputs, timeout, currentUserId);
             }
         }
 

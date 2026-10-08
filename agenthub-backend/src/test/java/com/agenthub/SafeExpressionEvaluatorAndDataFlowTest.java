@@ -121,4 +121,30 @@ class SafeExpressionEvaluatorAndDataFlowTest {
         boolean condResult = evaluator.evaluateCondition("steps.untrusted_agent.outputs.result == 'something_else'", context);
         assertThat(condResult).isFalse();
     }
+
+    @Test
+    @DisplayName("测试语法边界防御：未闭合括号、未闭合引号、尾随非法字符安全捕获并返回 false")
+    void shouldHandleMalformedSyntaxSafely() {
+        // Unclosed parenthesis
+        assertThat(evaluator.evaluateCondition("(1 == 1", context)).isFalse();
+
+        // Unclosed string literal
+        assertThat(evaluator.evaluateCondition("steps.node.status == 'SUCCEEDED", context)).isFalse();
+
+        // Unexpected trailing tokens
+        assertThat(evaluator.evaluateCondition("1 == 1 unexpected_trailing_tokens", context)).isFalse();
+    }
+
+    @Test
+    @DisplayName("测试空值字符串与弱类型兼容对比：'null' / 'undefined' 判定为 false，数值与数值字符串安全等值")
+    void shouldHandleNullStringsAndCoercionSafely() {
+        context.recordNodeOutput("test_node", "{\"score\": 100, \"nullField\": \"null\", \"statusStr\": \"100\"}");
+
+        // "null" string evaluates to false as boolean
+        assertThat(evaluator.evaluateCondition("steps.test_node.outputs.nullField", context)).isFalse();
+
+        // Numeric comparison across types
+        assertThat(evaluator.evaluateCondition("steps.test_node.outputs.score == '100'", context)).isTrue();
+        assertThat(evaluator.evaluateCondition("steps.test_node.outputs.statusStr == 100", context)).isTrue();
+    }
 }

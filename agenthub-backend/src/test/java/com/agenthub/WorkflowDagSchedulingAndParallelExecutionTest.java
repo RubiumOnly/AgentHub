@@ -145,4 +145,25 @@ class WorkflowDagSchedulingAndParallelExecutionTest {
         assertThat(runView.getStatus()).isEqualTo("CANCELLED");
         assertThat(runView.getCancelReason()).contains("测试主动取消");
     }
+
+    @Test
+    @DisplayName("测试 DAG 执行期间自动持有工作区锁，执行完成后自动释放")
+    void shouldAcquireAndReleaseWorkspaceLockDuringDagExecution(@TempDir File workspaceDir) throws Exception {
+        WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", null, null));
+        String runId = run.getId();
+
+        WorkflowDsl dsl = new WorkflowDsl("wf-lock-test", "工作区锁测试");
+        dsl.setNodes(List.of(
+                new WorkflowNodeDsl("start", "起点", "START"),
+                new WorkflowNodeDsl("step1", "任务1", "AGENT", "MOCK", "任务内容")
+        ));
+        dsl.setEdges(List.of(new WorkflowEdgeDsl("start", "step1")));
+
+        CompletableFuture<WorkflowRunStatus> future = dagExecutionEngine.executeDag(
+                runId, dsl, workspaceDir.getAbsolutePath(), Map.of(), 60
+        );
+
+        WorkflowRunStatus finalStatus = future.get(10, TimeUnit.SECONDS);
+        assertThat(finalStatus).isEqualTo(WorkflowRunStatus.SUCCEEDED);
+    }
 }

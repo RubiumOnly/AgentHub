@@ -174,4 +174,47 @@ class HumanInTheLoopApprovalIntegrationTest {
         WorkflowRunView finalRun = executionApplication.getRunById(runId);
         assertThat(finalRun.getStatus()).isEqualTo("FAILED");
     }
+
+    @Test
+    @DisplayName("测试审批挂起期间协作取消：Step 状态正确流转为 CANCELLED 而非伪报 FAILED")
+    void shouldCancelWorkflowGracefullyWhileWaitingForApproval(@TempDir File workspaceDir) throws Exception {
+        WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", null, null));
+        String runId = run.getId();
+
+        WorkflowDsl dsl = new WorkflowDsl("wf-approval-cancel", "审批取消测试");
+        WorkflowNodeDsl devNode = new WorkflowNodeDsl("dev_step", "开发编码", "AGENT", "MOCK", "开发功能代码");
+        WorkflowNodeDsl approvalNode = new WorkflowNodeDsl("human_gate", "上线人工门禁", "APPROVAL");
+        approvalNode.setRequiresApproval(true);
+
+        dsl.setNodes(List.of(devNode, approvalNode));
+        dsl.setEdges(List.of(new WorkflowEdgeDsl("dev_step", "human_gate")));
+
+        CompletableFuture<WorkflowRunStatus> future = dagExecutionEngine.executeDag(
+                runId, dsl, workspaceDir.getAbsolutePath(), Map.of(), 60
+        );
+
+        // Wait for workflow to reach WAITING_APPROVAL
+        for (int i = 0; i < 50; i++) {
+            List<ApprovalView> approvals = approvalApplication.listApprovalsByRunId(runId);
+            if (!approvals.isEmpty() && "PENDING".equalsIgnoreCase(approvals.get(0).getStatus())) {
+                break;
+            }
+            Thread.sleep(100);
+        }
+
+        // Cancel while waiting for approval
+        executionApplication.cancelRun(runId, "用户主动放弃并取消上线审批");
+
+        WorkflowRunStatus finalStatus = future.get(10, TimeUnit.SECONDS);
+        assertThat(finalStatus).isEqualTo(WorkflowRunStatus.CANCELLED);
+
+        WorkflowRunView finalRun = executionApplication.getRunById(runId);
+        assertThat(finalRun.getStatus()).isEqualTo("CANCELLED");
+
+        List<StepRunView> stepRuns = executionApplication.listStepRuns(runId);
+        StepRunView approvalStep = stepRuns.stream()
+                .filter(s -> "human_gate".equals(s.getNodeId()))
+                .findFirst().orElseThrow();
+        assertThat(approvalStep.getStatus()).isEqualTo("CANCELLED");
+    }
 }

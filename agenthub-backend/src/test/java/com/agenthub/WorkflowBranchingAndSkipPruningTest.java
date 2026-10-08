@@ -112,4 +112,43 @@ class WorkflowBranchingAndSkipPruningTest {
         List<RunEventView> events = executionApplication.listEvents(runId, 0L);
         assertThat(events.stream().anyMatch(e -> "STEP_SKIPPED".equals(e.getEventType()))).isTrue();
     }
+
+    @Test
+    @DisplayName("测试基于边条件表达式 (WorkflowEdgeDsl.condition) 的动态分支路由与跳过机制")
+    void shouldRouteBranchViaEdgeConditions(@TempDir File workspaceDir) throws Exception {
+        WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", null, null));
+        String runId = run.getId();
+
+        WorkflowDsl dsl = new WorkflowDsl("wf-edge-conditions", "边条件动态分支路由测试");
+
+        WorkflowNodeDsl startNode = new WorkflowNodeDsl("start", "起点", "START");
+        WorkflowNodeDsl entNode = new WorkflowNodeDsl("enterprise_branch", "企业版通道", "AGENT", "MOCK", "企业版流程");
+        WorkflowNodeDsl commNode = new WorkflowNodeDsl("community_branch", "社区版通道", "AGENT", "MOCK", "社区版流程");
+        WorkflowNodeDsl joinNode = new WorkflowNodeDsl("notify", "通知归档", "AGENT", "MOCK", "完成通知");
+        joinNode.setJoinPolicy("any_succeeded");
+
+        dsl.setNodes(List.of(startNode, entNode, commNode, joinNode));
+        dsl.setEdges(List.of(
+                new WorkflowEdgeDsl("e1", "start", "enterprise_branch", "inputs.tier == 'enterprise'"),
+                new WorkflowEdgeDsl("e2", "start", "community_branch", "inputs.tier == 'community'"),
+                new WorkflowEdgeDsl("e3", "enterprise_branch", "notify", null),
+                new WorkflowEdgeDsl("e4", "community_branch", "notify", null)
+        ));
+
+        // Execute with inputs.tier = 'enterprise'
+        CompletableFuture<WorkflowRunStatus> future = dagExecutionEngine.executeDag(
+                runId, dsl, workspaceDir.getAbsolutePath(), Map.of("tier", "enterprise"), 60
+        );
+
+        WorkflowRunStatus finalStatus = future.get(15, TimeUnit.SECONDS);
+        assertThat(finalStatus).isEqualTo(WorkflowRunStatus.SUCCEEDED);
+
+        List<StepRunView> stepRuns = executionApplication.listStepRuns(runId);
+        Map<String, String> statusMap = stepRuns.stream()
+                .collect(java.util.stream.Collectors.toMap(StepRunView::getNodeId, StepRunView::getStatus));
+
+        assertThat(statusMap.get("enterprise_branch")).isEqualTo("SUCCEEDED");
+        assertThat(statusMap.get("community_branch")).isEqualTo("SKIPPED");
+        assertThat(statusMap.get("notify")).isEqualTo("SUCCEEDED");
+    }
 }

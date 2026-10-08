@@ -105,6 +105,15 @@ public class DagExecutionEngine {
                                                            String workspacePath,
                                                            Map<String, Object> initialInputs,
                                                            long timeoutSeconds) {
+        return executeDag(runId, dsl, workspacePath, initialInputs, timeoutSeconds, null);
+    }
+
+    public CompletableFuture<WorkflowRunStatus> executeDag(String runId,
+                                                           WorkflowDsl dsl,
+                                                           String workspacePath,
+                                                           Map<String, Object> initialInputs,
+                                                           long timeoutSeconds,
+                                                           String initiatorUserId) {
         // Validate DSL strictly
         TopologicalSortResult topology = WorkflowDslValidator.validate(dsl);
 
@@ -123,11 +132,25 @@ public class DagExecutionEngine {
         }, effectiveTimeout, TimeUnit.SECONDS);
 
         return CompletableFuture.supplyAsync(() -> {
+            boolean lockAcquired = false;
             try {
-                stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "scheduler", "DAG execution started", null);
-                broadcaster.publishEvent(runId, "RUN_STARTED", "{\"runId\":\"" + runId + "\",\"nodeCount\":" + dsl.getNodes().size() + "}");
+                if (workspacePath != null && !workspacePath.isBlank()) {
+                    long lockTimeoutMs = 5000;
+                    long leaseTtlMs = Math.max(60000L, effectiveTimeout * 1000L + 30000L);
+                    lockAcquired = lockManager.tryAcquireLock(workspacePath, runId, lockTimeoutMs, leaseTtlMs);
+                    if (!lockAcquired) {
+                        log.warn("Failed to acquire workspace lock for run [{}] on [{}]", runId, workspacePath);
+                        stateMachine.transitionRun(runId, WorkflowRunStatus.FAILED, "scheduler",
+                                "Failed to acquire workspace lock due to concurrent execution: " + workspacePath, null);
+                        broadcaster.publishEvent(runId, "RUN_FAILED", "{\"reason\":\"Workspace lock contention\"}");
+                        return WorkflowRunStatus.FAILED;
+                    }
+                }
 
-                WorkflowExecutionContext context = new WorkflowExecutionContext(initialInputs);
+                stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "scheduler", "DAG execution started", null);
+                broadcaster.publishEvent(runId, "DAG_STARTED", "{\"runId\":\"" + runId + "\",\"nodeCount\":" + dsl.getNodes().size() + "}");
+
+                WorkflowExecutionContext context = new WorkflowExecutionContext(initialInputs, initiatorUserId);
 
                 // Build lookup maps
                 Map<String, WorkflowNodeDsl> nodeMap = new HashMap<>();
@@ -140,6 +163,16 @@ public class DagExecutionEngine {
                     stepEntity.setRequiresApproval(node.isRequiresApproval() || "APPROVAL".equalsIgnoreCase(node.getType()));
                     stepRunRepository.save(stepEntity);
                     stepEntityMap.put(node.getId(), stepEntity);
+                }
+
+                // Build edge mapping for edge-conditional branching
+                Map<String, List<WorkflowEdgeDsl>> incomingEdges = new HashMap<>();
+                if (dsl.getEdges() != null) {
+                    for (WorkflowEdgeDsl edge : dsl.getEdges()) {
+                        if (edge.getTarget() != null) {
+                            incomingEdges.computeIfAbsent(edge.getTarget().trim(), k -> new ArrayList<>()).add(edge);
+                        }
+                    }
                 }
 
                 ConcurrentMap<String, AtomicInteger> inDegrees = new ConcurrentHashMap<>();
@@ -155,9 +188,10 @@ public class DagExecutionEngine {
                 java.util.function.Consumer<WorkflowNodeDsl>[] taskLauncher = new java.util.function.Consumer[1];
                 taskLauncher[0] = (node) -> {
                     executionPool.submit(() -> {
+                        nodeStatuses.put(node.getId(), StepRunStatus.RUNNING);
                         executeNode(runId, node, stepEntityMap.get(node.getId()), stepEntityMap, topology, inDegrees,
                                 nodeMap, nodeStatuses, isAborted, completionLatch, context,
-                                workspacePath, cancelToken, taskLauncher[0]);
+                                workspacePath, cancelToken, taskLauncher[0], incomingEdges);
                     });
                 };
 
@@ -177,6 +211,7 @@ public class DagExecutionEngine {
                         break;
                     }
                     if (isAborted.get()) {
+                        cancelToken.cancel("Workflow aborted due to node failure");
                         abortRemainingNodes(stepEntityMap, nodeStatuses, completionLatch, "Workflow aborted");
                         break;
                     }
@@ -184,6 +219,17 @@ public class DagExecutionEngine {
                         break;
                     }
                     completionLatch.await(100, TimeUnit.MILLISECONDS);
+                }
+
+                // Brief grace period for running siblings to terminate cleanly
+                try {
+                    completionLatch.await(1, TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {}
+
+                if (isAborted.get() || nodeStatuses.values().stream().anyMatch(s -> s == StepRunStatus.FAILED)) {
+                    stateMachine.transitionRun(runId, WorkflowRunStatus.FAILED, "scheduler", "One or more nodes failed", null);
+                    broadcaster.publishEvent(runId, "RUN_FAILED", "{\"reason\":\"One or more nodes failed\"}");
+                    return WorkflowRunStatus.FAILED;
                 }
 
                 if (cancelToken.isCancelled()) {
@@ -198,12 +244,6 @@ public class DagExecutionEngine {
                     stateMachine.transitionRun(runId, WorkflowRunStatus.TIMED_OUT, "scheduler", "Timed out waiting for DAG nodes", null);
                     broadcaster.publishEvent(runId, "RUN_TIMED_OUT", "{\"timeoutSeconds\":" + effectiveTimeout + "}");
                     return WorkflowRunStatus.TIMED_OUT;
-                }
-
-                if (isAborted.get() || nodeStatuses.values().stream().anyMatch(s -> s == StepRunStatus.FAILED)) {
-                    stateMachine.transitionRun(runId, WorkflowRunStatus.FAILED, "scheduler", "One or more nodes failed", null);
-                    broadcaster.publishEvent(runId, "RUN_FAILED", "{\"reason\":\"One or more nodes failed\"}");
-                    return WorkflowRunStatus.FAILED;
                 }
 
                 // DAG succeeded: resolve final outputs
@@ -232,8 +272,8 @@ public class DagExecutionEngine {
                 cancelTokenRegistry.remove(runId);
                 stateMachine.cleanupRun(runId);
                 broadcaster.evictRun(runId);
-                if (workspacePath != null) {
-                    lockManager.unlock(workspacePath);
+                if (lockAcquired && workspacePath != null) {
+                    lockManager.releaseLock(workspacePath, runId);
                 }
             }
         }, executionPool);
@@ -252,7 +292,8 @@ public class DagExecutionEngine {
                              WorkflowExecutionContext context,
                              String workspacePath,
                              CancelToken cancelToken,
-                             java.util.function.Consumer<WorkflowNodeDsl> launcher) {
+                             java.util.function.Consumer<WorkflowNodeDsl> launcher,
+                             Map<String, List<WorkflowEdgeDsl>> incomingEdges) {
         String stepRunId = stepEntity.getId();
         try {
             if (cancelToken.isCancelled() || isAborted.get()) {
@@ -262,18 +303,39 @@ public class DagExecutionEngine {
                 return;
             }
 
-            // Check join policy against upstream predecessors
+            // Check join policy against upstream predecessors & edge conditions
             Set<String> preds = topology.getIncoming().get(node.getId());
+            List<WorkflowEdgeDsl> inEdges = incomingEdges != null ? incomingEdges.getOrDefault(node.getId(), Collections.emptyList()) : Collections.emptyList();
+            Map<String, WorkflowEdgeDsl> predToEdge = new HashMap<>();
+            for (WorkflowEdgeDsl edge : inEdges) {
+                if (edge.getSource() != null) {
+                    predToEdge.put(edge.getSource().trim(), edge);
+                }
+            }
+
             boolean shouldSkip = false;
             String skipReason = null;
 
             if (preds != null && !preds.isEmpty()) {
                 String joinPolicy = node.getJoinPolicy() != null ? node.getJoinPolicy().trim().toLowerCase() : "all_succeeded";
+
+                java.util.function.Predicate<String> isPredSatisfied = (p) -> {
+                    StepRunStatus pStatus = nodeStatuses.get(p);
+                    if (pStatus != StepRunStatus.SUCCEEDED) {
+                        return false;
+                    }
+                    WorkflowEdgeDsl edge = predToEdge.get(p);
+                    if (edge != null && edge.getCondition() != null && !edge.getCondition().trim().isEmpty()) {
+                        return evaluator.evaluateCondition(edge.getCondition(), context);
+                    }
+                    return true;
+                };
+
                 if ("any_succeeded".equals(joinPolicy)) {
-                    boolean anySucceeded = preds.stream().anyMatch(p -> nodeStatuses.get(p) == StepRunStatus.SUCCEEDED);
-                    if (!anySucceeded) {
+                    boolean anySatisfied = preds.stream().anyMatch(isPredSatisfied);
+                    if (!anySatisfied) {
                         shouldSkip = true;
-                        skipReason = "No predecessor succeeded under ANY_SUCCEEDED join policy";
+                        skipReason = "No predecessor satisfied under ANY_SUCCEEDED join policy";
                     }
                 } else if ("custom_condition".equals(joinPolicy)) {
                     boolean condPass = evaluator.evaluateCondition(node.getCondition(), context);
@@ -282,11 +344,22 @@ public class DagExecutionEngine {
                         skipReason = "Custom condition not satisfied";
                     }
                 } else { // default "all_succeeded"
-                    boolean allSucceeded = preds.stream().allMatch(p -> nodeStatuses.get(p) == StepRunStatus.SUCCEEDED);
-                    if (!allSucceeded) {
+                    boolean allSatisfied = preds.stream().allMatch(isPredSatisfied);
+                    if (!allSatisfied) {
                         boolean anySkipped = preds.stream().anyMatch(p -> nodeStatuses.get(p) == StepRunStatus.SKIPPED);
+                        boolean anyEdgeFailed = preds.stream().anyMatch(p -> {
+                            WorkflowEdgeDsl edge = predToEdge.get(p);
+                            return edge != null && edge.getCondition() != null && !edge.getCondition().trim().isEmpty()
+                                    && !evaluator.evaluateCondition(edge.getCondition(), context);
+                        });
                         shouldSkip = true;
-                        skipReason = anySkipped ? "Predecessor was SKIPPED in ALL_SUCCEEDED dependency" : "Predecessor was not SUCCEEDED";
+                        if (anyEdgeFailed) {
+                            skipReason = "Incoming edge condition not met in ALL_SUCCEEDED dependency";
+                        } else if (anySkipped) {
+                            skipReason = "Predecessor was SKIPPED in ALL_SUCCEEDED dependency";
+                        } else {
+                            skipReason = "Predecessor was not SUCCEEDED";
+                        }
                     }
                 }
             }
@@ -320,10 +393,20 @@ public class DagExecutionEngine {
 
             // Human approval gate
             if (node.isRequiresApproval() || "APPROVAL".equalsIgnoreCase(node.getType())) {
-                boolean approved = handleNodeApproval(runId, stepEntity, node, cancelToken);
+                boolean approved = handleNodeApproval(runId, stepEntity, node, cancelToken, context);
+                if (cancelToken.isCancelled()) {
+                    StepRunStatus finalStatus = cancelToken.isTimedOut() ? StepRunStatus.TIMED_OUT : StepRunStatus.CANCELLED;
+                    nodeStatuses.put(node.getId(), finalStatus);
+                    try {
+                        stateMachine.transitionStep(stepEntity.getId(), finalStatus, "scheduler", cancelToken.getReason(), null);
+                    } catch (Exception ignored) {}
+                    completionLatch.countDown();
+                    return;
+                }
                 if (!approved) {
                     isAborted.set(true);
                     nodeStatuses.put(node.getId(), StepRunStatus.FAILED);
+                    cancelToken.cancel("Approval rejected for node [" + node.getId() + "]");
                     completionLatch.countDown();
                     abortRemainingNodes(stepEntityMap, nodeStatuses, completionLatch, "Approval rejected");
                     return;
@@ -362,16 +445,30 @@ public class DagExecutionEngine {
                 completionLatch.countDown();
                 triggerSuccessors(node.getId(), topology, inDegrees, nodeMap, launcher);
             } else {
+                if (cancelToken.isCancelled()) {
+                    StepRunStatus finalStatus = cancelToken.isTimedOut() ? StepRunStatus.TIMED_OUT : StepRunStatus.CANCELLED;
+                    nodeStatuses.put(node.getId(), finalStatus);
+                    completionLatch.countDown();
+                    return;
+                }
                 isAborted.set(true);
                 nodeStatuses.put(node.getId(), StepRunStatus.FAILED);
+                cancelToken.cancel("Predecessor node [" + node.getId() + "] failed");
                 completionLatch.countDown();
                 abortRemainingNodes(stepEntityMap, nodeStatuses, completionLatch, "Predecessor node failed");
             }
 
         } catch (Exception e) {
             log.error("Execution error for node [{}]: {}", node.getId(), e.getMessage(), e);
+            if (cancelToken.isCancelled()) {
+                StepRunStatus finalStatus = cancelToken.isTimedOut() ? StepRunStatus.TIMED_OUT : StepRunStatus.CANCELLED;
+                nodeStatuses.put(node.getId(), finalStatus);
+                completionLatch.countDown();
+                return;
+            }
             isAborted.set(true);
             nodeStatuses.put(node.getId(), StepRunStatus.FAILED);
+            cancelToken.cancel("Node [" + node.getId() + "] error: " + e.getMessage());
             completionLatch.countDown();
             abortRemainingNodes(stepEntityMap, nodeStatuses, completionLatch, e.getMessage());
         }
@@ -384,9 +481,11 @@ public class DagExecutionEngine {
         if (stepEntityMap == null) return;
         for (Map.Entry<String, StepRunEntity> entry : stepEntityMap.entrySet()) {
             String nid = entry.getKey();
-            StepRunStatus status = nodeStatuses.get(nid);
-            if (status == null || status == StepRunStatus.PENDING) {
-                nodeStatuses.put(nid, StepRunStatus.CANCELLED);
+            StepRunStatus prev = nodeStatuses.putIfAbsent(nid, StepRunStatus.CANCELLED);
+            if (prev == null || prev == StepRunStatus.PENDING) {
+                if (prev == StepRunStatus.PENDING) {
+                    nodeStatuses.put(nid, StepRunStatus.CANCELLED);
+                }
                 markStepCancelled(entry.getValue().getId(), reason);
                 completionLatch.countDown();
             }
@@ -532,10 +631,18 @@ public class DagExecutionEngine {
     private boolean handleNodeApproval(String runId,
                                         StepRunEntity stepEntity,
                                         WorkflowNodeDsl node,
-                                        CancelToken cancelToken) {
+                                        CancelToken cancelToken,
+                                        WorkflowExecutionContext context) {
         String approvalId = "appr-" + UUID.randomUUID().toString().substring(0, 8);
+        String requestedBy = context.getInitiatorUserId();
+        if (requestedBy == null || requestedBy.isBlank()) {
+            requestedBy = RequestContext.get().getUserId();
+        }
+        if (requestedBy == null || requestedBy.isBlank()) {
+            requestedBy = "system";
+        }
         ApprovalEntity approval = new ApprovalEntity(
-                approvalId, runId, stepEntity.getId(), "PENDING", RequestContext.get().getUserId()
+                approvalId, runId, stepEntity.getId(), "PENDING", requestedBy
         );
         approvalRepository.save(approval);
 

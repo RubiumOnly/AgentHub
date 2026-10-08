@@ -130,6 +130,9 @@ public class SafeExpressionEvaluator {
         boolean parseExpression() {
             boolean result = parseOr();
             skipWhitespace();
+            if (pos < input.length()) {
+                throw new IllegalArgumentException("Unexpected trailing tokens: " + input.substring(pos));
+            }
             return result;
         }
 
@@ -203,7 +206,9 @@ public class SafeExpressionEvaluator {
             if (match("(")) {
                 boolean val = parseOr();
                 skipWhitespace();
-                match(")");
+                if (!match(")")) {
+                    throw new IllegalArgumentException("Unclosed parenthesis in expression");
+                }
                 return val;
             }
 
@@ -234,9 +239,11 @@ public class SafeExpressionEvaluator {
         private String parseStringLiteral() {
             char quote = input.charAt(pos++);
             StringBuilder sb = new StringBuilder();
+            boolean closed = false;
             while (pos < input.length()) {
                 char c = input.charAt(pos++);
                 if (c == quote) {
+                    closed = true;
                     break;
                 }
                 if (c == '\\' && pos < input.length()) {
@@ -244,6 +251,9 @@ public class SafeExpressionEvaluator {
                 } else {
                     sb.append(c);
                 }
+            }
+            if (!closed) {
+                throw new IllegalArgumentException("Unclosed string literal");
             }
             return sb.toString();
         }
@@ -302,6 +312,16 @@ public class SafeExpressionEvaluator {
             if (b instanceof Boolean && a instanceof String) {
                 return String.valueOf(b).equalsIgnoreCase((String) a);
             }
+            if (a instanceof Number && b instanceof String) {
+                try {
+                    return ((Number) a).doubleValue() == Double.parseDouble((String) b);
+                } catch (NumberFormatException ignored) {}
+            }
+            if (b instanceof Number && a instanceof String) {
+                try {
+                    return ((Number) b).doubleValue() == Double.parseDouble((String) a);
+                } catch (NumberFormatException ignored) {}
+            }
             return Objects.equals(String.valueOf(a), String.valueOf(b));
         }
 
@@ -328,6 +348,9 @@ public class SafeExpressionEvaluator {
             String str = String.valueOf(obj).trim();
             if ("true".equalsIgnoreCase(str) || "succeeded".equalsIgnoreCase(str) || "pass".equalsIgnoreCase(str)) {
                 return true;
+            }
+            if ("null".equalsIgnoreCase(str) || "undefined".equalsIgnoreCase(str) || "none".equalsIgnoreCase(str) || "nil".equalsIgnoreCase(str)) {
+                return false;
             }
             return !str.isEmpty() && !"false".equalsIgnoreCase(str) && !"0".equals(str);
         }

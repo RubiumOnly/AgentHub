@@ -15,6 +15,7 @@ public class WorkflowExecutionContext implements Serializable {
 
     private final Map<String, Object> inputs = new ConcurrentHashMap<>();
     private final Map<String, NodeState> steps = new ConcurrentHashMap<>();
+    private String initiatorUserId;
 
     public static class NodeState implements Serializable {
         private String status = "PENDING";
@@ -43,9 +44,22 @@ public class WorkflowExecutionContext implements Serializable {
     public WorkflowExecutionContext() {}
 
     public WorkflowExecutionContext(Map<String, Object> initialInputs) {
+        this(initialInputs, null);
+    }
+
+    public WorkflowExecutionContext(Map<String, Object> initialInputs, String initiatorUserId) {
         if (initialInputs != null) {
             this.inputs.putAll(initialInputs);
         }
+        this.initiatorUserId = initiatorUserId;
+    }
+
+    public String getInitiatorUserId() {
+        return initiatorUserId;
+    }
+
+    public void setInitiatorUserId(String initiatorUserId) {
+        this.initiatorUserId = initiatorUserId;
     }
 
     public Map<String, Object> getInputs() {

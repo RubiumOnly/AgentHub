@@ -204,4 +204,31 @@ class WorkflowDslValidationAndCycleDetectionTest {
                     assertThat(be.getMessage()).contains("Node timeout must not be negative");
                 });
     }
+
+    @Test
+    @DisplayName("测试 Kahn 拓扑排序后保留真实图入度信息，避免结果入度被算法置零")
+    void shouldPreserveInitialInDegreesInTopologicalSortResult() {
+        WorkflowDsl dsl = new WorkflowDsl("wf-diamond-indegrees", "菱形拓扑入度验证");
+        dsl.setNodes(List.of(
+                new WorkflowNodeDsl("start", "开始", "START"),
+                new WorkflowNodeDsl("branchA", "分支A", "AGENT"),
+                new WorkflowNodeDsl("branchB", "分支B", "AGENT"),
+                new WorkflowNodeDsl("join", "汇聚", "AGENT"),
+                new WorkflowNodeDsl("end", "结束", "END")
+        ));
+        dsl.setEdges(List.of(
+                new WorkflowEdgeDsl("start", "branchA"),
+                new WorkflowEdgeDsl("start", "branchB"),
+                new WorkflowEdgeDsl("branchA", "join"),
+                new WorkflowEdgeDsl("branchB", "join"),
+                new WorkflowEdgeDsl("join", "end")
+        ));
+
+        TopologicalSortResult result = WorkflowDslValidator.validate(dsl);
+        assertThat(result.getInDegrees().get("start")).isEqualTo(0);
+        assertThat(result.getInDegrees().get("branchA")).isEqualTo(1);
+        assertThat(result.getInDegrees().get("branchB")).isEqualTo(1);
+        assertThat(result.getInDegrees().get("join")).isEqualTo(2);
+        assertThat(result.getInDegrees().get("end")).isEqualTo(1);
+    }
 }

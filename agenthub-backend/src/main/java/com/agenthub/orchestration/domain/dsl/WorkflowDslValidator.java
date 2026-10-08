@@ -119,6 +119,9 @@ public class WorkflowDslValidator {
             }
         }
 
+        // Preserve initial in-degrees before Kahn reduction
+        Map<String, Integer> initialInDegrees = new LinkedHashMap<>(inDegrees);
+
         List<String> sortedOrder = new ArrayList<>();
         while (!queue.isEmpty()) {
             String current = queue.poll();
@@ -143,6 +146,6 @@ public class WorkflowDslValidator {
                     "Cycle detected in workflow graph involving nodes: " + cycleNodes);
         }
 
-        return new TopologicalSortResult(sortedOrder, inDegrees, outgoing, incoming);
+        return new TopologicalSortResult(sortedOrder, initialInDegrees, outgoing, incoming);
     }
 }
