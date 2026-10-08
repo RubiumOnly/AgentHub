@@ -1,13 +1,13 @@
-version: '3.8'
-
 services:
   agenthub-mysql:
     image: mysql:8.0
     container_name: agenthub-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: agenthub
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-agenthub}
+      MYSQL_USER: ${MYSQL_USER:-agenthub}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
     ports:
       - "3306:3306"
     volumes:
@@ -17,6 +17,16 @@ services:
     image: redis:7-alpine
     container_name: agenthub-redis
     restart: always
+    command: >
+      sh -c '
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          redis-server --requirepass "$$REDIS_PASSWORD"
+        else
+          redis-server
+        fi
+      '
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:
       - "6379:6379"
     volumes:

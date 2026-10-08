@@ -1,0 +1,37 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:agenthub}?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USER}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_PASSWORD}}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAX_POOL_SIZE:20}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MIN_IDLE:5}
+      idle-timeout: 300000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+  jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  h2:
+    console:
+      enabled: false
+
+agenthub:
+  workspace:
+    base-dir: "${AGENTHUB_WORKSPACE_BASE_DIR:/var/lib/agenthub/workspaces}"
+
+logging:
+  level:
+    root: INFO
+    com.agenthub: INFO
+    org.springframework: WARN

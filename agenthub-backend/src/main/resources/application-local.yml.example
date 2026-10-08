@@ -1,0 +1,20 @@
+# ==============================================================================
+# AgentHub 本地私有开发配置文件模板 (application-local.yml.example)
+# ==============================================================================
+# 说明：
+# 1. 复制本文件重命名为 application-local.yml
+# 2. 该文件已被 .gitignore 全局排除，严禁将包含真实凭据的文件提交至版本库
+# 3. 未配置 API Key 时系统将自动优雅降级为本地离线智能模拟模式
+# ==============================================================================
+
+agenthub:
+  workspace:
+    base-dir: "./data/workspaces"
+  cli:
+    timeout-ms: 300000
+  llm:
+    deepseek:
+      # 在此处填入你的 DeepSeek API Key，或通过系统环境变量 DEEPSEEK_API_KEY 注入
+      api-key: "${DEEPSEEK_API_KEY:}"
+      base-url: "https://api.deepseek.com"
+      model: "deepseek-chat"

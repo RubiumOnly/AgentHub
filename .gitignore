@@ -21,7 +21,12 @@ application-local.yml
 *application-local*.yml
 *application-local*.properties
 !*application-local*.example
+*.key
+*.pem
+*.p12
+credentials.json
 
 # Runtime Workspace Data
 data/workspaces/
 reference-shrimp-crab/
+.agents/
