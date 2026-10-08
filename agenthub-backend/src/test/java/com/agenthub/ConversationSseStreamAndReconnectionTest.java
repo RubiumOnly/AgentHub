@@ -68,7 +68,10 @@ class ConversationSseStreamAndReconnectionTest {
         SseEmitter reconnectEmitter = conversationApplication.registerStream(conv.getId(), "3", "user-1");
         assertThat(reconnectEmitter).isNotNull();
 
-        // 3. Trigger heartbeat
+        // 3. Emitter completion clears subscriber count on heartbeat/eviction
+        emitter1.complete();
+        reconnectEmitter.complete();
         eventBroadcaster.sendHeartbeat();
+        assertThat(eventBroadcaster.getActiveSubscriberCount(conv.getId())).isEqualTo(0);
     }
 }

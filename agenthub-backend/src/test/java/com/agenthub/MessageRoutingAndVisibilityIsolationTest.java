@@ -109,7 +109,20 @@ class MessageRoutingAndVisibilityIsolationTest {
         // Direct: invisible to third party
         assertThat(visibilityFilter.isVisible(directMsg, "agent-c", false)).isFalse();
 
+        // Direct: strictly invisible to unauthenticated/null/blank viewer
+        assertThat(visibilityFilter.isVisible(directMsg, null, false)).isFalse();
+        assertThat(visibilityFilter.isVisible(directMsg, "", false)).isFalse();
+
         // Direct: visible to admin
         assertThat(visibilityFilter.isVisible(directMsg, "admin", false)).isTrue();
+
+        // Filter list with null/blank viewerId: direct messages MUST be excluded!
+        List<MessageView> anonList = visibilityFilter.filterVisible(List.of(broadcastMsg, directMsg, systemMsg), null, false);
+        assertThat(anonList).hasSize(2);
+        assertThat(anonList).containsExactly(broadcastMsg, systemMsg);
+
+        List<MessageView> blankList = visibilityFilter.filterVisible(List.of(broadcastMsg, directMsg, systemMsg), "   ", false);
+        assertThat(blankList).hasSize(2);
+        assertThat(blankList).containsExactly(broadcastMsg, systemMsg);
     }
 }

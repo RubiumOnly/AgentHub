@@ -52,7 +52,7 @@ public class MessageVisibilityFilter {
         if (messages == null || messages.isEmpty()) {
             return Collections.emptyList();
         }
-        if (viewerId == null || viewerId.isBlank() || isPrivileged || "admin".equalsIgnoreCase(viewerId)) {
+        if (isPrivileged || "admin".equalsIgnoreCase(viewerId) || "system".equalsIgnoreCase(viewerId)) {
             return messages;
         }
 

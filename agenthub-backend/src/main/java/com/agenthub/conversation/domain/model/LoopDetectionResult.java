@@ -61,6 +61,16 @@ public class LoopDetectionResult {
         );
     }
 
+    public static LoopDetectionResult oscillation(List<String> agents, String details) {
+        String agentsSummary = String.join(", ", agents);
+        return new LoopDetectionResult(
+                true,
+                LoopType.OSCILLATION_DETECTED,
+                "Oscillating loop detected among agents: [" + agentsSummary + "]. " + details,
+                agents
+        );
+    }
+
     public boolean isLoopDetected() { return loopDetected; }
     public void setLoopDetected(boolean loopDetected) { this.loopDetected = loopDetected; }
     public LoopType getLoopType() { return loopType; }

@@ -127,6 +127,9 @@ public class ConversationEventBroadcaster {
 
         if (!deadHolders.isEmpty()) {
             holders.removeAll(deadHolders);
+            if (holders.isEmpty()) {
+                emitterMap.remove(conversationId);
+            }
         }
     }
 
@@ -148,6 +151,9 @@ public class ConversationEventBroadcaster {
                 }
             }
             holders.removeAll(dead);
+            if (holders.isEmpty()) {
+                emitterMap.remove(entry.getKey());
+            }
         }
     }
 
@@ -160,6 +166,9 @@ public class ConversationEventBroadcaster {
         List<EmitterHolder> list = emitterMap.get(conversationId);
         if (list != null) {
             list.remove(holder);
+            if (list.isEmpty()) {
+                emitterMap.remove(conversationId);
+            }
         }
     }
 

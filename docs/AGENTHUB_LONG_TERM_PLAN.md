@@ -386,7 +386,7 @@ public interface AgentRuntime {
 
 ### 阶段 6：多智能体协同网络、消息总线与对话系统（✅ 已圆满交付）
 
-> **阶段交付状态**：已完成多智能体团队拓扑协作网络（Hierarchical / Peer-to-Peer / Round-Robin）、会话消息总线与严格单调递增序号（ReentrantLock 并发保序）、消息路由与可见性隔离、跨智能体协议与三层防死循环检测、智能上下文窗口滑动修剪与滚动摘要合成，以及带断点补发的实时 SSE 事件流（后端 183/183 单元/领域/架构测试全绿灯，前端 Next.js 14 生产构建 100% 成功）。
+> **阶段交付状态**：已完成多智能体团队拓扑协作网络（Hierarchical / Peer-to-Peer / Round-Robin）、会话消息总线与严格单调递增序号（128 分段公平重入锁与悲观锁双轨保障）、消息路由与全方位可见性隔离、跨智能体协议与四层防死循环检测、智能上下文窗口滑动修剪与滚动摘要合成，以及带断点补发的实时 SSE 事件流（后端 187/187 单元/领域/架构测试全绿灯，前端 Next.js 14 生产构建 100% 成功）。
 
 **目标**：构建生产级多智能体团队协作拓扑网络、严格单调保序的会话消息总线、防循环震荡熔断与上下文智能治理基础设施，支撑复杂自主多 Agent 协作交付。
 
@@ -397,26 +397,26 @@ public interface AgentRuntime {
    - 抽象标准化团队角色 `TeamRole`（`ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`），支持 `system_prompt_override` 与 `can_delegate` 委派权限控制；
    - 暴露完整 REST 接口 `TeamController`（`/api/teams`），支持团队与成员的 CRUD 及协作拓扑推演；
 2. **会话消息总线与严格单调递增序号 (`ConversationSequenceManager`)**：
-   - 落地细粒度基于会话 ID 的重入锁机制，结合数据库底层同步，保障高并发写入下 `sequence_num` 绝对单调连续递增（1, 2, 3...）；
-   - 彻底消除了高并发消息乱序、覆盖与序号碰撞问题；
+   - 落地 128 分段公平重入锁池 (`Striped ReentrantLock`) 结合数据库底层事务持久化，保障高并发写入下 `sequence_num` 绝对单调连续递增（1, 2, 3...）；
+   - 彻底杜绝了高并发消息乱序、覆盖与序号碰撞问题，并根除了动态锁表内存溢出隐患；
 3. **消息路由与可见性隔离机制 (`MessageVisibilityFilter`)**：
    - 支持多路由类型：`BROADCAST`（全员广播）、`DIRECT`（定向点对点私聊）、`SYSTEM`（系统事件声明）；
-   - 实现智能可见性过滤器，拦截非收发方的第三方 Agent 偷看私聊消息，同时保障管理员和发起者的合法审计视角；
-4. **跨智能体协作协议与三层死循环熔断治理 (`LoopDetector`)**：
+   - 实现严密可见性过滤器，拦截非收发方的第三方 Agent 与未授权匿名请求偷看私聊消息，同时保障管理员和发起者的合法审计视角；
+4. **跨智能体协作协议与四层死循环熔断治理 (`LoopDetector`)**：
    - 支持标准化协作协议 `MessageProtocolType`（`REQUEST_REPLY`, `HANDOFF`, `SUMMARIZE`）；
-   - 建立三层递进防御矩阵：第 1 层最大轮次阈值截断（超出 `maxTurns` 触发 `4008 CONVERSATION_MAX_TURNS_EXCEEDED`）、第 2 层内容哈希碰撞检测（防复读）、第 3 层短周期 Ping-Pong 震荡检测（防 A-B 往复死循环）；
+   - 建立四层递进防御矩阵：第 1 层连续自主轮次截断（严格继承 Team `maxTurns`，人机长对话安全防误判）、第 2 层内容哈希碰撞检测（防复读）、第 3 层双智能体 Ping-Pong 震荡检测、第 4 层三智能体环形振荡 (A-B-C-A-B-C) 与单智能体重复自旋检测；
 5. **智能上下文窗口治理与滑动压缩 (`ContextWindowGovernance`)**：
    - `SlidingWindowContextTrimmer`：保护系统主 Prompt 与最近 N 条高保真消息，滑动修剪历史中间消息；
    - `TokenBudgetContextManager`：严格受限在最大 Token 预算内动态修剪；
    - `RollingSummaryService`：消息超阈值时自动合成为滚动摘要持久化落库（`conversations.summary`），并在下游 Prompt 中拼接 `[Previous Conversation Summary]`，节省 70%+ 上下文开销；
 6. **实时 SSE 事件总线与断点续传重放 (`ConversationEventBroadcaster`)**：
-   - 实时推送全生命周期领域事件，支持 HTTP `Last-Event-ID` 头部或 query 参数断点重连，基于序列号从数据库自动精准补齐历史消息后再切入实时广播；
+   - 实时推送全生命周期领域事件，支持 HTTP `Last-Event-ID` 头部或 query 参数断点重连，基于序列号从数据库自动精准补齐历史消息后再切入实时广播；连接关闭后自动清理闲置会话句柄；
    - 内置 20 秒周期性心跳保持连接活性；
 7. **Flyway 数据库演化 (`V7__phase6_multi_agent_teams_and_message_bus.sql`)**：
    - 扩展 `teams`、`team_members`、`conversations`、`messages` 表字段，新增 4 个复合索引，初始化预置 `team-dev-swarm` 经典多智能体开发团队种子数据；
 8. **全绿灯防御测试矩阵**：
    - 7 大测试套件：`TeamTopologyAndCoordinationTest`、`ConversationMonotonicSequenceAndConcurrencyTest`、`MessageRoutingAndVisibilityIsolationTest`、`CrossAgentProtocolAndLoopDetectionTest`、`ContextWindowAndRollingSummaryTest`、`ConversationSseStreamAndReconnectionTest` 与 `TeamAndConversationControllerIntegrationTest`；
-   - 后端 183/183 项测试 100% 绿灯；前端 Next.js 14 生产构建 100% 成功。
+   - 后端 187/187 项测试 100% 绿灯；前端 Next.js 14 生产构建 100% 成功。
 
 **退出条件与验证证据**：
 

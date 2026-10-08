@@ -193,7 +193,8 @@ public class ConversationApplicationService implements ConversationApplication {
     public List<MessageView> listMessages(String conversationId, Long sinceSeq, String viewerId) {
         ConversationEntity conv = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
-        accessGuard.checkOwnership(conv.getOwnerId(), RequestContext.get().getUserId());
+        String currentUserId = RequestContext.get().getUserId();
+        accessGuard.checkOwnership(conv.getOwnerId(), currentUserId);
 
         List<MessageEntity> entities;
         if (sinceSeq != null && sinceSeq > 0) {
@@ -202,8 +203,11 @@ public class ConversationApplicationService implements ConversationApplication {
             entities = messageRepository.findByConversationIdOrderBySequenceNumAsc(conversationId);
         }
 
+        boolean isPrivileged = "admin".equalsIgnoreCase(currentUserId) || "system".equalsIgnoreCase(currentUserId);
+        String effectiveViewerId = (viewerId != null && !viewerId.isBlank()) ? viewerId : currentUserId;
+
         List<MessageView> views = entities.stream().map(this::toMessageView).collect(Collectors.toList());
-        return visibilityFilter.filterVisible(views, viewerId, false);
+        return visibilityFilter.filterVisible(views, effectiveViewerId, isPrivileged);
     }
 
     @Override
@@ -254,6 +258,7 @@ public class ConversationApplicationService implements ConversationApplication {
             messageEntity.setMentions(String.join(",", mentions));
         }
 
+        conversation.setLastSequenceNum(nextSeq);
         conversation.setUpdatedAt(LocalDateTime.now());
         conversation.setTokenCount((conversation.getTokenCount() != null ? conversation.getTokenCount() : 0) + tokenCount);
         conversationRepository.save(conversation);
@@ -268,10 +273,10 @@ public class ConversationApplicationService implements ConversationApplication {
                 .collect(Collectors.toList());
 
         int maxTurns = 10;
-        if (conversation.getTeamId() != null) {
-            teamRepository.findById(conversation.getTeamId()).ifPresent(t -> {
-                // use team max turns
-            });
+        if (conversation.getTeamId() != null && !conversation.getTeamId().isBlank()) {
+            maxTurns = teamRepository.findById(conversation.getTeamId())
+                    .map(t -> t.getMaxTurns() != null && t.getMaxTurns() > 0 ? t.getMaxTurns() : 10)
+                    .orElse(10);
         }
 
         LoopDetectionResult loopResult = loopDetector.detectLoop(recentMessages, maxTurns);
@@ -483,6 +488,8 @@ public class ConversationApplicationService implements ConversationApplication {
                     null
             );
             messageRepository.save(summaryMsg);
+            conv.setStatus("COMPLETED");
+            conversationRepository.save(conv);
             broadcastEvent(conversationId, "message", toMessageView(summaryMsg));
             return;
         }

@@ -121,4 +121,73 @@ class CrossAgentProtocolAndLoopDetectionTest {
         assertThat(res.getLoopType()).isEqualTo(LoopDetectionResult.LoopType.OSCILLATION_DETECTED);
         assertThat(res.getReason()).contains("AgentA").contains("AgentB");
     }
+
+    @Test
+    @DisplayName("测试三方环形振荡 (A-B-C-A-B-C) 检测：三个 Agent 形成无进展闭环循环时被快速拦截")
+    void shouldDetectThreePartyCircularOscillationLoop() {
+        List<MessageView> history = List.of(
+                new MessageView("m1", "c1", "Orchestrator", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "请开始第一阶段设计", null, null, "v1", 1L, 10, null, null),
+                new MessageView("m2", "c1", "Architect", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "架构方案已产出", null, null, "v1", 2L, 10, null, null),
+                new MessageView("m3", "c1", "Reviewer", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "审查未发现硬伤", null, null, "v1", 3L, 10, null, null),
+                new MessageView("m4", "c1", "Orchestrator", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "请再次评估方案", null, null, "v1", 4L, 10, null, null),
+                new MessageView("m5", "c1", "Architect", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "架构方案依旧一致", null, null, "v1", 5L, 10, null, null),
+                new MessageView("m6", "c1", "Reviewer", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "再次审查完毕", null, null, "v1", 6L, 10, null, null)
+        );
+
+        LoopDetectionResult res = loopDetector.detectLoop(history, 10);
+        assertThat(res.isLoopDetected()).isTrue();
+        assertThat(res.getLoopType()).isEqualTo(LoopDetectionResult.LoopType.OSCILLATION_DETECTED);
+        assertThat(res.getReason()).contains("3-party");
+        assertThat(res.getInvolvedAgents()).containsExactly("Orchestrator", "Architect", "Reviewer");
+    }
+
+    @Test
+    @DisplayName("测试自身循环 (A-A-A) 检测：同一 Agent 连续 3 轮重复自言自语时被熔断")
+    void shouldDetectSelfLoopOscillation() {
+        List<MessageView> history = List.of(
+                new MessageView("m1", "c1", "DevAgent", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "正在尝试执行编译命令", null, null, "v1", 1L, 10, null, null),
+                new MessageView("m2", "c1", "DevAgent", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "编译仍在进行中，请耐心等候", null, null, "v1", 2L, 10, null, null),
+                new MessageView("m3", "c1", "DevAgent", SenderType.AGENT, null, MessageType.BROADCAST,
+                        MessageProtocolType.NORMAL, "状态维持中，尚未退出", null, null, "v1", 3L, 10, null, null)
+        );
+
+        LoopDetectionResult res = loopDetector.detectLoop(history, 10);
+        assertThat(res.isLoopDetected()).isTrue();
+        assertThat(res.getLoopType()).isEqualTo(LoopDetectionResult.LoopType.OSCILLATION_DETECTED);
+        assertThat(res.getReason()).contains("self-loop repetition");
+    }
+
+    @Test
+    @DisplayName("测试用户正常长对话防误判：用户与 Agent 交互超过 10 轮不会被误杀为死循环")
+    void shouldNotTriggerLoopDetectionDuringNormalMultiTurnUserDialogue() {
+        ConversationView conv = conversationApplication.createConversation(new CreateConversationCommand(
+                "长轮次人机对话会话",
+                ConversationType.DIRECT_CHAT,
+                List.of("BackendArchitect"),
+                "proj-default"
+        ));
+
+        // 12 turns of user-agent back-and-forth
+        for (int i = 1; i <= 6; i++) {
+            conversationApplication.sendMessage(conv.getId(), new SendMessageCommand(
+                    "user-1", SenderType.USER, "用户指令 #" + i
+            ));
+            conversationApplication.sendMessage(conv.getId(), new SendMessageCommand(
+                    "BackendArchitect", SenderType.AGENT, "响应代码 #" + i
+            ));
+        }
+
+        ConversationView current = conversationApplication.getConversationById(conv.getId());
+        assertThat(current.getStatus()).isNotEqualTo("TERMINATED");
+        List<MessageView> msgs = conversationApplication.listMessages(conv.getId());
+        assertThat(msgs).hasSize(12);
+    }
 }

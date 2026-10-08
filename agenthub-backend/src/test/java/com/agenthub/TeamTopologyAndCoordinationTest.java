@@ -55,6 +55,12 @@ class TeamTopologyAndCoordinationTest {
         assertThat(dec0.getNextSpeakerId()).isEqualTo("agent-lead");
         assertThat(dec0.getAction()).isEqualTo(NextSpeakerDecision.Action.CONTINUE);
 
+        // Turn 0 with user initiator: Leader receives task from initiator
+        TeamCoordinationContext ctxUser = new TeamCoordinationContext("c-1", "user-1", 0, 10, null, null, "Build login", null);
+        NextSpeakerDecision decUser = hierarchicalCoordinator.decideNextSpeaker(team, members, ctxUser);
+        assertThat(decUser.getNextSpeakerId()).isEqualTo("agent-lead");
+        assertThat(decUser.getReason()).contains("Leader received task from initiator");
+
         // Turn 1: Leader delegates to Architect
         TeamCoordinationContext ctx1 = new TeamCoordinationContext("c-1", "agent-lead", 1, 10, "@BackendArchitect", null, "Build login", null);
         NextSpeakerDecision dec1 = hierarchicalCoordinator.decideNextSpeaker(team, members, ctx1);

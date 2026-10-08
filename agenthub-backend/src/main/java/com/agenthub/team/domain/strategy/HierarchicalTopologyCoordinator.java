@@ -40,7 +40,7 @@ public class HierarchicalTopologyCoordinator implements TeamTopologyStrategy {
 
         boolean currentIsLeader = isSameAgent(leader, currentSpeaker);
 
-        // 2. If current speaker is a worker, control strictly returns to Leader
+        // 2. If current speaker is a worker or initiator, control strictly returns to Leader
         if (!currentIsLeader) {
             // Check if worker suggested a completion or final review
             if (context.getCurrentTurn() >= context.getMaxTurns() - 1) {
@@ -50,11 +50,16 @@ public class HierarchicalTopologyCoordinator implements TeamTopologyStrategy {
                         "Hierarchical topology: Max turn threshold approached; Leader synthesizes summary"
                 );
             }
+            boolean isRegisteredWorker = members.stream().anyMatch(m -> isSameAgent(m, currentSpeaker));
+            String reason = isRegisteredWorker
+                    ? "Hierarchical topology: Worker finished; control returns to Leader for evaluation"
+                    : "Hierarchical topology: Leader received task from initiator and coordinates execution";
+
             return NextSpeakerDecision.continueWith(
                     leader.getAgentInstanceId(),
                     leader.getRole(),
-                    "Hierarchical topology: Worker finished; control returns to Leader for evaluation",
-                    "Evaluate the previous worker output and delegate to the next worker or conclude."
+                    reason,
+                    "Evaluate the previous output and delegate to the next worker or conclude."
             );
         }
 

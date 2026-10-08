@@ -81,7 +81,10 @@ public class ConversationController {
     public Result<List<MessageView>> getMessages(@PathVariable("id") String id,
                                                  @RequestParam(value = "sinceSeq", required = false) Long sinceSeq,
                                                  @RequestParam(value = "viewerId", required = false) String viewerId) {
-        return Result.ok(conversationApplication.listMessages(id, sinceSeq, viewerId));
+        String effectiveViewerId = (viewerId != null && !viewerId.isBlank())
+                ? viewerId
+                : com.agenthub.shared.context.RequestContext.get().getUserId();
+        return Result.ok(conversationApplication.listMessages(id, sinceSeq, effectiveViewerId));
     }
 
     @PostMapping("/{id}/messages")
@@ -111,7 +114,10 @@ public class ConversationController {
                              @RequestParam(value = "sinceSeq", required = false) String sinceSeqParam,
                              @RequestParam(value = "viewerId", required = false) String viewerId) {
         String effectiveLastEventId = lastEventId != null ? lastEventId : sinceSeqParam;
-        return conversationApplication.registerStream(id, effectiveLastEventId, viewerId);
+        String effectiveViewerId = (viewerId != null && !viewerId.isBlank())
+                ? viewerId
+                : com.agenthub.shared.context.RequestContext.get().getUserId();
+        return conversationApplication.registerStream(id, effectiveLastEventId, effectiveViewerId);
     }
 
     @GetMapping(value = "/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -120,7 +126,10 @@ public class ConversationController {
                              @RequestParam(value = "after", required = false) String afterSeqParam,
                              @RequestParam(value = "viewerId", required = false) String viewerId) {
         String effectiveLastEventId = lastEventId != null ? lastEventId : afterSeqParam;
-        return conversationApplication.registerStream(id, effectiveLastEventId, viewerId);
+        String effectiveViewerId = (viewerId != null && !viewerId.isBlank())
+                ? viewerId
+                : com.agenthub.shared.context.RequestContext.get().getUserId();
+        return conversationApplication.registerStream(id, effectiveLastEventId, effectiveViewerId);
     }
 
     @GetMapping("/{id}/context")

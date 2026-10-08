@@ -16,24 +16,25 @@
   - 领域模型支持标准化团队角色 `TeamRole`（`ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`），支持成员级提示词覆盖 `system_prompt_override` 与委派权限 `can_delegate`；
   - 暴露团队与成员管理及拓扑推演 REST API：`TeamController` (`/api/teams`)；
 - **会话消息总线与严格单调递增序号 (`ConversationSequenceManager`)**：
-  - 基于会话 ID 锁池设计细粒度重入锁 (`ReentrantLock`) 并结合数据库原子增量同步；
+  - 基于 128 分段公平重入锁池 (`Striped ReentrantLock`) 消除内存泄露隐患，并结合数据库悲观写锁 (`PESSIMISTIC_WRITE`) 保障多实例并发安全；
   - 彻底杜绝并发写入时的序号冲突与消息乱序，确保同一会话内 `sequence_num` 100% 严格单调连续递增（1, 2, 3...）；
   - 保障高并发压测下消息时序的绝对一致性与事件时间线确定性；
 - **消息路由策略与可见性隔离机制 (`MessageVisibilityFilter`)**：
   - 标准化支持三大消息路由类型：`BROADCAST`（全员广播）、`DIRECT`（定向私聊）、`SYSTEM`（系统事件声明）；
-  - 落地智能可见性过滤器：第三方 Agent 无法窃视点对点私聊消息，同时保留发起者自身、接收目标与平台管理者的全局审计可见性；
+  - 落地严密可见性隔离：第三方 Agent 与未传 viewerId 的匿名请求绝对无法窃视点对点私聊消息，严格限制仅收发双方与特权审计者可见；
 - **跨智能体协作协议与三层死循环熔断治理 (`LoopDetector`)**：
   - 规范化跨智能体交互协议 `MessageProtocolType`（`REQUEST_REPLY`, `HANDOFF`, `SUMMARIZE`），通过 `in_reply_to_id` 构建结构化对话依赖树；
-  - 建立三层递进防御熔断矩阵：
-    - 第 1 层：最大轮次硬阈值截断（超出 `maxTurns` 抛出 `4008 CONVERSATION_MAX_TURNS_EXCEEDED`）；
+  - 建立四层递进防御熔断矩阵：
+    - 第 1 层：连续智能体自主协作轮次截断（严格继承 Team `maxTurns` 配置，人机交互不误杀）；
     - 第 2 层：内容哈希指纹碰撞检测（防复读死循环）；
-    - 第 3 层：短周期 Ping-Pong 震荡检测（防 A-B 往复无效震荡）；
+    - 第 3 层：短周期双智能体 Ping-Pong 震荡检测；
+    - 第 4 层：三智能体环形死循环 (A-B-C-A-B-C) 与单智能体连续自旋 (A-A-A) 闭环拦截；
 - **智能上下文窗口治理与滑动压缩 (`ContextWindowGovernance`)**：
   - `SlidingWindowContextTrimmer`：优先锚定保留系统初始提示词与最近 N 条交互高保真上下文，滑动修剪中间历史；
   - `TokenBudgetContextManager`：基于最大 Token 预算（`maxBudgetTokens`）严格限制上下文膨胀；
   - `RollingSummaryService`：消息超阈值时自动生成连贯滚动摘要（Summary）持久化落库（`conversations.summary`），在下游 Prompt 中注入 `[Previous Conversation Summary]`，节省 70%+ 上下文开销；
 - **实时 SSE 事件总线与断点续传重放 (`ConversationEventBroadcaster`)**：
-  - 全生命周期推送领域事件（`MESSAGE_CREATED`, `MEMBER_JOINED`, `MEMBER_LEFT`, `LOOP_DETECTED`, `CONTEXT_TRIMMED`, `STATUS_CHANGED`, `HEARTBEAT`）；
+  - 全生命周期推送领域事件，连接关闭自动安全驱逐空会话通道防止内存泄露；
   - 客户端通过 `Last-Event-ID` 头部或 query 参数断点重连时，系统基于 `sequence_num` 自动从数据库补齐历史事件后再平滑接入实时广播；
   - 内置 20 秒周期性心跳机制防网关断联；
 - **Flyway 数据库版本演进 (`V7__phase6_multi_agent_teams_and_message_bus.sql`)**：
@@ -46,7 +47,7 @@
   - 新增 7 大测试套件：`TeamTopologyAndCoordinationTest`、`ConversationMonotonicSequenceAndConcurrencyTest`、`MessageRoutingAndVisibilityIsolationTest`、`CrossAgentProtocolAndLoopDetectionTest`、`ContextWindowAndRollingSummaryTest`、`ConversationSseStreamAndReconnectionTest` 与 `TeamAndConversationControllerIntegrationTest`；
   - 更新 `FlywayMigrationAndSchemaTest`，验证 V7 迁移后 19 张核心领域表；
   - 加固 Controller 安全鉴权与水平越权防御，更新 `ErrorCode` 规范定义 `4005-4010`；
-  - 后端 183/183 项测试 100% 绿灯全通；前端 Next.js 14 生产构建 100% 成功。
+  - 后端 187/187 项测试 100% 绿灯全通；前端 Next.js 14 生产构建 100% 成功。
 
 ---
 

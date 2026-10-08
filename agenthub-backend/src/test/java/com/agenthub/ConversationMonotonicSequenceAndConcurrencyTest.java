@@ -140,4 +140,57 @@ class ConversationMonotonicSequenceAndConcurrencyTest {
         assertThat(incremental.stream().map(MessageView::getSequenceNum).collect(Collectors.toList()))
                 .containsExactly(4L, 5L, 6L);
     }
+
+    @Test
+    @DisplayName("测试全链路并发消息发送定序：10 个并发线程同时调用 sendMessage，序列号绝对无重复无空洞")
+    void shouldAllocateSequencesConcurrentlyViaSendMessageWithoutCollisions() throws Exception {
+        ConversationView conv = conversationApplication.createConversation(new CreateConversationCommand(
+                "并发SendMessage会话",
+                ConversationType.DIRECT_CHAT,
+                List.of("BackendArchitect"),
+                "proj-default"
+        ));
+
+        int threadCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch readyLatch = new CountDownLatch(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        List<Future<MessageView>> futures = new ArrayList<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            final int index = i;
+            futures.add(executor.submit(() -> {
+                RequestContext.get().setUserId("user-1");
+                readyLatch.countDown();
+                startLatch.await();
+                return conversationApplication.sendMessage(conv.getId(), new SendMessageCommand(
+                        "user-1", SenderType.USER, "并发需求 " + index
+                ));
+            }));
+        }
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+
+        List<Long> sequenceNums = new ArrayList<>();
+        for (Future<MessageView> f : futures) {
+            sequenceNums.add(f.get(10, TimeUnit.SECONDS).getSequenceNum());
+        }
+
+        executor.shutdown();
+
+        Set<Long> uniqueSeqs = new HashSet<>(sequenceNums);
+        assertThat(uniqueSeqs).hasSize(threadCount);
+
+        List<Long> sorted = new ArrayList<>(sequenceNums);
+        Collections.sort(sorted);
+        List<Long> expected = new ArrayList<>();
+        for (long i = 1; i <= threadCount; i++) {
+            expected.add(i);
+        }
+        assertThat(sorted).containsExactlyElementsOf(expected);
+
+        ConversationView updatedConv = conversationApplication.getConversationById(conv.getId());
+        assertThat(updatedConv.getLastSequenceNum()).isEqualTo((long) threadCount);
+    }
 }
