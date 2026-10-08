@@ -90,4 +90,47 @@ class DynamicProviderRouterAndRoutingPolicyTest {
         assertThat(candidates).noneMatch(p -> p.getId().equals("p-high-code"));
         assertThat(candidates.get(0).getId()).isEqualTo("p-med-general");
     }
+
+    @Test
+    @DisplayName("测试 真实物理延迟动态选择：同优先级下优先选择实测延迟更低的 Provider")
+    void shouldPrioritizeLowerLatencyProviderWhenPriorityIsEqual() {
+        MockLlmProvider fast = new MockLlmProvider("p-fast", "Fast Provider", "fast-m", 100, 1, Set.of("code"));
+        fast.setSimulatedLatencyMs(20);
+        fast.getCircuitBreaker().recordSuccess(20);
+
+        MockLlmProvider slow = new MockLlmProvider("p-slow", "Slow Provider", "slow-m", 100, 1, Set.of("code"));
+        slow.setSimulatedLatencyMs(250);
+        slow.getCircuitBreaker().recordSuccess(250);
+
+        router.registerProvider(slow);
+        router.registerProvider(fast);
+
+        ChatRequest req = new ChatRequest();
+        req.setRequiredCapabilities(Set.of("code"));
+
+        List<LlmProvider> candidates = router.selectCandidates(req);
+        // Both priority 100, fast (20ms) should beat slow (250ms)
+        int fastIdx = -1;
+        int slowIdx = -1;
+        for (int i = 0; i < candidates.size(); i++) {
+            if (candidates.get(i).getId().equals("p-fast")) fastIdx = i;
+            if (candidates.get(i).getId().equals("p-slow")) slowIdx = i;
+        }
+        assertThat(fastIdx).isLessThan(slowIdx);
+    }
+
+    @Test
+    @DisplayName("测试 routeAndStream 返回聚合响应契约：流式执行返回完整 ChatResponse 元数据与计费")
+    void shouldReturnAggregatedChatResponseFromRouteAndStream() {
+        ChatRequest req = ChatRequest.of("auto", "Stream pipeline test");
+        com.agenthub.agent.domain.provider.model.ChatResponse resp =
+                router.routeAndStream(req, chunk -> {}, null, null);
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getProviderId()).isEqualTo("p-high-code");
+        assertThat(resp.getContent()).isNotEmpty();
+        assertThat(resp.getUsage()).isNotNull();
+        assertThat(resp.getUsage().getTotalTokens()).isGreaterThan(0);
+        assertThat(resp.getLatencyMs()).isGreaterThan(0L);
+    }
 }

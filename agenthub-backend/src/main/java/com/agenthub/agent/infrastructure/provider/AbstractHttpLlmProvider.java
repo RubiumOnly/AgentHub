@@ -95,11 +95,15 @@ public abstract class AbstractHttpLlmProvider implements LlmProvider {
         if (!circuitBreaker.allowRequest()) {
             return ProviderHealth.down("Circuit breaker is OPEN due to " + circuitBreaker.getConsecutiveFailures() + " consecutive failures");
         }
+        long measuredLatency = circuitBreaker.getLastLatencyMs();
+        if (measuredLatency <= 0) {
+            measuredLatency = isSimulated() ? 5L : 25L;
+        }
         String key = getEffectiveApiKey(providerType + "_API_KEY");
         if (key == null || key.isBlank() || key.startsWith("sk-placeholder") || "none".equalsIgnoreCase(key)) {
-            return ProviderHealth.degraded(5, "Running in simulation mode (API key not configured)");
+            return ProviderHealth.degraded(measuredLatency, "Running in simulation mode (API key not configured)");
         }
-        return ProviderHealth.up(25, "Provider endpoint configured: " + baseUrl);
+        return ProviderHealth.up(measuredLatency, "Provider endpoint configured: " + baseUrl);
     }
 
     @Override

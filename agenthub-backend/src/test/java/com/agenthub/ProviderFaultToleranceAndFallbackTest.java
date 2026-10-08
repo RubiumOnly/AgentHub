@@ -127,4 +127,48 @@ class ProviderFaultToleranceAndFallbackTest {
                 .isInstanceOf(NoAvailableProviderException.class)
                 .hasMessageContaining("All 2 candidate LLM providers failed");
     }
+
+    @Test
+    @DisplayName("测试 熔断半开状态单探针保护与并发压测限流：HALF_OPEN 状态仅放行单次探测，未完成前拦截并发流量")
+    void shouldGateProbingRequestsInHalfOpenState() throws Exception {
+        CircuitBreaker cb = new CircuitBreaker("test-cb", 2, 50L);
+        cb.trip();
+        assertThat(cb.getStatus()).isEqualTo(CircuitStatus.OPEN);
+        assertThat(cb.allowRequest()).isFalse();
+
+        // Wait for open timeout to expire
+        Thread.sleep(60L);
+
+        // First call should transition to HALF_OPEN and be allowed as probe
+        boolean firstProbe = cb.allowRequest();
+        assertThat(firstProbe).isTrue();
+        assertThat(cb.getStatus()).isEqualTo(CircuitStatus.HALF_OPEN);
+
+        // Second concurrent call while probe is in flight MUST be blocked
+        boolean secondConcurrent = cb.allowRequest();
+        assertThat(secondConcurrent).isFalse();
+
+        // Successful completion closes circuit
+        cb.recordSuccess(42L);
+        assertThat(cb.getStatus()).isEqualTo(CircuitStatus.CLOSED);
+        assertThat(cb.getLastLatencyMs()).isEqualTo(42L);
+        assertThat(cb.allowRequest()).isTrue();
+    }
+
+    @Test
+    @DisplayName("测试 熔断半开探测失败即刻重熔：HALF_OPEN 状态下探测失败无需累积计数直接回退至 OPEN")
+    void shouldImmediatelyTripBackToOpenWhenProbeFailsInHalfOpen() throws Exception {
+        CircuitBreaker cb = new CircuitBreaker("test-cb-fail", 3, 50L);
+        cb.trip();
+        Thread.sleep(60L);
+
+        // Transition to HALF_OPEN
+        assertThat(cb.allowRequest()).isTrue();
+        assertThat(cb.getStatus()).isEqualTo(CircuitStatus.HALF_OPEN);
+
+        // Probe fails
+        cb.recordFailure(new RuntimeException("Probe connect error"));
+        assertThat(cb.getStatus()).isEqualTo(CircuitStatus.OPEN);
+        assertThat(cb.allowRequest()).isFalse();
+    }
 }

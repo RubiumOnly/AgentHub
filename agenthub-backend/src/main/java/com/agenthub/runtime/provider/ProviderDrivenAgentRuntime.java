@@ -77,14 +77,13 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
                 sink.onLog(runId, stepRunId, "INFO", "Dispatching to Dynamic Provider Router with HA failover protection");
 
                 ChatRequest chatRequest = buildChatRequest(request);
-                StringBuilder outputBuffer = new StringBuilder();
-                long startTime = System.currentTimeMillis();
 
-                router.routeAndStream(
+                ChatResponse streamResponse = router.routeAndStream(
                         chatRequest,
                         chunk -> {
-                            outputBuffer.append(chunk.getDeltaContent());
-                            sink.onToken(runId, stepRunId, chunk.getDeltaContent());
+                            if (chunk != null && chunk.getDeltaContent() != null && !chunk.getDeltaContent().isEmpty()) {
+                                sink.onToken(runId, stepRunId, chunk.getDeltaContent());
+                            }
                         },
                         fallbackEvent -> {
                             String alert = fallbackEvent.toAlertMessage();
@@ -94,25 +93,29 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
                         cancelToken
                 );
 
-                long latencyMs = System.currentTimeMillis() - startTime;
-                String fullOutput = outputBuffer.toString();
+                String fullOutput = streamResponse != null && streamResponse.getContent() != null ? streamResponse.getContent() : "";
 
                 // Persist file into workspace if path is specified
                 if (request.getWorkspacePath() != null && !fullOutput.isBlank()) {
                     persistWorkspaceFile(request.getWorkspacePath(), fullOutput, sink, runId, stepRunId);
                 }
 
-                int promptTokens = Math.max(30, chatRequest.getMessages().get(0).getContent().length() / 4);
-                int completionTokens = Math.max(20, fullOutput.length() / 4);
-                double cost = ModelPricing.calculateCost(chatRequest.getModel(), promptTokens, completionTokens, 0.0, 0.0);
+                TokenUsage usage = streamResponse != null && streamResponse.getUsage() != null ? streamResponse.getUsage() : TokenUsage.zero();
+                int promptTokens = usage.getPromptTokens();
+                int completionTokens = usage.getCompletionTokens();
+                double cost = streamResponse != null ? streamResponse.getEstimatedCost() : 0.0;
+                long latencyMs = streamResponse != null ? streamResponse.getLatencyMs() : 0L;
+                String effectiveProviderId = streamResponse != null ? streamResponse.getProviderId() : null;
+                String effectiveProviderType = streamResponse != null ? streamResponse.getProviderType() : "ROUTER";
+                String effectiveModel = streamResponse != null ? streamResponse.getModel() : "unknown";
 
                 // Persist token usage audit
                 tokenUsageApplication.recordUsage(
                         runId,
                         stepRunId,
-                        chatRequest.getPreferredProvider() != null ? chatRequest.getPreferredProvider() : "router-selected",
-                        "ROUTER",
-                        chatRequest.getModel() != null ? chatRequest.getModel() : "auto",
+                        effectiveProviderId,
+                        effectiveProviderType,
+                        effectiveModel,
                         promptTokens,
                         completionTokens,
                         latencyMs,
@@ -131,7 +134,7 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
                     tokenUsageApplication.recordUsage(
                             runId,
                             stepRunId,
-                            "unknown",
+                            null, // null providerId instead of "unknown" to prevent FK constraint violation
                             "ROUTER",
                             "unknown",
                             0, 0, 0, 0.0,
@@ -148,14 +151,17 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
 
     @Override
     public void cancel(ExecutionHandle handle) {
-        log.info("Cancel requested for handle [{}]", handle.getHandleId());
+        if (handle != null) {
+            handle.markCancelled();
+            log.info("Cancel requested and marked for handle [{}]", handle.getHandleId());
+        }
     }
 
     private ChatRequest buildChatRequest(AgentExecutionRequest req) {
         ChatRequest chatReq = new ChatRequest();
-        chatReq.setTimeoutSeconds(req.getTimeoutSeconds());
+        chatReq.setTimeoutSeconds(req.getTimeoutSeconds() > 0 ? req.getTimeoutSeconds() : 60);
 
-        String prompt = req.getPrompt() != null ? req.getPrompt() : "Execute agent step task";
+        String prompt = (req.getPrompt() != null && !req.getPrompt().isBlank()) ? req.getPrompt() : "Execute agent step task";
         chatReq.setMessages(List.of(ChatMessage.user(prompt)));
 
         // Extract capabilities based on agent role

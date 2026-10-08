@@ -49,11 +49,14 @@ public class GeminiProvider extends AbstractHttpLlmProvider {
             Map<String, Object> bodyMap = buildGeminiRequestBody(request);
             String jsonPayload = objectMapper.writeValueAsString(bodyMap);
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(requestUrl))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
+            if (effectiveKey != null && !effectiveKey.isBlank() && !isSimulated()) {
+                reqBuilder.header("x-goog-api-key", effectiveKey);
+            }
+            HttpRequest httpRequest = reqBuilder.build();
 
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             long latencyMs = System.currentTimeMillis() - start;
@@ -105,11 +108,14 @@ public class GeminiProvider extends AbstractHttpLlmProvider {
             Map<String, Object> bodyMap = buildGeminiRequestBody(request);
             String jsonPayload = objectMapper.writeValueAsString(bodyMap);
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(requestUrl))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
+            if (effectiveKey != null && !effectiveKey.isBlank() && !isSimulated()) {
+                reqBuilder.header("x-goog-api-key", effectiveKey);
+            }
+            HttpRequest httpRequest = reqBuilder.build();
 
             HttpResponse<java.io.InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
 
@@ -161,7 +167,7 @@ public class GeminiProvider extends AbstractHttpLlmProvider {
     private String buildEndpointUrl(String apiKey, boolean stream) {
         String base = baseUrl != null ? baseUrl.trim() : "https://generativelanguage.googleapis.com";
         if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        String action = stream ? "streamGenerateContent?alt=sse&key=" + apiKey : "generateContent?key=" + apiKey;
+        String action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
         return base + "/v1beta/models/" + model + ":" + action;
     }
 
@@ -171,12 +177,16 @@ public class GeminiProvider extends AbstractHttpLlmProvider {
         List<Map<String, Object>> contents = new ArrayList<>();
         Map<String, Object> systemInstruction = null;
 
-        for (ChatMessage msg : request.getMessages()) {
-            if ("system".equalsIgnoreCase(msg.getRole())) {
-                systemInstruction = Map.of("parts", List.of(Map.of("text", msg.getContent())));
-            } else {
-                String geminiRole = "assistant".equalsIgnoreCase(msg.getRole()) ? "model" : "user";
-                contents.add(Map.of("role", geminiRole, "parts", List.of(Map.of("text", msg.getContent()))));
+        if (request != null && request.getMessages() != null) {
+            for (ChatMessage msg : request.getMessages()) {
+                if (msg == null) continue;
+                String content = msg.getContent() != null ? msg.getContent() : "";
+                if ("system".equalsIgnoreCase(msg.getRole())) {
+                    systemInstruction = Map.of("parts", List.of(Map.of("text", content)));
+                } else {
+                    String geminiRole = "assistant".equalsIgnoreCase(msg.getRole()) ? "model" : "user";
+                    contents.add(Map.of("role", geminiRole, "parts", List.of(Map.of("text", content))));
+                }
             }
         }
 
@@ -189,24 +199,31 @@ public class GeminiProvider extends AbstractHttpLlmProvider {
             body.put("systemInstruction", systemInstruction);
         }
         body.put("generationConfig", Map.of(
-                "temperature", request.getTemperature() != null ? request.getTemperature() : 0.7,
-                "maxOutputTokens", request.getMaxTokens() != null ? request.getMaxTokens() : 2048
+                "temperature", request != null && request.getTemperature() != null ? request.getTemperature() : 0.7,
+                "maxOutputTokens", request != null && request.getMaxTokens() != null ? request.getMaxTokens() : 2048
         ));
         return body;
     }
 
     private ChatResponse simulateChat(ChatRequest request, long startTime) {
-        String promptSummary = request.getMessages().isEmpty() ? "Task" : request.getMessages().get(request.getMessages().size() - 1).getContent();
+        String promptSummary = "Task";
+        if (request != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
+            ChatMessage last = request.getMessages().get(request.getMessages().size() - 1);
+            if (last != null && last.getContent() != null && !last.getContent().isBlank()) {
+                promptSummary = last.getContent();
+            }
+        }
+        String safeSummary = promptSummary != null ? promptSummary.replace("\"", "\\\"") : "Task";
         String output = String.format("""
                 // [Google Gemini Multimodal and Reasoning Result]
                 // Model: %s (Priority: %d, Capabilities: %s)
                 export function generateGeminiReport() {
                     return { status: "OK", prompt: "%s" };
                 }
-                """, model, priority, String.join(",", capabilities), promptSummary.replace("\"", "\\\""));
+                """, model, priority, String.join(",", capabilities), safeSummary);
 
         long latencyMs = Math.max(16, System.currentTimeMillis() - startTime);
-        int promptTokens = Math.max(35, promptSummary.length() / 3);
+        int promptTokens = Math.max(35, safeSummary.length() / 3);
         int completionTokens = Math.max(45, output.length() / 4);
         return buildResponse(output, promptTokens, completionTokens, latencyMs);
     }

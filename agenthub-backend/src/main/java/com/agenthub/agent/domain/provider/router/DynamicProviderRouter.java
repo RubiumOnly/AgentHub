@@ -220,14 +220,19 @@ public class DynamicProviderRouter implements ProviderRouter {
                 continue;
             }
 
-            // 2. Check capability matching
+            // 2. Skip providers that report health status DOWN
+            if (provider.checkHealth().getStatus() == ProviderHealth.Status.DOWN) {
+                continue;
+            }
+
+            // 3. Check capability matching
             if (request != null && request.getRequiredCapabilities() != null && !request.getRequiredCapabilities().isEmpty()) {
                 if (!provider.getCapabilities().containsAll(request.getRequiredCapabilities())) {
                     continue;
                 }
             }
 
-            // 3. Check general support
+            // 4. Check general support
             if (request != null && !provider.supports(request)) {
                 continue;
             }
@@ -260,10 +265,12 @@ public class DynamicProviderRouter implements ProviderRouter {
             int prioDiff = Integer.compare(p2.getPriority(), p1.getPriority());
             if (prioDiff != 0) return prioDiff;
 
-            // Measured latency ASC
+            // Measured latency ASC (only for positive latency, otherwise penalize non-positive/unknown)
             long lat1 = p1.checkHealth().getLatencyMs();
             long lat2 = p2.checkHealth().getLatencyMs();
-            int latDiff = Long.compare(Math.max(0, lat1), Math.max(0, lat2));
+            long effLat1 = lat1 > 0 ? lat1 : Long.MAX_VALUE;
+            long effLat2 = lat2 > 0 ? lat2 : Long.MAX_VALUE;
+            int latDiff = Long.compare(effLat1, effLat2);
             if (latDiff != 0) return latDiff;
 
             // Weight DESC
@@ -271,6 +278,15 @@ public class DynamicProviderRouter implements ProviderRouter {
         });
 
         return eligible;
+    }
+
+    private int healthScore(ProviderHealth.Status status) {
+        if (status == null) return 0;
+        return switch (status) {
+            case UP -> 2;
+            case DEGRADED -> 1;
+            case DOWN -> 0;
+        };
     }
 
     @Override
@@ -335,10 +351,10 @@ public class DynamicProviderRouter implements ProviderRouter {
     }
 
     @Override
-    public void routeAndStream(ChatRequest request,
-                               Consumer<ChatChunk> chunkConsumer,
-                               Consumer<FallbackEvent> fallbackListener,
-                               CancelToken cancelToken) {
+    public ChatResponse routeAndStream(ChatRequest request,
+                                       Consumer<ChatChunk> chunkConsumer,
+                                       Consumer<FallbackEvent> fallbackListener,
+                                       CancelToken cancelToken) {
         List<LlmProvider> candidates = selectCandidates(request);
         if (candidates.isEmpty()) {
             throw new NoAvailableProviderException("No active LLM provider available for streaming");
@@ -350,13 +366,60 @@ public class DynamicProviderRouter implements ProviderRouter {
         for (int i = 0; i < candidates.size(); i++) {
             LlmProvider candidate = candidates.get(i);
             AtomicBoolean chunkEmitted = new AtomicBoolean(false);
+            StringBuilder contentAccumulator = new StringBuilder();
+            java.util.concurrent.atomic.AtomicReference<TokenUsage> usageRef = new java.util.concurrent.atomic.AtomicReference<>(null);
+            long start = System.currentTimeMillis();
 
             try {
+                final int candidateIndex = i;
                 candidate.streamChat(request, chunk -> {
                     chunkEmitted.set(true);
-                    chunkConsumer.accept(chunk);
+                    if (chunk != null) {
+                        if (chunk.getDeltaContent() != null && !chunk.getDeltaContent().isEmpty()) {
+                            contentAccumulator.append(chunk.getDeltaContent());
+                        }
+                        if (chunk.getUsage() != null) {
+                            usageRef.set(chunk.getUsage());
+                        }
+                    }
+                    if (chunkConsumer != null) {
+                        chunkConsumer.accept(chunk);
+                    }
                 }, cancelToken);
-                return; // Successfully completed streaming!
+
+                long latencyMs = Math.max(1, System.currentTimeMillis() - start);
+                String fullContent = contentAccumulator.toString();
+                TokenUsage finalUsage = usageRef.get();
+                if (finalUsage == null) {
+                    int pTokens = request != null && request.getMessages() != null && !request.getMessages().isEmpty() && request.getMessages().get(0).getContent() != null
+                            ? Math.max(10, request.getMessages().get(0).getContent().length() / 4) : 30;
+                    int cTokens = Math.max(10, fullContent.length() / 4);
+                    finalUsage = TokenUsage.of(pTokens, cTokens);
+                }
+
+                double cost = ModelPricing.calculateCost(candidate.getModel(),
+                        finalUsage.getPromptTokens(), finalUsage.getCompletionTokens(),
+                        candidate.getCostPerMillionInput(), candidate.getCostPerMillionOutput());
+
+                ChatResponse response = new ChatResponse(
+                        "resp-stream-" + UUID.randomUUID().toString().substring(0, 8),
+                        candidate.getModel(),
+                        candidate.getId(),
+                        candidate.getProviderType(),
+                        fullContent,
+                        "stop",
+                        finalUsage,
+                        latencyMs,
+                        cost
+                );
+
+                if (candidateIndex > 0) {
+                    response.setFallbackUsed(true);
+                    response.setOriginalProviderId(originalPrimary.getId());
+                }
+
+                return response; // Successfully completed streaming!
+
             } catch (Exception e) {
                 lastException = e;
                 int statusCode = (e instanceof ProviderRateLimitException) ? 429 : 500;

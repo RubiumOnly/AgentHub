@@ -66,4 +66,16 @@ class SecretMaskingAndCredentialSecurityTest {
         String rawVal = SecretMasker.resolveSecret("regular-secret", mockEnv, null);
         assertThat(rawVal).isEqualTo("regular-secret");
     }
+
+    @Test
+    @DisplayName("测试 请求头 API Key 脱敏：对日志中出现的 x-api-key 与 x-goog-api-key 进行脱敏保护")
+    void shouldMaskHeaderApiKeysInText() {
+        String logLine = "Headers: {x-api-key: custom-anthropic-secret-999, x-goog-api-key: AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6}";
+        String sanitized = SecretMasker.maskInText(logLine);
+
+        assertThat(sanitized).doesNotContain("custom-anthropic-secret-999");
+        assertThat(sanitized).doesNotContain("AIzaSyA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6");
+        assertThat(sanitized).contains("x-api-key: cust***-999");
+        assertThat(sanitized).contains("x-goog-api-key:");
+    }
 }

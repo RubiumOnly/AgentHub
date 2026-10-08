@@ -15,9 +15,12 @@ import java.util.stream.Collectors;
 public class TokenUsageApplicationService implements TokenUsageApplication {
 
     private final TokenUsageAuditRepository repository;
+    private final com.agenthub.agent.infrastructure.repository.ProviderRepository providerRepository;
 
-    public TokenUsageApplicationService(TokenUsageAuditRepository repository) {
+    public TokenUsageApplicationService(TokenUsageAuditRepository repository,
+                                        com.agenthub.agent.infrastructure.repository.ProviderRepository providerRepository) {
         this.repository = repository;
+        this.providerRepository = providerRepository;
     }
 
     @Override
@@ -67,18 +70,26 @@ public class TokenUsageApplicationService implements TokenUsageApplication {
                                           String status,
                                           String errorMessage) {
         String id = "use-" + UUID.randomUUID().toString().substring(0, 8);
+        String safeProviderId = providerId;
+        if (safeProviderId != null) {
+            if (safeProviderId.isBlank() || "unknown".equalsIgnoreCase(safeProviderId) || "router-selected".equalsIgnoreCase(safeProviderId)) {
+                safeProviderId = null;
+            } else if (providerRepository != null && !providerRepository.existsById(safeProviderId)) {
+                safeProviderId = null;
+            }
+        }
         TokenUsageAuditEntity entity = new TokenUsageAuditEntity(
                 id,
                 runId,
                 stepRunId,
-                providerId,
+                safeProviderId,
                 providerType,
                 model,
-                promptTokens,
-                completionTokens,
-                promptTokens + completionTokens,
-                latencyMs,
-                estimatedCost,
+                Math.max(0, promptTokens),
+                Math.max(0, completionTokens),
+                Math.max(0, promptTokens) + Math.max(0, completionTokens),
+                Math.max(0L, latencyMs),
+                Math.max(0.0, estimatedCost),
                 status != null ? status : "SUCCESS",
                 errorMessage
         );

@@ -183,13 +183,17 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
         StringBuilder systemBuilder = new StringBuilder();
         List<Map<String, String>> messagesList = new ArrayList<>();
 
-        for (ChatMessage msg : request.getMessages()) {
-            if ("system".equalsIgnoreCase(msg.getRole())) {
-                if (systemBuilder.length() > 0) systemBuilder.append("\n\n");
-                systemBuilder.append(msg.getContent());
-            } else {
-                String role = "assistant".equalsIgnoreCase(msg.getRole()) ? "assistant" : "user";
-                messagesList.add(Map.of("role", role, "content", msg.getContent()));
+        if (request.getMessages() != null) {
+            for (ChatMessage msg : request.getMessages()) {
+                if (msg == null) continue;
+                String content = msg.getContent() != null ? msg.getContent() : "";
+                if ("system".equalsIgnoreCase(msg.getRole())) {
+                    if (systemBuilder.length() > 0) systemBuilder.append("\n\n");
+                    systemBuilder.append(content);
+                } else {
+                    String role = "assistant".equalsIgnoreCase(msg.getRole()) ? "assistant" : "user";
+                    messagesList.add(Map.of("role", role, "content", content));
+                }
             }
         }
 
@@ -204,7 +208,14 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
     }
 
     private ChatResponse simulateChat(ChatRequest request, long startTime) {
-        String promptSummary = request.getMessages().isEmpty() ? "Task" : request.getMessages().get(request.getMessages().size() - 1).getContent();
+        String promptSummary = "Task";
+        if (request != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
+            ChatMessage last = request.getMessages().get(request.getMessages().size() - 1);
+            if (last != null && last.getContent() != null && !last.getContent().isBlank()) {
+                promptSummary = last.getContent();
+            }
+        }
+        String safeSummary = promptSummary != null ? promptSummary.replace("\"", "\\\"") : "Task";
         String output = String.format("""
                 // [Anthropic Claude Architecture Implementation]
                 // Model: %s (Priority: %d, Weight: %d)
@@ -214,10 +225,10 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
                         // Reasoning context processed for: %s
                     }
                 }
-                """, model, priority, weight, String.join(", ", capabilities), promptSummary.replace("\"", "\\\""));
+                """, model, priority, weight, String.join(", ", capabilities), safeSummary);
 
         long latencyMs = Math.max(18, System.currentTimeMillis() - startTime);
-        int promptTokens = Math.max(45, promptSummary.length() / 3);
+        int promptTokens = Math.max(45, safeSummary.length() / 3);
         int completionTokens = Math.max(55, output.length() / 4);
         return buildResponse(output, promptTokens, completionTokens, latencyMs);
     }

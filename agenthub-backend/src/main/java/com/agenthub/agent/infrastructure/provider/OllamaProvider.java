@@ -142,22 +142,37 @@ public class OllamaProvider extends AbstractHttpLlmProvider {
         body.put("stream", stream);
 
         List<Map<String, String>> messagesList = new ArrayList<>();
-        for (ChatMessage msg : request.getMessages()) {
-            messagesList.add(Map.of("role", msg.getRole(), "content", msg.getContent()));
+        if (request != null && request.getMessages() != null) {
+            for (ChatMessage msg : request.getMessages()) {
+                if (msg == null) continue;
+                String role = msg.getRole() != null ? msg.getRole() : "user";
+                String content = msg.getContent() != null ? msg.getContent() : "";
+                messagesList.add(Map.of("role", role, "content", content));
+            }
+        }
+        if (messagesList.isEmpty()) {
+            messagesList.add(Map.of("role", "user", "content", "Hello"));
         }
         body.put("messages", messagesList);
         return body;
     }
 
     private ChatResponse simulateChat(ChatRequest request, long startTime) {
-        String promptSummary = request.getMessages().isEmpty() ? "Local Task" : request.getMessages().get(request.getMessages().size() - 1).getContent();
+        String promptSummary = "Local Task";
+        if (request != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
+            ChatMessage last = request.getMessages().get(request.getMessages().size() - 1);
+            if (last != null && last.getContent() != null && !last.getContent().isBlank()) {
+                promptSummary = last.getContent();
+            }
+        }
+        String safeSummary = promptSummary != null ? promptSummary.replace("\"", "\\\"") : "Local Task";
         String output = String.format("""
                 // [Local Llama / Ollama Output]
                 // Model: %s (Zero Cost: $0.00)
                 public class LocalLlamaOutput {
                     // Locally generated result for: %s
                 }
-                """, model, promptSummary.replace("\"", "\\\""));
+                """, model, safeSummary);
 
         long latencyMs = Math.max(12, System.currentTimeMillis() - startTime);
         return buildResponse(output, 40, 60, latencyMs);

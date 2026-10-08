@@ -14,6 +14,7 @@ public final class SecretMasker {
 
     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)(sk-[a-zA-Z0-9_-]{8,}|key-[a-zA-Z0-9_-]{8,}|AIza[0-9A-Za-z-_]{35})");
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)(Bearer\\s+)([a-zA-Z0-9._-]{8,})");
+    private static final Pattern HEADER_API_KEY_PATTERN = Pattern.compile("(?i)((?:x-api-key|x-goog-api-key|api-key):\\s*)([^\\r\\n,;\"'\\s]+)");
     private static final Pattern QUERY_PARAM_KEY_PATTERN = Pattern.compile("(?i)([?&](?:key|apiKey|token|secret)=)([^&]+)");
 
     private SecretMasker() {}
@@ -70,6 +71,17 @@ public final class SecretMasker {
             bearerMatcher.appendReplacement(sb, Matcher.quoteReplacement(prefix + maskSecret(token)));
         }
         bearerMatcher.appendTail(sb);
+        masked = sb.toString();
+
+        // Mask Header API keys (e.g. x-api-key, x-goog-api-key)
+        Matcher headerMatcher = HEADER_API_KEY_PATTERN.matcher(masked);
+        sb = new StringBuffer();
+        while (headerMatcher.find()) {
+            String prefix = headerMatcher.group(1);
+            String rawSecret = headerMatcher.group(2);
+            headerMatcher.appendReplacement(sb, Matcher.quoteReplacement(prefix + maskSecret(rawSecret)));
+        }
+        headerMatcher.appendTail(sb);
         masked = sb.toString();
 
         // Mask query param secrets

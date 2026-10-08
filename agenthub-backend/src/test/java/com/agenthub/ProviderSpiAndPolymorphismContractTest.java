@@ -163,4 +163,35 @@ class ProviderSpiAndPolymorphismContractTest {
         assertThat(response.getUsage().getTotalTokens()).isEqualTo(300);
         assertThat(response.getLatencyMs()).isGreaterThanOrEqualTo(20L);
     }
+
+    @Test
+    @DisplayName("测试 极端空值与空消息防御：所有 Provider 均能防御 null 消息、null 角色与 null 内容，杜绝 NPE")
+    void shouldHandleNullAndEmptyMessagesWithoutNpeAcrossAllProviders() {
+        ChatMessage msgWithNulls = new ChatMessage();
+        msgWithNulls.setRole(null);
+        msgWithNulls.setContent(null);
+
+        ChatRequest edgeRequest = new ChatRequest();
+        edgeRequest.setMessages(List.of(msgWithNulls));
+
+        // 1. OpenAI Compatible
+        OpenAiCompatibleProvider openAi = new OpenAiCompatibleProvider("test-oai", "OPENAI", "OAI", "https://api.openai.com", "none", "gpt-4o", 100, 1, Set.of("general"), 5.0, 15.0, env);
+        ChatResponse resp1 = openAi.chat(edgeRequest);
+        assertThat(resp1).isNotNull();
+
+        // 2. Anthropic
+        AnthropicProvider anthropic = new AnthropicProvider("test-anth", "ANTHROPIC", "Anth", "https://api.anthropic.com", "none", "claude-3-5-sonnet", 90, 1, Set.of("general"), 3.0, 15.0, env);
+        ChatResponse resp2 = anthropic.chat(edgeRequest);
+        assertThat(resp2).isNotNull();
+
+        // 3. Gemini
+        GeminiProvider gemini = new GeminiProvider("test-gem", "GEMINI", "Gem", "https://generativelanguage.googleapis.com", "none", "gemini-1.5-flash", 80, 1, Set.of("general"), 0.075, 0.3, env);
+        ChatResponse resp3 = gemini.chat(edgeRequest);
+        assertThat(resp3).isNotNull();
+
+        // 4. Ollama
+        OllamaProvider ollama = new OllamaProvider("test-oll", "OLLAMA", "Oll", "http://localhost:11434", "none", "llama3.2:3b", 50, 1, Set.of("general"), 0.0, 0.0, env);
+        ChatResponse resp4 = ollama.chat(edgeRequest);
+        assertThat(resp4).isNotNull();
+    }
 }

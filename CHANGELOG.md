@@ -38,10 +38,14 @@
 - **集成内核与 REST 端点**：
   - 落地 `ProviderDrivenAgentRuntime`，与 `ExecutionScheduler`、`DagExecutionEngine` 和 `AgentRuntimeRegistry` 深度集成；
   - 新增 REST 控制器 `ProviderController` (`/api/providers`) 与 `TokenUsageController` (`/api/token-usages`)；
-- **全绿灯测试矩阵**：
-  - 新增 6 大测试套件：`ProviderSpiAndPolymorphismContractTest`、`DynamicProviderRouterAndRoutingPolicyTest`、`ProviderFaultToleranceAndFallbackTest`、`TokenCostAccountingAndAuditingTest`、`SecretMaskingAndCredentialSecurityTest` 与 `ProviderAndTokenUsageControllerIntegrationTest`；
+- **全绿灯测试矩阵与运行时加固**：
+  - 新增 7 大测试套件：`ProviderSpiAndPolymorphismContractTest`、`DynamicProviderRouterAndRoutingPolicyTest`、`ProviderFaultToleranceAndFallbackTest`、`TokenCostAccountingAndAuditingTest`、`SecretMaskingAndCredentialSecurityTest`、`ProviderAndTokenUsageControllerIntegrationTest` 与端到端 `ProviderDrivenAgentRuntimeIntegrationTest`；
+  - 加固 `CircuitBreaker` 状态机：支持 `HALF_OPEN` 单探针并发隔离与失败即刻回退、真实物理延迟原子捕获与动态加权路由打分；
+  - 加固多 Provider 消息模型防御：防范 null role 与 null content，杜绝 NPE；
+  - 加固凭证安全：`SecretMasker` 扩展清洗 `x-api-key` 与 `x-goog-api-key` 请求头，Google Gemini 迁移至 Header 传参消灭 URL 泄密隐患；
+  - 加固运行时外键约束：`TokenUsageApplicationService` 与 `ProviderDrivenAgentRuntime` 校验真实 providerId，彻底杜绝外键约束破损；
   - 更新 `FlywayMigrationAndSchemaTest` 验证 19 张核心领域表与 V6 脚本；
-  - 后端 155/155 项测试 100% 绿灯全通；前端 Next.js 14 生产构建 100% 成功。
+  - 后端 163/163 项测试 100% 绿灯全通；前端 Next.js 14 生产构建 100% 成功。
 
 ---
 

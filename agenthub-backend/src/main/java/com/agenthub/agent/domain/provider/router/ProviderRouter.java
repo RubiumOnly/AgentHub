@@ -16,10 +16,10 @@ public interface ProviderRouter {
 
     ChatResponse routeAndExecute(ChatRequest request, Consumer<FallbackEvent> fallbackListener);
 
-    void routeAndStream(ChatRequest request,
-                        Consumer<ChatChunk> chunkConsumer,
-                        Consumer<FallbackEvent> fallbackListener,
-                        CancelToken cancelToken);
+    ChatResponse routeAndStream(ChatRequest request,
+                                Consumer<ChatChunk> chunkConsumer,
+                                Consumer<FallbackEvent> fallbackListener,
+                                CancelToken cancelToken);
 
     List<LlmProvider> selectCandidates(ChatRequest request);
 

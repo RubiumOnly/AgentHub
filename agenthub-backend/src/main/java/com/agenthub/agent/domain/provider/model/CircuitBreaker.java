@@ -1,5 +1,6 @@
 package com.agenthub.agent.domain.provider.model;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -18,6 +19,8 @@ public class CircuitBreaker {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong lastFailureTime = new AtomicLong(0L);
     private final AtomicLong lastSuccessTime = new AtomicLong(0L);
+    private final AtomicLong lastLatencyMs = new AtomicLong(0L);
+    private final AtomicBoolean probeInFlight = new AtomicBoolean(false);
 
     public CircuitBreaker(String providerId) {
         this(providerId, 3, 30_000L);
@@ -26,7 +29,7 @@ public class CircuitBreaker {
     public CircuitBreaker(String providerId, int failureThreshold, long openTimeoutMs) {
         this.providerId = providerId;
         this.failureThreshold = Math.max(1, failureThreshold);
-        this.openTimeoutMs = Math.max(1000L, openTimeoutMs);
+        this.openTimeoutMs = Math.max(1L, openTimeoutMs);
     }
 
     /**
@@ -43,14 +46,15 @@ public class CircuitBreaker {
             if (now - lastFailureTime.get() >= openTimeoutMs) {
                 // Try transition to HALF_OPEN to probe recovery
                 if (status.compareAndSet(CircuitStatus.OPEN, CircuitStatus.HALF_OPEN)) {
+                    probeInFlight.set(true);
                     return true;
                 }
             }
             return false;
         }
 
-        // HALF_OPEN allows probe request
-        return true;
+        // HALF_OPEN allows exactly ONE probe request in flight to avoid stampede
+        return probeInFlight.compareAndSet(false, true);
     }
 
     /**
@@ -58,7 +62,9 @@ public class CircuitBreaker {
      */
     public void recordSuccess(long latencyMs) {
         lastSuccessTime.set(System.currentTimeMillis());
+        lastLatencyMs.set(Math.max(0L, latencyMs));
         consecutiveFailures.set(0);
+        probeInFlight.set(false);
         status.set(CircuitStatus.CLOSED);
     }
 
@@ -67,6 +73,13 @@ public class CircuitBreaker {
      */
     public void recordFailure(Throwable cause) {
         lastFailureTime.set(System.currentTimeMillis());
+        probeInFlight.set(false);
+        CircuitStatus current = status.get();
+        if (current == CircuitStatus.HALF_OPEN) {
+            // Immediate re-trip to OPEN if probe fails
+            status.set(CircuitStatus.OPEN);
+            return;
+        }
         int failures = consecutiveFailures.incrementAndGet();
         if (failures >= failureThreshold) {
             status.set(CircuitStatus.OPEN);
@@ -79,6 +92,7 @@ public class CircuitBreaker {
     public void trip() {
         lastFailureTime.set(System.currentTimeMillis());
         consecutiveFailures.set(failureThreshold);
+        probeInFlight.set(false);
         status.set(CircuitStatus.OPEN);
     }
 
@@ -87,6 +101,7 @@ public class CircuitBreaker {
      */
     public void reset() {
         consecutiveFailures.set(0);
+        probeInFlight.set(false);
         status.set(CircuitStatus.CLOSED);
     }
 
@@ -95,6 +110,8 @@ public class CircuitBreaker {
     public int getConsecutiveFailures() { return consecutiveFailures.get(); }
     public long getLastFailureTime() { return lastFailureTime.get(); }
     public long getLastSuccessTime() { return lastSuccessTime.get(); }
+    public long getLastLatencyMs() { return lastLatencyMs.get(); }
+    public void setLastLatencyMs(long latencyMs) { this.lastLatencyMs.set(Math.max(0L, latencyMs)); }
     public int getFailureThreshold() { return failureThreshold; }
     public long getOpenTimeoutMs() { return openTimeoutMs; }
 }

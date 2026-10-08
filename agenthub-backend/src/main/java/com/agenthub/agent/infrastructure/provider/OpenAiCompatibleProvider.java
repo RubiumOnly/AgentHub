@@ -174,20 +174,35 @@ public class OpenAiCompatibleProvider extends AbstractHttpLlmProvider {
     private Map<String, Object> buildRequestBody(ChatRequest request, boolean stream) {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel() != null && !request.getModel().isBlank() ? request.getModel() : this.model);
-        body.put("temperature", request.getTemperature());
-        body.put("max_tokens", request.getMaxTokens());
+        body.put("temperature", request.getTemperature() != null ? request.getTemperature() : 0.7);
+        body.put("max_tokens", request.getMaxTokens() != null ? request.getMaxTokens() : 2048);
         body.put("stream", stream);
 
         List<Map<String, String>> messagesList = new ArrayList<>();
-        for (ChatMessage msg : request.getMessages()) {
-            messagesList.add(Map.of("role", msg.getRole(), "content", msg.getContent()));
+        if (request.getMessages() != null) {
+            for (ChatMessage msg : request.getMessages()) {
+                if (msg == null) continue;
+                String role = msg.getRole() != null ? msg.getRole() : "user";
+                String content = msg.getContent() != null ? msg.getContent() : "";
+                messagesList.add(Map.of("role", role, "content", content));
+            }
+        }
+        if (messagesList.isEmpty()) {
+            messagesList.add(Map.of("role", "user", "content", "Hello"));
         }
         body.put("messages", messagesList);
         return body;
     }
 
     private ChatResponse simulateChat(ChatRequest request, long startTime) {
-        String promptSummary = request.getMessages().isEmpty() ? "Task" : request.getMessages().get(request.getMessages().size() - 1).getContent();
+        String promptSummary = "Task";
+        if (request != null && request.getMessages() != null && !request.getMessages().isEmpty()) {
+            ChatMessage last = request.getMessages().get(request.getMessages().size() - 1);
+            if (last != null && last.getContent() != null && !last.getContent().isBlank()) {
+                promptSummary = last.getContent();
+            }
+        }
+        String safeSummary = promptSummary != null ? promptSummary.replace("\"", "\\\"") : "Task";
         String output = String.format("""
                 // [%s - Simulated %s Response]
                 // Model: %s (Priority: %d, Capabilities: %s)
@@ -196,10 +211,10 @@ public class OpenAiCompatibleProvider extends AbstractHttpLlmProvider {
                         System.out.println("Executed successfully for prompt: %s");
                     }
                 }
-                """, name, providerType, model, priority, String.join(",", capabilities), promptSummary.replace("\"", "\\\""));
+                """, name, providerType, model, priority, String.join(",", capabilities), safeSummary);
 
         long latencyMs = Math.max(15, System.currentTimeMillis() - startTime);
-        int promptTokens = Math.max(30, promptSummary.length() / 3);
+        int promptTokens = Math.max(30, safeSummary.length() / 3);
         int completionTokens = Math.max(40, output.length() / 4);
         return buildResponse(output, promptTokens, completionTokens, latencyMs);
     }

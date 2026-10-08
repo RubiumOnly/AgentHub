@@ -54,4 +54,5 @@ VALUES
 ('prov-deepseek', 'user-1', 'DEEPSEEK', 'https://api.deepseek.com', 'env:DEEPSEEK_API_KEY', 'deepseek-chat', 'ACTIVE', 95, 1, 'code,general,fast,reasoning', 0.14, 0.28, 'CLOSED', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('prov-anthropic', 'user-1', 'ANTHROPIC', 'https://api.anthropic.com/v1', 'env:ANTHROPIC_API_KEY', 'claude-3-5-sonnet-20241022', 'ACTIVE', 90, 1, 'code,general,reasoning', 3.0, 15.0, 'CLOSED', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('prov-gemini', 'user-1', 'GEMINI', 'https://generativelanguage.googleapis.com', 'env:GEMINI_API_KEY', 'gemini-1.5-flash', 'ACTIVE', 85, 1, 'general,fast,long_context', 0.075, 0.30, 'CLOSED', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('prov-ollama', 'user-1', 'OLLAMA', 'http://localhost:11434', 'none', 'llama3.2:3b', 'ACTIVE', 50, 1, 'code,general,fast,local', 0.0, 0.0, 'CLOSED', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('prov-ollama', 'user-1', 'OLLAMA', 'http://localhost:11434', 'none', 'llama3.2:3b', 'ACTIVE', 50, 1, 'code,general,fast,local', 0.0, 0.0, 'CLOSED', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('prov-mock', 'user-1', 'MOCK', 'mock://local', 'none', 'mock-v1', 'ACTIVE', 10, 1, 'code,general,fast,reasoning,local', 0.0, 0.0, 'CLOSED', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
