@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class AgentAdapterTest {
 
     @Autowired
@@ -54,11 +56,31 @@ class AgentAdapterTest {
         AgentExecutionRequest request = new AgentExecutionRequest(
                 "agent-test-1",
                 AgentPlatformType.CLAUDE_CODE,
-                "d:/work/agenthub",
+                "./target/test-workspaces/agent-test",
                 "Generate a quick test spec"
         );
         AgentExecutionResult result = claudeAdapter.execute(request);
         assertThat(result).isNotNull();
+        assertThat(result.getOutput()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("测试 SpringAiApiAdapter 在无有效 API Key 时优雅降级为模拟模式并正确标记 degraded")
+    void shouldDegradeGracefullyWhenSpringAiKeyNotConfigured() {
+        UnifiedAgentAdapter springAiAdapter = adapterFactory.getAdapter(AgentPlatformType.SPRING_AI_API);
+        AgentExecutionRequest request = new AgentExecutionRequest(
+                "agent-springai-1",
+                AgentPlatformType.SPRING_AI_API,
+                "./target/test-workspaces/agent-springai",
+                "Generate authentication service"
+        );
+        AgentExecutionResult result = springAiAdapter.execute(request);
+        assertThat(result).isNotNull();
+        assertThat(result.isDegraded()).isTrue();
+        assertThat(result.getStatus()).isEqualTo(AgentExecutionResult.Status.DEGRADED);
+        assertThat(result.isSimulated()).isTrue();
+        assertThat(result.getDurationMs()).isGreaterThanOrEqualTo(0);
+        assertThat(result.getErrorDetails()).contains("fallback");
         assertThat(result.getOutput()).isNotEmpty();
     }
 

@@ -11,9 +11,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.io.File;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,8 +18,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -50,22 +45,9 @@ public class SpringAiApiAdapter implements UnifiedAgentAdapter {
     private final HttpClient httpClient = buildHttpClient();
 
     private static HttpClient buildHttpClient() {
-        try {
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new TrustManager[]{new X509TrustManager() {
-                public void checkClientTrusted(X509Certificate[] chain, String authType) {}
-                public void checkServerTrusted(X509Certificate[] chain, String authType) {}
-                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-            }}, new SecureRandom());
-            return HttpClient.newBuilder()
-                    .sslContext(sslContext)
-                    .connectTimeout(Duration.ofSeconds(15))
-                    .build();
-        } catch (Exception e) {
-            return HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(15))
-                    .build();
-        }
+        return HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .build();
     }
 
     @Override
@@ -87,17 +69,22 @@ public class SpringAiApiAdapter implements UnifiedAgentAdapter {
     public AgentExecutionResult execute(AgentExecutionRequest request) {
         long startTime = System.currentTimeMillis();
         String responseContent = null;
+        boolean degraded = false;
 
         if (apiKey != null && !apiKey.isBlank() && !apiKey.startsWith("sk-placeholder")) {
             try {
                 responseContent = callDeepSeekChatApi(request.getPrompt());
             } catch (Exception e) {
                 log.warn("DeepSeek API call failed ({}), falling back to intelligent offline simulation.", e.getMessage());
+                degraded = true;
             }
+        } else {
+            degraded = true;
         }
 
         if (responseContent == null || responseContent.isBlank()) {
             responseContent = generateIntelligentResponse(request.getPrompt());
+            degraded = true;
         }
 
         // Persist generated code to workspace if path provided
@@ -106,6 +93,9 @@ public class SpringAiApiAdapter implements UnifiedAgentAdapter {
         }
 
         long duration = System.currentTimeMillis() - startTime;
+        if (degraded) {
+            return AgentExecutionResult.degraded(responseContent, "Offline intelligent simulation fallback", duration);
+        }
         return AgentExecutionResult.success(responseContent, duration, false);
     }
 

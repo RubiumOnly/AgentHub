@@ -1,28 +1,36 @@
 package com.agenthub.domain.sandbox.service;
 
 import com.agenthub.domain.sandbox.model.DeploymentManifest;
+import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 @Service
 public class PreviewSandboxService {
 
-    @Value("${agenthub.workspace.base-dir:d:/work/agenthub/data/workspaces}")
+    @Value("${agenthub.workspace.base-dir:./data/workspaces}")
     private String workspaceBaseDir;
 
+    private final WorkspaceResolver workspaceResolver;
+
+    public PreviewSandboxService(WorkspaceResolver workspaceResolver) {
+        this.workspaceResolver = workspaceResolver;
+    }
+
     public String renderPreviewHtml(String projectId) {
-        File projectDir = new File(workspaceBaseDir, projectId);
-        File indexHtml = new File(projectDir, "index.html");
-        if (indexHtml.exists()) {
-            try {
-                return Files.readString(indexHtml.toPath(), StandardCharsets.UTF_8);
-            } catch (Exception ignored) {}
-        }
+        Path projectDir = workspaceResolver.getWorkspaceRoot(projectId);
+        try {
+            Path indexHtml = workspaceResolver.resolvePathForRead(projectId, "index.html");
+            if (Files.exists(indexHtml) && !Files.isDirectory(indexHtml)) {
+                return Files.readString(indexHtml, StandardCharsets.UTF_8);
+            }
+        } catch (Exception ignored) {}
 
         // Return a sleek, live reactive preview template representing the deliverables
         return "<!DOCTYPE html>\n" +
@@ -49,6 +57,7 @@ public class PreviewSandboxService {
     }
 
     public DeploymentManifest deployProject(String projectId) {
+        workspaceResolver.getWorkspaceRoot(projectId);
         String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
         String dockerfile = "# AgentHub Production Deployment Container\n" +
                 "FROM nginx:alpine\n" +

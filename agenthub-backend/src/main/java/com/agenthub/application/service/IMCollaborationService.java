@@ -43,7 +43,7 @@ public class IMCollaborationService {
     private final AgentAdapterFactory agentAdapterFactory;
     private final ObjectMapper objectMapper;
 
-    @Value("${agenthub.workspace.base-dir:d:/work/agenthub/data/workspaces}")
+    @Value("${agenthub.workspace.base-dir:./data/workspaces}")
     private String workspaceBaseDir;
 
     // Concurrent map of conversation ID -> list of active SseEmitters

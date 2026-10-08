@@ -5,11 +5,14 @@ import com.agenthub.domain.workflow.model.WorkflowModels.*;
 import com.agenthub.domain.workflow.service.WorkflowEngineService;
 import com.agenthub.domain.workspace.model.FileDiffEntry;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
+import com.agenthub.domain.workspace.service.WorkspaceResolver;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,12 +21,19 @@ import java.util.Map;
 @RequestMapping("/api/workspace")
 public class WorkflowAndDiffController {
 
+    @Value("${agenthub.workspace.base-dir:./data/workspaces}")
+    private String workspaceBaseDir;
+
     private final JGitWorkspaceManager gitManager;
     private final WorkflowEngineService workflowEngineService;
+    private final WorkspaceResolver workspaceResolver;
 
-    public WorkflowAndDiffController(JGitWorkspaceManager gitManager, WorkflowEngineService workflowEngineService) {
+    public WorkflowAndDiffController(JGitWorkspaceManager gitManager,
+                                    WorkflowEngineService workflowEngineService,
+                                    WorkspaceResolver workspaceResolver) {
         this.gitManager = gitManager;
         this.workflowEngineService = workflowEngineService;
+        this.workspaceResolver = workspaceResolver;
     }
 
     public static class ExecuteWorkflowRequest {
@@ -54,16 +64,19 @@ public class WorkflowAndDiffController {
 
     @GetMapping("/diff")
     public Result<List<FileDiffEntry>> getDiff(@RequestParam("path") String path) throws Exception {
-        File dir = new File(path);
-        List<FileDiffEntry> diff = gitManager.computeWorkspaceDiff(dir);
+        Path safeDir = workspaceResolver.resolveLegacyPath(path, false);
+        List<FileDiffEntry> diff = gitManager.computeWorkspaceDiff(safeDir.toFile());
         return Result.ok(diff);
     }
 
     @PostMapping("/workflow/execute")
     public Result<WorkflowExecutionResult> executeWorkflow(@RequestBody ExecuteWorkflowRequest req) {
+        String targetPath = (req.workspacePath != null && !req.workspacePath.isBlank())
+                ? req.workspacePath : workspaceBaseDir + "/default";
+        Path safeWorkspace = workspaceResolver.resolveLegacyPath(targetPath, false);
         WorkflowExecutionResult result = workflowEngineService.executeWorkflow(
                 req.workflow,
-                req.workspacePath != null ? req.workspacePath : "d:/work/agenthub/data/workspaces/default",
+                safeWorkspace.toString(),
                 req.taskPrompt
         );
         return Result.ok(result);
@@ -71,7 +84,8 @@ public class WorkflowAndDiffController {
 
     @GetMapping("/files")
     public Result<List<WorkspaceFileNode>> listFiles(@RequestParam("path") String path) {
-        File root = new File(path);
+        Path safeRoot = workspaceResolver.resolveLegacyPath(path, false);
+        File root = safeRoot.toFile();
         List<WorkspaceFileNode> fileNodes = new ArrayList<>();
         if (!root.exists()) {
             return Result.ok(fileNodes);
@@ -83,21 +97,22 @@ public class WorkflowAndDiffController {
 
     @GetMapping("/file/content")
     public Result<String> getFileContent(@RequestParam("filePath") String filePath) throws Exception {
-        File file = new File(filePath);
+        Path safeFile = workspaceResolver.resolveLegacyPath(filePath, false);
+        File file = safeFile.toFile();
         if (!file.exists() || file.isDirectory()) {
             return Result.fail(404, "File not found: " + filePath);
         }
-        String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+        String content = Files.readString(safeFile, StandardCharsets.UTF_8);
         return Result.ok(content);
     }
 
     @PostMapping("/file/save")
     public Result<Void> saveFile(@RequestBody SaveFileRequest req) throws Exception {
-        File file = new File(req.filePath);
-        if (!file.getParentFile().exists()) {
-            file.getParentFile().mkdirs();
+        Path safeFile = workspaceResolver.resolveLegacyPath(req.filePath, true);
+        if (safeFile.getParent() != null && !Files.exists(safeFile.getParent())) {
+            Files.createDirectories(safeFile.getParent());
         }
-        Files.writeString(file.toPath(), req.content != null ? req.content : "", StandardCharsets.UTF_8);
+        Files.writeString(safeFile, req.content != null ? req.content : "", StandardCharsets.UTF_8);
         return Result.ok();
     }
 
@@ -106,7 +121,7 @@ public class WorkflowAndDiffController {
         if (files == null) return;
 
         for (File f : files) {
-            if (f.getName().equals(".git")) continue;
+            if (f.getName().equalsIgnoreCase(".git")) continue;
             String relative = root.toPath().relativize(f.toPath()).toString().replace("\\", "/");
             nodes.add(new WorkspaceFileNode(f.getName(), relative, f.isDirectory(), f.length()));
             if (f.isDirectory()) {

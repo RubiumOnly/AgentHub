@@ -63,6 +63,17 @@ public class AgentExecutionResult implements Serializable {
         return result;
     }
 
+    public static AgentExecutionResult degraded(String fallbackOutput, String reason, long durationMs) {
+        AgentExecutionResult result = new AgentExecutionResult();
+        result.status = Status.DEGRADED;
+        result.output = fallbackOutput;
+        result.errorDetails = reason;
+        result.exitCode = 0;
+        result.durationMs = durationMs;
+        result.simulated = true;
+        return result;
+    }
+
     public Status getStatus() {
         return status;
     }
@@ -109,6 +120,10 @@ public class AgentExecutionResult implements Serializable {
 
     public void setSimulated(boolean simulated) {
         this.simulated = simulated;
+    }
+
+    public boolean isDegraded() {
+        return status == Status.DEGRADED || simulated;
     }
 
     public long getTimestamp() {

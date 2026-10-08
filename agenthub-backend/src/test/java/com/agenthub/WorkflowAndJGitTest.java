@@ -17,9 +17,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 
+import org.springframework.test.context.ActiveProfiles;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@ActiveProfiles("test")
 class WorkflowAndJGitTest {
 
     @Autowired
@@ -54,7 +57,7 @@ class WorkflowAndJGitTest {
     @Test
     @DisplayName("测试 WorkspaceLockManager 防并发锁机制")
     void shouldPreventConcurrentLocking() {
-        String path = "d:/test/workspace/1";
+        String path = "./target/test-workspaces/lock-1";
         boolean firstLock = lockManager.tryLock(path, 100);
         assertThat(firstLock).isTrue();
 

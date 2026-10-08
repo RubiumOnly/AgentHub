@@ -1,4 +1,4 @@
-package com.agenthub.adapter.common;
+package com.agenthub.infrastructure.common.exception;
 
 public enum ErrorCode {
     SUCCESS(0, "Operation Successful"),
