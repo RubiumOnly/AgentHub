@@ -11,11 +11,11 @@
   <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind%20CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white" alt="Tailwind CSS" /></a>
   <a href="https://www.eclipse.org/jgit/"><img src="https://img.shields.io/badge/JGit-6.8%2B-F05032?logo=git&logoColor=white" alt="Eclipse JGit" /></a>
   <a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events"><img src="https://img.shields.io/badge/SSE-Live%20Streaming-5C8A72" alt="SSE" /></a>
-  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" alt="Docker" /></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Manifest%20Ready-2496ED?logo=docker&logoColor=white" alt="Docker Manifest Ready" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-5C8A72" alt="MIT License" /></a>
 </p>
 
-[快速开始](#-快速开始) · [工作台真实截图](#️-工作台全景与核心功能截图) · [Live 运行指标](#-真实-live-协同运行与全流程证据) · [功能状态矩阵](#-功能状态矩阵) · [系统架构与-DDD-分层](#-系统架构与-ddd-四层分层) · [技术文档](docs/ARCHITECTURE.md) · [API 参考](docs/API.md) · [安全说明](SECURITY.md) · [贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md)
+[快速开始](#-快速开始) · [工作台真实截图](#️-工作台全景与核心功能截图) · [实测运行指标](#-本地端到端协同运行与全流程实测证据) · [功能状态矩阵](#-功能状态矩阵) · [系统架构与-DDD-分层](#-系统架构与-ddd-四层分层) · [架构决策 (ADR)](docs/adr/ADR-001-modular-monolith-architecture.md) · [当前能力边界](docs/CURRENT_CAPABILITY_BOUNDARIES.md) · [技术文档](docs/ARCHITECTURE.md) · [API 参考](docs/API.md) · [安全说明](SECURITY.md) · [贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md)
 
 ---
 
@@ -28,13 +28,13 @@
 - **Orchestrator 任务拓扑拆解引擎**：长程需求智能分解为有向无环图（DAG）子任务，并通过富文本交互式卡片（Interactive Cards）进行审批与状态反馈；
 - **统一智能体 SPI 适配器层**：兼容主流本地 CLI（Claude Code、Codex、OpenClaw）与云端大模型 API（DeepSeek V3 / Spring AI Native），实现非阻塞多通道协同；
 - **基于 JGit 的真实代码 Diff 审计**：工作区受原生 Git 版本控制，精确比对物理文件树与基线版本，输出行级 Unified Diff；
-- **Bento Grid 全栈控制台**：Next.js 14 打造的暗黑美学工作台，集成可视化 DAG 工作流画布、工作区文件树、实时 Web 预览沙箱与一键 Docker 部署。
+- **Bento Grid 全栈控制台**：Next.js 14 打造的暗黑美学工作台，集成可视化 DAG 工作流画布、工作区文件树、Web 页面模版预览与 Dockerfile 部署清单生成。
 
 ---
 
-## ⚡ 真实 Live 协同运行与全流程证据
+## ⚡ 本地端到端协同运行与全流程实测证据
 
-以下数据与页面状态来自系统本地**真实端到端 Live 运行**（非 Mock 或静态假数据）：
+以下数据与页面状态来自系统本地端到端协同运行实测记录（系统支持真实公网 DeepSeek API 及本地 CLI 执行；未配置凭证或离线演示时自动启用高仿真降级模式，详见 [ADR-004](docs/adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md) 与 [当前真实能力边界白皮书](docs/CURRENT_CAPABILITY_BOUNDARIES.md)）：
 
 - **测试需求输入**：`@Orchestrator 请设计并实现一个企业级用户中心（包含个人信息展示、密码修改与权限审计）`
 - **协同会话模式**：群聊 `@Mention` 智能路由总线（会话 ID：`conv-8ebf2ff1`）
@@ -49,8 +49,8 @@
 | 协同阶段 | 执行主体 | 运行时类型 | 产生结果 / 产出证据 | 状态 |
 | :--- | :--- | :--- | :--- | :---: |
 | **阶段分解** | `Orchestrator` | 内部编排调度器 | 自动生成飞书级富文本卡片，建立三阶段依赖拓扑 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
-| **阶段一：后端服务** | `BackendArchitect` | DeepSeek V3 / Spring AI | 编写生产级 Spring Boot 3 接口与领域模型并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
-| **阶段二：前端界面** | `FrontendEngineer` | DeepSeek V3 / Spring AI | 编写 Next.js 14 响应式用户中心组件并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
+| **阶段一：后端服务** | `BackendArchitect` | DeepSeek V3 / 本地离线仿真 | 编写 Spring Boot 3 接口与领域模型并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
+| **阶段二：前端界面** | `FrontendEngineer` | DeepSeek V3 / 本地离线仿真 | 编写 Next.js 14 响应式用户中心组件并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
 | **阶段三：代码审计** | `QAAuditor` | Eclipse JGit 原生内核 | 触发 Working Tree 与 Baseline 比对，生成标准 Patch | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
 
 ---
@@ -79,34 +79,36 @@
 
 ![工作区物理文件树浏览与在线编辑器](docs/images/04-workspace-file-explorer.png)
 
-### 5. 实时 Web 预览沙箱与一键 Docker 部署
-通过隔离 iframe 沙箱实时预览 Agent 协同生成的前端界面与组件；点击“部署”按钮可自动生成生产级 Dockerfile 镜像构建配置：
+### 5. Web 页面模版预览与 Dockerfile 部署清单生成
+通过 iframe 挂载预览 Agent 协同生成的静态 Web 页面效果；点击“部署”按钮可自动生成包含 Nginx 配置与工作区静态资源的 Dockerfile 部署清单（当前阶段导出清单规范，物理微容器隔离沙箱将在阶段 7 接入，详见 [当前真实能力边界白皮书](docs/CURRENT_CAPABILITY_BOUNDARIES.md)）：
 
-![实时 Web 预览沙箱与一键 Docker 部署](docs/images/05-sandbox-preview.png)
+![Web 页面模版预览与 Dockerfile 部署清单生成](docs/images/05-sandbox-preview.png)
 
 ---
 
 ## 📊 功能状态矩阵
 
+> **注**：关于当前系统经过代码验证的真实边界与阶段消除路线，请参阅《[当前真实能力边界与架构现状白皮书](docs/CURRENT_CAPABILITY_BOUNDARIES.md)》。
+
 | 功能模块 | 核心能力描述 | 当前实现状态 | 演进规划 |
 | :--- | :--- | :---: | :--- |
 | **IM 协同总线** | 会话生命周期、@Mention 指令路由、群聊广播 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持群组权限角色划分与敏感词拦截 |
-| **流式打字机** | Server-Sent Events (SSE) 实时长连接通信 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持 WebSocket 双向流式断点续传 |
-| **任务拓扑编排** | Orchestrator 需求多阶段拆解与交互式卡片 | ![完成](https://img.shields.io/badge/-已就绪-success) | 引入长程任务失败回溯与多分支动态条件决策 |
-| **统一 SPI 架构** | 解耦 CLI 本地进程管道与云端 API 交互 | ![完成](https://img.shields.io/badge/-已就绪-success) | 扩充 Ollama、vLLM 本地私有化大模型接入点 |
-| **DeepSeek 集成** | 官方 DeepSeek V3 对话与代码生成模型支持 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持 Function Calling 工具调用扩展 |
+| **流式打字机** | Server-Sent Events (SSE) 实时长连接通信 | ![完成](https://img.shields.io/badge/-已就绪-success) | 引入持久化事件流与断点回放续传 (参见 [ADR-002](docs/adr/ADR-002-sse-and-persistent-event-stream.md)) |
+| **任务拓扑编排** | Orchestrator 需求多阶段拆解与交互式卡片 | ![完成](https://img.shields.io/badge/-已就绪-success) | 引入长程任务失败回溯与状态机持久化 |
+| **统一 SPI 架构** | 解耦 CLI 本地进程管道与云端 API 交互 | ![完成](https://img.shields.io/badge/-已就绪-success) | 规范 Mock 降级边界 (参见 [ADR-004](docs/adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md)) |
+| **DeepSeek 集成** | 官方 DeepSeek V3 对话与代码生成模型支持 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持 Function Calling 工具调用扩展与自主循环 |
 | **版本控制审计** | Eclipse JGit 原生行级 Unified Diff 与增删行指标 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持一键生成 Git Commit 与 PR 提交推送 |
-| **防并发锁治理** | 工作区细粒度 ReentrantLock 互斥，杜绝脏写 | ![完成](https://img.shields.io/badge/-已就绪-success) | 扩展基于 Redis/Redisson 的分布式多节点锁 |
+| **防并发锁治理** | 工作区细粒度 ReentrantLock 互斥，杜绝脏写 | ![完成](https://img.shields.io/badge/-已就绪-success) | 结合 WorkspaceResolver 实施受控路径防御 (参见 [ADR-003](docs/adr/ADR-003-workspace-distrusts-client-paths.md)) |
 | **可视化 DAG 画布** | 基于 `@xyflow/react` 的拖拽式工作流节点编排 | ![完成](https://img.shields.io/badge/-已就绪-success) | 画布与后端 DAG 引擎双向实时执行状态高亮联动 |
-| **工作区文件树** | 实时物理目录扫描与 Monaco 代码在线编辑预览 | ![完成](https://img.shields.io/badge/-已就绪-success) | 增加多标签页代码对比与语法高亮扩展 |
-| **实时预览沙箱** | 动态 Web 页面 iframe 挂载渲染与资源预览 | ![完成](https://img.shields.io/badge/-已就绪-success) | 提供 WebAssembly 与隔离 Node.js 容器化执行沙箱 |
-| **一键容器化部署** | 自动化生成生产级 Dockerfile 与部署配置清单 | ![完成](https://img.shields.io/badge/-已就绪-success) | 集成 Kubernetes Deployment 编排模板生成 |
+| **工作区文件树** | 实时物理目录扫描与 Monaco 代码在线编辑预览 | ![完成](https://img.shields.io/badge/-已就绪-success) | 增加多标签页代码对比与受控相对路径浏览 |
+| **Web 模版预览** | 静态 Web 页面 iframe 挂载渲染与资源预览 | ![完成](https://img.shields.io/badge/-已就绪-success) | 阶段 7 接入基于 Docker Engine API 的轻量微容器隔离沙箱 |
+| **Dockerfile 清单生成**| 自动化导出 Nginx Dockerfile 镜像构建配置与清单 | ![完成](https://img.shields.io/badge/-已就绪-success) | 接入真实容器镜像构建流水线与 Kubernetes 部署编排 |
 
 ---
 
 ## 🏗️ 系统架构与 DDD 四层分层
 
-系统遵循经典的 **领域驱动设计 (DDD)** 四层架构，各层边界分明、职责单一：
+系统遵循经典的 **领域驱动设计 (DDD)** 四层架构，采用 **模块化单体架构 (Modular Monolith)** 形态（参见 [ADR-001](docs/adr/ADR-001-modular-monolith-architecture.md)），各层边界分明、职责单一：
 
 ```mermaid
 flowchart TD
@@ -154,6 +156,9 @@ agenthub/
 ├── data/workspaces/                  # 受 Git 控制的多 Agent 物理协作工作区
 ├── docs/                             # 系统技术文档与实机运行证据
 │   ├── images/                       # 真实桌面端实机截图集 (01-05)
+│   ├── adr/                          # 核心架构决策记录 (ADR-001 ~ ADR-004)
+│   ├── CURRENT_CAPABILITY_BOUNDARIES.md # 当前真实能力边界与系统事实白皮书
+│   ├── AGENTHUB_LONG_TERM_PLAN.md    # 长期产品化演进路线 (10 阶段全景)
 │   ├── ARCHITECTURE.md               # 核心架构设计说明书
 │   └── API.md                        # RESTful API 与 SSE 事件流契约
 ├── .github/workflows/ci.yml          # GitHub Actions 自动化 CI 流水线
@@ -238,10 +243,11 @@ npm run dev
 
 ## 🛡️ 安全与凭证管理规范
 
-- **零敏感信息入库**：代码库全局配置了严苛的 [`.gitignore`](.gitignore)，禁止任何 `.env*` 及 `*application-local*.yml` 密钥文件提交；
+- **零敏感信息入库**：代码库全局配置了严苛的 [`.gitignore`](.gitignore)，禁止任何 `.env*` 及 `*application-local*.yml` 密钥文件提交；敏感凭证均由环境变量或本地私有配置注入；
 - **进程看门狗机制**：本地 CLI 进程统一配置最长执行超时与强制回收逻辑，防止僵尸进程耗尽系统资源；
-- **工作区目录遍历防御**：所有对文件读写操作均施加路径边界校验，杜绝越权访问系统关键目录。
-- 详细安全指引请参阅 [SECURITY.md](SECURITY.md)。
+- **受控工作区安全机制 (Phase 0 治理中)**：通过集中引入 `WorkspaceResolver`（参见 [ADR-003](docs/adr/ADR-003-workspace-distrusts-client-paths.md)），全面废止客户端直接传入未校验的绝对路径，实施 5 重路径边界防御，坚决阻断 `../` 目录穿越与 `.git` 元数据篡改；
+- **多环境配置硬隔离**：建立 `dev`、`test`、`prod` 严格隔离配置，生产 Profile 彻底关闭 H2 Console 并锁定数据库 DDL；
+- 详细能力边界与安全指引请参阅 [《当前真实能力边界与架构现状白皮书》](docs/CURRENT_CAPABILITY_BOUNDARIES.md) 与 [SECURITY.md](SECURITY.md)。
 
 ---
 

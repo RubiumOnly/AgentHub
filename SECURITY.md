@@ -29,7 +29,7 @@ AgentHub 涉及多智能体协同、本地命令行进程调用以及第三方�
 
 - 多 Agent 协同接收的用户指令与第三方文本输入均属于不可信数据；
 - 编排器（Orchestrator）将指令与任务定义严格区分，系统提示词中施加了不可绕过的安全隔离围栏；
-- 生成的代码在落盘与沙箱挂载前经过路径遍历检查，严禁任何跳出 `data/workspaces/` 沙箱根目录的相对路径跳转（如 `../` 越权攻击）。
+- **受控工作区安全解析 (WorkspaceResolver)**：系统在阶段 0 治理中全面落地 `WorkspaceResolver` 机制（详见 [ADR-003](docs/adr/ADR-003-workspace-distrusts-client-paths.md) 与 [《当前真实能力边界与架构现状白皮书》](docs/CURRENT_CAPABILITY_BOUNDARIES.md)），收敛所有文件读写接口，全面拒止客户端传入未校验的绝对路径，严禁任何跳出受控工作区根目录的相对路径跳转（如 `../` 越权攻击）及对 `.git` 目录的非法修改。
 
 ---
 

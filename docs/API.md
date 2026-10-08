@@ -36,14 +36,15 @@
 - `GET /api/im/conversations/{id}/stream`：**SSE 实时事件流通道**。
 
 ### 3. 工作区与版本审计 (Workspace & JGit Diff)
-- `GET /api/workspace/diff?path={workspacePath}`：基于 Eclipse JGit 计算并返回当前物理工作区的 Unified Diff 列表（包含文件路径、变更类型、变更行数统计与完整 diff patch 文本）；
-- `GET /api/workspace/files?path={workspacePath}`：获取物理工作区的文件与目录树结构；
-- `POST /api/workspace/files/save`：在线编辑并保存工作区文件代码；
+> 注：阶段 0 治理中全面收敛绝对路径，入参收敛为受控 `workspaceId` / `projectId` 与受控相对路径，详情参见 [ADR-003](adr/ADR-003-workspace-distrusts-client-paths.md)。
+- `GET /api/workspace/diff`：基于 Eclipse JGit 计算并返回当前受控工作区的 Unified Diff 列表（包含文件路径、变更类型、变更行数统计与完整 diff patch 文本）；
+- `GET /api/workspace/files`：获取受控工作区的文件与目录树结构；
+- `POST /api/workspace/files/save`：在线编辑并保存受控工作区文件代码；
 - `POST /api/workspace/workflow/execute`：触发 DAG 拓扑工作流引擎按序执行各阶段节点。
 
-### 4. 沙箱与容器化部署 (Sandbox & Deploy)
-- `GET /api/sandbox/preview/{id}`：挂载并实时预览 Agent 协同生成的 Web 静态页面或前端单页应用；
-- `POST /api/sandbox/deploy/{id}`：自动化生成生产级 Dockerfile 与部署清单。
+### 4. 模版预览与部署清单生成 (Sandbox & Deploy)
+- `GET /api/sandbox/preview/{id}`：挂载并实时预览 Agent 协同生成的 Web 静态模版页面；
+- `POST /api/sandbox/deploy/{id}`：自动化导出 Nginx Dockerfile 镜像构建配置与部署清单（详见 [当前真实能力边界白皮书](CURRENT_CAPABILITY_BOUNDARIES.md)）。
 
 ---
 

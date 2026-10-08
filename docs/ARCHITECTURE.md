@@ -2,6 +2,9 @@
 
 本文档系统阐述 AgentHub 平台的领域建模、四层架构分层规范、SPI 插件机制与并发控制模型。
 
+> 核心架构决策请参阅 [ADR-001 ~ ADR-004](adr/ADR-001-modular-monolith-architecture.md)。  
+> 当前系统经过代码验证的真实边界与局限请参阅 [《当前真实能力边界与架构现状白皮书》](CURRENT_CAPABILITY_BOUNDARIES.md)。
+
 ---
 
 ## 一、 领域驱动设计 (DDD) 四层分层架构
@@ -61,13 +64,13 @@ flowchart TD
   - `agent/`：定义 `UnifiedAgentAdapter` SPI 核心接口与智能体能力元数据；
   - `conversation/`：定义群聊会话模型、富文本交互卡片 `InteractiveCard` 与 Orchestrator 任务拓扑拆解器；
   - `workflow/`：基于有向无环图（DAG）的状态机引擎与节点流转规则；
-  - `workspace/`：基于 Eclipse JGit 内核的原生版本控制引擎与行级 Unified Diff 增删行统计器；
-  - `sandbox/`：Web 预览沙箱生命周期与一键 Docker 部署清单生成器。
+  - `workspace/`：受控工作区安全解析器（`WorkspaceResolver`，参见 ADR-003）与基于 Eclipse JGit 内核的原生版本控制引擎与行级 Unified Diff 增删行统计器；
+  - `sandbox/`：Web 页面静态模版预览与 Dockerfile 部署清单生成器（参见 CURRENT_CAPABILITY_BOUNDARIES.md）。
 
 ### 4. 基础设施层 (Infrastructure Layer)
 - **包路径**：`com.agenthub.infrastructure`
 - **职责**：为上层提供具体的外部 IO、进程管道与存储支撑。
-  - `adapter/`：支持本地命令行运行时（Claude Code、Codex、OpenClaw）的非阻塞进程管道包装，以及 DeepSeek V3 API 自适应 TLS 适配器；
+  - `adapter/`：支持本地命令行运行时（Claude Code、Codex、OpenClaw）的非阻塞进程管道包装，以及 DeepSeek V3 API 标准安全 HTTP 适配器；
   - `concurrency/`：基于可重入读写锁与超时看门狗机制的 `WorkspaceLockManager`，防止多 Agent 协作时对同一代码工作区的读写冲突；
   - `repository/`：Spring Data JPA 实体映射与持久化仓储。
 
@@ -88,7 +91,7 @@ public interface UnifiedAgentAdapter {
 ```
 
 - **本地 CLI 进程安全**：通过 `ProcessBuilder` 构造非阻塞流，内置 Windows / POSIX 命令行差异抹平、超时强制回收看门狗与敏感 Token 正则脱敏过滤；
-- **优雅降级策略**：当宿主机未安装特定 CLI（如 Claude Code 未登录或环境缺失）时，适配器工厂自动回退至智能容错模拟器，确保平台服务链路不中断。
+- **优雅降级与模拟边界**：当宿主机未安装特定 CLI 或未配置 API Key 时，支持在开发/测试环境下回退至模拟器演示，执行结果强制标记 `simulated=true`；生产环境严格禁用降级（详见 [ADR-004](adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md)）。
 
 ---
 
