@@ -341,9 +341,50 @@ public interface AgentRuntime {
 - [x] 条件分支动态跳过未命中分支并级联剪枝后续依赖（`WorkflowBranchingAndSkipPruningTest` 验证通过）；
 - [x] 人工审批挂起并可通过 REST API 决策恢复或熔断中止（审批流与控制器测试通过）。
 
-### 阶段 5：IM、事件流和交互闭环（预计 1～2 周）
+### 阶段 5：Agent 统一接入层、多 Provider 与动态路由（✅ 已圆满交付）
 
-**目标**：让聊天体验成为可靠的执行入口，而不是一个隐藏的后台副作用。
+> **阶段交付状态**：已完成 Provider SPI 标准化契约、多 Provider 生态适配矩阵（OpenAI / DeepSeek / Anthropic / Gemini / Ollama / Mock）、全链路凭证安全脱敏、动态加权路由器、三态熔断器与 429/5xx 容灾自动 Fallback，以及全链路 Token 消耗与成本计量审计（后端 155/155 全绿灯，前端 npm run build 生产构建通过）。
+
+**目标**：打破单模型与单供应商强绑定，建立企业级高可用、多态适配、智能动态路由与成本可审计的 Agent 统一接入基础设施。
+
+**具体工作与实现**：
+
+1. **Provider SPI 抽象与统一交互契约**：标准化统一抽象 `ChatMessage`（抹平 system/user/assistant/tool 异构）、`ChatRequest`、`ChatResponse` 与流式增量 `ChatChunk` 契约，支持真实端到端毫秒级延迟测量（`latencyMs`）与全维度 Token 计数统计（`prompt_tokens`, `completion_tokens`, `total_tokens`）；
+2. **多 Provider 生态适配矩阵**：
+   - `OpenAiCompatibleProvider`：落地 OpenAI (GPT-4o, GPT-4o-mini) 与 DeepSeek (deepseek-chat, deepseek-reasoner) 标准 chat completions 与 SSE 流式解析；
+   - `AnthropicProvider`：落地 Anthropic Claude 3.5 Sonnet / Haiku 专用 `/v1/messages` 消息分层与 `content_block_delta` 流式解析；
+   - `GeminiProvider`：落地 Google Gemini 1.5 Flash / Pro 原生 REST `generateContent` 与流式 SSE 解析；
+   - `OllamaProvider`：落地本地 Ollama / vLLM 原生 `/api/chat` 接口，支持本地模型离线零成本计费；
+   - `MockLlmProvider`：确定性离线仿真引擎，支持 429 限流、5xx 服务端异常与延迟仿真；
+3. **全链路凭证安全与脱敏治理 (`SecretMasker`)**：
+   - 彻底杜绝密钥明文存储，支持 `env:VAR_NAME` 环境变量注入与 `prop:KEY` 配置解耦；
+   - 全链路自动识别并脱敏 API Key 为 `sk-***` / `[REDACTED_SECRET]`，严格清洗 HTTP 请求头（`Authorization`, `x-api-key`）、URL 查询参数（如 Gemini `?key=...`）、日志与异常堆栈，REST 控制器与 DTO 绝不泄露明文凭证；
+4. **动态路由策略与高可用智能选择器 (`DynamicProviderRouter`)**：
+   - 支持多维动态加权路由选择：按优先级 (`priority` 降序)、模型能力需求 (`capabilities`: code/general/fast/reasoning/long_context)、健康延迟 (`latencyMs` 升序) 与权重 (`weight` 降序) 挑选最合适 Provider；
+   - 提供路由推演端点 `POST /api/providers/route`，清晰返回主候选节点与备用节点链条；
+5. **高可用容灾与自动 Fallback 降级 (HA Failover & Circuit Breaking)**：
+   - 落地线程安全三态熔断器 `CircuitBreaker`，严格管理 `CLOSED`, `OPEN`, `HALF_OPEN` 状态机流转；
+   - 当主 Provider 发生 429 限流、5xx 超时、网络故障或连续失败达到阈值时，自动快速切换至备用 Backup Provider，并向事件流沉淀结构化告警 `FallbackEvent`；
+6. **Token 与成本计量治理 (Token & Cost Accounting)**：
+   - 落地 `ModelPricing` 定价核算引擎，内置主流模型基准牌价，并支持 Provider 数据库实体自定义费率覆盖；
+   - 每次调用精细化落库 `token_usages` 审计表，提供平台级总 Token 消耗与成本计量汇总端点；
+7. **Flyway 数据库版本演进 (`V6__phase5_agent_providers_and_routing.sql`)**：
+   - 升级 `providers`（priority, weight, capabilities, cost_per_million_input, cost_per_million_output, circuit_status, avg_latency_ms）；
+   - 升级 `agent_definitions`（preferred_provider_type, preferred_model, required_capabilities, fallback_enabled）；
+   - 新增 `token_usages` 审计表并建立高性能索引，初始化 5 大主流 Provider 种子基线数据；
+8. **全绿灯测试矩阵**：
+   - 6 大测试套件覆盖 Provider SPI 契约、动态路由策略、Fallback 降级容灾、Token 成本核算、凭证脱敏与 REST 端点，后端 155/155 项测试全部通过。
+
+**退出条件与验证证据**：
+
+- [x] 所有 Provider 实现严格遵守 `LlmProvider` 统一契约，支持消息分层与流式输出（`ProviderSpiAndPolymorphismContractTest` 验证通过）；
+- [x] 动态路由器根据能力、优先级、健康状态与权重精准选择候选 Provider，熔断节点被安全跳过（`DynamicProviderRouterAndRoutingPolicyTest` 验证通过）；
+- [x] 主 Provider 遭遇 429 限流或 5xx 故障时自动无缝降级切换至备用 Provider，熔断器支持三态自愈（`ProviderFaultToleranceAndFallbackTest` 验证通过）；
+- [x] 精细化核算 Token 消耗与模型牌价成本，并完整落库 `token_usages` 审计表（`TokenCostAccountingAndAuditingTest` 验证通过）；
+- [x] 全链路凭证安全脱敏，请求头、URL 参数、日志与异常堆栈零明文密钥泄露（`SecretMasker` 边界测试验证通过）；
+- [x] Flyway V6 迁移脚本成功创建 19 张核心领域表与高效索引（`FlywayMigrationAndSchemaTest` 验证通过）。
+
+### 阶段 6：IM、事件流和交互闭环（预计 1～2 周）
 
 **具体工作**：
 

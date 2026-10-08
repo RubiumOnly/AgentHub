@@ -37,6 +37,11 @@ public class AgentRuntimeRegistry {
                 return entry.getValue();
             }
         }
+        // If type mentions provider, llm, or router, route to providerDrivenAgentRuntime
+        if (key.contains("provider") || key.contains("router") || key.contains("llm") || key.contains("openai") || key.contains("deepseek")) {
+            AgentRuntime prov = runtimeMap.get("providerDrivenAgentRuntime");
+            if (prov != null) return prov;
+        }
         return defaultRuntime;
     }
 
@@ -46,6 +51,8 @@ public class AgentRuntimeRegistry {
         }
         switch (platformType) {
             case SPRING_AI_API:
+                AgentRuntime providerRuntime = runtimeMap.get("providerDrivenAgentRuntime");
+                if (providerRuntime != null) return providerRuntime;
                 AgentRuntime api = runtimeMap.get("openAiCompatibleRuntime");
                 return api != null ? api : defaultRuntime;
             case CLAUDE_CODE:

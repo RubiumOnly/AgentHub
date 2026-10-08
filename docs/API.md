@@ -41,6 +41,11 @@
 - `4001` CONVERSATION_NOT_FOUND：协同会话不存在；
 - `4003` CONVERSATION_PERMISSION_DENIED：非当前会话参与者；
 - `5001` AGENT_NOT_FOUND：智能体定义或实例不存在；
+- `5005` PROVIDER_NOT_FOUND：大模型或 CLI 提供商不存在；
+- `5006` PROVIDER_UNAVAILABLE：提供商不可用或当前处于熔断状态；
+- `5007` PROVIDER_RATE_LIMIT：大模型 Provider 命中 429 速率限制；
+- `5008` PROVIDER_AUTH_FAILED：大模型 Provider 凭证鉴权失败；
+- `5009` NO_AVAILABLE_PROVIDER：无可满足路由与能力约束的可用 Provider；
 - `6001` RUN_NOT_FOUND：执行实例不存在；
 - `9001` INTERNAL_ERROR：系统内部未捕获异常。
 
@@ -149,6 +154,20 @@
 ### 10. 系统探针 (Health Check)
 - `GET /api/system/health`：获取系统状态、Java 运行时版本、操作系统与应用版本。
 
+### 11. 大模型提供商生态与动态路由管理 (LLM Providers & Dynamic Routing)
+- `GET /api/providers`：获取已注册的模型 Provider 列表（包含健康状态、延迟与熔断状态，API Key 严格脱敏）；
+- `GET /api/providers/{id}`：获取指定 Provider 详情；
+- `POST /api/providers`：注册新的大模型 Provider；
+- `PUT /api/providers/{id}`：更新 Provider 的优先级、权重、能力标签与费率配置；
+- `DELETE /api/providers/{id}`：注销指定 Provider；
+- `POST /api/providers/route`：传入请求参数进行动态路由推演，返回首选 Primary Provider 与备用 Backup 候选链条；
+- `POST /api/providers/{id}/test`：对指定 Provider 发起测试连通性 Ping 请求，测量真实延迟与连通状态。
+
+### 12. Token 消耗审计与成本计量 (Token & Cost Accounting)
+- `GET /api/token-usages/runs/{runId}`：按 WorkflowRun 实例查询所有步骤调用的详细 Token 消耗与成本审计记录；
+- `GET /api/token-usages/steps/{stepRunId}`：按 StepRun 节点查询单次调用审计明细；
+- `GET /api/token-usages/summary`：获取平台全局累计 Token 消耗（Prompt、Completion、Total）与总美元成本计量汇总。
+
 ---
 
 ## 三、 SSE 事件类型定义
@@ -176,6 +195,7 @@
 | `FILE_CHANGE` | `{"path":"...","changeType":"CREATED"}` | 工作区文件受控变动 |
 | `LOG` | `{"level":"INFO","message":"..."}` | 结构化执行日志 |
 | `USAGE` | `{"promptTokens":120,"completionTokens":250,"cost":0.0004}` | Token 消耗与成本核算 |
+| `PROVIDER_FALLBACK`| `{"failedProvider":"...","backupProvider":"...","statusCode":429}` | 主 Provider 故障触发高可用自动容灾降级 |
 | `STEP_COMPLETED` | `{"stepRunId":"...","nodeId":"..."}` | 步骤成功完成 |
 | `STEP_RETRYING` | `{"stepRunId":"...","nextAttempt":2}` | 步骤失败触发重试治理 |
 | `RUN_CANCELLED` | `{"reason":"..."}` | 用户手动取消或协同终止 |

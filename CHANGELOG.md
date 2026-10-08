@@ -4,7 +4,49 @@
 
 ---
 
+## [v1.5.0] - 2026-10-08
+
+### 🌟 阶段 5：Agent 统一接入层、多 Provider 与动态路由 (Phase 5 Deliverables)
+- **Provider SPI 抽象与统一交互契约 (`LlmProvider` & Standard SPI)**：
+  - 标准化统一定义统一消息模型 `ChatMessage` (role: system/user/assistant/tool, content, name)、请求模型 `ChatRequest` 与响应模型 `ChatResponse`；
+  - 规范流式 Chunk 契约 `ChatChunk`，统一打通同步与 SSE 流式事件推送；
+  - 细粒度测量每次调用的真实物理延迟（`latencyMs`）并准确统计 Token 消耗 (`prompt_tokens`, `completion_tokens`, `total_tokens`)；
+- **多 Provider 生态适配矩阵 (Multi-Provider Ecosystem)**：
+  - 落地 `OpenAiCompatibleProvider`（兼容 OpenAI 与 DeepSeek 标准 chat completions 协议）；
+  - 落地 `AnthropicProvider`（Claude messages 协议，处理分层 system/messages 与 content_block_delta 流式协议）；
+  - 落地 `GeminiProvider`（Google Gemini generateContent 与 streamGenerateContent REST 协议）；
+  - 落地 `OllamaProvider`（本地 Ollama / vLLM 原生 `/api/chat` 零成本执行）；
+  - 落地 `MockLlmProvider`（确定性模拟故障注入，支持 429 限流、5xx 服务端异常与延迟仿真）；
+- **全链路凭证安全与敏感信息脱敏 (`SecretMasker`)**：
+  - 支持 `env:VAR_NAME` 环境变量注入与 `prop:KEY` 配置解耦；
+  - 严格防御全链路凭证泄漏：API Key 自动脱敏为 `sk-***` / `[REDACTED_SECRET]`，全面清洗日志、异常堆栈、请求头（`Authorization`, `x-api-key`）及 URL 查询参数（Gemini `?key=...`）；REST 接口与 DTO 绝不明文返回敏感密钥；
+- **动态路由策略与高可用智能选择器 (`DynamicProviderRouter`)**：
+  - 支持多维动态加权路由选择：按优先级 (`priority` 降序)、模型能力需求 (`capabilities`: code/general/fast/reasoning/long_context)、健康延迟 (`latencyMs` 升序) 与权重 (`weight`) 智能挑选最合适 Provider；
+  - 提供路由决策预演端点 `POST /api/providers/route`，清晰返回主候选节点与备用节点链条；
+- **高可用容灾与自动 Fallback 降级 (HA Failover & Circuit Breaking)**：
+  - 落地线程安全熔断器 `CircuitBreaker`，管理 `CLOSED`, `OPEN`, `HALF_OPEN` 状态机流转；
+  - 当主 Provider 发生 429 限流、5xx 超时、网络中断或连续失败达到阈值时，自动触发熔断并快速切换至备用 Backup Provider；
+  - 自动向事件流和运行日志沉淀标准化降级告警事件 `FallbackEvent`（包含失败原因、状态码与接管节点）；
+- **Token 与成本计量治理 (Token & Cost Accounting)**：
+  - 落地 `ModelPricing` 定价核算引擎，内置主流大模型官方基准牌价（GPT-4o, DeepSeek, Claude 3.5 Sonnet, Gemini 1.5 Flash, Ollama 本地零成本），同时支持 Provider 实体自定义输入/输出百万 Token 计费覆盖；
+  - 每次 LLM 调用精细化落库 `token_usages` 审计表，提供平台级总 Token 消耗与成本计量汇总端点；
+- **Flyway 数据库演进 (`V6__phase5_agent_providers_and_routing.sql`)**：
+  - 升级 `providers` 表（增加 priority, weight, capabilities, cost_per_million_input, cost_per_million_output, circuit_status, avg_latency_ms 等）；
+  - 升级 `agent_definitions` 表（增加 preferred_provider_type, preferred_model, required_capabilities, fallback_enabled 等）；
+  - 新增 `token_usages` 审计表并建立 `idx_token_usages_run`, `idx_token_usages_provider`, `idx_token_usages_created`, `idx_providers_status_priority` 高效索引；
+  - 初始化系统级四大主流 Provider 及本地 Ollama 种子基线数据；
+- **集成内核与 REST 端点**：
+  - 落地 `ProviderDrivenAgentRuntime`，与 `ExecutionScheduler`、`DagExecutionEngine` 和 `AgentRuntimeRegistry` 深度集成；
+  - 新增 REST 控制器 `ProviderController` (`/api/providers`) 与 `TokenUsageController` (`/api/token-usages`)；
+- **全绿灯测试矩阵**：
+  - 新增 6 大测试套件：`ProviderSpiAndPolymorphismContractTest`、`DynamicProviderRouterAndRoutingPolicyTest`、`ProviderFaultToleranceAndFallbackTest`、`TokenCostAccountingAndAuditingTest`、`SecretMaskingAndCredentialSecurityTest` 与 `ProviderAndTokenUsageControllerIntegrationTest`；
+  - 更新 `FlywayMigrationAndSchemaTest` 验证 19 张核心领域表与 V6 脚本；
+  - 后端 155/155 项测试 100% 绿灯全通；前端 Next.js 14 生产构建 100% 成功。
+
+---
+
 ## [v1.4.0] - 2026-10-08
+
 
 ### 🌟 阶段 4：工作流编排引擎、DAG 依赖与数据流拓扑 (Phase 4 Deliverables)
 - **版本化工作流 DSL 与 Kahn 拓扑排序校验 (`WorkflowDslValidator`)**：

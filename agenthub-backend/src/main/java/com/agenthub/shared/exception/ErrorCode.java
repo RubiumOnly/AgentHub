@@ -47,6 +47,10 @@ public enum ErrorCode {
     AGENT_EXECUTION_TIMEOUT(5003, "Agent Execution Timed Out"),
     AGENT_EXECUTION_FAILED(5004, "Agent Execution Failed"),
     PROVIDER_NOT_FOUND(5005, "LLM or CLI Provider not found"),
+    PROVIDER_UNAVAILABLE(5006, "LLM Provider Unavailable or Circuit Broken"),
+    PROVIDER_RATE_LIMIT(5007, "LLM Provider Rate Limit Exceeded (429)"),
+    PROVIDER_AUTH_FAILED(5008, "LLM Provider Authentication Failed"),
+    NO_AVAILABLE_PROVIDER(5009, "No Available Provider Satisfying Routing Constraints"),
 
     // Workflow & Execution
     WORKFLOW_INVALID(6001, "Workflow Definition Invalid or Cyclic"),

@@ -7,11 +7,16 @@ public enum ErrorCode {
     FORBIDDEN(403, "Access Forbidden"),
     NOT_FOUND(404, "Requested Resource Not Found"),
     
-    // Agent Specific Codes
+    // Agent & Provider Specific Codes
     AGENT_NOT_FOUND(1001, "Agent Not Found"),
     AGENT_CLI_UNAVAILABLE(1002, "Agent CLI Runtime Not Available"),
     AGENT_EXECUTION_TIMEOUT(1003, "Agent Execution Timed Out"),
     AGENT_EXECUTION_FAILED(1004, "Agent Execution Failed"),
+    PROVIDER_NOT_FOUND(1005, "LLM Provider Not Found"),
+    PROVIDER_UNAVAILABLE(1006, "LLM Provider Unavailable or Circuit Broken"),
+    PROVIDER_RATE_LIMIT(1007, "LLM Provider Rate Limit Exceeded (429)"),
+    PROVIDER_AUTHENTICATION_FAILED(1008, "LLM Provider Authentication Failed"),
+    NO_AVAILABLE_PROVIDER(1009, "No Available Provider Satisfying Routing Constraints"),
     
     // Workflow Specific Codes
     WORKFLOW_INVALID(2001, "Workflow Definition Invalid or Cyclic"),

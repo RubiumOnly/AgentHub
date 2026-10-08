@@ -246,5 +246,52 @@ flowchart TD
   - 审批通过后无缝解冻调度器，恢复下游拓扑节点继续执行；
   - 审批驳回时立即将 Step 状态收敛为 `FAILED`，并级联中止后续节点执行，全链路持久化审查人与驳回意见。
 
+---
 
+## 八、 Agent 统一接入层、多 Provider 与动态路由 (Phase 5 升级)
 
+### 1. Provider SPI 抽象与统一交互契约 (`LlmProvider` & Standard SPI)
+- **统一消息与请求响应模型**：
+  - `ChatMessage`：标准化抽象角色（`system`, `user`, `assistant`, `tool`）、消息内容与元数据，抹平各家大模型字段异构；
+  - `ChatRequest` / `ChatResponse`：标准化请求参数（模型名称、上下文消息、温度系数、最大 Token、能力标签要求、流式开关），响应体严格包含唯一标识、完成原因、物理延迟测量（`latencyMs`）、估算成本以及降级追踪标记（`fallbackUsed`, `originalProviderId`）；
+  - `ChatChunk`：标准化流式契约，规范增量内容 (`deltaContent`) 与最终 Token 消耗统计；
+- **真实延迟与消耗精确度量**：
+  - 执行层精确度量端到端网络与推理物理耗时；
+  - 准确统计 `prompt_tokens`、`completion_tokens` 与 `total_tokens`。
+
+### 2. 多 Provider 生态适配矩阵 (Multi-Provider Ecosystem)
+- **`OpenAiCompatibleProvider`**：针对 OpenAI (GPT-4o, GPT-4o-mini) 与 DeepSeek (deepseek-chat, deepseek-reasoner) 的标准 `/v1/chat/completions` REST 接口与 SSE 数据流协议；
+- **`AnthropicProvider`**：针对 Anthropic Claude (claude-3-5-sonnet, claude-3-haiku) 的 `/v1/messages` 消息协议，实现 system prompt 与 messages 分层抽象及 `content_block_delta` 流式解析；
+- **`GeminiProvider`**：针对 Google Gemini (gemini-1.5-pro, gemini-1.5-flash) 的 `generateContent` 与 `streamGenerateContent?alt=sse` REST 协议；
+- **`OllamaProvider`**：针对本地 Ollama 与 vLLM 实例原生 `/api/chat` 接口，支持本地离线零成本调度；
+- **`MockLlmProvider`**：确定性离线仿真引擎，支持 429 限流、5xx 超时故障注入与微秒级延迟仿真。
+
+### 3. 全链路凭证安全与脱敏治理 (`SecretMasker`)
+- **密钥引用与环境变量解耦**：支持 `env:VAR_NAME` 环境变量注入与 `prop:KEY` 配置解耦，数据库 `secret_ref` 绝不明文落库生产密钥；
+- **全链路严密脱敏清洗**：
+  - API Key 自动脱敏为 `sk-***` 或 `[REDACTED_SECRET]`；
+  - 自动识别并过滤网络请求头（`Authorization`, `x-api-key`）与 URL 敏感参数（如 Gemini `?key=...`）；
+  - 全链路运行日志与异常堆栈经过正则扫描自动脱敏，REST 控制器与 DTO 绝不向客户端泄露真实密钥。
+
+### 4. 动态路由策略与高可用选择器 (`DynamicProviderRouter`)
+- **多维动态加权评分与路由过滤**：
+  - **能力匹配 (Capabilities)**：精准匹配任务要求的模型能力（`code`, `general`, `fast`, `reasoning`, `long_context`）；
+  - **熔断状态感知**：自动过滤处于 `OPEN` 熔断状态的不健康 Provider；
+  - **多维综合排序**：优先按优先级 (`priority` 降序)，同优先级按健康检查延迟 (`latencyMs` 升序) 与权重 (`weight` 降序) 挑选最优 Primary Provider；
+- **路由决策预演 (`POST /api/providers/route`)**：支持向平台实时查询任意 prompt 或能力需求下的路由推演结果与完整备份链条。
+
+### 5. 高可用容灾与自动 Fallback 降级 (HA Failover & Circuit Breaking)
+- **三态线程安全熔断器 (`CircuitBreaker`)**：
+  - 状态转移矩阵：`CLOSED` (正常) -> 连续失败超阈值 -> `OPEN` (阻断熔断) -> 超时探测 -> `HALF_OPEN` (半开探测) -> 成功恢复 `CLOSED` / 失败重回 `OPEN`；
+- **自动 Fallback 快速切换**：
+  - 当主 Provider 遇到 429 限流、5xx 超时、连接被拒或熔断阻断时，路由引擎自动拦截并无缝切换至备用 Backup Provider；
+  - 自动向事件流和运行日志沉淀标准化降级告警事件 `FallbackEvent`，记录原失败节点、接管节点与故障原因。
+
+### 6. Token 与成本计量治理 (Token & Cost Accounting)
+- **`ModelPricing` 官方基准牌价与自定义重载**：
+  - 内置 GPT-4o, DeepSeek, Claude 3.5 Sonnet, Gemini 1.5 Flash 官方基准百万 Token 牌价；
+  - 支持本地 Ollama / vLLM 零成本 ($0.00) 计算；
+  - 支持 Provider 数据库记录自定义输入/输出价格精准覆盖；
+- **`token_usages` 数据库审计与平台汇总**：
+  - 单次 LLM 调用持久化至 `token_usages` 审计表，包含模型、Token 计数、测量延迟与折算美元成本；
+  - 提供 `GET /api/token-usages/summary` 与 `/api/token-usages/runs/{runId}` 实时查询端点。

@@ -156,14 +156,22 @@ public class AgentApplicationService implements AgentApplication {
     }
 
     private ProviderView toView(ProviderEntity entity) {
+        String maskedSecret = com.agenthub.agent.infrastructure.security.SecretMasker.maskSecret(entity.getSecretRef());
         return new ProviderView(
                 entity.getId(),
                 entity.getOwnerId(),
                 entity.getProviderType(),
                 entity.getBaseUrl(),
-                entity.getSecretRef(),
+                maskedSecret,
                 entity.getModel(),
                 entity.getStatus(),
+                entity.getPriority(),
+                entity.getWeight(),
+                entity.getCapabilities(),
+                entity.getCostPerMillionInput(),
+                entity.getCostPerMillionOutput(),
+                entity.getCircuitStatus(),
+                entity.getAvgLatencyMs() != null ? entity.getAvgLatencyMs() : 0L,
                 entity.getCreatedAt()
         );
     }

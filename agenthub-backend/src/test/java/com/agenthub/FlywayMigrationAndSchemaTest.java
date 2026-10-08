@@ -24,11 +24,11 @@ class FlywayMigrationAndSchemaTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("测试 Flyway 迁移成功执行且包含初始架构与种子基线脚本")
+    @DisplayName("测试 Flyway 迁移成功执行且包含初始架构、种子基线与 Phase 5 Provider 路由架构演进脚本")
     void shouldSuccessfullyApplyFlywayMigrations() {
         MigrationInfo[] applied = flyway.info().applied();
         assertThat(applied).isNotEmpty();
-        assertThat(applied.length).isGreaterThanOrEqualTo(5);
+        assertThat(applied.length).isGreaterThanOrEqualTo(6);
 
         assertThat(applied[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(applied[0].getDescription()).contains("init schema");
@@ -38,11 +38,14 @@ class FlywayMigrationAndSchemaTest {
 
         assertThat(applied[4].getVersion().getVersion()).isEqualTo("5");
         assertThat(applied[4].getDescription()).contains("workflow dag and orchestration");
+
+        assertThat(applied[5].getVersion().getVersion()).isEqualTo("6");
+        assertThat(applied[5].getDescription()).contains("agent providers and routing");
     }
 
     @Test
-    @DisplayName("测试所有 18 张核心领域表在数据库中均已成功创建")
-    void shouldVerifyAll18FoundationTablesExist() {
+    @DisplayName("测试所有 19 张核心领域表在数据库中均已成功创建（包含 token_usages 审计表）")
+    void shouldVerifyAll19FoundationTablesExist() {
         List<String> expectedTables = List.of(
                 "USERS",
                 "PROJECTS",
@@ -61,7 +64,8 @@ class FlywayMigrationAndSchemaTest {
                 "RUN_EVENTS",
                 "ARTIFACTS",
                 "APPROVALS",
-                "DEPLOYMENTS"
+                "DEPLOYMENTS",
+                "TOKEN_USAGES"
         );
 
         for (String table : expectedTables) {
@@ -75,13 +79,16 @@ class FlywayMigrationAndSchemaTest {
     }
 
     @Test
-    @DisplayName("测试种子基线数据正确加载默认用户、Agent定义与默认工作区")
+    @DisplayName("测试种子基线数据正确加载默认用户、Agent定义、多Provider生态矩阵与默认工作区")
     void shouldVerifyBaselineSeedDataLoaded() {
         Integer userCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Integer.class);
         assertThat(userCount).isGreaterThanOrEqualTo(2);
 
         Integer agentDefCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM agent_definitions", Integer.class);
         assertThat(agentDefCount).isGreaterThanOrEqualTo(4);
+
+        Integer providerCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM providers", Integer.class);
+        assertThat(providerCount).isGreaterThanOrEqualTo(5);
 
         Integer projectCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM projects WHERE id = 'proj-default'", Integer.class);
         assertThat(projectCount).isEqualTo(1);
