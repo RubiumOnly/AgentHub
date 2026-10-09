@@ -155,6 +155,12 @@ public class DagExecutionEngine {
 
                 WorkflowRunEntity runEntity = workflowRunRepository.findById(runId).orElse(null);
                 if (runEntity != null) {
+                    if (runEntity.getLeaseOwner() != null && !INSTANCE_WORKER_ID.equals(runEntity.getLeaseOwner())
+                            && runEntity.getLeaseUntil() != null && runEntity.getLeaseUntil().isAfter(LocalDateTime.now())) {
+                        log.warn("Run [{}] active lease held by [{}] until [{}], aborting concurrent execution on [{}]",
+                                runId, runEntity.getLeaseOwner(), runEntity.getLeaseUntil(), INSTANCE_WORKER_ID);
+                        return WorkflowRunStatus.FAILED;
+                    }
                     runEntity.setLeaseOwner(INSTANCE_WORKER_ID);
                     runEntity.setLeaseUntil(LocalDateTime.now().plusSeconds(effectiveTimeout + 30));
                     runEntity.setHeartbeatAt(LocalDateTime.now());
@@ -349,12 +355,7 @@ public class DagExecutionEngine {
                     lockManager.releaseLock(workspacePath, runId);
                 }
                 try {
-                    WorkflowRunEntity r = workflowRunRepository.findById(runId).orElse(null);
-                    if (r != null && r.getLeaseUntil() != null) {
-                        r.setLeaseUntil(null);
-                        r.setLeaseOwner(null);
-                        workflowRunRepository.save(r);
-                    }
+                    workflowRunRepository.releaseRunLease(runId, INSTANCE_WORKER_ID, LocalDateTime.now());
                 } catch (Exception ignored) {}
             }
         }, executionPool);

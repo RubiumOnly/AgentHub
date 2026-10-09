@@ -26,7 +26,7 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRunEntity, 
     List<WorkflowRunEntity> findQueuedRuns();
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkflowRunEntity r SET r.leaseOwner = :newOwner, r.leaseUntil = :leaseUntil, r.heartbeatAt = :now, r.attempt = COALESCE(r.attempt, 0) + 1 " +
            "WHERE r.id = :runId AND (r.leaseUntil IS NULL OR r.leaseUntil < :now OR r.leaseOwner = :newOwner)")
     int tryAcquireRunLease(@Param("runId") String runId,
@@ -35,7 +35,7 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRunEntity, 
                            @Param("now") LocalDateTime now);
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkflowRunEntity r SET r.leaseOwner = NULL, r.leaseUntil = NULL, r.heartbeatAt = :now " +
            "WHERE r.id = :runId AND r.leaseOwner = :owner")
     int releaseRunLease(@Param("runId") String runId,

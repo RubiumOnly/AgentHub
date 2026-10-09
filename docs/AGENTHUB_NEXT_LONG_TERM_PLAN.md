@@ -401,8 +401,14 @@ Git commit：cbadb09 (feat(scheduler): 完成阶段 C 单一可靠执行内核�
     2. shouldRecoverStaleRunAndResumeExecutionWithoutRepeatingCompletedSteps: 模拟后端在 Step 运行中强杀中断，重启恢复后继续未完步骤，Step 1 维持 SUCCEEDED 且绝不重复执行；
     3. shouldPreserveWaitingApprovalStateAcrossRestartRecovery: 模拟崩溃重启后等待人工审批的 Run 稳态保留在 WAITING_APPROVAL；
     4. shouldEnforceEventMonotonicityAndUniqueConstraint: 验证事件序号原子自增与数据库唯一约束防重。
+  - 高并发与事务生命周期深度加固：
+    1. 彻底解决会话定序锁与事务生命周期倒置：在 ConversationSequenceManager 中以 TransactionTemplate (PROPAGATION_REQUIRES_NEW) 确保在分段公平锁释放前完成数据库物理事务提交，增强边界防御与历史最大序号追溯；
+    2. 全面解耦消息流转与外层大事务：防止 JPA 一级缓存陈旧 ConversationEntity 覆盖回写数据库，采用 recordMessageActivity、updateStatus 与 updateSummary 原子更新增量指标并彻底解耦 triggerTeamTurn 与 generateRollingSummary；
+    3. 修复崩溃恢复内核跨线程事务竞态与租约防篡改：移除 PersistentExecutionRecoveryRunner 大事务，在 WorkflowRunRepository 与 StepRunRepository 的 @Modifying 注解补充 clearAutomatically = true, flushAutomatically = true，并在 DagExecutionEngine 中严格采用原子 releaseRunLease 释放与活跃租约防篡改校验，确保租约抢占在独立物理事务提交后再异步拉起恢复执行，消灭跨线程脏读与租约覆盖；
+    4. 循环压测验证：ConversationMonotonicSequenceAndConcurrencyTest (6/6) 与 PersistentExecutionRecoveryAndLeaseTest (5/5) 经连续多次循环高频并发压测 100% 稳定绿灯，全量后端 283 项测试与前端生产构建 100% 绿灯通过。
 Artifact / 日志位置：
   - target/surefire-reports/TEST-com.agenthub.PersistentExecutionRecoveryAndLeaseTest.xml
+  - target/surefire-reports/TEST-com.agenthub.ConversationMonotonicSequenceAndConcurrencyTest.xml
   - target/surefire-reports/
   - agenthub-frontend/.next/
 未覆盖场景：

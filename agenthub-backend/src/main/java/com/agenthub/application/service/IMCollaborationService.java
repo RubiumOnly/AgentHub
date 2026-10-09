@@ -101,13 +101,11 @@ public class IMCollaborationService implements ConversationApplication {
     }
 
     @Override
-    @Transactional
     public MessageView sendMessage(String conversationId, SendMessageCommand cmd) {
         return conversationApplicationService.sendMessage(conversationId, cmd);
     }
 
     // Overload for legacy signature & test compatibility
-    @Transactional
     public MessageEntity sendMessage(String conversationId, String senderId, SenderType senderType, String content) {
         MessageView view = sendMessage(conversationId, new SendMessageCommand(senderId, senderType, content));
         return messageRepository.findById(view.getId()).orElseThrow();
@@ -120,13 +118,11 @@ public class IMCollaborationService implements ConversationApplication {
     }
 
     @Override
-    @Transactional
     public ConversationSummaryView generateRollingSummary(String conversationId) {
         return conversationApplicationService.generateRollingSummary(conversationId);
     }
 
     @Override
-    @Transactional
     public void triggerTeamTurn(String conversationId) {
         conversationApplicationService.triggerTeamTurn(conversationId);
     }

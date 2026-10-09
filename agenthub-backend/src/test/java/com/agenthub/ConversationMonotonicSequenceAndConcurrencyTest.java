@@ -193,4 +193,81 @@ class ConversationMonotonicSequenceAndConcurrencyTest {
         ConversationView updatedConv = conversationApplication.getConversationById(conv.getId());
         assertThat(updatedConv.getLastSequenceNum()).isEqualTo((long) threadCount);
     }
+
+    @Test
+    @DisplayName("测试边界防御：空或无效 Conversation ID 请求定序抛出异常")
+    void shouldRejectNullOrEmptyConversationIdInSequenceManager() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> sequenceManager.nextSequenceNum(null))
+                .isInstanceOf(com.agenthub.shared.exception.BusinessException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> sequenceManager.nextSequenceNum("   "))
+                .isInstanceOf(com.agenthub.shared.exception.BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("测试滚动摘要与高并发消息混部：滚动摘要生成绝不覆盖或倒退并发分配的最新序列号")
+    void shouldMaintainSequenceIntegrityUnderConcurrentSummaryAndMessages() throws Exception {
+        ConversationView conv = conversationApplication.createConversation(new CreateConversationCommand(
+                "并发摘要与定序会话",
+                ConversationType.DIRECT_CHAT,
+                List.of("BackendArchitect"),
+                "proj-default"
+        ));
+
+        // Pre-populate 5 messages
+        for (int i = 1; i <= 5; i++) {
+            conversationApplication.sendMessage(conv.getId(), new SendMessageCommand(
+                    "user-1", SenderType.USER, "初始化历史消息 " + i
+            ));
+        }
+
+        int concurrentMessages = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(concurrentMessages + 1);
+        CountDownLatch readyLatch = new CountDownLatch(concurrentMessages + 1);
+        CountDownLatch startLatch = new CountDownLatch(1);
+
+        // Task to trigger rolling summary
+        Future<?> summaryFuture = executor.submit(() -> {
+            RequestContext.get().setUserId("user-1");
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                conversationApplication.generateRollingSummary(conv.getId());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // Concurrent message senders
+        List<Future<MessageView>> msgFutures = new ArrayList<>();
+        for (int i = 0; i < concurrentMessages; i++) {
+            final int idx = i;
+            msgFutures.add(executor.submit(() -> {
+                RequestContext.get().setUserId("user-1");
+                readyLatch.countDown();
+                startLatch.await();
+                return conversationApplication.sendMessage(conv.getId(), new SendMessageCommand(
+                        "user-1", SenderType.USER, "并发增量 " + idx
+                ));
+            }));
+        }
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+
+        summaryFuture.get(10, TimeUnit.SECONDS);
+        for (Future<MessageView> f : msgFutures) {
+            f.get(10, TimeUnit.SECONDS);
+        }
+        executor.shutdown();
+
+        // Total messages should be 5 + 10 = 15
+        List<MessageView> allMessages = conversationApplication.listMessages(conv.getId());
+        assertThat(allMessages).hasSize(15);
+
+        Set<Long> seqs = allMessages.stream().map(MessageView::getSequenceNum).collect(Collectors.toSet());
+        assertThat(seqs).hasSize(15);
+
+        ConversationView finalConv = conversationApplication.getConversationById(conv.getId());
+        assertThat(finalConv.getLastSequenceNum()).isEqualTo(15L);
+    }
 }

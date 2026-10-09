@@ -14,6 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,6 +40,7 @@ public class PersistentExecutionRecoveryRunner implements ApplicationRunner {
     private final StepRunRepository stepRunRepository;
     private final ExecutionStateMachine stateMachine;
     private final RunEventBroadcaster broadcaster;
+    private final TransactionTemplate transactionTemplate;
 
     @Autowired(required = false)
     private DagExecutionEngine dagExecutionEngine;
@@ -44,11 +48,14 @@ public class PersistentExecutionRecoveryRunner implements ApplicationRunner {
     public PersistentExecutionRecoveryRunner(WorkflowRunRepository workflowRunRepository,
                                              StepRunRepository stepRunRepository,
                                              ExecutionStateMachine stateMachine,
-                                             RunEventBroadcaster broadcaster) {
+                                             RunEventBroadcaster broadcaster,
+                                             PlatformTransactionManager transactionManager) {
         this.workflowRunRepository = workflowRunRepository;
         this.stepRunRepository = stepRunRepository;
         this.stateMachine = stateMachine;
         this.broadcaster = broadcaster;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override
@@ -56,7 +63,6 @@ public class PersistentExecutionRecoveryRunner implements ApplicationRunner {
         recoverStaleRuns();
     }
 
-    @org.springframework.transaction.annotation.Transactional
     public synchronized int recoverStaleRuns() {
         LocalDateTime now = LocalDateTime.now();
         List<WorkflowRunEntity> staleRuns = workflowRunRepository.findStaleRunningRuns(now);
@@ -91,9 +97,11 @@ public class PersistentExecutionRecoveryRunner implements ApplicationRunner {
                     continue;
                 }
 
-                // Atomically claim lease
-                int acquired = workflowRunRepository.tryAcquireRunLease(runId, DagExecutionEngine.INSTANCE_WORKER_ID, LocalDateTime.now().plusSeconds(180), now);
-                if (acquired <= 0) {
+                // Atomically claim lease in independent physical transaction committed before resuming
+                Integer acquired = transactionTemplate.execute(status ->
+                        workflowRunRepository.tryAcquireRunLease(runId, DagExecutionEngine.INSTANCE_WORKER_ID, LocalDateTime.now().plusSeconds(180), LocalDateTime.now())
+                );
+                if (acquired == null || acquired <= 0) {
                     log.info("Run [{}] lease was claimed by another worker during recovery, skipping", runId);
                     continue;
                 }
@@ -110,6 +118,9 @@ public class PersistentExecutionRecoveryRunner implements ApplicationRunner {
                 } catch (Exception e) {
                     log.error("Failed to resume DAG execution for run [{}]: {}", runId, e.getMessage(), e);
                     stateMachine.transitionRun(runId, WorkflowRunStatus.FAILED, "recovery-watchdog", "Recovery failed: " + e.getMessage(), null);
+                    try {
+                        workflowRunRepository.releaseRunLease(runId, DagExecutionEngine.INSTANCE_WORKER_ID, LocalDateTime.now());
+                    } catch (Exception ignored) {}
                 }
             } else {
                 // Cannot resume without snapshot

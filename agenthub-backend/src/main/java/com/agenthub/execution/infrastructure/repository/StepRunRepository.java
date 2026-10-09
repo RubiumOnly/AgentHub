@@ -23,7 +23,7 @@ public interface StepRunRepository extends JpaRepository<StepRunEntity, String> 
     List<StepRunEntity> findStaleRunningSteps(@Param("now") LocalDateTime now);
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE StepRunEntity s SET s.leaseOwner = :newOwner, s.leaseUntil = :leaseUntil, s.heartbeatAt = :now, s.attempt = COALESCE(s.attempt, 0) + 1 " +
            "WHERE s.id = :stepId AND (s.leaseUntil IS NULL OR s.leaseUntil < :now OR s.leaseOwner = :newOwner)")
     int tryAcquireStepLease(@Param("stepId") String stepId,
@@ -32,7 +32,7 @@ public interface StepRunRepository extends JpaRepository<StepRunEntity, String> 
                             @Param("now") LocalDateTime now);
 
     @Transactional
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE StepRunEntity s SET s.leaseOwner = NULL, s.leaseUntil = NULL, s.heartbeatAt = :now " +
            "WHERE s.id = :stepId AND s.leaseOwner = :owner")
     int releaseStepLease(@Param("stepId") String stepId,

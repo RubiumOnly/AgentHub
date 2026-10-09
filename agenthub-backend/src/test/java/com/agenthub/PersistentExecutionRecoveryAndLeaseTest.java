@@ -31,6 +31,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -232,5 +233,31 @@ class PersistentExecutionRecoveryAndLeaseTest {
                 return null;
             });
         }).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("测试阶段 C 租约防篡改保护：当其他活跃 Worker 持有未过期租约时，执行引擎拒绝抢占并拒绝篡改")
+    void shouldPreventLeaseTheftWhenRunIsActivelyHeldByAnotherWorker() throws Exception {
+        String runId = "run-active-" + UUID.randomUUID().toString().substring(0, 8);
+        WorkflowRunEntity run = new WorkflowRunEntity(runId, "proj-default", "wf-active", "RUNNING", null);
+        run.setLeaseOwner("worker-foreign");
+        LocalDateTime activeUntil = LocalDateTime.now().plusSeconds(60);
+        run.setLeaseUntil(activeUntil);
+        workflowRunRepository.save(run);
+
+        WorkflowDsl dsl = new WorkflowDsl("wf-active", "活跃租约保护测试");
+        dsl.setNodes(List.of(new WorkflowNodeDsl("node-1", "单步", "START")));
+        dsl.setEdges(Collections.emptyList());
+
+        CompletableFuture<com.agenthub.execution.domain.model.WorkflowRunStatus> future =
+                dagExecutionEngine.executeDag(runId, dsl, null, Collections.emptyMap(), 60);
+
+        com.agenthub.execution.domain.model.WorkflowRunStatus status = future.get(5, TimeUnit.SECONDS);
+        assertThat(status).isEqualTo(com.agenthub.execution.domain.model.WorkflowRunStatus.FAILED);
+
+        // Verify foreign worker lease was NOT stomped
+        WorkflowRunEntity preserved = workflowRunRepository.findById(runId).orElseThrow();
+        assertThat(preserved.getLeaseOwner()).isEqualTo("worker-foreign");
+        assertThat(preserved.getLeaseUntil()).isAfter(LocalDateTime.now());
     }
 }

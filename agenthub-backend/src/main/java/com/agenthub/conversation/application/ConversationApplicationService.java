@@ -211,7 +211,6 @@ public class ConversationApplicationService implements ConversationApplication {
     }
 
     @Override
-    @Transactional
     public MessageView sendMessage(String conversationId, SendMessageCommand cmd) {
         ConversationEntity conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
@@ -258,10 +257,7 @@ public class ConversationApplicationService implements ConversationApplication {
             messageEntity.setMentions(String.join(",", mentions));
         }
 
-        conversation.setLastSequenceNum(nextSeq);
-        conversation.setUpdatedAt(LocalDateTime.now());
-        conversation.setTokenCount((conversation.getTokenCount() != null ? conversation.getTokenCount() : 0) + tokenCount);
-        conversationRepository.save(conversation);
+        conversationRepository.recordMessageActivity(conversationId, tokenCount, LocalDateTime.now());
         MessageEntity saved = messageRepository.save(messageEntity);
         MessageView savedView = toMessageView(saved);
 
@@ -282,8 +278,7 @@ public class ConversationApplicationService implements ConversationApplication {
         LoopDetectionResult loopResult = loopDetector.detectLoop(recentMessages, maxTurns);
         if (loopResult.isLoopDetected()) {
             log.warn("Loop detected in conversation [{}]: {} ({})", conversationId, loopResult.getReason(), loopResult.getLoopType());
-            conversation.setStatus("TERMINATED");
-            conversationRepository.save(conversation);
+            conversationRepository.updateStatus(conversationId, "TERMINATED", LocalDateTime.now());
 
             long sysSeq = sequenceManager.nextSequenceNum(conversationId);
             MessageEntity sysMsg = new MessageEntity(
@@ -380,7 +375,6 @@ public class ConversationApplicationService implements ConversationApplication {
     }
 
     @Override
-    @Transactional
     public ConversationSummaryView generateRollingSummary(String conversationId) {
         ConversationEntity conv = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
@@ -390,12 +384,13 @@ public class ConversationApplicationService implements ConversationApplication {
                 .map(this::toMessageView)
                 .collect(Collectors.toList());
 
+        String effectiveSummary = conv.getSummary();
         if (allMessages.size() > 4) {
             SlidingWindowContextTrimmer.WindowSplit split = contextTrimmer.trimToWindow(allMessages, 4);
             if (!split.getOlderMessages().isEmpty()) {
                 String updatedSummary = rollingSummaryService.synthesizeRollingSummary(conv.getSummary(), split.getOlderMessages());
-                conv.setSummary(updatedSummary);
-                conversationRepository.save(conv);
+                conversationRepository.updateSummary(conversationId, updatedSummary, LocalDateTime.now());
+                effectiveSummary = updatedSummary;
                 broadcastEvent(conversationId, "summary_generated", Map.of(
                         "conversationId", conversationId,
                         "summary", updatedSummary
@@ -405,14 +400,13 @@ public class ConversationApplicationService implements ConversationApplication {
 
         return new ConversationSummaryView(
                 conversationId,
-                conv.getSummary(),
+                effectiveSummary,
                 allMessages.size(),
-                tokenBudgetManager.estimateTokens(conv.getSummary())
+                tokenBudgetManager.estimateTokens(effectiveSummary)
         );
     }
 
     @Override
-    @Transactional
     public void triggerTeamTurn(String conversationId) {
         ConversationEntity conv = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
@@ -448,8 +442,7 @@ public class ConversationApplicationService implements ConversationApplication {
         NextSpeakerDecision decision = strategy.decideNextSpeaker(team, members, context);
 
         if (decision.getAction() == NextSpeakerDecision.Action.TERMINATE) {
-            conv.setStatus("TERMINATED");
-            conversationRepository.save(conv);
+            conversationRepository.updateStatus(conversationId, "TERMINATED", LocalDateTime.now());
             long seq = sequenceManager.nextSequenceNum(conversationId);
             MessageEntity finishMsg = new MessageEntity(
                     "msg-" + UUID.randomUUID().toString().substring(0, 8),
@@ -488,8 +481,7 @@ public class ConversationApplicationService implements ConversationApplication {
                     null
             );
             messageRepository.save(summaryMsg);
-            conv.setStatus("COMPLETED");
-            conversationRepository.save(conv);
+            conversationRepository.updateStatus(conversationId, "COMPLETED", LocalDateTime.now());
             broadcastEvent(conversationId, "message", toMessageView(summaryMsg));
             return;
         }
