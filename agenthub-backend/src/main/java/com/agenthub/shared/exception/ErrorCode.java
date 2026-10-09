@@ -74,7 +74,15 @@ public enum ErrorCode {
     APPROVAL_ALREADY_DECIDED(6013, "Approval request has already been decided"),
 
     // Sandbox & Deployment
-    DEPLOYMENT_NOT_FOUND(7001, "Deployment record not found");
+    DEPLOYMENT_NOT_FOUND(7001, "Deployment record not found"),
+    SANDBOX_COMMAND_BLOCKED(7002, "Sandbox command execution blocked by security policy"),
+    SANDBOX_TIMEOUT(7003, "Sandbox command execution timed out"),
+    SANDBOX_OUTPUT_TRUNCATED(7004, "Sandbox output exceeded maximum allowed buffer size"),
+    SANDBOX_EXECUTION_FAILED(7005, "Sandbox process execution failed"),
+    DEPLOYMENT_PORT_EXHAUSTED(7006, "No available ports for deployment in configured range"),
+    DEPLOYMENT_BUILD_FAILED(7007, "Deployment build failed"),
+    DEPLOYMENT_HEALTH_CHECK_FAILED(7008, "Deployment health check probing failed"),
+    DEPLOYMENT_INVALID_STATUS(7009, "Invalid deployment status transition");
 
     private final int code;
     private final String message;

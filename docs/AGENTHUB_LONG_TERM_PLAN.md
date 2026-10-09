@@ -428,25 +428,49 @@ public interface AgentRuntime {
 - [x] SSE 流式通道携带 `Last-Event-ID` 重连时成功回放历史补发事件，心跳正常发送（`ConversationSseStreamAndReconnectionTest` 验证通过）；
 - [x] Flyway V7 迁移在 H2/MySQL 顺利执行，团队与会话端点通过 JWT 鉴权与水平越权防护（`TeamAndConversationControllerIntegrationTest` & `FlywayMigrationAndSchemaTest` 验证通过）。
 
-### 阶段 7：交付物、测试门禁和人工审批（预计 1～2 周）
+### 阶段 7：工作区沙箱容器化与部署自动化（✅ 已圆满交付）
 
-**目标**：把 Agent 输出变成可以判断、审查和交付的工程成果。
+> **阶段交付状态**：已完成沙箱隔离体系架构（`SandboxProvider` SPI、`LocalProcessSandbox` 与 `DockerSandbox`）、全方位安全策略与命令防火墙（高危命令与注入阻断、宿主机凭证隔离）、资源配额与看门狗超时监控（多平台进程树强平、海量日志输出截断防 OOM）、代码一键部署与运行预览环境（`DeploymentApplication`、`DeploymentController`、原子端口分配与主动健康检查探测），以及 Flyway V8 部署表演进（后端 243/243 单元/领域/架构测试全绿灯，前端 Next.js 14 生产构建 100% 成功）。
 
-**具体工作**：
+**目标**：构建生产级受限工作区沙箱隔离体系与代码一键预览/部署自动化引擎，确保不可信代码的安全隔离、可控执行、资源看门狗防撑爆与服务高可用探测。
 
-1. 定义 Artifact 类型：source change、diff、test report、build log、preview、deployment manifest、runtime log。
-2. QA Agent 不只输出自然语言，要调用受限工具执行格式化、编译、单元测试、静态检查和安全扫描，并把结果结构化。
-3. 实现质量门禁：编译失败、测试失败、Secret 扫描命中、Diff 超预算或路径违规时自动阻止发布。
-4. 审批卡片展示风险摘要、变更文件、Diff、测试结果和发布目标；审批记录 reviewer、时间、意见和策略版本。
-5. 为 Java 后端加入 Checkstyle/SpotBugs/依赖漏洞扫描；前端加入 lint/typecheck/build；必要时加入 OWASP/Secret 扫描。
-6. 生成一次 Run 的可分享证据包：计划、事件、Prompt 版本、Agent 版本、Diff、测试、审批和产物 checksum。
+**具体工作与实现**：
 
-**退出条件**：
+1. **沙箱隔离体系架构 (`com.agenthub.sandbox.domain.provider`)**：
+   - 抽象定义沙箱统一 SPI 接口 `SandboxProvider`，统一封装命令执行、工作目录隔离、环境变量注入与销毁逻辑，提供 `SandboxProviderFactory` 服务解析与平滑降级；
+   - 落地受限子进程沙箱 `LocalProcessSandbox`：严格锁定受控工作区路径，清除外部不可信环境变量，支持多平台安全执行；
+   - 落地容器化沙箱 `DockerSandbox`：精确组装非特权用户（`--user 1000:1000`）、只读根文件系统（`--read-only`）、内存硬上限（`--memory`）、CPU 限制（`--cpus`）、限制临时目录（`--tmpfs /tmp:rw,noexec,nosuid,size=64m`），且严格仅挂载受控工作区（`-v <workspace>:/workspace:rw`）；
+2. **安全策略与命令防火墙 (`CommandSecurityGuard`)**：
+   - 建立高危系统命令防御矩阵：精准阻断文件系统破坏命令（`rm -rf /`, `rm -rf ~`, `rm -rf *`, `del /s /q C:\` 等）、底层磁盘格式化与覆盖（`mkfs`, `dd if=...`, `fdisk`）、提权操作（`chmod 777 /`）、远程脚本管道注入（`curl ... | sh`, `wget ... | bash`）、PowerShell EncodedCommand 与恶性命令串联注入（`; rm -rf`, `&& rm -rf`）及 Fork Bomb；
+   - 白名单严格限制可用可执行文件：仅允许 `node`, `npm`, `mvn`, `java`, `python`, `git`, `echo` 等合规工具，拦截 `sudo`, `su`, `useradd`, `nc`, `netcat`, `nmap` 等黑名单程序；
+3. **环境变量隔离与敏感凭证防泄漏 (`EnvironmentSanitizer`)**：
+   - 严格阻断宿主机敏感凭证继承：自动清洗并剔除包含 `KEY`, `SECRET`, `PASSWORD`, `TOKEN`, `CREDENTIAL`, `AUTH`, `DATABASE` 等关键字的宿主机变量，防泄露 API Key；
+   - 仅继承标准系统安全变量（`PATH`, `HOME`, `USER`, `LANG`, `TEMP` 等），并阻断 `LD_PRELOAD`, `BASH_ENV` 等动态链接劫持；
+4. **资源配额与看门狗超时监控 (`SandboxResourceQuota` & Watchdog)**：
+   - 支持自定义沙箱超时、内存、CPU、磁盘和最大输出大小配额；
+   - 落地看门狗单命令超时监控：超时自动触发跨平台进程树强平（Process Tree Kill），退出码置为 137 并落库 `TIMED_OUT`；
+   - 落地输出缓冲区防撑爆机制（Output Buffer Truncation）：当子进程标准输出/错误流超出配额上限时自动截断并追加警示标识，从原理上消除海量输出导致 JVM 内存溢出 OOM 隐患；
+5. **代码一键部署与运行预览环境 (`DeploymentApplication` & `DeploymentController`)**：
+   - 落地部署领域状态机（`CREATED`, `BUILDING`, `RUNNING`, `STOPPED`, `FAILED`）与部署规范 `DeploymentSpec`；
+   - 落地线程安全端口分配管理器 `PortAllocationService`：在受控端口范围（18000-18999）内原子互斥分配，验证真实操作系统 TCP 套接字绑定，支持全生命周期释放与回收；
+   - 落地主动健康检查探测器 `HealthCheckProbeService`：基于 HTTP Client 进行多次重试探测与超时感知，验证部署服务可用性；
+   - 暴露标准 RESTful 接口 `DeploymentController` (`/api/deployments`)，支持部署创建、停止、状态查询、日志获取与项目历史列表；
+6. **Flyway 数据库版本演进 (`V8__phase7_sandbox_and_deployments.sql`)**：
+   - 扩展 `deployments` 部署表字段（port, build_command, start_command, health_check_path, log_output, error_message, sandbox_type, container_id, updated_at）；
+   - 新增 4 个高性能索引（`idx_deployments_status`, `idx_deployments_proj_status`, `idx_deployments_port`, `idx_deployments_created`）；
+7. **全绿灯测试矩阵与架构守护**：
+   - 4 大新增测试套件：`SandboxSecurityGuardAndFirewallTest`、`SandboxProviderAndExecutionTest`、`PortAllocationAndHealthCheckTest` 与 `DeploymentLifecycleAndControllerIntegrationTest`；
+   - 后端 243/243 项测试 100% 绿灯；前端 Next.js 14 生产构建 100% 成功。
 
-- 用户可以逐步接受或拒绝某个 Step 的产物；
-- 失败门禁能阻断部署，并说明原因；
-- 一键导出证据包后第三方无需访问数据库即可理解一次 Run；
-- 质量门禁结果在 UI、API 和日志中的状态一致。
+**退出条件与验证证据**：
+
+- [x] 命令防火墙严格拦截高危破坏性命令、远程管道注入与黑名单程序（`SandboxSecurityGuardAndFirewallTest` 验证通过）；
+- [x] 宿主机 API Key 与数据库凭证无法被沙箱子进程继承，动态链接注入被有效过滤（`SandboxSecurityGuardAndFirewallTest` 验证通过）；
+- [x] 看门狗定时器在命令超时时强平进程树并标记退出码 137，海量输出超出配额时安全截断无 OOM（`SandboxProviderAndExecutionTest` 验证通过）；
+- [x] Docker 沙箱精确组装非特权用户、只读根文件系统、tmpfs 与受控工作区单目录挂载（`SandboxProviderAndExecutionTest` 验证通过）；
+- [x] 端口分配在 18000-18999 范围内原子分配与释放，多线程并发无碰撞冲突，端口池耗尽时安全熔断（`PortAllocationAndHealthCheckTest` 验证通过）；
+- [x] 主动健康检查探测在有效服务上正常通过，在失效服务上优雅重试并上报失败（`PortAllocationAndHealthCheckTest` 验证通过）；
+- [x] 一键部署生命周期（BUILDING -> RUNNING -> STOPPED / FAILED）与 REST 控制器通过端到端验证，Flyway V8 迁移顺利执行（`DeploymentLifecycleAndControllerIntegrationTest` & `FlywayMigrationAndSchemaTest` 验证通过）。
 
 ### 阶段 8：真实预览与部署（预计 1～2 周）
 

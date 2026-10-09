@@ -35,6 +35,7 @@ flowchart TD
         WfCtrl[WorkflowAndDiffController]
         AgentCtrl[AgentRegistryController]
         SandboxCtrl[SandboxController]
+        DeployCtrl[DeploymentController]
         SysCtrl[SystemHealthController]
     end
 
@@ -45,7 +46,7 @@ flowchart TD
         ConvApp[ConversationApplication]
         ExecApp[ExecutionApplication]
         AgentApp[AgentApplication]
-        SandboxApp[SandboxApplication]
+        SandboxApp[SandboxApplication / DeploymentApplication]
     end
 
     subgraph Domain [十大领域核心 (Domain Models & Ports)]
@@ -57,12 +58,12 @@ flowchart TD
         Orch[orchestration: WorkflowDefinition DSL]
         Exec[execution: WorkflowRun, StepRun, RunEvent, StateMachine]
         Audit[audit: Artifact, JGit Baseline, Diff Engine, Safe Revert]
-        Sandbox[sandbox: Deployment, Preview]
+        Sandbox[sandbox: SandboxProvider, CommandGuard, PortManager, Deployment]
         Shared[shared: Result, RequestContext, ErrorCode, BusinessException]
     end
 
     subgraph Persistence [持久化与基础设施层]
-        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3-V7 Evolutions)]
+        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3-V8 Evolutions)]
         H2MySQL[H2 (MySQL Mode) / MySQL 8.0]
         GitFS[JGit Repository / Controlled Workspaces]
     end
@@ -355,4 +356,68 @@ flowchart TD
 - **基于 Last-Event-ID 的断点续传**：
   - 客户端携带 `Last-Event-ID` 头部或参数重连时，系统基于 `sequence_num` 游标自动从数据库补齐重连期间缺失的所有历史消息事件后再平滑接入实时流；
   - 内置保活心跳（Heartbeat），杜绝网关空闲断联。
+
+---
+
+## 十、 工作区沙箱容器化与部署自动化体系 (Phase 7 升级)
+
+### 1. 沙箱隔离体系架构 (`SandboxProvider` SPI & Providers)
+- **统一沙箱 SPI 契约 (`SandboxProvider`)**：
+  - 抽象 `execute(SandboxExecutionRequest)`、`destroy(executionId)` 与 `isAvailable()`，解耦上层业务调用与底层沙箱运行环境；
+  - 提供 `SandboxProviderFactory`，支持按类型（`LOCAL_PROCESS`, `DOCKER`）解析提供商，并在容器不可用时安全平滑兜底；
+- **受限子进程沙箱 (`LocalProcessSandbox`)**：
+  - 严格限制 `workingDirectory` 在受控项目工作区内，禁止逃逸；
+  - 清空宿主机环境，仅注入经安全脱敏的白名单环境变量；
+  - 基于异步并发 `BoundedOutputReader` 与看门狗定时器进行全链路流式审计；
+- **容器化沙箱 (`DockerSandbox`)**：
+  - 组装非特权安全配置：非 root 用户（`--user 1000:1000`）、只读根文件系统（`--read-only`）；
+  - 限制临时写入空间（`--tmpfs /tmp:rw,noexec,nosuid,size=64m`）；
+  - 严格限制宿主机挂载：仅挂载受控工作区（`-v <workspace>:/workspace:rw`），禁止宿主机敏感目录或 Docker socket 挂载；
+  - 资源上限硬限制：`--memory <quota>m` 与 `--cpus <quota>`。
+
+### 2. 安全策略与命令防火墙 (`CommandSecurityGuard`)
+- **高危破坏性命令拦截矩阵**：
+  - 阻断破坏性文件删除：`rm -rf /`, `rm -rf ~`, `rm -rf *`, `del /s /q C:\`, `format D:`, `rmdir /s /q C:\`；
+  - 阻断低级磁盘破坏：`mkfs`, `dd if=...`, `fdisk`, `chmod -R 777 /`；
+  - 阻断远程管道脚本注入：`curl ... | sh`, `wget ... | bash`, `curl ... | python`；
+  - 阻断恶意命令串联与逃逸：`; rm -rf`, `&& rm -rf`, `|| rm -rf`, PowerShell `-enc/-EncodedCommand`, Fork Bomb (`:(){ :|:& };:`)，主机越权 (`> /dev/sd*`, `> /etc/`)；
+- **白名单机制 (`Executable Whitelist`)**：
+  - 严格放行标准开发工具：`node`, `npm`, `npx`, `yarn`, `pnpm`, `java`, `javac`, `mvn`, `gradle`, `python`, `git`, `echo` 等；
+  - 严格拦截非白名单与黑名单程序：`sudo`, `su`, `useradd`, `nc`, `netcat`, `nmap`, `iptables`, `chroot`。
+
+### 3. 环境变量隔离与敏感凭证防护 (`EnvironmentSanitizer`)
+- **宿主机凭证继承阻断**：
+  - 自动审查并剔除包含 `KEY`, `SECRET`, `PASSWORD`, `TOKEN`, `CREDENTIAL`, `AUTH`, `DATABASE` 等关键字的宿主机变量；
+  - 防止 `OPENAI_API_KEY`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` 等敏感资产随子进程泄漏；
+- **注入攻击拦截**：
+  - 仅继承标准系统安全变量（`PATH`, `HOME`, `USER`, `LANG`, `TEMP` 等）；
+  - 拦截 `LD_PRELOAD`, `BASH_ENV` 等动态链接劫持注入攻击。
+
+### 4. 资源配额与看门狗超时监控 (`SandboxResourceQuota` & Watchdog)
+- **看门狗超时监控 (Watchdog Timeout Kill)**：
+  - 单命令执行设定硬超时阈值；
+  - 超时自动触发多平台进程树递归强平（Process Tree Kill，包括 Windows/Linux 子孙进程级联终止），进程标记退出码 137 并设置 `isTimedOut = true`；
+- **输出缓冲区截断防撑爆 (Output Buffer Truncation)**：
+  - 实时限制子进程输出捕获字节上限（默认 1MB，支持自定义）；
+  - 超出配额时自动截断后续字符，并追加 `[SANDBOX WARNING: Output truncated...]` 警示，彻底消除海量日志输出导致 JVM 内存溢出 OOM 隐患。
+
+### 5. 端口分配管理与健康检查探测 (`PortAllocationService` & `HealthCheckProbeService`)
+- **原子受控端口池分配 (`PortAllocationService`)**：
+  - 管理 18000-18999 端口池；
+  - 结合内存并发原子分配与操作系统底层 TCP ServerSocket 真实绑定探测；
+  - 部署结束或失败时自动回收与释放；
+- **主动健康检查探测 (`HealthCheckProbeService`)**：
+  - 支持对 HTTP 服务进行周期性探测与重试探测；
+  - 响应 HTTP 2xx/3xx 判定为健康，探测超时或连接拒绝判定为失败。
+
+### 6. 代码一键部署生命周期与 REST 端点 (`DeploymentApplication` & `DeploymentController`)
+- **部署状态机模型 (`DeploymentStatus`)**：
+  - `CREATED` -> `BUILDING` -> `RUNNING` / `FAILED` -> `STOPPED`；
+- **RESTful 端点矩阵 (`/api/deployments`)**：
+  - `POST /api/deployments`：创建并触发构建与部署；
+  - `GET /api/deployments/{id}`：查询部署详情与运行状态；
+  - `GET /api/deployments/{id}/logs`：获取部署构建与运行日志；
+  - `POST /api/deployments/{id}/stop`：主动停止部署并释放占用端口；
+  - `GET /api/deployments?projectId={id}`：查询项目历史部署记录。
+
 

@@ -54,6 +54,15 @@
 - `5008` PROVIDER_AUTH_FAILED：大模型 Provider 凭证鉴权失败；
 - `5009` NO_AVAILABLE_PROVIDER：无可满足路由与能力约束的可用 Provider；
 - `6001` RUN_NOT_FOUND：执行实例不存在；
+- `7001` DEPLOYMENT_NOT_FOUND：目标部署记录不存在；
+- `7002` SANDBOX_COMMAND_BLOCKED：命令被安全防火墙阻断（命中了高危破坏模式或非白名单程序）；
+- `7003` SANDBOX_TIMEOUT：沙箱命令执行超时（已被看门狗强平，退出码 137）；
+- `7004` SANDBOX_OUTPUT_TRUNCATED：沙箱输出超出缓冲区配额上限并被截断；
+- `7005` SANDBOX_EXECUTION_FAILED：沙箱子进程启动或执行异常；
+- `7006` DEPLOYMENT_PORT_EXHAUSTED：受控端口池已耗尽；
+- `7007` DEPLOYMENT_BUILD_FAILED：部署构建阶段失败；
+- `7008` DEPLOYMENT_HEALTH_CHECK_FAILED：服务健康检查探测超时或未响应；
+- `7009` DEPLOYMENT_INVALID_STATUS：非法的部署状态机流转；
 - `9001` INTERNAL_ERROR：系统内部未捕获异常。
 
 ---
@@ -192,6 +201,23 @@
 - `GET /api/im/conversations/{id}/context` 与 `GET /api/conversations/{id}/context`：获取经过滑动窗口 (`windowSize`) 与 Token 预算控制 (`maxTokens`) 裁剪后的上下文窗口 `ContextWindowView`；
 - `POST /api/im/conversations/{id}/summarize` 与 `POST /api/conversations/{id}/summarize`：手动或自动触发滚动历史摘要浓缩，将老消息压缩为紧凑前情要点；
 - `POST /api/im/conversations/{id}/coordinate` 与 `POST /api/conversations/{id}/coordinate`：驱动团队拓扑执行下一协作轮次。
+
+### 15. 工作区沙箱与部署自动化 (Sandbox & Deployment Automation)
+- `POST /api/deployments`：创建并启动项目构建与部署
+  - Request: `{"projectId": "proj-default", "target": "STATIC_PREVIEW", "sandboxType": "LOCAL_PROCESS", "buildCommand": "npm run build", "port": 18080, "healthCheckPath": "/"}`
+  - Response: `Result<DeploymentResponse>` (`{"id": "dep-...", "status": "RUNNING", "port": 18080, "url": "http://localhost:18080/", ...}`)
+- `GET /api/deployments/{id}`：查询指定部署详情与实时运行状态 (`BUILDING`, `RUNNING`, `STOPPED`, `FAILED`)
+  - Response: `Result<DeploymentResponse>`
+- `GET /api/deployments/{id}/logs`：查询部署构建与运行完整控制台日志
+  - Response: `Result<String>`
+- `POST /api/deployments/{id}/stop`：主动终止运行中部署并释放绑定的本地端口
+  - Response: `Result<DeploymentResponse>`
+- `GET /api/deployments?projectId={projectId}`：按项目分页或全量查询历史部署列表
+  - Response: `Result<List<DeploymentResponse>>`
+- `GET /api/sandbox/preview/{projectId}`：渲染并返回项目实时前端静态预览 HTML 页面
+  - Response: `text/html`
+- `POST /api/sandbox/deploy/{projectId}`：一键部署并生成容器镜像交付清单与 Dockerfile
+  - Response: `Result<DeploymentManifest>`
 
 ---
 

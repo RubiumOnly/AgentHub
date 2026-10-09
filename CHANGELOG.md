@@ -4,6 +4,38 @@
 
 ---
 
+## [v1.7.0] - 2026-10-09
+
+### 🌟 阶段 7：工作区沙箱容器化与部署自动化 (Phase 7 Deliverables)
+- **沙箱隔离体系架构 (`com.agenthub.sandbox.domain.provider`)**：
+  - 定义沙箱运行时统一 SPI 接口 `SandboxProvider` 与注册工厂 `SandboxProviderFactory`；
+  - 落地受限子进程沙箱 `LocalProcessSandbox`：实现严格的工作目录边界约束、受控环境变量注入与命令执行；
+  - 落地容器化沙箱 `DockerSandbox`：精确构建非特权用户（`--user 1000:1000`）、只读根文件系统（`--read-only`）、内存与 CPU 资源硬限制（`--memory`, `--cpus`）、临时目录限制（`--tmpfs /tmp:rw,noexec,nosuid,size=64m`），以及严格限制仅挂载受控工作区（`-v <workspace>:/workspace:rw`）；
+- **安全策略与命令防火墙 (`CommandSecurityGuard`)**：
+  - 建立全方位高危命令检测与恶意注入拦截矩阵：严格阻断破坏性文件删除（`rm -rf /`, `rm -rf ~`, `rm -rf *`, `del /s /q C:\` 等）、底层磁盘格式化与覆盖（`mkfs`, `dd if=...`, `fdisk`）、远程管道注入（`curl ... | sh`, `wget ... | bash`）、PowerShell EncodedCommand、恶性命令串联注入（`; rm -rf`, `&& rm -rf`）与 Fork Bomb 攻击；
+  - 白名单限制可用可执行文件（放行 `node`, `npm`, `mvn`, `java`, `python`, `git`, `echo` 等标准开发工具，严格封禁 `sudo`, `su`, `useradd`, `nc`, `netcat`, `nmap` 等提权与渗透工具）；
+- **环境变量隔离与敏感凭证防护 (`EnvironmentSanitizer`)**：
+  - 阻断宿主机敏感凭证继承：自动清洗并拦截包含 `KEY`, `SECRET`, `PASSWORD`, `TOKEN`, `CREDENTIAL`, `AUTH`, `DATABASE` 等关键字的敏感变量，防止 API Key 与数据库密码泄露至沙箱子进程；
+  - 仅继承标准系统安全基线（`PATH`, `HOME`, `USER`, `LANG`, `TEMP` 等），并阻断 `LD_PRELOAD`, `BASH_ENV` 等动态链接劫持注入；
+- **资源配额与看门狗超时监控 (`SandboxResourceQuota` & Watchdog)**：
+  - 建立沙箱资源配额模型（最大超时毫秒、最大输出字节数、最大内存与 CPU 核心数）；
+  - 落地单命令执行超时看门狗监控：命令超时时自动触发多平台进程树强平（Process Tree Kill，包括 Windows/Linux 子孙进程级级联终止），标记 `isTimedOut = true` 并返回退出码 137；
+  - 落地输出缓冲区防撑爆机制（Output Buffer Truncation）：当子进程标准输出/错误流超出配额（如海量死循环打印）时，安全截断内容并追加警示标识，从根源消除海量日志撑爆 JVM 内存 OOM 隐患；
+- **代码一键部署与运行预览环境 (`DeploymentApplication` & `DeploymentController`)**：
+  - 落地部署领域模型：状态机（`CREATED`, `BUILDING`, `RUNNING`, `STOPPED`, `FAILED`）、部署目标（`STATIC_PREVIEW`, `LOCAL_PROCESS`, `DOCKER_CONTAINER`）与部署规范；
+  - 落地线程安全端口分配管理器 `PortAllocationService`：在受控端口范围（18000-18999）内进行原子分配、真实操作系统 TCP 套接字绑定探测、以及全生命周期释放与回收；
+  - 落地主动健康检查探测器 `HealthCheckProbeService`：基于 HTTP Client 进行多次重试探测与超时感知，验证部署服务可用性；
+  - 暴露标准 RESTful 接口 `DeploymentController` (`/api/deployments`)，支持创建部署、停止部署、查询部署状态、获取执行日志与项目历史部署列表，并向下完全兼容现有 Web 沙箱预览接口；
+- **Flyway 数据库版本演进 (`V8__phase7_sandbox_and_deployments.sql`)**：
+  - 扩展 `deployments` 部署表：新增 `port`, `build_command`, `start_command`, `health_check_path`, `log_output`, `error_message`, `sandbox_type`, `container_id`, `updated_at`；
+  - 建立高性能索引 `idx_deployments_status`, `idx_deployments_proj_status`, `idx_deployments_port`, `idx_deployments_created`；
+- **全绿灯防御测试矩阵与架构守护**：
+  - 新增 4 大测试套件：`SandboxSecurityGuardAndFirewallTest`、`SandboxProviderAndExecutionTest`、`PortAllocationAndHealthCheckTest` 与 `DeploymentLifecycleAndControllerIntegrationTest`；
+  - 更新 `FlywayMigrationAndSchemaTest`，验证 V8 迁移顺利生效；
+  - 后端测试套件由 187 项提升至 243 项（243/243 全部通过，0 错误，0 失败）；前端 Next.js 14 生产构建 100% 成功。
+
+---
+
 ## [v1.6.0] - 2026-10-08
 
 ### 🌟 阶段 6：多智能体协同网络、消息总线与对话系统 (Phase 6 Deliverables)

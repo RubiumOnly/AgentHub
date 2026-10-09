@@ -28,7 +28,7 @@ class FlywayMigrationAndSchemaTest {
     void shouldSuccessfullyApplyFlywayMigrations() {
         MigrationInfo[] applied = flyway.info().applied();
         assertThat(applied).isNotEmpty();
-        assertThat(applied.length).isGreaterThanOrEqualTo(7);
+        assertThat(applied.length).isGreaterThanOrEqualTo(8);
 
         assertThat(applied[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(applied[0].getDescription()).contains("init schema");
@@ -44,6 +44,9 @@ class FlywayMigrationAndSchemaTest {
 
         assertThat(applied[6].getVersion().getVersion()).isEqualTo("7");
         assertThat(applied[6].getDescription()).contains("multi agent teams and message bus");
+
+        assertThat(applied[7].getVersion().getVersion()).isEqualTo("8");
+        assertThat(applied[7].getDescription()).contains("phase7 sandbox and deployments");
     }
 
     @Test
