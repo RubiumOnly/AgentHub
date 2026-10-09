@@ -10,6 +10,7 @@ import {
   DeploymentResponse,
 } from "@/types";
 import { MetricCard } from "@/components/common/MetricCard";
+import { isDemoMode } from "@/services/api";
 import {
   Activity,
   Users,
@@ -37,25 +38,27 @@ export function MetricBentoGrid({
   deployment,
   onCardClick,
 }: MetricBentoGridProps) {
+  const isDemo = isDemoMode();
+
   // Compute step stats
-  const totalSteps = steps.length || 7;
+  const totalSteps = steps.length || (isDemo ? 7 : 0);
   const completedSteps = steps.filter((s) => s.status === "SUCCEEDED").length;
   const waitingApproval = steps.some((s) => s.status === "WAITING_APPROVAL");
   const runStatus = waitingApproval
     ? "WAITING_APPROVAL"
-    : run?.status || "RUNNING";
+    : run?.status || (isDemo ? "RUNNING" : "IDLE");
 
   // Provider lowest latency
   const activeProviders = providers.filter((p) => p.status === "ACTIVE");
   const minLatency =
     activeProviders.length > 0
       ? Math.min(...activeProviders.map((p) => p.avgLatencyMs || 999))
-      : 245;
+      : (isDemo ? 245 : 0);
 
   // Format currency
-  const cost = tokenSummary?.totalEstimatedCost || 0.0218;
+  const cost = tokenSummary?.totalEstimatedCost || (isDemo ? 0.0218 : 0);
   const costStr = `$${cost.toFixed(4)}`;
-  const totalTokens = tokenSummary?.totalTokens || 116370;
+  const totalTokens = tokenSummary?.totalTokens || (isDemo ? 116370 : 0);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">

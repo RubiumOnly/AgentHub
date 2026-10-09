@@ -1,6 +1,6 @@
 // ============================================================================
 // AgentHub Unified API Client & Resilience Layer
-// Phase 8: Bento Executive Dashboard
+// Stage B: Frontend De-mocking, Real Authentication & Production Portability
 // ============================================================================
 
 import {
@@ -21,16 +21,142 @@ import {
   CreateDeploymentRequest,
   RouteDecisionView,
   RunEventView,
+  ProjectView,
+  WorkspaceView,
+  UserView,
+  AuthTokenView,
+  CreateProjectRequest,
+  StartRunRequest,
 } from "@/types";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+// Dynamic API Base URL: defaults to same-origin relative path "" for portable Nginx reverse proxy,
+// or uses configured NEXT_PUBLIC_API_URL without trailing slash.
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 export const DEFAULT_WORKSPACE_PATH = "d:/work/agenthub/data/workspaces/default";
 export const DEFAULT_PROJECT_ID = "proj-default";
 export const DEFAULT_PREVIEW_URL = `${API_BASE}/api/sandbox/preview/default`;
 
-// --- Realistic Fallback Seeds for Offline / Resilience ---
+// ============================================================================
+// Token & Session Storage Management
+// ============================================================================
+const TOKEN_KEY = "agenthub_token";
+const USER_KEY = "agenthub_user";
+const DEMO_MODE_KEY = "agenthub_demo_mode";
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setStoredToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+    document.cookie = `agenthub_token=${encodeURIComponent(token)}; path=/; max-age=86400; SameSite=Lax`;
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+    document.cookie = `agenthub_token=; path=/; max-age=0; SameSite=Lax`;
+  }
+}
+
+export function getStoredUser(): UserView | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: UserView | null): void {
+  if (typeof window === "undefined") return;
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(USER_KEY);
+  }
+}
+
+export function isDemoMode(): boolean {
+  if (typeof window === "undefined") {
+    return process.env.NEXT_PUBLIC_AGENTHUB_DEMO_MODE === "true";
+  }
+  const override = localStorage.getItem(DEMO_MODE_KEY);
+  if (override !== null) {
+    return override === "true";
+  }
+  return process.env.NEXT_PUBLIC_AGENTHUB_DEMO_MODE === "true";
+}
+
+export function setDemoMode(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DEMO_MODE_KEY, String(enabled));
+}
+
+// Custom Error Class
+export class ApiError extends Error {
+  status: number;
+  code?: number;
+  constructor(message: string, status: number, code?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+// ============================================================================
+// Robust Generic Fetch Helper
+// ============================================================================
+async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string> || {}),
+  };
+
+  // Attach authentic Bearer token when available
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
+
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("agenthub:unauthorized"));
+    }
+    throw new ApiError("认证失效或未登录，请登录后继续操作", 401, 1001);
+  }
+
+  if (res.status === 403) {
+    throw new ApiError("访问拒绝：无权操作该资源", 403, 1002);
+  }
+
+  if (!res.ok) {
+    let errMessage = `HTTP 请求失败 (${res.status})`;
+    let errCode: number | undefined;
+    try {
+      const errJson = await res.json();
+      if (errJson.message) errMessage = errJson.message;
+      if (errJson.code) errCode = errJson.code;
+    } catch {}
+    throw new ApiError(errMessage, res.status, errCode);
+  }
+
+  const json = await res.json();
+  return (json.data !== undefined ? json.data : json) as T;
+}
+
+// ============================================================================
+// Realistic Fallback Fixtures (EXCLUSIVELY FOR EXPLICIT DEMO MODE)
+// ============================================================================
 export const MOCK_RUN: WorkflowRunView = {
   id: "run-exec-94218a",
   projectId: "proj-default",
@@ -358,96 +484,178 @@ export const MOCK_DIFFS: FileDiffEntry[] = [
   },
 ];
 
-// --- Generic Fetch Helper ---
-async function fetchJson<T>(url: string, options?: RequestInit): Promise<T | null> {
-  try {
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": "user-1",
-        ...(options?.headers || {}),
-      },
-    });
-    if (!res.ok) {
-      console.warn(`[API] ${options?.method || "GET"} ${url} returned ${res.status}`);
-      return null;
-    }
-    const json = await res.json();
-    return json.data !== undefined ? json.data : json;
-  } catch (err) {
-    console.warn(`[API] Failed fetching ${url}:`, err);
-    return null;
-  }
-}
-
-// --- API Client Methods ---
+// ============================================================================
+// Real Production API Client
+// ============================================================================
 export const apiClient = {
   // 1. System Health
-  async getHealth(): Promise<{ status: string; uptime?: string; version?: string } | null> {
+  async getHealth(): Promise<{ status: string; uptime?: string; version?: string }> {
     return fetchJson(`${API_BASE}/api/system/health`);
   },
 
-  // 2. Workflow Runs & Steps
-  async getRun(runId: string): Promise<WorkflowRunView | null> {
-    const data = await fetchJson<WorkflowRunView>(`${API_BASE}/api/runs/${runId}`);
-    return data || MOCK_RUN;
+  // 2. Authentication Flow
+  async login(email: string, password: string): Promise<AuthTokenView> {
+    const res = await fetchJson<AuthTokenView>(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    if (res && res.token) {
+      setStoredToken(res.token);
+      setStoredUser(res.user);
+    }
+    return res;
+  },
+
+  async register(email: string, password: string, displayName?: string): Promise<AuthTokenView> {
+    const res = await fetchJson<AuthTokenView>(`${API_BASE}/api/auth/register`, {
+      method: "POST",
+      body: JSON.stringify({ email, password, displayName: displayName || email.split("@")[0] }),
+    });
+    if (res && res.token) {
+      setStoredToken(res.token);
+      setStoredUser(res.user);
+    }
+    return res;
+  },
+
+  async logout(): Promise<void> {
+    try {
+      await fetchJson(`${API_BASE}/api/auth/logout`, { method: "POST" });
+    } catch {}
+    setStoredToken(null);
+    setStoredUser(null);
+  },
+
+  async createStreamTicket(): Promise<string> {
+    const data = await fetchJson<{ ticket: string } | string>(`${API_BASE}/api/auth/stream-ticket`, {
+      method: "POST",
+    });
+    if (typeof data === "string") return data;
+    return data.ticket;
+  },
+
+  // 3. Projects & Workspaces
+  async listProjects(): Promise<ProjectView[]> {
+    return fetchJson<ProjectView[]>(`${API_BASE}/api/projects`);
+  },
+
+  async createProject(cmd: CreateProjectRequest): Promise<ProjectView> {
+    return fetchJson<ProjectView>(`${API_BASE}/api/projects`, {
+      method: "POST",
+      body: JSON.stringify(cmd),
+    });
+  },
+
+  async getProject(projectId: string): Promise<ProjectView> {
+    return fetchJson<ProjectView>(`${API_BASE}/api/projects/${projectId}`);
+  },
+
+  async getWorkspace(projectId: string): Promise<WorkspaceView> {
+    return fetchJson<WorkspaceView>(`${API_BASE}/api/projects/${projectId}/workspace`);
+  },
+
+  async getStructuredDiff(workspaceId: string): Promise<StructuredDiff | null> {
+    return fetchJson<StructuredDiff>(`${API_BASE}/api/workspaces/${workspaceId}/diff`);
+  },
+
+  async listFiles(workspaceId: string): Promise<WorkspaceFileNode[]> {
+    return fetchJson<WorkspaceFileNode[]>(`${API_BASE}/api/workspaces/${workspaceId}/files`);
+  },
+
+  async getFileContent(workspaceId: string, filePath: string): Promise<string> {
+    return fetchJson<string>(`${API_BASE}/api/workspaces/${workspaceId}/file?path=${encodeURIComponent(filePath)}`);
+  },
+
+  async saveFile(workspaceId: string, filePath: string, content: string): Promise<boolean> {
+    await fetchJson(`${API_BASE}/api/workspaces/${workspaceId}/file`, {
+      method: "POST",
+      body: JSON.stringify({ path: filePath, content }),
+    });
+    return true;
+  },
+
+  async getLockStatus(workspaceId: string): Promise<{ workspaceId: string; ownerId?: string; locked: boolean }> {
+    return fetchJson(`${API_BASE}/api/workspaces/${workspaceId}/lock/status`);
+  },
+
+  // 4. Workflow Definitions & Orchestration
+  async listDefinitions(): Promise<WorkflowDefinitionView[]> {
+    return fetchJson<WorkflowDefinitionView[]>(`${API_BASE}/api/workflows/definitions`);
+  },
+
+  async validateDsl(dsl: any): Promise<{ valid: boolean; errors?: string[] }> {
+    return fetchJson(`${API_BASE}/api/workflows/definitions/validate`, {
+      method: "POST",
+      body: JSON.stringify(dsl),
+    });
+  },
+
+  // 5. Workflow Runs & Steps
+  async startRun(req: StartRunRequest): Promise<WorkflowRunView> {
+    return fetchJson<WorkflowRunView>(`${API_BASE}/api/executions/runs`, {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
+  async getRun(runId: string): Promise<WorkflowRunView> {
+    return fetchJson<WorkflowRunView>(`${API_BASE}/api/executions/runs/${runId}`);
+  },
+
+  async listRunsByProject(projectId: string): Promise<WorkflowRunView[]> {
+    return fetchJson<WorkflowRunView[]>(`${API_BASE}/api/executions/projects/${projectId}/runs`);
   },
 
   async listStepRuns(runId: string): Promise<StepRunView[]> {
-    const data = await fetchJson<StepRunView[]>(`${API_BASE}/api/executions/runs/${runId}/steps`);
-    return data && data.length > 0 ? data : MOCK_STEPS;
+    return fetchJson<StepRunView[]>(`${API_BASE}/api/executions/runs/${runId}/steps`);
   },
 
-  async cancelRun(runId: string, reason?: string): Promise<WorkflowRunView | null> {
-    return fetchJson(`${API_BASE}/api/runs/${runId}/cancel`, {
+  async listEvents(runId: string, afterSeq?: number): Promise<RunEventView[]> {
+    const query = afterSeq !== undefined ? `?afterSeq=${afterSeq}` : "";
+    return fetchJson<RunEventView[]>(`${API_BASE}/api/executions/runs/${runId}/events${query}`);
+  },
+
+  async cancelRun(runId: string, reason?: string): Promise<WorkflowRunView> {
+    return fetchJson<WorkflowRunView>(`${API_BASE}/api/executions/runs/${runId}/cancel`, {
       method: "POST",
       body: JSON.stringify({ reason: reason || "Manual cancellation from Bento UI" }),
     });
   },
 
-  // 3. Human-in-the-Loop Approvals
+  // 6. Human-in-the-Loop Approvals
   async listApprovals(runId: string): Promise<ApprovalView[]> {
-    const data = await fetchJson<ApprovalView[]>(`${API_BASE}/api/approvals/runs/${runId}`);
-    return data && data.length > 0 ? data : [MOCK_APPROVAL];
+    return fetchJson<ApprovalView[]>(`${API_BASE}/api/approvals/runs/${runId}`);
   },
 
-  async approve(approvalId: string, reviewer: string, reason?: string): Promise<ApprovalView | null> {
-    const res = await fetchJson<ApprovalView>(`${API_BASE}/api/approvals/${approvalId}/approve`, {
+  async approve(approvalId: string, reviewer?: string, reason?: string): Promise<ApprovalView> {
+    return fetchJson<ApprovalView>(`${API_BASE}/api/approvals/${approvalId}/approve`, {
       method: "POST",
-      headers: { "X-User-Id": reviewer || "SecOpsLead" },
-      body: JSON.stringify({ reason: reason || "Approved by Lead Reviewer" }),
+      body: JSON.stringify({ reason: reason || "Approved by Reviewer" }),
     });
-    return res;
   },
 
-  async reject(approvalId: string, reviewer: string, reason?: string): Promise<ApprovalView | null> {
-    const res = await fetchJson<ApprovalView>(`${API_BASE}/api/approvals/${approvalId}/reject`, {
+  async reject(approvalId: string, reviewer?: string, reason?: string): Promise<ApprovalView> {
+    return fetchJson<ApprovalView>(`${API_BASE}/api/approvals/${approvalId}/reject`, {
       method: "POST",
-      headers: { "X-User-Id": reviewer || "SecOpsLead" },
       body: JSON.stringify({ reason: reason || "Rejected by Reviewer" }),
     });
-    return res;
   },
 
-  // 4. Team Swarm & Conversations
-  async getTeam(teamId: string = "team-dev-swarm"): Promise<TeamView | null> {
-    const data = await fetchJson<TeamView>(`${API_BASE}/api/teams/${teamId}`);
-    return data || MOCK_TEAM;
+  // 7. Team Swarm & Conversations
+  async getTeam(teamId: string = "team-dev-swarm"): Promise<TeamView> {
+    return fetchJson<TeamView>(`${API_BASE}/api/teams/${teamId}`);
   },
 
   async listConversations(): Promise<ConversationView[]> {
-    const data = await fetchJson<ConversationView[]>(`${API_BASE}/api/im/conversations`);
-    return data || [];
+    return fetchJson<ConversationView[]>(`${API_BASE}/api/im/conversations`);
   },
 
   async getMessages(convId: string): Promise<MessageView[]> {
-    const data = await fetchJson<MessageView[]>(`${API_BASE}/api/im/conversations/${convId}/messages`);
-    return data || [];
+    return fetchJson<MessageView[]>(`${API_BASE}/api/im/conversations/${convId}/messages`);
   },
 
-  async sendMessage(convId: string, content: string, senderId = "Developer"): Promise<MessageView | null> {
-    return fetchJson(`${API_BASE}/api/im/conversations/${convId}/messages`, {
+  async sendMessage(convId: string, content: string, senderId = "Developer"): Promise<MessageView> {
+    return fetchJson<MessageView>(`${API_BASE}/api/im/conversations/${convId}/messages`, {
       method: "POST",
       body: JSON.stringify({
         senderId,
@@ -457,90 +665,64 @@ export const apiClient = {
     });
   },
 
-  // 5. JGit Diffs & Workspace
-  async getDiff(workspacePath: string = DEFAULT_WORKSPACE_PATH): Promise<FileDiffEntry[]> {
-    const data = await fetchJson<FileDiffEntry[]>(
-      `${API_BASE}/api/workspace/diff?path=${encodeURIComponent(workspacePath)}`
-    );
-    return data && data.length > 0 ? data : MOCK_DIFFS;
-  },
-
-  async getStructuredDiff(workspaceId: string = "default"): Promise<StructuredDiff | null> {
-    const data = await fetchJson<StructuredDiff>(`${API_BASE}/api/workspaces/${workspaceId}/diff`);
-    return data;
-  },
-
-  async listFiles(workspacePath: string = DEFAULT_WORKSPACE_PATH): Promise<WorkspaceFileNode[]> {
-    const data = await fetchJson<WorkspaceFileNode[]>(
-      `${API_BASE}/api/workspace/files?path=${encodeURIComponent(workspacePath)}`
-    );
-    return data || [];
-  },
-
-  async getFileContent(filePath: string): Promise<string> {
-    const data = await fetchJson<string>(
-      `${API_BASE}/api/workspace/file/content?filePath=${encodeURIComponent(filePath)}`
-    );
-    return data || "";
-  },
-
-  async saveFile(filePath: string, content: string): Promise<boolean> {
-    const res = await fetchJson(`${API_BASE}/api/workspace/file/save`, {
-      method: "POST",
-      body: JSON.stringify({ filePath, content }),
-    });
-    return res !== null;
-  },
-
-  async revertArtifact(artifactId: string): Promise<ArtifactView | null> {
-    return fetchJson(`${API_BASE}/api/audit/artifacts/${artifactId}/revert`, {
+  // 8. Artifacts
+  async revertArtifact(artifactId: string): Promise<ArtifactView> {
+    return fetchJson<ArtifactView>(`${API_BASE}/api/audit/artifacts/${artifactId}/revert`, {
       method: "POST",
     });
   },
 
-  // 6. Provider Dynamic Routing & Token Usages
+  // 9. Provider Dynamic Routing & Token Usages
   async listProviders(): Promise<ProviderView[]> {
-    const data = await fetchJson<ProviderView[]>(`${API_BASE}/api/providers`);
-    return data && data.length > 0 ? data : MOCK_PROVIDERS;
+    return fetchJson<ProviderView[]>(`${API_BASE}/api/providers`);
   },
 
-  async getTokenSummary(): Promise<TokenSummaryView | null> {
-    const data = await fetchJson<TokenSummaryView>(`${API_BASE}/api/token-usages/summary`);
-    return data || MOCK_TOKEN_SUMMARY;
+  async getTokenSummary(): Promise<TokenSummaryView> {
+    return fetchJson<TokenSummaryView>(`${API_BASE}/api/token-usages/summary`);
   },
 
-  async evaluateRoute(capabilities: string = "code,reasoning"): Promise<RouteDecisionView | null> {
+  async evaluateRoute(capabilities: string = "code,reasoning"): Promise<RouteDecisionView> {
     const req = {
       messages: [{ role: "user", content: "Optimize SQL index" }],
       metadata: { capabilities },
     };
-    return fetchJson(`${API_BASE}/api/providers/route`, {
+    return fetchJson<RouteDecisionView>(`${API_BASE}/api/providers/route`, {
       method: "POST",
       body: JSON.stringify(req),
     });
   },
 
-  // 7. Deployments & Sandbox
+  // 10. Deployments & Sandbox
   async listDeployments(projectId: string = DEFAULT_PROJECT_ID): Promise<DeploymentResponse[]> {
-    const data = await fetchJson<DeploymentResponse[]>(`${API_BASE}/api/deployments?projectId=${projectId}`);
-    return data && data.length > 0 ? data : [MOCK_DEPLOYMENT];
+    return fetchJson<DeploymentResponse[]>(`${API_BASE}/api/deployments?projectId=${encodeURIComponent(projectId)}`);
   },
 
-  async createDeployment(req: CreateDeploymentRequest): Promise<DeploymentResponse | null> {
-    return fetchJson(`${API_BASE}/api/deployments`, {
+  async createDeployment(req: CreateDeploymentRequest): Promise<DeploymentResponse> {
+    return fetchJson<DeploymentResponse>(`${API_BASE}/api/deployments`, {
       method: "POST",
       body: JSON.stringify(req),
     });
   },
 
-  async stopDeployment(id: string): Promise<DeploymentResponse | null> {
-    return fetchJson(`${API_BASE}/api/deployments/${id}/stop`, {
+  async stopDeployment(id: string): Promise<DeploymentResponse> {
+    return fetchJson<DeploymentResponse>(`${API_BASE}/api/deployments/${id}/stop`, {
       method: "POST",
     });
   },
 
   async getDeploymentLogs(id: string): Promise<string> {
-    const data = await fetchJson<string>(`${API_BASE}/api/deployments/${id}/logs`);
-    return data || "";
+    return fetchJson<string>(`${API_BASE}/api/deployments/${id}/logs`);
+  },
+
+  // 11. Deprecated Workspace Fallback Helpers for Legacy Test Scenarios
+  async getDiff(workspacePath: string = DEFAULT_WORKSPACE_PATH): Promise<FileDiffEntry[]> {
+    try {
+      const data = await fetchJson<FileDiffEntry[]>(
+        `${API_BASE}/api/workspace/diff?path=${encodeURIComponent(workspacePath)}`
+      );
+      return data || [];
+    } catch {
+      return [];
+    }
   },
 };

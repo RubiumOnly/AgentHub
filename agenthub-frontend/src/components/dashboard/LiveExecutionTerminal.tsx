@@ -14,7 +14,7 @@ import {
   Lock,
   Unlock,
 } from "lucide-react";
-import { API_BASE } from "@/services/api";
+import { API_BASE, apiClient, isDemoMode } from "@/services/api";
 
 export interface LogEntry {
   id: string;
@@ -106,7 +106,7 @@ function renderAnsiMessage(text: string): React.ReactNode {
   return parts;
 }
 
-const DEFAULT_LOGS: LogEntry[] = [
+const DEMO_LOGS: LogEntry[] = [
   {
     id: "log-1",
     timestamp: "11:00:01",
@@ -164,87 +164,140 @@ interface LiveExecutionTerminalProps {
 }
 
 export function LiveExecutionTerminal({
-  runId = "run-exec-94218a",
+  runId,
   onRefresh,
   className = "",
 }: LiveExecutionTerminalProps) {
-  const [logs, setLogs] = useState<LogEntry[]>(DEFAULT_LOGS);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"CONNECTED" | "RECONNECTING" | "OFFLINE">("CONNECTED");
-  const [lastEventId, setLastEventId] = useState<number>(6);
+  const [connectionStatus, setConnectionStatus] = useState<"CONNECTED" | "RECONNECTING" | "OFFLINE">("OFFLINE");
+  const [lastEventId, setLastEventId] = useState<number>(0);
 
   const terminalBodyRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // SSE subscription with Last-Event-ID reconnect
+  // Load historical events from backend or initialize demo logs
   useEffect(() => {
-    if (!runId) return;
-
-    const sseUrl = `${API_BASE}/api/runs/${runId}/stream?lastEventId=${lastEventId}`;
-
-    try {
-      const es = new EventSource(sseUrl);
-      eventSourceRef.current = es;
-
-      es.onopen = () => {
-        setConnectionStatus("CONNECTED");
-      };
-
-      es.onmessage = (event) => {
-        try {
-          const raw = JSON.parse(event.data);
-          const seq = event.lastEventId ? parseInt(event.lastEventId, 10) : (raw.sequenceNum || Date.now());
-          setLastEventId(seq);
-
-          const newLog: LogEntry = {
-            id: `sse-${seq}-${Date.now()}`,
-            timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
-            seq,
-            level: raw.eventType?.includes("WARN")
-              ? "WARN"
-              : raw.eventType?.includes("ERR")
-              ? "ERROR"
-              : raw.eventType?.includes("STEP")
-              ? "STEP"
-              : "INFO",
-            source: raw.eventType || "Stream",
-            message: typeof raw.payload === "string" ? raw.payload : JSON.stringify(raw),
-          };
-
-          setLogs((prev) => [...prev, newLog]);
-        } catch {
-          // Plain text fallback
-          setLogs((prev) => [
-            ...prev,
-            {
-              id: `raw-${Date.now()}`,
-              timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
-              level: "INFO",
-              source: "Stream",
-              message: event.data,
-            },
-          ]);
-        }
-      };
-
-      let errCount = 0;
-      es.onerror = () => {
-        errCount++;
-        if (errCount > 2) {
-          setConnectionStatus("OFFLINE");
-        } else {
-          setConnectionStatus("RECONNECTING");
-        }
-      };
-    } catch {
-      setConnectionStatus("OFFLINE");
+    if (isDemoMode()) {
+      setLogs(DEMO_LOGS);
+      setConnectionStatus("CONNECTED");
+      setLastEventId(6);
+      return;
     }
 
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+    if (!runId) {
+      setLogs([]);
+      setConnectionStatus("OFFLINE");
+      return;
+    }
+
+    // Fetch initial event history from database
+    let isCancelled = false;
+    apiClient
+      .listEvents(runId)
+      .then((events) => {
+        if (isCancelled || !events || events.length === 0) return;
+        const initialLogs: LogEntry[] = events.map((ev) => ({
+          id: `ev-${ev.id || ev.sequenceNum}`,
+          timestamp: new Date(ev.createdAt).toLocaleTimeString("en-GB", { hour12: false }),
+          seq: ev.sequenceNum,
+          level: ev.eventType?.includes("WARN")
+            ? "WARN"
+            : ev.eventType?.includes("ERR")
+            ? "ERROR"
+            : ev.eventType?.includes("STEP")
+            ? "STEP"
+            : "INFO",
+          source: ev.eventType || "Kernel",
+          message: ev.payload,
+        }));
+        setLogs(initialLogs);
+        const maxSeq = Math.max(...events.map((e) => e.sequenceNum), 0);
+        setLastEventId(maxSeq);
+      })
+      .catch(() => {});
+
+    // Acquire stream ticket and connect EventSource
+    let activeEs: EventSource | null = null;
+    const connectSSE = async () => {
+      try {
+        let ticketParam = "";
+        try {
+          const ticket = await apiClient.createStreamTicket();
+          if (ticket) {
+            ticketParam = `&ticket=${encodeURIComponent(ticket)}`;
+          }
+        } catch {}
+
+        if (isCancelled) return;
+
+        const sseUrl = `${API_BASE}/api/runs/${runId}/stream?lastEventId=${lastEventId}${ticketParam}`;
+        const es = new EventSource(sseUrl, { withCredentials: true });
+        activeEs = es;
+        eventSourceRef.current = es;
+
+        es.onopen = () => {
+          if (!isCancelled) setConnectionStatus("CONNECTED");
+        };
+
+        es.onmessage = (event) => {
+          if (isCancelled) return;
+          try {
+            const raw = JSON.parse(event.data);
+            const seq = event.lastEventId ? parseInt(event.lastEventId, 10) : (raw.sequenceNum || Date.now());
+            setLastEventId(seq);
+
+            const newLog: LogEntry = {
+              id: `sse-${seq}-${Date.now()}`,
+              timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+              seq,
+              level: raw.eventType?.includes("WARN")
+                ? "WARN"
+                : raw.eventType?.includes("ERR")
+                ? "ERROR"
+                : raw.eventType?.includes("STEP")
+                ? "STEP"
+                : "INFO",
+              source: raw.eventType || "Stream",
+              message: typeof raw.payload === "string" ? raw.payload : JSON.stringify(raw),
+            };
+
+            setLogs((prev) => {
+              if (prev.some((p) => p.seq === seq && p.source === newLog.source)) return prev;
+              return [...prev, newLog];
+            });
+            onRefresh?.();
+          } catch {
+            setLogs((prev) => [
+              ...prev,
+              {
+                id: `raw-${Date.now()}`,
+                timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+                level: "INFO",
+                source: "Stream",
+                message: event.data,
+              },
+            ]);
+          }
+        };
+
+        es.onerror = () => {
+          if (!isCancelled) {
+            setConnectionStatus("RECONNECTING");
+          }
+        };
+      } catch {
+        if (!isCancelled) setConnectionStatus("OFFLINE");
       }
+    };
+
+    connectSSE();
+
+    return () => {
+      isCancelled = true;
+      if (activeEs) activeEs.close();
+      if (eventSourceRef.current) eventSourceRef.current.close();
     };
   }, [runId]);
 
@@ -255,7 +308,6 @@ export function LiveExecutionTerminal({
     }
   }, [logs, autoScroll]);
 
-  // Copy logs
   const handleCopyLogs = () => {
     const text = logs
       .map((l) => `[${l.timestamp}] [${l.level}] [${l.source || "System"}] ${l.message}`)
@@ -265,24 +317,8 @@ export function LiveExecutionTerminal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Clear logs
   const handleClearLogs = () => {
     setLogs([]);
-  };
-
-  // Simulate injecting a test event
-  const handleSimulateEvent = () => {
-    const nextSeq = (lastEventId || 0) + 1;
-    setLastEventId(nextSeq);
-    const simulatedLog: LogEntry = {
-      id: `sim-${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
-      seq: nextSeq,
-      level: "AGENT",
-      source: "RuntimeWatchdog",
-      message: `Memory watchdog tick: heap used 182MB / 512MB quota (Health probe HTTP 200 OK).`,
-    };
-    setLogs((prev) => [...prev, simulatedLog]);
   };
 
   const getLevelColor = (level: LogEntry["level"]) => {
@@ -307,14 +343,14 @@ export function LiveExecutionTerminal({
   return (
     <BentoCard
       title="实时执行流 (SSE Terminal)"
-      subtitle={`Run: ${runId} | Last-Event-ID: #${lastEventId}`}
+      subtitle={runId ? `Run: ${runId} | Cursor: #${lastEventId}` : "暂无活跃 Run"}
       icon={<Terminal className="w-4 h-4 text-sky-400" />}
       badge={
         <div className="flex items-center space-x-2">
           <StatusBadge status={connectionStatus} size="sm" />
           <span className="hidden sm:inline-flex items-center space-x-1 text-[10px] font-mono text-zinc-500">
             <Radio className="w-3 h-3 text-sky-400 animate-pulse" />
-            <span>20s Heartbeat</span>
+            <span>Ticket Secured</span>
           </span>
         </div>
       }
@@ -331,14 +367,6 @@ export function LiveExecutionTerminal({
           >
             {autoScroll ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
             <span className="hidden sm:inline">Auto-Scroll</span>
-          </button>
-
-          <button
-            onClick={handleSimulateEvent}
-            title="模拟心跳事件"
-            className="p-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900/80 text-zinc-400 hover:text-zinc-200"
-          >
-            <Play className="w-3 h-3" />
           </button>
 
           <button
@@ -370,7 +398,7 @@ export function LiveExecutionTerminal({
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-zinc-600 py-8">
             <Terminal className="w-6 h-6 mb-2 text-zinc-700" />
-            <span>等待实时执行流事件输出...</span>
+            <span>{runId ? "等待实时执行流事件输出..." : "请启动或选择一个 Workflow Run"}</span>
           </div>
         ) : (
           logs.map((log) => (
@@ -378,12 +406,10 @@ export function LiveExecutionTerminal({
               key={log.id}
               className="flex items-start space-x-2 py-0.5 hover:bg-zinc-900/40 rounded px-1 -mx-1 transition-colors"
             >
-              {/* Sequence / Timestamp */}
               <span className="text-zinc-600 shrink-0 select-none">
                 {log.seq ? `#${String(log.seq).padStart(2, "0")}` : ""} {log.timestamp}
               </span>
 
-              {/* Level Tag */}
               <span
                 className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 border ${getLevelColor(
                   log.level
@@ -392,14 +418,12 @@ export function LiveExecutionTerminal({
                 {log.level}
               </span>
 
-              {/* Source Tag */}
               {log.source && (
                 <span className="text-zinc-400 shrink-0 font-medium">
                   [{log.source}]
                 </span>
               )}
 
-              {/* Log Message with ANSI Colors */}
               <span className="text-zinc-200 break-all flex-1 whitespace-pre-wrap">
                 {renderAnsiMessage(log.message)}
               </span>
@@ -412,7 +436,7 @@ export function LiveExecutionTerminal({
       <div className="border-t border-zinc-800/60 bg-zinc-900/80 px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-zinc-500">
         <div className="flex items-center space-x-3">
           <span>Buffer: {logs.length} events</span>
-          <span>SSE Protocol: chunked/text-event-stream</span>
+          <span>SSE: ticket-validated / chunked</span>
         </div>
         <div className="flex items-center space-x-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />

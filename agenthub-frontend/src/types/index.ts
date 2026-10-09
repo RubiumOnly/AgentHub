@@ -297,3 +297,51 @@ export interface RunEventView {
   payload: string;
   createdAt: string;
 }
+
+export interface UserView {
+  id: string;
+  email: string;
+  displayName?: string;
+  status?: string;
+  createdAt?: string;
+}
+
+export interface AuthTokenView {
+  token: string;
+  tokenType: string;
+  expiresIn: number;
+  user: UserView;
+}
+
+export interface ProjectView {
+  id: string;
+  ownerId?: string;
+  name: string;
+  description?: string;
+  status: string;
+  workspaceId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkspaceView {
+  id: string;
+  projectId: string;
+  basePath?: string;
+  relativeRoot?: string;
+  status?: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+}
+
+export interface StartRunRequest {
+  projectId: string;
+  definitionId?: string;
+  idempotencyKey?: string;
+  workflowDsl?: any;
+  inputs?: Record<string, any>;
+}
+

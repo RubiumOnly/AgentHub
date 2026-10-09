@@ -8,7 +8,7 @@ import {
   MessageView,
   InteractiveCard,
 } from "@/types";
-import { apiClient } from "@/services/api";
+import { apiClient, isDemoMode } from "@/services/api";
 import {
   Users,
   Bot,
@@ -107,13 +107,39 @@ export function MultiAgentSwarmChat({
   onCardAction,
   className = "",
 }: MultiAgentSwarmChatProps) {
-  const [messages, setMessages] = useState<MessageView[]>(INITIAL_SWARM_MESSAGES);
+  const [messages, setMessages] = useState<MessageView[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"ALL" | "BROADCAST" | "DIRECT" | "CARDS">("ALL");
   const [inputText, setInputText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [showSummary, setShowSummary] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isDemoMode()) {
+      setMessages(INITIAL_SWARM_MESSAGES);
+      return;
+    }
+
+    apiClient
+      .listConversations()
+      .then(async (convs) => {
+        if (convs && convs.length > 0) {
+          const first = convs[0];
+          setActiveConvId(first.id);
+          const msgs = await apiClient.getMessages(first.id);
+          if (msgs && msgs.length > 0) {
+            setMessages(msgs);
+            return;
+          }
+        }
+        setMessages([]);
+      })
+      .catch(() => {
+        setMessages([]);
+      });
+  }, []);
 
   const filteredMessages = messages.filter((m) => {
     if (filter === "BROADCAST") return m.messageType === "BROADCAST";
@@ -143,15 +169,19 @@ export function MultiAgentSwarmChat({
     };
 
     setMessages((prev) => [...prev, newMsg]);
+    const textToSend = inputText;
     setInputText("");
     setIsSending(true);
 
-    // Call backend API if active conversation exists
-    try {
-      await apiClient.sendMessage("default-conv", inputText, "Developer");
-    } catch (e) {
-      console.warn("Could not push to backend message bus:", e);
-    } finally {
+    if (activeConvId) {
+      try {
+        await apiClient.sendMessage(activeConvId, textToSend, "Developer");
+      } catch (e) {
+        console.warn("Could not push to backend message bus:", e);
+      } finally {
+        setIsSending(false);
+      }
+    } else {
       setIsSending(false);
     }
   };
@@ -245,9 +275,16 @@ export function MultiAgentSwarmChat({
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-zinc-950/60 font-sans">
-        {filteredMessages.map((m, idx) => {
-          const isUser = m.senderType === "USER";
-          const isDirect = m.messageType === "DIRECT";
+        {filteredMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-zinc-500 py-12 text-center">
+            <Users className="w-8 h-8 text-zinc-700 mb-2" />
+            <p className="text-xs">暂无多智能体协同消息</p>
+            <p className="text-[11px] text-zinc-600 mt-1">在下方输入消息并发送即可唤醒 Swarm 协同网络</p>
+          </div>
+        ) : (
+          filteredMessages.map((m, idx) => {
+            const isUser = m.senderType === "USER";
+            const isDirect = m.messageType === "DIRECT";
 
           return (
             <div
@@ -350,7 +387,7 @@ export function MultiAgentSwarmChat({
               </div>
             </div>
           );
-        })}
+        }))}
         <div ref={messagesEndRef} />
       </div>
 

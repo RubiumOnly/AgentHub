@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { BentoCard } from "@/components/common/BentoCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeploymentResponse, CreateDeploymentRequest } from "@/types";
-import { apiClient, DEFAULT_PREVIEW_URL } from "@/services/api";
+import { apiClient } from "@/services/api";
 import {
   Server,
   Play,
@@ -20,12 +20,14 @@ import {
 
 interface SandboxPreviewPanelProps {
   deployment?: DeploymentResponse | null;
+  projectId?: string;
   onRefresh?: () => void;
   className?: string;
 }
 
 export function SandboxPreviewPanel({
   deployment,
+  projectId = "proj-default",
   onRefresh,
   className = "",
 }: SandboxPreviewPanelProps) {
@@ -35,26 +37,28 @@ export function SandboxPreviewPanel({
   const [isStopping, setIsStopping] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
 
-  const currentStatus = deployment?.status || "RUNNING";
-  const currentPort = deployment?.port || 18080;
-  const previewUrl = deployment?.url || DEFAULT_PREVIEW_URL;
+  const currentStatus = deployment?.status || "STOPPED";
+  const currentPort = deployment?.port;
+  const previewUrl = deployment?.url;
 
-  // Fetch deployment logs
+  // Fetch authentic deployment logs from API
   const fetchLogs = async () => {
     if (deployment?.id) {
-      const logText = await apiClient.getDeploymentLogs(deployment.id);
-      if (logText) {
-        setLogs(logText);
-      } else {
-        setLogs(`[SANDBOX WATCHDOG] Container instance initialized.
-[PORT ALLOCATOR] Leased atomic port ${currentPort} from pool (18000-18999).
-[FIREWALL] Non-root user: 1000:1000, read-only rootfs, tmpfs mounted.
-[BUILD] npm run build completed with 0 errors.
-[START] Serving on http://0.0.0.0:${currentPort}
-[PROBE] Health check GET / HTTP/1.1 -> 200 OK.`);
+      try {
+        const logText = await apiClient.getDeploymentLogs(deployment.id);
+        if (logText && logText.trim().length > 0) {
+          setLogs(logText);
+        } else {
+          setLogs(`[SANDBOX] 部署实例 ID: ${deployment.id}
+[STATUS] 状态: ${deployment.status}
+[TARGET] 部署目标: ${deployment.target} (${deployment.sandboxType})
+[LOG] 暂无增量控制台输出。`);
+        }
+      } catch (err: any) {
+        setLogs(`[ERROR] 无法读取部署日志: ${err.message || "网络或权限异常"}`);
       }
     } else {
-      setLogs(`[SANDBOX WATCHDOG] Ready. Active port :${currentPort}`);
+      setLogs(`[SANDBOX] 当前项目暂无活跃部署实例。点击右上角“一键启动部署”即可在隔离沙箱中运行产物。`);
     }
   };
 
@@ -66,12 +70,12 @@ export function SandboxPreviewPanel({
     setIsDeploying(true);
     try {
       const req: CreateDeploymentRequest = {
-        projectId: "proj-default",
+        projectId,
         target: "STATIC_PREVIEW",
         sandboxType: "LOCAL_PROCESS",
         buildCommand: "npm run build --prefix frontend",
-        startCommand: `npm run start --port ${currentPort}`,
-        port: currentPort,
+        startCommand: "npm run start",
+        port: currentPort || 18080,
       };
       await apiClient.createDeployment(req);
       setIframeKey((prev) => prev + 1);
@@ -105,14 +109,18 @@ export function SandboxPreviewPanel({
   return (
     <BentoCard
       title="沙箱预览与部署控制台 (Sandbox & Preview)"
-      subtitle={`生命周期状态机: CREATED ➔ BUILDING ➔ RUNNING ➔ STOPPED | 隔离端口: :${currentPort}`}
+      subtitle={`生命周期状态机: CREATED ➔ BUILDING ➔ RUNNING ➔ STOPPED ${
+        currentPort ? `| 隔离端口: :${currentPort}` : ""
+      }`}
       icon={<Server className="w-4 h-4 text-emerald-400" />}
       badge={
         <div className="flex items-center space-x-1.5">
           <StatusBadge status={currentStatus} size="sm" />
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
-            Port :{currentPort}
-          </span>
+          {currentPort && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+              Port :{currentPort}
+            </span>
+          )}
         </div>
       }
       actions={
@@ -182,51 +190,73 @@ export function SandboxPreviewPanel({
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            部署日志 (Container Logs)
+            部署日志 (Deploy Logs)
           </button>
         </div>
 
-        {/* Browser-style address bar */}
-        <div className="hidden sm:flex items-center space-x-2 rounded-lg border border-zinc-800 bg-zinc-900/90 px-2.5 py-1 text-[11px] font-mono text-zinc-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          <span className="truncate max-w-[200px] text-zinc-300">{previewUrl}</span>
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-indigo-400 hover:text-indigo-300 ml-1"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
+        {/* Browser Mock Address Bar */}
+        <div className="flex items-center space-x-2">
+          {previewUrl ? (
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-300 hover:text-white hover:border-zinc-700 transition"
+            >
+              <span className="truncate max-w-[200px]">{previewUrl}</span>
+              <ExternalLink className="w-3 h-3 text-zinc-400 shrink-0" />
+            </a>
+          ) : (
+            <span className="text-[11px] font-mono text-zinc-500">
+              [未就绪: 无活跃预览 URL]
+            </span>
+          )}
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-[300px] bg-zinc-950/90 overflow-hidden relative">
+      <div className="flex-1 bg-zinc-950/90 relative overflow-hidden flex flex-col">
         {activeSubTab === "preview" ? (
-          <div className="w-full h-full flex flex-col">
-            <iframe
-              key={iframeKey}
-              src={previewUrl}
-              title="AgentHub Sandbox Preview"
-              sandbox="allow-scripts allow-same-origin allow-forms"
-              className="w-full flex-1 border-0 bg-white dark:bg-zinc-950"
-            />
-          </div>
+          previewUrl && currentStatus === "RUNNING" ? (
+            <div className="w-full h-full relative">
+              <iframe
+                key={iframeKey}
+                src={previewUrl}
+                title="Sandbox Preview Frame"
+                className="w-full h-full border-0 bg-white"
+                sandbox="allow-scripts allow-same-origin allow-forms"
+              />
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-zinc-500">
+              <Server className="w-10 h-10 text-zinc-700 mb-3" />
+              <p className="text-xs font-medium text-zinc-300">
+                {currentStatus === "BUILDING"
+                  ? "沙箱正在构建应用产物并分配端口，请稍候..."
+                  : "当前无运行中的沙箱实例"}
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-1 max-w-sm">
+                点击右上角“一键启动部署”即可在隔离沙箱环境中启动并实时预览
+              </p>
+            </div>
+          )
         ) : (
-          <div className="w-full h-full p-3 font-mono text-[11px] text-emerald-400/90 bg-zinc-950 overflow-y-auto space-y-1 select-text">
-            <pre className="leading-relaxed whitespace-pre-wrap">{logs}</pre>
+          <div className="flex-1 p-3 font-mono text-[11px] text-zinc-300 whitespace-pre-wrap overflow-y-auto leading-relaxed select-text">
+            {logs}
           </div>
         )}
       </div>
 
-      {/* Footer Info */}
-      <div className="border-t border-zinc-800/80 bg-zinc-950/80 px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-zinc-500 shrink-0">
-        <div className="flex items-center space-x-2">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Non-Root Sandbox / Atomic Port Lock Leased</span>
+      {/* Bottom Status bar */}
+      <div className="border-t border-zinc-800/60 bg-zinc-900/80 px-3 py-1.5 flex items-center justify-between text-[11px] font-mono text-zinc-500">
+        <div className="flex items-center space-x-3">
+          <span>Sandbox: {deployment?.sandboxType || "LOCAL_PROCESS"}</span>
+          <span>Target: {deployment?.target || "STATIC_PREVIEW"}</span>
         </div>
-        <span>Target: LOCAL_PROCESS / DOCKER</span>
+        <div className="flex items-center space-x-1.5">
+          <ShieldCheck className="w-3 h-3 text-emerald-400" />
+          <span>Non-Root Sandbox Guard Active</span>
+        </div>
       </div>
     </BentoCard>
   );

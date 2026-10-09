@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { BentoCard } from "@/components/common/BentoCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ProviderView, TokenSummaryView, RouteDecisionView } from "@/types";
-import { apiClient } from "@/services/api";
+import { apiClient, isDemoMode, MOCK_TOKEN_SUMMARY, MOCK_PROVIDERS } from "@/services/api";
 import {
   Cpu,
   Coins,
@@ -35,10 +35,19 @@ export function ProviderCostDashboard({
   const [routeDecision, setRouteDecision] = useState<RouteDecisionView | null>(null);
   const [isRouting, setIsRouting] = useState(false);
 
-  const totalTokens = tokenSummary?.totalTokens || 116370;
-  const promptTokens = tokenSummary?.totalPromptTokens || 84920;
-  const completionTokens = tokenSummary?.totalCompletionTokens || 31450;
-  const totalCost = tokenSummary?.totalEstimatedCost || 0.0218;
+  const isDemo = isDemoMode();
+  const summary = tokenSummary || (isDemo ? MOCK_TOKEN_SUMMARY : {
+    totalTokens: 0,
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    totalEstimatedCost: 0,
+    totalInvocations: 0,
+  });
+
+  const totalTokens = summary.totalTokens;
+  const promptTokens = summary.totalPromptTokens;
+  const completionTokens = summary.totalCompletionTokens;
+  const totalCost = summary.totalEstimatedCost;
 
   const handleSimulateRoute = async () => {
     setIsRouting(true);
@@ -46,8 +55,7 @@ export function ProviderCostDashboard({
       const decision = await apiClient.evaluateRoute(testCapability);
       if (decision) {
         setRouteDecision(decision);
-      } else {
-        // Fallback realistic simulation
+      } else if (isDemo) {
         setRouteDecision({
           selectedProviderId: "prov-deepseek",
           selectedModel: "deepseek-chat",
@@ -55,13 +63,22 @@ export function ProviderCostDashboard({
           candidateChain: ["deepseek-chat", "claude-3-5-sonnet", "gemini-1.5-flash"],
         });
       }
-    } catch {
-      setRouteDecision({
-        selectedProviderId: "prov-deepseek",
-        selectedModel: "deepseek-chat",
-        reason: "动态加权最优：具备 code+reasoning 能力，优先级 100，健康延迟 245ms",
-        candidateChain: ["deepseek-chat", "claude-3-5-sonnet"],
-      });
+    } catch (err: any) {
+      if (isDemo) {
+        setRouteDecision({
+          selectedProviderId: "prov-deepseek",
+          selectedModel: "deepseek-chat",
+          reason: "动态加权最优：具备 code+reasoning 能力，优先级 100，健康延迟 245ms",
+          candidateChain: ["deepseek-chat", "claude-3-5-sonnet"],
+        });
+      } else {
+        setRouteDecision({
+          selectedProviderId: "NONE",
+          selectedModel: "N/A",
+          reason: `路由评估失败: ${err.message || "后端不可用或未配置可用 Provider"}`,
+          candidateChain: [],
+        });
+      }
     } finally {
       setIsRouting(false);
     }

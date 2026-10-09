@@ -335,3 +335,42 @@ Artifact / 日志位置：
 状态：自动化测试通过
 ```
 
+---
+
+### 阶段 B 验收记录
+
+```text
+阶段：阶段 B（前端去 Mock 化与真实产品主旅程）
+验收日期：2026-10-09
+Git commit：待提交（见当次 commit SHA）
+运行环境：OS: Windows 11 / JDK: 17.0.15 / Node: 20.x / Next.js: 14.2.13
+执行命令：
+  - npm run build (agenthub-frontend)
+  - mvn test (agenthub-backend)
+测试汇总：
+  - Frontend: Next.js 14.2.13 生产构建通过 (4/4 页面静态预渲染，0 类型报错，0 Webpack 警告)
+  - Backend: 276/276 passed (0 failures, 0 errors, Surefire clean)
+黑盒流程：
+  1. 生产 API Client 全面去 Mock 化：移除静默 MOCK_RUN / MOCK_STEPS / MOCK_APPROVAL 回退，异常统一向上抛出类型化 ApiError (包含 HTTP status 与后端业务错误码)，页面展示可恢复错误提示与重试机制；
+  2. 显式演示模式隔离：引入 NEXT_PUBLIC_AGENTHUB_DEMO_MODE 与前端即时切换开关，演示模式下在看板顶部醒目标注“离线演示模式 (Demo Mode)”，真实产品模式绝不混入伪造数据；
+  3. 认证主流程与凭证生命周期：落地 AuthModal (支持登录与注册)，统一管理 agenthub_token (localStorage 与 SameSite Lax Cookie 双写)，所有 API 请求自动装配 Authorization: Bearer <token> 并在 401 时主动清理过期态并弹窗提示登录；彻底清除请求头中任何 X-User-Id 伪造旁路；
+  4. API Base URL 部署可移植：默认采用同源相对路径 /api (生产走 Nginx 统一反代网关)，并在 next.config.mjs 中配置 Next.js 开发反向代理 rewrites，消除写死 localhost:8080 的硬编码；
+  5. 动态 Project / Workspace 联动：前端登录后动态调取 GET /api/projects 获取用户真实项目列表，支持顶部项目切换，工作区文件树以实际 workspaceId 路由，彻底废弃 Windows 绝对路径传递；
+  6. 真实执行与 SSE 流控闭环：点击“触发执行”调用 POST /api/executions/runs 启动真实任务，获取服务端下发的唯一 runId，订阅 SSE 前通过 POST /api/auth/stream-ticket 动态申请短时一次性凭证，终端与 DAG 节点状态完全由后端 run_events 与 step_runs 真实驱动；
+  7. 真实人工审批闭环：审批卡片提交 approve/reject 仅向后端投递 decision 原因，审批成功后由后端事实源重新加载 Run、Step 与 Approval，不再由前端内存虚假改写节点状态；
+  8. JGit Diff 与沙箱去伪造：Diff 组件与沙箱部署面板全面剔除自造虚假输出，无未提交改动时呈现干净工作树状态，部署面板仅显示真实 Deployment 实例及健康日志。
+失败/恢复演练：
+  - 401 凭证过期自动触发全局 agenthub:unauthorized 事件并弹出 AuthModal；
+  - 后端停机时前端呈现醒目 API OFFLINE 告警与重试按钮，不再虚假呈现运行中状态；
+  - 审批操作失败时提示错误信息并保持原挂起状态。
+Artifact / 日志位置：
+  - agenthub-frontend/.next/
+  - target/surefire-reports/
+未覆盖场景：
+  - 跨多实例/多节点重启后的持久化恢复 Worker 与数据库租约接管 (属于阶段 C 规划范畴)。
+剩余风险：
+  - 阶段 C 待推进：DAG 调度目前仍主要依赖 JVM 内存线程池，需在阶段 C 落地持久化调度内核、数据库事件原子自增与应用重启恢复。
+状态：自动化测试通过
+```
+
+

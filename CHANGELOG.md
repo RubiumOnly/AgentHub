@@ -2,6 +2,31 @@
 
 所有关键架构升级、特性新增与重要缺陷修复均按版本记录于此。
 
+## [v2.0.0-stage-b] - 2026-10-09
+
+### 🚀 阶段 B 里程碑：前端去 Mock 化与真实产品主旅程 (Stage B Frontend De-mocking & Real User Journey)
+- **生产 API Client 彻底去 Mock 化与错误透明化**：
+  - 重构 `services/api.ts`，彻底移除静默 `MOCK_RUN` / `MOCK_STEPS` / `MOCK_APPROVAL` 等降级假数据回退；
+  - 遇到非 2xx 或网络故障统一抛出结构化 `ApiError`，页面如实展示错误、重试或干净空状态，杜绝掩盖后端故障；
+  - 设立显式演示模式隔离体系：基于 `NEXT_PUBLIC_AGENTHUB_DEMO_MODE` 与前端实时切换开关，演示模式在顶部突出展示黄底警示条，真实产品模式杜绝任何伪造数据侵入。
+- **真实身份认证链与 Token 生命周期管控**：
+  - 新增现代化磨砂拟态登录/注册弹窗组件 `AuthModal`，提供邮箱、密码与显示名称校验，并内置管理员快捷凭据填入；
+  - 落地 `agenthub_token` 双写同步存储（LocalStorage + SameSite Lax Cookie），所有 API 请求自动装配标准 `Authorization: Bearer <token>`；
+  - 彻底肃清前端 API 层中的 `X-User-Id: user-1` 伪造头；401 未认证时全局触发重新登录引导，403 时展示明确权限拒绝状态。
+- **环境部署可移植性与同源反代**：
+  - `API_BASE` 默认采用同源相对路径 `/api`，生产环境直通 Nginx 高性能反向代理网关；
+  - 在 `next.config.mjs` 中为 Next.js 开发服务器配置 `/api/:path*` 与 `/actuator/:path*` 动态代理重写，消除前端代码对浏览器本机 `localhost:8080` 的硬编码依赖。
+- **项目与工作区真实主旅程驱动**：
+  - 登录后动态调取 `GET /api/projects` 绑定用户真实项目列表，支持顶部导航动态切换 Project；
+  - 工作区树全面切至 `GET /api/workspaces/{workspaceId}/files` 受控端点，彻底下线客户端 Windows 绝对路径传递；
+  - JGit Diff 与部署面板去伪造：无代码变更时真实呈现干净工作树状态，部署面板真实展示实例健康与运行日志。
+- **真实 Run 启动、SSE 凭据消费与审批响应闭环**：
+  - “触发执行”真实调用 `POST /api/executions/runs` 获得后端派发的唯一 `runId`；
+  - 终端流式连接前先通过 `POST /api/auth/stream-ticket` 申领 60 秒短时票据，杜绝长期 Bearer Token 在 URL 中暴露；
+  - 审批卡片决策放行与驳回直接向服务端提交，并在处理完成后从后端重新抓取权威事实状态，消除前端内存私自更改节点状态。
+
+---
+
 ## [v2.0.0-stage-a] - 2026-10-09
 
 ### 🛡️ 阶段 A 里程碑：可信身份收敛与多租户资源边界防御 (Stage A Identity & Resource Boundary Defense)

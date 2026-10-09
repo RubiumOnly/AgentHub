@@ -10,10 +10,19 @@ import {
   ProviderView,
   DeploymentResponse,
   FileDiffEntry,
+  ProjectView,
+  UserView,
 } from "@/types";
 import {
   apiClient,
+  getStoredUser,
+  setStoredUser,
+  getStoredToken,
+  setStoredToken,
+  isDemoMode,
+  setDemoMode,
   DEFAULT_WORKSPACE_PATH,
+  DEFAULT_PROJECT_ID,
   MOCK_RUN,
   MOCK_STEPS,
   MOCK_APPROVAL,
@@ -34,6 +43,7 @@ import { DiffArtifactReviewer } from "@/components/dashboard/DiffArtifactReviewe
 import { ProviderCostDashboard } from "@/components/dashboard/ProviderCostDashboard";
 import { SandboxPreviewPanel } from "@/components/dashboard/SandboxPreviewPanel";
 import WorkspaceExplorer from "@/components/WorkspaceExplorer";
+import { AuthModal } from "@/components/auth/AuthModal";
 
 import {
   LayoutDashboard,
@@ -44,35 +54,74 @@ import {
   Cpu,
   Server,
   FolderTree,
+  AlertCircle,
+  Plus,
+  Play,
+  RotateCcw,
 } from "lucide-react";
 
 export default function AgentHubExecutiveApp() {
   const [backendUp, setBackendUp] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserView | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Active Project & Workspace state
+  const [projects, setProjects] = useState<ProjectView[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(DEFAULT_PROJECT_ID);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>("ws-default");
+
+  // Runs
+  const [runs, setRuns] = useState<WorkflowRunView[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string>("run-exec-94218a");
+
+  // Navigation Tab
   const [activeTab, setActiveTab] = useState<
     "overview" | "dag" | "swarm" | "diff" | "providers" | "sandbox" | "files"
   >("overview");
 
   // Core Domain State
-  const [run, setRun] = useState<WorkflowRunView | null>(MOCK_RUN);
-  const [steps, setSteps] = useState<StepRunView[]>(MOCK_STEPS);
-  const [approval, setApproval] = useState<ApprovalView | null>(MOCK_APPROVAL);
-  const [team, setTeam] = useState<TeamView | null>(MOCK_TEAM);
-  const [tokenSummary, setTokenSummary] = useState<TokenSummaryView | null>(
-    MOCK_TOKEN_SUMMARY
-  );
-  const [providers, setProviders] = useState<ProviderView[]>(MOCK_PROVIDERS);
-  const [deployment, setDeployment] = useState<DeploymentResponse | null>(
-    MOCK_DEPLOYMENT
-  );
-  const [diffs, setDiffs] = useState<FileDiffEntry[]>(MOCK_DIFFS);
+  const [run, setRun] = useState<WorkflowRunView | null>(null);
+  const [steps, setSteps] = useState<StepRunView[]>([]);
+  const [approval, setApproval] = useState<ApprovalView | null>(null);
+  const [team, setTeam] = useState<TeamView | null>(null);
+  const [tokenSummary, setTokenSummary] = useState<TokenSummaryView | null>(null);
+  const [providers, setProviders] = useState<ProviderView[]>([]);
+  const [deployment, setDeployment] = useState<DeploymentResponse | null>(null);
+  const [diffs, setDiffs] = useState<FileDiffEntry[]>([]);
 
   const [isRunningWorkflow, setIsRunningWorkflow] = useState(false);
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
 
-  // Initialize and sync data from backend
+  // Initialize Auth & Mode on client mount
+  useEffect(() => {
+    setIsDemo(isDemoMode());
+    const stored = getStoredUser();
+    if (stored) {
+      setCurrentUser(stored);
+    }
+
+    const handleUnauthorized = () => {
+      setCurrentUser(null);
+      setStoredToken(null);
+      setStoredUser(null);
+      setIsAuthModalOpen(true);
+    };
+
+    window.addEventListener("agenthub:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("agenthub:unauthorized", handleUnauthorized);
+    };
+  }, []);
+
+  // Sync dashboard data from authentic backend or demo fixtures
   const syncDashboardData = useCallback(async () => {
+    setSyncErrorMessage(null);
+
+    // 1. Check Backend Health
     try {
       const health = await apiClient.getHealth();
-      if (health) {
+      if (health && health.status === "UP") {
         setBackendUp(true);
       } else {
         setBackendUp(false);
@@ -81,7 +130,68 @@ export default function AgentHubExecutiveApp() {
       setBackendUp(false);
     }
 
+    // 2. Demo Mode Branch: populate with verified demo fixtures
+    if (isDemoMode()) {
+      setRun(MOCK_RUN);
+      setSteps(MOCK_STEPS);
+      setApproval(MOCK_APPROVAL);
+      setTeam(MOCK_TEAM);
+      setTokenSummary(MOCK_TOKEN_SUMMARY);
+      setProviders(MOCK_PROVIDERS);
+      setDeployment(MOCK_DEPLOYMENT);
+      setDiffs(MOCK_DIFFS);
+      setSelectedRunId(MOCK_RUN.id);
+      return;
+    }
+
+    // 3. Live Product Mode Branch: load authentic backend data
     try {
+      // 3.1 Load Projects for current authenticated user
+      let currentProjId = selectedProjectId;
+      try {
+        const userProjects = await apiClient.listProjects();
+        if (userProjects && userProjects.length > 0) {
+          setProjects(userProjects);
+          if (!userProjects.some((p) => p.id === selectedProjectId)) {
+            currentProjId = userProjects[0].id;
+            setSelectedProjectId(currentProjId);
+          }
+        } else {
+          setProjects([]);
+        }
+      } catch (err: any) {
+        if (err.status !== 401) {
+          console.warn("Could not list projects:", err);
+        }
+      }
+
+      // 3.2 Load Workspace for project
+      if (currentProjId) {
+        try {
+          const ws = await apiClient.getWorkspace(currentProjId);
+          if (ws && ws.id) {
+            setActiveWorkspaceId(ws.id);
+          }
+        } catch {}
+      }
+
+      // 3.3 Load Runs for current project
+      let currentRunId = selectedRunId;
+      try {
+        const projectRuns = await apiClient.listRunsByProject(currentProjId);
+        if (projectRuns && projectRuns.length > 0) {
+          setRuns(projectRuns);
+          if (!projectRuns.some((r) => r.id === selectedRunId)) {
+            currentRunId = projectRuns[0].id;
+            setSelectedRunId(currentRunId);
+          }
+        } else {
+          setRuns([]);
+          currentRunId = "";
+        }
+      } catch {}
+
+      // 3.4 Parallel fetch authentic domain objects
       const [
         runData,
         stepsData,
@@ -90,99 +200,130 @@ export default function AgentHubExecutiveApp() {
         tokensData,
         provsData,
         depsData,
-        diffsData,
-      ] = await Promise.all([
-        apiClient.getRun("run-exec-94218a"),
-        apiClient.listStepRuns("run-exec-94218a"),
-        apiClient.listApprovals("run-exec-94218a"),
-        apiClient.getTeam("team-dev-swarm"),
-        apiClient.getTokenSummary(),
-        apiClient.listProviders(),
-        apiClient.listDeployments("proj-default"),
-        apiClient.getDiff(DEFAULT_WORKSPACE_PATH),
+        diffData,
+      ] = await Promise.allSettled([
+        currentRunId ? apiClient.getRun(currentRunId) : Promise.resolve(null),
+        currentRunId ? apiClient.listStepRuns(currentRunId) : Promise.resolve([]),
+        currentRunId ? apiClient.listApprovals(currentRunId) : Promise.resolve([]),
+        apiClient.getTeam("team-dev-swarm").catch(() => null),
+        apiClient.getTokenSummary().catch(() => null),
+        apiClient.listProviders().catch(() => []),
+        apiClient.listDeployments(currentProjId).catch(() => []),
+        activeWorkspaceId ? apiClient.getStructuredDiff(activeWorkspaceId).catch(() => null) : Promise.resolve(null),
       ]);
 
-      if (runData) setRun(runData);
-      if (stepsData && stepsData.length > 0) setSteps(stepsData);
-      if (approvalsData && approvalsData.length > 0) setApproval(approvalsData[0]);
-      if (teamData) setTeam(teamData);
-      if (tokensData) setTokenSummary(tokensData);
-      if (provsData && provsData.length > 0) setProviders(provsData);
-      if (depsData && depsData.length > 0) setDeployment(depsData[0]);
-      if (diffsData && diffsData.length > 0) setDiffs(diffsData);
-    } catch (err) {
-      console.warn("Sync encountered error; fallback mock data maintained:", err);
+      if (runData.status === "fulfilled" && runData.value) {
+        setRun(runData.value);
+      } else {
+        setRun(null);
+      }
+
+      if (stepsData.status === "fulfilled" && stepsData.value) {
+        setSteps(stepsData.value);
+      } else {
+        setSteps([]);
+      }
+
+      if (approvalsData.status === "fulfilled" && approvalsData.value && approvalsData.value.length > 0) {
+        const pending = approvalsData.value.find((a) => a.status === "PENDING") || approvalsData.value[0];
+        setApproval(pending);
+      } else {
+        setApproval(null);
+      }
+
+      if (teamData.status === "fulfilled" && teamData.value) {
+        setTeam(teamData.value);
+      }
+
+      if (tokensData.status === "fulfilled" && tokensData.value) {
+        setTokenSummary(tokensData.value);
+      }
+
+      if (provsData.status === "fulfilled" && provsData.value) {
+        setProviders(provsData.value);
+      }
+
+      if (depsData.status === "fulfilled" && depsData.value && depsData.value.length > 0) {
+        setDeployment(depsData.value[0]);
+      } else {
+        setDeployment(null);
+      }
+
+      if (diffData.status === "fulfilled" && diffData.value) {
+        setDiffs(diffData.value.entries || []);
+      } else {
+        setDiffs([]);
+      }
+    } catch (err: any) {
+      setSyncErrorMessage(`看板同步出现异常: ${err.message || "网络请求失败"}`);
     }
-  }, []);
+  }, [selectedProjectId, selectedRunId, activeWorkspaceId]);
 
   useEffect(() => {
     syncDashboardData();
   }, [syncDashboardData]);
 
+  // Handle Demo Mode Toggle
+  const handleToggleDemoMode = () => {
+    const nextMode = !isDemo;
+    setDemoMode(nextMode);
+    setIsDemo(nextMode);
+  };
+
   // Workflow trigger handler
   const handleRunWorkflow = async () => {
     setIsRunningWorkflow(true);
-    try {
-      // Reset approval and steps to demonstrate live execution
+    setSyncErrorMessage(null);
+
+    if (isDemo) {
       setApproval(MOCK_APPROVAL);
       setSteps(MOCK_STEPS);
       setTimeout(() => {
         syncDashboardData();
         setIsRunningWorkflow(false);
       }, 1200);
-    } catch {
+      return;
+    }
+
+    try {
+      const newRun = await apiClient.startRun({
+        projectId: selectedProjectId || "proj-default",
+        definitionId: "wf-enterprise-auth-delivery",
+        idempotencyKey: `idem-${Date.now()}`,
+      });
+
+      if (newRun && newRun.id) {
+        setRun(newRun);
+        setSelectedRunId(newRun.id);
+        setSteps([]);
+        setApproval(null);
+        setTimeout(() => {
+          syncDashboardData();
+        }, 800);
+      }
+    } catch (err: any) {
+      setSyncErrorMessage(`启动工作流失败: ${err.message || "请求异常"}`);
+    } finally {
       setIsRunningWorkflow(false);
     }
   };
 
   // Approval decision callback
-  const handleApprovalDecided = (decision: "APPROVED" | "REJECTED") => {
-    if (approval) {
-      setApproval({
-        ...approval,
-        status: decision,
-        decision,
-      });
+  const handleApprovalDecided = async (decision: "APPROVED" | "REJECTED") => {
+    if (isDemo) {
+      if (approval) {
+        setApproval({ ...approval, status: decision, decision });
+      }
+      if (run) {
+        setRun({ ...run, status: decision === "APPROVED" ? "RUNNING" : "FAILED" });
+      }
+      return;
     }
 
-    if (run) {
-      setRun({
-        ...run,
-        status: decision === "APPROVED" ? "RUNNING" : "FAILED",
-      });
-    }
-
-    // Update steps
-    setSteps((prev) =>
-      prev.map((s) => {
-        if (s.nodeId === "node-security-gate" || s.id === "step-5-approval") {
-          return {
-            ...s,
-            status: decision === "APPROVED" ? "SUCCEEDED" : "FAILED",
-            errorMessage: decision === "REJECTED" ? "安全架构师拒绝合并与沙箱部署" : undefined,
-          };
-        }
-        if (
-          decision === "APPROVED" &&
-          (s.nodeId === "node-sandbox-deploy" || s.id === "step-6-deploy")
-        ) {
-          return {
-            ...s,
-            status: "RUNNING",
-          };
-        }
-        if (
-          decision === "REJECTED" &&
-          (s.nodeId === "node-sandbox-deploy" || s.nodeId === "node-end" || s.id === "step-6-deploy" || s.id === "step-7-end")
-        ) {
-          return {
-            ...s,
-            status: "SKIPPED",
-          };
-        }
-        return s;
-      })
-    );
+    // In live mode, refresh authentic status from backend after approval submission
+    setTimeout(() => {
+      syncDashboardData();
+    }, 600);
   };
 
   // Card action handler
@@ -196,13 +337,29 @@ export default function AgentHubExecutiveApp() {
     }
   };
 
+  const handleLogout = async () => {
+    await apiClient.logout();
+    setCurrentUser(null);
+    syncDashboardData();
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#09090b] text-zinc-100 font-sans ambient-glow selection:bg-indigo-600 selection:text-white">
       {/* 1. Global Navigation Header */}
       <HeaderNav
         backendUp={backendUp}
         circuitBreakerStatus={providers[0]?.circuitStatus || "CLOSED"}
-        activeRunId={run?.id || "run-exec-94218a"}
+        activeProjectId={selectedProjectId}
+        activeRunId={run?.id || selectedRunId}
+        projects={projects}
+        onSelectProject={(projId) => {
+          setSelectedProjectId(projId);
+        }}
+        currentUser={currentUser}
+        isDemoMode={isDemo}
+        onToggleDemoMode={handleToggleDemoMode}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
         onRefreshAll={syncDashboardData}
         onRunWorkflow={handleRunWorkflow}
         isRunning={isRunningWorkflow}
@@ -210,7 +367,39 @@ export default function AgentHubExecutiveApp() {
 
       {/* 2. Main Executive View Area */}
       <main className="flex-1 flex flex-col p-4 md:p-6 space-y-4 max-w-[1720px] w-full mx-auto overflow-hidden">
-        {/* KPI Bento Metric Grid (5 Micro Cards) */}
+        {/* Sync Error Toast */}
+        {syncErrorMessage && (
+          <div className="flex items-center space-x-2 rounded-xl border border-rose-500/40 bg-rose-950/40 p-3 text-xs text-rose-300">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span className="flex-1">{syncErrorMessage}</span>
+            <button
+              onClick={syncDashboardData}
+              className="px-2 py-0.5 rounded bg-rose-900/60 hover:bg-rose-800 text-[11px] font-mono"
+            >
+              重试同步
+            </button>
+          </div>
+        )}
+
+        {/* Demo Mode Notice Banner */}
+        {isDemo && (
+          <div className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-950/30 px-3.5 py-2 text-xs text-amber-200">
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <span>
+                <strong>离线演示模式已激活 (Demo Mode)</strong>：当前展示受控模拟数据集，未连接真实生产执行内核。
+              </span>
+            </div>
+            <button
+              onClick={handleToggleDemoMode}
+              className="px-2.5 py-1 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 font-semibold text-[11px] transition"
+            >
+              切换至真实产品模式
+            </button>
+          </div>
+        )}
+
+        {/* KPI Bento Metric Grid */}
         <MetricBentoGrid
           run={run}
           steps={steps}
@@ -273,10 +462,9 @@ export default function AgentHubExecutiveApp() {
 
         {/* View Content Renderer */}
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* TAB 1: Bento Overview (High-Density Multi-Panel Bento Grid) */}
+          {/* TAB 1: Bento Overview */}
           {activeTab === "overview" && (
             <div className="flex-1 space-y-4 pb-6 overflow-y-auto">
-              {/* Row 1: Hero DAG Canvas (7 cols) + SSE Stream Terminal (5 cols) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[380px]">
                 <div className="lg:col-span-7 h-[380px]">
                   <DagTopologyVisualizer
@@ -287,13 +475,12 @@ export default function AgentHubExecutiveApp() {
                 </div>
                 <div className="lg:col-span-5 h-[380px]">
                   <LiveExecutionTerminal
-                    runId={run?.id || "run-exec-94218a"}
+                    runId={run?.id || selectedRunId}
                     onRefresh={syncDashboardData}
                   />
                 </div>
               </div>
 
-              {/* Row 2: Swarm Timeline (6 cols) + JGit Unified Diff Reviewer (6 cols) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[460px]">
                 <div className="lg:col-span-6 h-[460px]">
                   <MultiAgentSwarmChat
@@ -309,7 +496,6 @@ export default function AgentHubExecutiveApp() {
                 </div>
               </div>
 
-              {/* Row 3: Provider Dynamic Router (6 cols) + Sandbox & Preview Deployment (6 cols) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[440px]">
                 <div className="lg:col-span-6 h-[440px]">
                   <ProviderCostDashboard
@@ -321,6 +507,7 @@ export default function AgentHubExecutiveApp() {
                 <div className="lg:col-span-6 h-[440px]">
                   <SandboxPreviewPanel
                     deployment={deployment}
+                    projectId={selectedProjectId}
                     onRefresh={syncDashboardData}
                   />
                 </div>
@@ -340,7 +527,7 @@ export default function AgentHubExecutiveApp() {
               </div>
               <div className="lg:col-span-4 h-[640px]">
                 <LiveExecutionTerminal
-                  runId={run?.id || "run-exec-94218a"}
+                  runId={run?.id || selectedRunId}
                   onRefresh={syncDashboardData}
                 />
               </div>
@@ -383,6 +570,7 @@ export default function AgentHubExecutiveApp() {
             <div className="flex-1 h-[680px]">
               <SandboxPreviewPanel
                 deployment={deployment}
+                projectId={selectedProjectId}
                 onRefresh={syncDashboardData}
               />
             </div>
@@ -391,11 +579,24 @@ export default function AgentHubExecutiveApp() {
           {/* TAB 7: Workspace Explorer Files */}
           {activeTab === "files" && (
             <div className="flex-1 h-[680px]">
-              <WorkspaceExplorer workspacePath={DEFAULT_WORKSPACE_PATH} />
+              <WorkspaceExplorer
+                workspaceId={activeWorkspaceId}
+                workspacePath={DEFAULT_WORKSPACE_PATH}
+              />
             </div>
           )}
         </div>
       </main>
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+          syncDashboardData();
+        }}
+      />
     </div>
   );
 }

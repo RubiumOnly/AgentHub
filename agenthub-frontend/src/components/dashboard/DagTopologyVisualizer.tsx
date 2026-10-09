@@ -24,6 +24,7 @@ import {
   WorkflowNodeStatus,
   StepRunView,
 } from "@/types";
+import { isDemoMode } from "@/services/api";
 import {
   Play,
   Bot,
@@ -332,7 +333,21 @@ export function DagTopologyVisualizer({
 
   // Synchronize dynamic status from steps prop into nodes and edges reactively
   useEffect(() => {
-    if (!steps || steps.length === 0) return;
+    if (!steps || steps.length === 0) {
+      if (!isDemoMode()) {
+        setNodes((currentNodes) =>
+          currentNodes.map((n) => ({
+            ...n,
+            data: {
+              ...n.data,
+              status: n.data.nodeType === "START" ? "PENDING" : "PENDING",
+              durationMs: 0,
+            },
+          }))
+        );
+      }
+      return;
+    }
 
     setNodes((currentNodes) =>
       currentNodes.map((n) => {
