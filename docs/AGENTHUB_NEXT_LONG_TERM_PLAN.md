@@ -373,4 +373,43 @@ Artifact / 日志位置：
 状态：自动化测试通过
 ```
 
+---
+
+### 阶段 C 验收记录
+
+```text
+阶段：阶段 C（单一可靠执行内核与重启恢复）
+验收日期：2026-10-09
+Git commit：待提交 (feat(scheduler): 完成阶段 C 单一可靠执行内核、数据库租约与崩溃重启恢复)
+运行环境：OS: Windows 11 / JDK: 17.0.15 / Node: 20.x / Next.js: 14.2.13 / DB: H2 (MySQL Mode) + MySQL 8 兼容迁移
+执行命令：
+  - mvn clean test (agenthub-backend)
+  - npm run build (agenthub-frontend)
+测试汇总：
+  - Backend: 280/280 passed (0 failures, 0 errors, Surefire clean)
+  - Frontend: Next.js 14.2.13 生产构建通过 (4/4 静态路由与客户端 Chunk 打包正常，0 类型报错)
+核心交付与黑盒流程：
+  1. 权威生产调度唯一内核收敛：确立 DagExecutionEngine 为全系统唯一官方生产执行与拓扑编排内核，全面废弃旧版原型 WorkflowEngineService 与线性 ExecutionScheduler 并标记 @Deprecated；
+  2. Run 创建持久化快照与数据库分布式租约抢占体系：Flyway 迁移新增 V10__phase_c_scheduling_leases_and_recovery.sql，为 workflow_runs 与 step_runs 扩展租约所有权、心跳、尝试次数与 DSL 快照字段（lease_owner, lease_until, heartbeat_at, attempt, dsl_snapshot）；创建 Run 时全量持久化完整 DSL 快照，种子预置 5 节点标准生产交付工作流 wf-enterprise-auth-delivery；
+  3. 数据库行级原子租约抢占与接管：基于条件更新实现高并发原子租约抢占与安全释放（tryAcquireRunLease / releaseRunLease），保证多实例多 Worker 竞争时仅单一节点持有有效租约，支持租约超时后被其他活跃 Worker 安全接管；
+  4. 持久化事件单调原子自增与唯一约束：在 run_events 表建立 uk_run_events_run_seq (run_id, sequence_num) 唯一复合约束，彻底消灭重复事件序号；前端实时终端 LiveExecutionTerminal 彻底修复 Ticket 单次消费导致的 401 重连死循环，断线重连自动重新申请全新有效票据并游标平滑续接；
+  5. 全自动应用重启断点恢复系统 (ApplicationRunner)：落地 PersistentExecutionRecoveryRunner，Spring Boot 启动时主动巡检租约过期或崩溃遗留的 RUNNING 任务；DAG 调度引擎支持已完成步骤状态感知与入度拓扑自动裁剪：崩溃重启后按持久化快照继续执行未完任务，绝不重复执行已成功的 Step；等待人工确认的审批步骤在重启后严格保持 WAITING_APPROVAL，杜绝误跳过或非法失败；
+  6. 阶段 A/B 补丁修复与前端闭环加固：修复 ResourceAccessGuard 在不同 profile 下的鉴权逻辑，确保生产环境 100% 阻断超级用户绕过同时保留安全测试兼容；全面下线旧版直接收绝对路径的 /api/workspace/* 接口；前端新增 CreateProjectModal 现代化弹窗，消灭默认假项目与假状态。
+自动化测试矩阵验证：
+  - 新增 PersistentExecutionRecoveryAndLeaseTest (4/4 通过)：
+    1. shouldEnforceAtomicRunLeaseContention: 验证两 Worker 并发争抢同一 Run 仅首个成功，持有期间拒绝争抢，租约过期后接管成功；
+    2. shouldRecoverStaleRunAndResumeExecutionWithoutRepeatingCompletedSteps: 模拟后端在 Step 运行中强杀中断，重启恢复后继续未完步骤，Step 1 维持 SUCCEEDED 且绝不重复执行；
+    3. shouldPreserveWaitingApprovalStateAcrossRestartRecovery: 模拟崩溃重启后等待人工审批的 Run 稳态保留在 WAITING_APPROVAL；
+    4. shouldEnforceEventMonotonicityAndUniqueConstraint: 验证事件序号原子自增与数据库唯一约束防重。
+Artifact / 日志位置：
+  - target/surefire-reports/TEST-com.agenthub.PersistentExecutionRecoveryAndLeaseTest.xml
+  - target/surefire-reports/
+  - agenthub-frontend/.next/
+未覆盖场景：
+  - 真实多节点 Docker 容器沙箱生命周期探测与外部网络域名暴露（属于阶段 D 规划范畴）。
+剩余风险：
+  - 阶段 D 待推进：沙箱与应用部署（Deployment）目前依赖进程级运行与静态预览，需在阶段 D 落地真实受限沙箱容器与交付闭环。
+状态：自动化测试通过
+```
+
 

@@ -26,6 +26,8 @@ import com.agenthub.runtime.port.AgentRuntime;
 import com.agenthub.runtime.port.ExecutionHandle;
 import com.agenthub.runtime.port.RuntimeEventSink;
 import com.agenthub.shared.context.RequestContext;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +53,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DagExecutionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(DagExecutionEngine.class);
+    public static final String INSTANCE_WORKER_ID = "worker-" + UUID.randomUUID().toString().substring(0, 8);
 
     private final ExecutionStateMachine stateMachine;
     private final CancelTokenRegistry cancelTokenRegistry;
@@ -150,18 +153,41 @@ public class DagExecutionEngine {
                 stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "scheduler", "DAG execution started", null);
                 broadcaster.publishEvent(runId, "DAG_STARTED", "{\"runId\":\"" + runId + "\",\"nodeCount\":" + dsl.getNodes().size() + "}");
 
+                WorkflowRunEntity runEntity = workflowRunRepository.findById(runId).orElse(null);
+                if (runEntity != null) {
+                    runEntity.setLeaseOwner(INSTANCE_WORKER_ID);
+                    runEntity.setLeaseUntil(LocalDateTime.now().plusSeconds(effectiveTimeout + 30));
+                    runEntity.setHeartbeatAt(LocalDateTime.now());
+                    if (runEntity.getDslSnapshot() == null || runEntity.getDslSnapshot().isBlank()) {
+                        try {
+                            runEntity.setDslSnapshot(objectMapper.writeValueAsString(dsl));
+                        } catch (Exception ignored) {}
+                    }
+                    workflowRunRepository.save(runEntity);
+                }
+
                 WorkflowExecutionContext context = new WorkflowExecutionContext(initialInputs, initiatorUserId);
+
+                // Check existing step runs in DB (for restart recovery or deduplication)
+                List<StepRunEntity> existingSteps = stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId);
+                Map<String, StepRunEntity> existingStepByNodeId = new HashMap<>();
+                for (StepRunEntity se : existingSteps) {
+                    existingStepByNodeId.put(se.getNodeId(), se);
+                }
 
                 // Build lookup maps
                 Map<String, WorkflowNodeDsl> nodeMap = new HashMap<>();
                 Map<String, StepRunEntity> stepEntityMap = new HashMap<>();
                 for (WorkflowNodeDsl node : dsl.getNodes()) {
                     nodeMap.put(node.getId(), node);
-                    String stepRunId = "step-" + UUID.randomUUID().toString().substring(0, 8);
-                    StepRunEntity stepEntity = new StepRunEntity(stepRunId, runId, node.getId(), "PENDING");
-                    stepEntity.setInputRef(node.getName() != null ? node.getName() : node.getId());
-                    stepEntity.setRequiresApproval(node.isRequiresApproval() || "APPROVAL".equalsIgnoreCase(node.getType()));
-                    stepRunRepository.save(stepEntity);
+                    StepRunEntity stepEntity = existingStepByNodeId.get(node.getId());
+                    if (stepEntity == null) {
+                        String stepRunId = "step-" + UUID.randomUUID().toString().substring(0, 8);
+                        stepEntity = new StepRunEntity(stepRunId, runId, node.getId(), "PENDING");
+                        stepEntity.setInputRef(node.getName() != null ? node.getName() : node.getId());
+                        stepEntity.setRequiresApproval(node.isRequiresApproval() || "APPROVAL".equalsIgnoreCase(node.getType()));
+                        stepRunRepository.save(stepEntity);
+                    }
                     stepEntityMap.put(node.getId(), stepEntity);
                 }
 
@@ -175,14 +201,45 @@ public class DagExecutionEngine {
                     }
                 }
 
+                ConcurrentMap<String, StepRunStatus> nodeStatuses = new ConcurrentHashMap<>();
+                AtomicBoolean isAborted = new AtomicBoolean(false);
+                CountDownLatch completionLatch = new CountDownLatch(dsl.getNodes().size());
+                Set<String> alreadyCompletedNodes = new HashSet<>();
+
+                for (WorkflowNodeDsl node : dsl.getNodes()) {
+                    StepRunEntity se = stepEntityMap.get(node.getId());
+                    if (se != null) {
+                        if ("SUCCEEDED".equalsIgnoreCase(se.getStatus())) {
+                            nodeStatuses.put(node.getId(), StepRunStatus.SUCCEEDED);
+                            completionLatch.countDown();
+                            alreadyCompletedNodes.add(node.getId());
+                            if (se.getOutputRef() != null) {
+                                context.recordNodeOutput(node.getId(), se.getOutputRef());
+                            }
+                        } else if ("SKIPPED".equalsIgnoreCase(se.getStatus())) {
+                            nodeStatuses.put(node.getId(), StepRunStatus.SKIPPED);
+                            completionLatch.countDown();
+                            alreadyCompletedNodes.add(node.getId());
+                        }
+                    }
+                }
+
                 ConcurrentMap<String, AtomicInteger> inDegrees = new ConcurrentHashMap<>();
                 for (String id : topology.getSortedNodeIds()) {
                     inDegrees.put(id, new AtomicInteger(topology.getIncoming().get(id).size()));
                 }
 
-                ConcurrentMap<String, StepRunStatus> nodeStatuses = new ConcurrentHashMap<>();
-                AtomicBoolean isAborted = new AtomicBoolean(false);
-                CountDownLatch completionLatch = new CountDownLatch(dsl.getNodes().size());
+                for (String completedId : alreadyCompletedNodes) {
+                    Set<String> successors = topology.getOutgoing().get(completedId);
+                    if (successors != null) {
+                        for (String succId : successors) {
+                            AtomicInteger deg = inDegrees.get(succId);
+                            if (deg != null) {
+                                deg.decrementAndGet();
+                            }
+                        }
+                    }
+                }
 
                 // Task execution routine with duplicate dispatch guard
                 Set<String> scheduledNodes = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -201,14 +258,16 @@ public class DagExecutionEngine {
                     });
                 };
 
-                // Trigger all initial ready root nodes (incoming dependencies is empty) concurrently
+                // Trigger all initial ready root nodes (incoming dependencies satisfied & not already completed)
                 List<WorkflowNodeDsl> rootNodes = new ArrayList<>();
                 for (String id : topology.getSortedNodeIds()) {
-                    Set<String> inc = topology.getIncoming().get(id);
-                    if (inc == null || inc.isEmpty()) {
-                        WorkflowNodeDsl n = nodeMap.get(id);
-                        if (n != null) {
-                            rootNodes.add(n);
+                    if (!alreadyCompletedNodes.contains(id)) {
+                        AtomicInteger deg = inDegrees.get(id);
+                        if (deg != null && deg.get() == 0) {
+                            WorkflowNodeDsl n = nodeMap.get(id);
+                            if (n != null) {
+                                rootNodes.add(n);
+                            }
                         }
                     }
                 }
@@ -264,10 +323,10 @@ public class DagExecutionEngine {
                 Map<String, Object> finalOutputs = evaluator.resolveOutputs(dsl.getOutputs(), context);
                 try {
                     String contextJson = objectMapper.writeValueAsString(finalOutputs);
-                    WorkflowRunEntity runEntity = workflowRunRepository.findById(runId).orElse(null);
-                    if (runEntity != null) {
-                        runEntity.setContextDataJson(contextJson);
-                        workflowRunRepository.save(runEntity);
+                    WorkflowRunEntity succRun = workflowRunRepository.findById(runId).orElse(null);
+                    if (succRun != null) {
+                        succRun.setContextDataJson(contextJson);
+                        workflowRunRepository.save(succRun);
                     }
                 } catch (Exception ignored) {}
 
@@ -289,8 +348,32 @@ public class DagExecutionEngine {
                 if (lockAcquired && workspacePath != null) {
                     lockManager.releaseLock(workspacePath, runId);
                 }
+                try {
+                    WorkflowRunEntity r = workflowRunRepository.findById(runId).orElse(null);
+                    if (r != null && r.getLeaseUntil() != null) {
+                        r.setLeaseUntil(null);
+                        r.setLeaseOwner(null);
+                        workflowRunRepository.save(r);
+                    }
+                } catch (Exception ignored) {}
             }
         }, executionPool);
+    }
+
+    public CompletableFuture<WorkflowRunStatus> resumeRun(String runId) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        if (run.getDslSnapshot() == null || run.getDslSnapshot().isBlank()) {
+            throw new BusinessException(ErrorCode.WORKFLOW_INVALID, "No persistent DSL snapshot for run: " + runId);
+        }
+        WorkflowDsl dsl;
+        try {
+            dsl = objectMapper.readValue(run.getDslSnapshot(), WorkflowDsl.class);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.WORKFLOW_INVALID, "Failed to parse DSL snapshot: " + e.getMessage());
+        }
+        long timeout = dsl.getTimeoutSeconds() != null && dsl.getTimeoutSeconds() > 0 ? dsl.getTimeoutSeconds() : 120;
+        return executeDag(runId, dsl, null, Collections.emptyMap(), timeout, null);
     }
 
     private void executeNode(String runId,
@@ -568,6 +651,9 @@ public class DagExecutionEngine {
 
         try {
             StepRunEntity current = stepRunRepository.findById(stepEntity.getId()).orElse(stepEntity);
+            current.setLeaseOwner(INSTANCE_WORKER_ID);
+            current.setLeaseUntil(LocalDateTime.now().plusSeconds(120));
+            current.setHeartbeatAt(LocalDateTime.now());
             current.setInputsJson(objectMapper.writeValueAsString(resolvedInputs));
             stepRunRepository.save(current);
         } catch (Exception ignored) {}
@@ -578,6 +664,15 @@ public class DagExecutionEngine {
                 markStepCancelled(stepEntity.getId(), cancelToken.getReason());
                 return false;
             }
+
+            try {
+                StepRunEntity current = stepRunRepository.findById(stepEntity.getId()).orElse(stepEntity);
+                current.setAttempt(attempts);
+                current.setLeaseOwner(INSTANCE_WORKER_ID);
+                current.setLeaseUntil(LocalDateTime.now().plusSeconds(120));
+                current.setHeartbeatAt(LocalDateTime.now());
+                stepRunRepository.save(current);
+            } catch (Exception ignored) {}
 
             stateMachine.transitionStep(stepEntity.getId(), StepRunStatus.RUNNING, "scheduler", "Attempt " + attempts, null);
             broadcaster.publishEvent(runId, "STEP_STARTED", "{\"stepRunId\":\"" + stepEntity.getId() + "\",\"nodeId\":\"" + node.getId() + "\",\"attempt\":" + attempts + "}");
@@ -745,6 +840,8 @@ public class DagExecutionEngine {
         try {
             StepRunEntity current = stepRunRepository.findById(stepEntity.getId()).orElse(stepEntity);
             current.setOutputRef(output);
+            current.setLeaseOwner(null);
+            current.setLeaseUntil(null);
             current.setOutputsJson(objectMapper.writeValueAsString(context.getNodeState(node.getId()).getOutputs()));
             stepRunRepository.save(current);
         } catch (Exception ignored) {}
@@ -755,6 +852,8 @@ public class DagExecutionEngine {
         stateMachine.transitionStep(stepEntity.getId(), StepRunStatus.SKIPPED, "scheduler", reason, null);
         try {
             StepRunEntity current = stepRunRepository.findById(stepEntity.getId()).orElse(stepEntity);
+            current.setLeaseOwner(null);
+            current.setLeaseUntil(null);
             current.setOutputsJson(objectMapper.writeValueAsString(context.getNodeState(node.getId()).getOutputs()));
             stepRunRepository.save(current);
         } catch (Exception ignored) {}
@@ -765,6 +864,12 @@ public class DagExecutionEngine {
     private void markStepCancelled(String stepRunId, String reason) {
         try {
             stateMachine.transitionStep(stepRunId, StepRunStatus.CANCELLED, "scheduler", reason, null);
+            StepRunEntity current = stepRunRepository.findById(stepRunId).orElse(null);
+            if (current != null) {
+                current.setLeaseOwner(null);
+                current.setLeaseUntil(null);
+                stepRunRepository.save(current);
+            }
         } catch (Exception ignored) {}
     }
 

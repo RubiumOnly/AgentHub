@@ -21,8 +21,6 @@ import {
   setStoredToken,
   isDemoMode,
   setDemoMode,
-  DEFAULT_WORKSPACE_PATH,
-  DEFAULT_PROJECT_ID,
   MOCK_RUN,
   MOCK_STEPS,
   MOCK_APPROVAL,
@@ -44,6 +42,7 @@ import { ProviderCostDashboard } from "@/components/dashboard/ProviderCostDashbo
 import { SandboxPreviewPanel } from "@/components/dashboard/SandboxPreviewPanel";
 import WorkspaceExplorer from "@/components/WorkspaceExplorer";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { CreateProjectModal } from "@/components/project/CreateProjectModal";
 
 import {
   LayoutDashboard,
@@ -65,15 +64,16 @@ export default function AgentHubExecutiveApp() {
   const [isDemo, setIsDemo] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserView | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
 
   // Active Project & Workspace state
   const [projects, setProjects] = useState<ProjectView[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(DEFAULT_PROJECT_ID);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>("ws-default");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>("");
 
   // Runs
   const [runs, setRuns] = useState<WorkflowRunView[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string>("run-exec-94218a");
+  const [selectedRunId, setSelectedRunId] = useState<string>("");
 
   // Navigation Tab
   const [activeTab, setActiveTab] = useState<
@@ -158,6 +158,9 @@ export default function AgentHubExecutiveApp() {
           }
         } else {
           setProjects([]);
+          currentProjId = "";
+          setSelectedProjectId("");
+          setActiveWorkspaceId("");
         }
       } catch (err: any) {
         if (err.status !== 401) {
@@ -173,23 +176,36 @@ export default function AgentHubExecutiveApp() {
             setActiveWorkspaceId(ws.id);
           }
         } catch {}
+      } else {
+        setActiveWorkspaceId("");
       }
 
       // 3.3 Load Runs for current project
       let currentRunId = selectedRunId;
-      try {
-        const projectRuns = await apiClient.listRunsByProject(currentProjId);
-        if (projectRuns && projectRuns.length > 0) {
-          setRuns(projectRuns);
-          if (!projectRuns.some((r) => r.id === selectedRunId)) {
-            currentRunId = projectRuns[0].id;
-            setSelectedRunId(currentRunId);
+      if (currentProjId) {
+        try {
+          const projectRuns = await apiClient.listRunsByProject(currentProjId);
+          if (projectRuns && projectRuns.length > 0) {
+            setRuns(projectRuns);
+            if (!projectRuns.some((r) => r.id === selectedRunId)) {
+              currentRunId = projectRuns[0].id;
+              setSelectedRunId(currentRunId);
+            }
+          } else {
+            setRuns([]);
+            currentRunId = "";
+            setSelectedRunId("");
           }
-        } else {
+        } catch {
           setRuns([]);
           currentRunId = "";
+          setSelectedRunId("");
         }
-      } catch {}
+      } else {
+        setRuns([]);
+        currentRunId = "";
+        setSelectedRunId("");
+      }
 
       // 3.4 Parallel fetch authentic domain objects
       const [
@@ -285,9 +301,16 @@ export default function AgentHubExecutiveApp() {
       return;
     }
 
+    if (!selectedProjectId) {
+      setIsCreateProjectModalOpen(true);
+      setIsRunningWorkflow(false);
+      setSyncErrorMessage("请先创建或选择研发项目后再启动执行");
+      return;
+    }
+
     try {
       const newRun = await apiClient.startRun({
-        projectId: selectedProjectId || "proj-default",
+        projectId: selectedProjectId,
         definitionId: "wf-enterprise-auth-delivery",
         idempotencyKey: `idem-${Date.now()}`,
       });
@@ -355,6 +378,7 @@ export default function AgentHubExecutiveApp() {
         onSelectProject={(projId) => {
           setSelectedProjectId(projId);
         }}
+        onOpenCreateProjectModal={() => setIsCreateProjectModalOpen(true)}
         currentUser={currentUser}
         isDemoMode={isDemo}
         onToggleDemoMode={handleToggleDemoMode}
@@ -377,6 +401,32 @@ export default function AgentHubExecutiveApp() {
               className="px-2 py-0.5 rounded bg-rose-900/60 hover:bg-rose-800 text-[11px] font-mono"
             >
               重试同步
+            </button>
+          </div>
+        )}
+
+        {/* Empty project callout for live product mode */}
+        {!isDemo && projects.length === 0 && (
+          <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-zinc-900/60 to-indigo-950/20 p-5 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                <FolderTree className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-zinc-100">
+                  开启您的首个多 Agent 研发项目
+                </h4>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  当前账户尚未创建项目。创建项目后将自动分配受控工作区、建立 JGit 基线与多 Agent 协同流程。
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsCreateProjectModalOpen(true)}
+              className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-md shadow-indigo-600/30 transition shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>新建研发项目</span>
             </button>
           </div>
         )}
@@ -491,6 +541,7 @@ export default function AgentHubExecutiveApp() {
                 <div className="lg:col-span-6 h-[460px]">
                   <DiffArtifactReviewer
                     diffs={diffs}
+                    workspaceId={activeWorkspaceId}
                     onRefresh={syncDashboardData}
                   />
                 </div>
@@ -549,6 +600,7 @@ export default function AgentHubExecutiveApp() {
             <div className="flex-1 h-[680px]">
               <DiffArtifactReviewer
                 diffs={diffs}
+                workspaceId={activeWorkspaceId}
                 onRefresh={syncDashboardData}
               />
             </div>
@@ -581,7 +633,6 @@ export default function AgentHubExecutiveApp() {
             <div className="flex-1 h-[680px]">
               <WorkspaceExplorer
                 workspaceId={activeWorkspaceId}
-                workspacePath={DEFAULT_WORKSPACE_PATH}
               />
             </div>
           )}
@@ -594,6 +645,19 @@ export default function AgentHubExecutiveApp() {
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={(user) => {
           setCurrentUser(user);
+          syncDashboardData();
+        }}
+      />
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={isCreateProjectModalOpen}
+        onClose={() => setIsCreateProjectModalOpen(false)}
+        onSuccess={(newProject) => {
+          setSelectedProjectId(newProject.id);
+          if (newProject.workspaceId) {
+            setActiveWorkspaceId(newProject.workspaceId);
+          }
           syncDashboardData();
         }}
       />

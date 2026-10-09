@@ -13,24 +13,20 @@ public class ResourceAccessGuard {
     private boolean allowSuperuserBypass = false;
 
     public void checkOwnership(String resourceOwnerId, String currentUserId) {
-        if (resourceOwnerId == null) {
-            return;
-        }
         if (currentUserId == null || currentUserId.isBlank()) {
             currentUserId = RequestContext.get().getUserId();
         }
+        // Explicit internal system background worker context bypass
+        if (RequestContext.get().isSystem()) {
+            return;
+        }
         if (currentUserId == null || currentUserId.isBlank()) {
-            // System background worker context bypass
-            if (RequestContext.get().isSystem()) {
-                return;
-            }
             if (allowSuperuserBypass) {
                 return;
             }
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to access resource");
         }
-        // Explicit internal system background worker context bypass
-        if (RequestContext.get().isSystem()) {
+        if (resourceOwnerId == null) {
             return;
         }
         // Hardcoded user-1/system bypass is strictly blocked in production and only active when explicitly enabled

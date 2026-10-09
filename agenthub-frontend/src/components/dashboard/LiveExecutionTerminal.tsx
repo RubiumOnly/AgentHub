@@ -173,9 +173,15 @@ export function LiveExecutionTerminal({
   const [copied, setCopied] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"CONNECTED" | "RECONNECTING" | "OFFLINE">("OFFLINE");
   const [lastEventId, setLastEventId] = useState<number>(0);
+  const lastEventIdRef = useRef<number>(0);
 
   const terminalBodyRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    lastEventIdRef.current = lastEventId;
+  }, [lastEventId]);
 
   // Load historical events from backend or initialize demo logs
   useEffect(() => {
@@ -215,12 +221,14 @@ export function LiveExecutionTerminal({
         setLogs(initialLogs);
         const maxSeq = Math.max(...events.map((e) => e.sequenceNum), 0);
         setLastEventId(maxSeq);
+        lastEventIdRef.current = maxSeq;
       })
       .catch(() => {});
 
-    // Acquire stream ticket and connect EventSource
+    // Acquire fresh stream ticket and connect EventSource
     let activeEs: EventSource | null = null;
     const connectSSE = async () => {
+      if (isCancelled) return;
       try {
         let ticketParam = "";
         try {
@@ -228,11 +236,14 @@ export function LiveExecutionTerminal({
           if (ticket) {
             ticketParam = `&ticket=${encodeURIComponent(ticket)}`;
           }
-        } catch {}
+        } catch (ticketErr) {
+          console.debug("Stream ticket generation bypassed or failed:", ticketErr);
+        }
 
         if (isCancelled) return;
 
-        const sseUrl = `${API_BASE}/api/runs/${runId}/stream?lastEventId=${lastEventId}${ticketParam}`;
+        const currentCursor = lastEventIdRef.current || 0;
+        const sseUrl = `${API_BASE}/api/runs/${runId}/stream?lastEventId=${currentCursor}${ticketParam}`;
         const es = new EventSource(sseUrl, { withCredentials: true });
         activeEs = es;
         eventSourceRef.current = es;
@@ -247,6 +258,7 @@ export function LiveExecutionTerminal({
             const raw = JSON.parse(event.data);
             const seq = event.lastEventId ? parseInt(event.lastEventId, 10) : (raw.sequenceNum || Date.now());
             setLastEventId(seq);
+            lastEventIdRef.current = seq;
 
             const newLog: LogEntry = {
               id: `sse-${seq}-${Date.now()}`,
@@ -283,12 +295,33 @@ export function LiveExecutionTerminal({
         };
 
         es.onerror = () => {
-          if (!isCancelled) {
-            setConnectionStatus("RECONNECTING");
+          if (isCancelled) return;
+          setConnectionStatus("RECONNECTING");
+          if (activeEs) {
+            activeEs.close();
+            activeEs = null;
           }
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (!isCancelled) connectSSE();
+          }, 3000);
         };
       } catch {
-        if (!isCancelled) setConnectionStatus("OFFLINE");
+        if (!isCancelled) {
+          setConnectionStatus("OFFLINE");
+          if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+          }
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (!isCancelled) connectSSE();
+          }, 5000);
+        }
       }
     };
 
@@ -296,6 +329,9 @@ export function LiveExecutionTerminal({
 
     return () => {
       isCancelled = true;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       if (activeEs) activeEs.close();
       if (eventSourceRef.current) eventSourceRef.current.close();
     };

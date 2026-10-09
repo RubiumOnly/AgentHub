@@ -14,6 +14,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+/**
+ * Legacy workflow engine.
+ * @deprecated Superceded in Phase C by {@link com.agenthub.orchestration.scheduler.DagExecutionEngine}
+ * which serves as the single authoritative DAG execution and recovery engine.
+ */
+@Deprecated
 @Service
 public class WorkflowEngineService {
 

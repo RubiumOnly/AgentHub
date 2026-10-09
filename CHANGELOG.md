@@ -2,6 +2,29 @@
 
 所有关键架构升级、特性新增与重要缺陷修复均按版本记录于此。
 
+## [v2.0.0-stage-c] - 2026-10-09
+
+### ⚙️ 阶段 C 里程碑：单一可靠执行内核与重启恢复 (Stage C Reliable Execution Kernel & Restart Recovery)
+- **权威执行调度唯一内核收敛**：
+  - 确立 `DagExecutionEngine` 为全系统唯一官方生产执行与拓扑编排内核，全面废弃旧版原型 `WorkflowEngineService` 与线性 `ExecutionScheduler` 并标记 `@Deprecated`；
+  - `ExecutionApplicationService` 在事务提交后通过 `TransactionSynchronization` 异步分发 DAG 调度，彻底根除主事务未提交即被后台 Worker 消费导致的空指针与脏读竞态。
+- **Run 创建持久化快照与数据库分布式租约抢占体系**：
+  - Flyway 迁移新增 `V10__phase_c_scheduling_leases_and_recovery.sql`，为 `workflow_runs` 与 `step_runs` 扩展租约所有权、心跳、尝试次数与 DSL 快照字段（`lease_owner`, `lease_until`, `heartbeat_at`, `attempt`, `dsl_snapshot`）；
+  - 创建 Run 时全量持久化完整 DSL 快照，种子预置 5 节点标准生产交付工作流 `wf-enterprise-auth-delivery`；
+  - 基于数据库条件更新实现高并发原子租约抢占与安全释放（`tryAcquireRunLease` / `releaseRunLease`），保证多实例多 Worker 竞争时仅单一节点持有有效租约，支持租约超时自动接管。
+- **持久化事件单调原子自增与数据库唯一索引约束**：
+  - 在 `run_events` 表建立 `uk_run_events_run_seq (run_id, sequence_num)` 唯一复合约束，彻底消灭重复事件序号；
+  - 前端实时终端 `LiveExecutionTerminal` 彻底修复 Ticket 单次消费导致的 401 重连死循环，断线重连自动重新申请全新有效票据并游标平滑续接。
+- **全自动应用重启断点恢复系统 (ApplicationRunner)**：
+  - 落地 `PersistentExecutionRecoveryRunner`，Spring Boot 启动时主动巡检租约过期或崩溃遗留的 RUNNING 任务；
+  - DAG 调度引擎支持已完成步骤状态感知与入度拓扑自动裁剪：**崩溃重启后按持久化快照继续执行未完任务，绝不重复执行已成功的 Step**；
+  - 等待人工确认的审批步骤在重启后严格保持 `WAITING_APPROVAL`，杜绝误跳过或非法失败。
+- **全量测试套件保障**：
+  - 新增 `PersistentExecutionRecoveryAndLeaseTest` 覆盖数据库原子租约争抢、崩溃重启恢复断点执行、待审批状态保护与事件唯一约束；
+  - 全工程全量 280 个测试用例全部绿灯通过（280 run, 0 failures, 0 errors, 0 skipped）。
+
+---
+
 ## [v2.0.0-stage-b] - 2026-10-09
 
 ### 🚀 阶段 B 里程碑：前端去 Mock 化与真实产品主旅程 (Stage B Frontend De-mocking & Real User Journey)

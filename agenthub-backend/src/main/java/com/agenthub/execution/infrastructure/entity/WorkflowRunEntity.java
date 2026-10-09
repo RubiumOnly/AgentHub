@@ -47,6 +47,21 @@ public class WorkflowRunEntity {
     @Column(name = "context_data_json", columnDefinition = "TEXT")
     private String contextDataJson;
 
+    @Column(name = "lease_owner", length = 64)
+    private String leaseOwner;
+
+    @Column(name = "lease_until")
+    private LocalDateTime leaseUntil;
+
+    @Column(name = "heartbeat_at")
+    private LocalDateTime heartbeatAt;
+
+    @Column(name = "attempt")
+    private Integer attempt = 1;
+
+    @Column(name = "dsl_snapshot", columnDefinition = "TEXT")
+    private String dslSnapshot;
+
     public WorkflowRunEntity() {}
 
     public WorkflowRunEntity(String id, String projectId, String definitionId, String status, String idempotencyKey) {
@@ -55,6 +70,7 @@ public class WorkflowRunEntity {
         this.definitionId = definitionId;
         this.status = status != null ? status : "PENDING";
         this.idempotencyKey = idempotencyKey;
+        this.attempt = 1;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
@@ -85,4 +101,14 @@ public class WorkflowRunEntity {
     public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
     public String getContextDataJson() { return contextDataJson; }
     public void setContextDataJson(String contextDataJson) { this.contextDataJson = contextDataJson; }
+    public String getLeaseOwner() { return leaseOwner; }
+    public void setLeaseOwner(String leaseOwner) { this.leaseOwner = leaseOwner; }
+    public LocalDateTime getLeaseUntil() { return leaseUntil; }
+    public void setLeaseUntil(LocalDateTime leaseUntil) { this.leaseUntil = leaseUntil; }
+    public LocalDateTime getHeartbeatAt() { return heartbeatAt; }
+    public void setHeartbeatAt(LocalDateTime heartbeatAt) { this.heartbeatAt = heartbeatAt; }
+    public Integer getAttempt() { return attempt; }
+    public void setAttempt(Integer attempt) { this.attempt = attempt; }
+    public String getDslSnapshot() { return dslSnapshot; }
+    public void setDslSnapshot(String dslSnapshot) { this.dslSnapshot = dslSnapshot; }
 }

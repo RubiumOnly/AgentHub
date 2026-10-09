@@ -33,8 +33,8 @@ import {
 // or uses configured NEXT_PUBLIC_API_URL without trailing slash.
 export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
-export const DEFAULT_WORKSPACE_PATH = "d:/work/agenthub/data/workspaces/default";
-export const DEFAULT_PROJECT_ID = "proj-default";
+export const DEFAULT_WORKSPACE_PATH = "";
+export const DEFAULT_PROJECT_ID = "";
 export const DEFAULT_PREVIEW_URL = `${API_BASE}/api/sandbox/preview/default`;
 
 // ============================================================================
@@ -693,7 +693,8 @@ export const apiClient = {
   },
 
   // 10. Deployments & Sandbox
-  async listDeployments(projectId: string = DEFAULT_PROJECT_ID): Promise<DeploymentResponse[]> {
+  async listDeployments(projectId?: string): Promise<DeploymentResponse[]> {
+    if (!projectId) return [];
     return fetchJson<DeploymentResponse[]>(`${API_BASE}/api/deployments?projectId=${encodeURIComponent(projectId)}`);
   },
 
@@ -714,13 +715,12 @@ export const apiClient = {
     return fetchJson<string>(`${API_BASE}/api/deployments/${id}/logs`);
   },
 
-  // 11. Deprecated Workspace Fallback Helpers for Legacy Test Scenarios
-  async getDiff(workspacePath: string = DEFAULT_WORKSPACE_PATH): Promise<FileDiffEntry[]> {
+  // 11. Workspace Diff Helper (routes to authoritative /api/workspaces/{workspaceId}/diff)
+  async getDiff(workspaceId?: string): Promise<FileDiffEntry[]> {
+    if (!workspaceId) return [];
     try {
-      const data = await fetchJson<FileDiffEntry[]>(
-        `${API_BASE}/api/workspace/diff?path=${encodeURIComponent(workspacePath)}`
-      );
-      return data || [];
+      const data = await this.getStructuredDiff(workspaceId);
+      return data?.entries || [];
     } catch {
       return [];
     }

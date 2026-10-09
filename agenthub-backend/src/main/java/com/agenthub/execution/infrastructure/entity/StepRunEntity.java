@@ -59,6 +59,15 @@ public class StepRunEntity {
     @Column(name = "requires_approval")
     private Boolean requiresApproval = false;
 
+    @Column(name = "lease_owner", length = 64)
+    private String leaseOwner;
+
+    @Column(name = "lease_until")
+    private LocalDateTime leaseUntil;
+
+    @Column(name = "heartbeat_at")
+    private LocalDateTime heartbeatAt;
+
     public StepRunEntity() {}
 
     public StepRunEntity(String id, String runId, String nodeId, String status) {
@@ -105,4 +114,10 @@ public class StepRunEntity {
     public void setOutputsJson(String outputsJson) { this.outputsJson = outputsJson; }
     public Boolean getRequiresApproval() { return requiresApproval; }
     public void setRequiresApproval(Boolean requiresApproval) { this.requiresApproval = requiresApproval; }
+    public String getLeaseOwner() { return leaseOwner; }
+    public void setLeaseOwner(String leaseOwner) { this.leaseOwner = leaseOwner; }
+    public LocalDateTime getLeaseUntil() { return leaseUntil; }
+    public void setLeaseUntil(LocalDateTime leaseUntil) { this.leaseUntil = leaseUntil; }
+    public LocalDateTime getHeartbeatAt() { return heartbeatAt; }
+    public void setHeartbeatAt(LocalDateTime heartbeatAt) { this.heartbeatAt = heartbeatAt; }
 }

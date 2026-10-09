@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Cpu,
   FolderGit2,
+  FolderPlus,
   RefreshCw,
   Sparkles,
   User,
@@ -22,6 +23,7 @@ interface HeaderNavProps {
   activeRunId?: string;
   projects?: ProjectView[];
   onSelectProject?: (projectId: string) => void;
+  onOpenCreateProjectModal?: () => void;
   currentUser?: UserView | null;
   isDemoMode: boolean;
   onToggleDemoMode: () => void;
@@ -39,6 +41,7 @@ export function HeaderNav({
   activeRunId,
   projects = [],
   onSelectProject,
+  onOpenCreateProjectModal,
   currentUser,
   isDemoMode,
   onToggleDemoMode,
@@ -74,19 +77,42 @@ export function HeaderNav({
         <div className="hidden md:flex items-center space-x-2 pl-3 border-l border-zinc-800/80 text-xs text-zinc-400">
           <FolderGit2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
           {projects.length > 0 ? (
-            <select
-              value={activeProjectId}
-              onChange={(e) => onSelectProject?.(e.target.value)}
-              className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-md px-2 py-1 font-mono focus:outline-none focus:border-indigo-500"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.id})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center space-x-1">
+              <select
+                value={activeProjectId}
+                onChange={(e) => onSelectProject?.(e.target.value)}
+                className="bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs rounded-md px-2 py-1 font-mono focus:outline-none focus:border-indigo-500 max-w-[200px] truncate"
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              {onOpenCreateProjectModal && (
+                <button
+                  onClick={onOpenCreateProjectModal}
+                  title="新建研发项目"
+                  className="p-1 rounded bg-zinc-900 border border-zinc-800 hover:border-indigo-500 hover:text-indigo-300 text-zinc-400 transition"
+                >
+                  <FolderPlus className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           ) : (
-            <span className="font-mono text-[11px] text-zinc-300">{activeProjectId}</span>
+            <div className="flex items-center space-x-1.5">
+              {onOpenCreateProjectModal ? (
+                <button
+                  onClick={onOpenCreateProjectModal}
+                  className="flex items-center space-x-1 px-2 py-1 rounded bg-indigo-950/70 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-900/70 text-[11px] font-medium transition"
+                >
+                  <FolderPlus className="w-3 h-3" />
+                  <span>新建项目</span>
+                </button>
+              ) : (
+                <span className="font-mono text-[11px] text-zinc-400">无项目</span>
+              )}
+            </div>
           )}
           {activeRunId && (
             <>

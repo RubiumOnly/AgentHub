@@ -31,7 +31,10 @@ import java.util.concurrent.*;
  * Decoupled Execution Scheduler.
  * Coordinates workflow state transitions, step sequencing, retries, timeouts, and cancellations.
  * Delegates concrete execution details strictly to AgentRuntime implementations.
+ * @deprecated Superceded in Phase C by {@link com.agenthub.orchestration.scheduler.DagExecutionEngine}
+ * which serves as the single authoritative DAG execution and recovery engine.
  */
+@Deprecated
 @Component
 public class ExecutionScheduler {
 

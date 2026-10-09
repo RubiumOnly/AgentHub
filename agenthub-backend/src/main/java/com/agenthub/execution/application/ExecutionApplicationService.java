@@ -125,15 +125,42 @@ public class ExecutionApplicationService implements ExecutionApplication {
         }
 
         String runId = "run-" + UUID.randomUUID().toString().substring(0, 8);
+        String targetDefId = cmd.getDefinitionId() != null && !cmd.getDefinitionId().isBlank() ? cmd.getDefinitionId() : "def-default";
         WorkflowRunEntity run = new WorkflowRunEntity(
                 runId,
                 cmd.getProjectId(),
-                cmd.getDefinitionId() != null ? cmd.getDefinitionId() : "def-default",
+                targetDefId,
                 "RUNNING",
                 cmd.getIdempotencyKey()
         );
         run.setStartedAt(LocalDateTime.now());
         run.setCorrelationId(RequestContext.get().getCorrelationId());
+
+        // Resolve workflow DSL if present
+        WorkflowDsl dslToRun = null;
+        if (cmd.getWorkflowDsl() != null) {
+            dslToRun = cmd.getWorkflowDsl();
+        } else if (workflowDefinitionRepository != null) {
+            Optional<WorkflowDefinitionEntity> defOpt = workflowDefinitionRepository.findById(targetDefId);
+            if (defOpt.isPresent() && objectMapper != null) {
+                try {
+                    dslToRun = objectMapper.readValue(defOpt.get().getDslJson(), WorkflowDsl.class);
+                } catch (Exception e) {
+                    log.warn("Failed to parse DSL JSON for run [{}]: {}", runId, e.getMessage());
+                }
+            }
+        }
+
+        if (dslToRun != null && objectMapper != null) {
+            try {
+                run.setDslSnapshot(objectMapper.writeValueAsString(dslToRun));
+            } catch (Exception ignored) {}
+        }
+
+        run.setLeaseOwner(DagExecutionEngine.INSTANCE_WORKER_ID);
+        run.setLeaseUntil(LocalDateTime.now().plusSeconds(180));
+        run.setHeartbeatAt(LocalDateTime.now());
+        run.setAttempt(1);
         workflowRunRepository.save(run);
 
         // Record initial event through broadcaster (produces sequence 1)
@@ -161,34 +188,31 @@ public class ExecutionApplicationService implements ExecutionApplication {
             }
         });
 
-        // If workflow DSL or saved definition is provided, trigger DAG execution
-        if (dagExecutionEngine != null) {
-            WorkflowDsl dslToRun = null;
-            if (cmd.getWorkflowDsl() != null) {
-                dslToRun = cmd.getWorkflowDsl();
-            } else if (cmd.getDefinitionId() != null && workflowDefinitionRepository != null) {
-                Optional<WorkflowDefinitionEntity> defOpt = workflowDefinitionRepository.findById(cmd.getDefinitionId());
-                if (defOpt.isPresent() && objectMapper != null) {
-                    try {
-                        dslToRun = objectMapper.readValue(defOpt.get().getDslJson(), WorkflowDsl.class);
-                    } catch (Exception e) {
-                        log.warn("Failed to parse DSL JSON for run [{}]: {}", runId, e.getMessage());
-                    }
-                }
+        // If workflow DSL or saved definition is provided, trigger DAG execution post-commit
+        if (dagExecutionEngine != null && dslToRun != null) {
+            String wsPath = null;
+            Optional<WorkspaceEntity> wsOpt = workspaceRepository.findByProjectId(cmd.getProjectId());
+            if (wsOpt.isPresent()) {
+                try {
+                    wsPath = workspaceResolver.getWorkspaceRoot(wsOpt.get().getId()).toAbsolutePath().toString();
+                } catch (Exception ignored) {}
             }
-            if (dslToRun != null) {
-                String wsPath = null;
-                Optional<WorkspaceEntity> wsOpt = workspaceRepository.findByProjectId(cmd.getProjectId());
-                if (wsOpt.isPresent()) {
-                    try {
-                        wsPath = workspaceResolver.getWorkspaceRoot(wsOpt.get().getId()).toAbsolutePath().toString();
-                    } catch (Exception ignored) {}
-                }
-                final WorkflowDsl finalDsl = dslToRun;
-                final String finalWsPath = wsPath;
-                final Map<String, Object> finalInputs = cmd.getInputs();
-                long timeout = finalDsl.getTimeoutSeconds() != null && finalDsl.getTimeoutSeconds() > 0 ? finalDsl.getTimeoutSeconds() : 120;
-                String currentUserId = RequestContext.get().getUserId();
+            final WorkflowDsl finalDsl = dslToRun;
+            final String finalWsPath = wsPath;
+            final Map<String, Object> finalInputs = cmd.getInputs();
+            long timeout = finalDsl.getTimeoutSeconds() != null && finalDsl.getTimeoutSeconds() > 0 ? finalDsl.getTimeoutSeconds() : 120;
+            String currentUserId = RequestContext.get().getUserId();
+
+            if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+                org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                        new org.springframework.transaction.support.TransactionSynchronization() {
+                            @Override
+                            public void afterCommit() {
+                                dagExecutionEngine.executeDag(runId, finalDsl, finalWsPath, finalInputs, timeout, currentUserId);
+                            }
+                        }
+                );
+            } else {
                 dagExecutionEngine.executeDag(runId, finalDsl, finalWsPath, finalInputs, timeout, currentUserId);
             }
         }

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { BentoCard } from "@/components/common/BentoCard";
 import { FileDiffEntry, StructuredDiff } from "@/types";
-import { apiClient, DEFAULT_WORKSPACE_PATH } from "@/services/api";
+import { apiClient } from "@/services/api";
 import {
   GitCompare,
   RotateCcw,
@@ -21,6 +21,7 @@ import {
 interface DiffArtifactReviewerProps {
   diffs?: FileDiffEntry[];
   structuredDiff?: StructuredDiff | null;
+  workspaceId?: string;
   onRefresh?: () => void;
   className?: string;
 }
@@ -28,6 +29,7 @@ interface DiffArtifactReviewerProps {
 export function DiffArtifactReviewer({
   diffs = [],
   structuredDiff,
+  workspaceId,
   onRefresh,
   className = "",
 }: DiffArtifactReviewerProps) {
@@ -109,7 +111,7 @@ export function DiffArtifactReviewer({
   return (
     <BentoCard
       title="受控工作区与 JGit 行级审查 (Diff & Baseline)"
-      subtitle={`工作区: ${DEFAULT_WORKSPACE_PATH} | 基线快照隔离保护`}
+      subtitle={workspaceId ? `工作区: ${workspaceId} | 基线快照隔离保护` : "工作区: 未选定 | 基线快照隔离保护"}
       icon={<GitCompare className="w-4 h-4 text-emerald-400" />}
       badge={
         <div className="flex items-center space-x-2 text-[10px] font-mono">

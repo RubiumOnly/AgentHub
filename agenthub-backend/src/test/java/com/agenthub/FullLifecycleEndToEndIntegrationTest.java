@@ -92,6 +92,7 @@ public class FullLifecycleEndToEndIntegrationTest {
     @AfterEach
     void tearDown() {
         RequestContext.clear();
+        org.eclipse.jgit.lib.RepositoryCache.clear();
     }
 
     @Test
