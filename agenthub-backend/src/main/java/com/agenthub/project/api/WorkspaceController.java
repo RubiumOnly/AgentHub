@@ -6,6 +6,7 @@ import com.agenthub.infrastructure.concurrency.WorkspaceLockManager;
 import com.agenthub.project.application.WorkspaceApplication;
 import com.agenthub.project.dto.WorkspaceFileDetailView;
 import com.agenthub.project.dto.WorkspaceFileNode;
+import com.agenthub.shared.context.RequestContext;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -120,30 +121,49 @@ public class WorkspaceController {
     @PostMapping("/{workspaceId}/lock/acquire")
     public Result<Boolean> acquireLock(
             @PathVariable("workspaceId") String workspaceId,
-            @RequestBody AcquireLockRequest req) {
-        boolean acquired = lockManager.tryAcquireLock(workspaceId, req.ownerId, req.waitTimeoutMs, req.leaseTtlMs);
+            @RequestBody(required = false) AcquireLockRequest req) {
+        workspaceApplication.checkWorkspaceAccess(workspaceId);
+        String currentUserId = RequestContext.get().getUserId();
+        String lockOwner = (currentUserId != null && !currentUserId.isBlank())
+                ? currentUserId
+                : (req != null && req.ownerId != null && !req.ownerId.isBlank() ? req.ownerId : "anonymous");
+        long waitTimeout = (req != null && req.waitTimeoutMs > 0) ? req.waitTimeoutMs : 3000;
+        long leaseTtl = (req != null && req.leaseTtlMs > 0) ? req.leaseTtlMs : 60000;
+        boolean acquired = lockManager.tryAcquireLock(workspaceId, lockOwner, waitTimeout, leaseTtl);
         return Result.ok(acquired);
     }
 
     @PostMapping("/{workspaceId}/lock/renew")
     public Result<Boolean> renewLock(
             @PathVariable("workspaceId") String workspaceId,
-            @RequestBody RenewLockRequest req) {
-        boolean renewed = lockManager.renewLease(workspaceId, req.ownerId, req.additionalTtlMs);
+            @RequestBody(required = false) RenewLockRequest req) {
+        workspaceApplication.checkWorkspaceAccess(workspaceId);
+        String currentUserId = RequestContext.get().getUserId();
+        String lockOwner = (currentUserId != null && !currentUserId.isBlank())
+                ? currentUserId
+                : (req != null && req.ownerId != null && !req.ownerId.isBlank() ? req.ownerId : "anonymous");
+        long additionalTtl = (req != null && req.additionalTtlMs > 0) ? req.additionalTtlMs : 60000;
+        boolean renewed = lockManager.renewLease(workspaceId, lockOwner, additionalTtl);
         return Result.ok(renewed);
     }
 
     @PostMapping("/{workspaceId}/lock/release")
     public Result<Boolean> releaseLock(
             @PathVariable("workspaceId") String workspaceId,
-            @RequestBody ReleaseLockRequest req) {
-        boolean released = lockManager.releaseLock(workspaceId, req.ownerId);
+            @RequestBody(required = false) ReleaseLockRequest req) {
+        workspaceApplication.checkWorkspaceAccess(workspaceId);
+        String currentUserId = RequestContext.get().getUserId();
+        String lockOwner = (currentUserId != null && !currentUserId.isBlank())
+                ? currentUserId
+                : (req != null && req.ownerId != null && !req.ownerId.isBlank() ? req.ownerId : "anonymous");
+        boolean released = lockManager.releaseLock(workspaceId, lockOwner);
         return Result.ok(released);
     }
 
     @GetMapping("/{workspaceId}/lock/status")
     public Result<WorkspaceLockManager.LockInfo> getLockStatus(
             @PathVariable("workspaceId") String workspaceId) {
+        workspaceApplication.checkWorkspaceAccess(workspaceId);
         WorkspaceLockManager.LockInfo info = lockManager.getLockInfo(workspaceId)
                 .orElse(new WorkspaceLockManager.LockInfo(workspaceId, null, false, 0, 0));
         return Result.ok(info);

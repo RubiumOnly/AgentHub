@@ -27,6 +27,9 @@ spring:
       enabled: false
 
 agenthub:
+  auth:
+    secret: "${AGENTHUB_AUTH_SECRET:}"
+    allow-superuser-bypass: false
   workspace:
     base-dir: "${AGENTHUB_WORKSPACE_BASE_DIR:/var/lib/agenthub/workspaces}"
 

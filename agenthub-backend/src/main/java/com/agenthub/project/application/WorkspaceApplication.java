@@ -40,5 +40,7 @@ public interface WorkspaceApplication {
 
     byte[] archiveWorkspace(String workspaceIdOrPath) throws Exception;
 
+    void checkWorkspaceAccess(String workspaceIdOrPath);
+
     WorkflowExecutionResult executeWorkflow(WorkflowDefinition workflow, String workspacePath, String taskPrompt);
 }

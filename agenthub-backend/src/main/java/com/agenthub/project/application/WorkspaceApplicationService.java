@@ -74,19 +74,31 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
         this.accessGuard = accessGuard;
     }
 
-    private void checkWorkspaceAccess(String workspaceIdOrPath) {
+    @Override
+    public void checkWorkspaceAccess(String workspaceIdOrPath) {
+        if (RequestContext.get().isSystem()) {
+            return;
+        }
         if (workspaceRepository != null && projectRepository != null && accessGuard != null) {
             String currentUserId = RequestContext.get().getUserId();
-            if (currentUserId != null && !currentUserId.isBlank()) {
-                Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceIdOrPath);
-                if (wsOpt.isEmpty()) {
-                    wsOpt = workspaceRepository.findByProjectId(workspaceIdOrPath);
+            Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceIdOrPath);
+            if (wsOpt.isEmpty()) {
+                wsOpt = workspaceRepository.findByProjectId(workspaceIdOrPath);
+            }
+            if (wsOpt.isPresent()) {
+                ProjectEntity project = projectRepository.findById(wsOpt.get().getProjectId()).orElse(null);
+                if (project != null) {
+                    accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
+                    return;
                 }
-                if (wsOpt.isPresent()) {
-                    projectRepository.findById(wsOpt.get().getProjectId()).ifPresent(project -> {
-                        accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
-                    });
-                }
+            }
+            Optional<ProjectEntity> projOpt = projectRepository.findById(workspaceIdOrPath);
+            if (projOpt.isPresent()) {
+                accessGuard.checkOwnership(projOpt.get().getOwnerId(), currentUserId);
+                return;
+            }
+            if (currentUserId == null || currentUserId.isBlank()) {
+                accessGuard.checkOwnership("unauthenticated-resource", null);
             }
         }
     }

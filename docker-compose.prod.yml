@@ -57,7 +57,7 @@ services:
     networks:
       - agenthub-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -77,6 +77,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8080
+      AGENTHUB_AUTH_SECRET: ${AGENTHUB_AUTH_SECRET:?AGENTHUB_AUTH_SECRET is required in production}
       SPRING_DATASOURCE_URL: jdbc:mysql://agenthub-mysql:3306/${MYSQL_DATABASE:-agenthub}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-agenthub_app}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required in production}

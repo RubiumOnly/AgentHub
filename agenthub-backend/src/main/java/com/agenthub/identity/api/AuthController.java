@@ -6,6 +6,9 @@ import com.agenthub.identity.dto.AuthTokenView;
 import com.agenthub.identity.dto.LoginCommand;
 import com.agenthub.identity.dto.RegisterCommand;
 import com.agenthub.identity.dto.UserView;
+import com.agenthub.shared.context.RequestContext;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,6 +19,19 @@ public class AuthController {
 
     public AuthController(AuthApplication authApplication) {
         this.authApplication = authApplication;
+    }
+
+    public static class StreamTicketResponse {
+        private String ticket;
+        private long expiresInSeconds;
+
+        public StreamTicketResponse(String ticket, long expiresInSeconds) {
+            this.ticket = ticket;
+            this.expiresInSeconds = expiresInSeconds;
+        }
+
+        public String getTicket() { return ticket; }
+        public long getExpiresInSeconds() { return expiresInSeconds; }
     }
 
     @PostMapping("/register")
@@ -33,8 +49,8 @@ public class AuthController {
     @PostMapping("/refresh")
     public Result<AuthTokenView> refresh(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new com.agenthub.shared.exception.BusinessException(
-                    com.agenthub.shared.exception.ErrorCode.UNAUTHORIZED,
+            throw new BusinessException(
+                    ErrorCode.UNAUTHORIZED,
                     "Bearer token required to refresh"
             );
         }
@@ -58,5 +74,16 @@ public class AuthController {
     public Result<UserView> getCurrentUser() {
         UserView user = authApplication.getCurrentUser();
         return Result.ok(user);
+    }
+
+    @PostMapping("/stream-ticket")
+    public Result<StreamTicketResponse> createStreamTicket() {
+        String currentUserId = RequestContext.get().getUserId();
+        String currentEmail = RequestContext.get().getUsername();
+        if (currentUserId == null || currentUserId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to generate stream ticket");
+        }
+        String ticket = authApplication.createStreamTicket(currentUserId, currentEmail);
+        return Result.ok(new StreamTicketResponse(ticket, 60));
     }
 }

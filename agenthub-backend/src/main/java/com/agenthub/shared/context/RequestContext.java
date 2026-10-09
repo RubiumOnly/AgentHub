@@ -4,7 +4,7 @@ import java.util.UUID;
 
 /**
  * ThreadLocal-based context holding request-scoped metadata such as
- * requestId, correlationId, and authenticated user information.
+ * requestId, correlationId, authenticated user information, and system worker flag.
  */
 public class RequestContext {
 
@@ -14,6 +14,7 @@ public class RequestContext {
     private String correlationId;
     private String userId;
     private String username;
+    private boolean system = false;
 
     public RequestContext() {}
 
@@ -73,5 +74,13 @@ public class RequestContext {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public boolean isSystem() {
+        return system;
+    }
+
+    public void setSystem(boolean system) {
+        this.system = system;
     }
 }

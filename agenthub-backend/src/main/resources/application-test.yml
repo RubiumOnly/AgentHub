@@ -17,6 +17,9 @@ spring:
       enabled: false
 
 agenthub:
+  auth:
+    secret: "AgentHub-Test-Secret-Key-Phase1-2026-SuperStrong-Min32Chars"
+    allow-superuser-bypass: true
   workspace:
     base-dir: "${AGENTHUB_TEST_WORKSPACE_DIR:./target/test-workspaces}"
   cli:

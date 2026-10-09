@@ -37,6 +37,9 @@ management:
       application: ${spring.application.name}
 
 agenthub:
+  auth:
+    secret: "${AGENTHUB_AUTH_SECRET:AgentHub-Dev-Secret-Key-Only-For-Local-Testing-2026-Min32Chars}"
+    allow-superuser-bypass: false
   workspace:
     base-dir: ${AGENTHUB_WORKSPACE_BASE_DIR:./data/workspaces}
   cli:

@@ -33,6 +33,19 @@ AgentHub 涉及多智能体协同、本地命令行进程调用以及第三方�
 
 ---
 
-## 四、 漏洞上报 (Reporting Security Vulnerabilities)
+---
+
+## 四、 身份可信链与多租户资源边界 (Identity & Access Boundary Defense)
+
+- **JWT 密钥生产硬化**：生产环境（`prod` profile）必须通过外部环境变量 `AGENTHUB_AUTH_SECRET` 提供至少 32 字符的高强密钥。应用启动时自动检测弱密码、占位符或示例默认值，一旦命中立即熔断拒绝启动。
+- **杜绝生产身份旁路**：生产环境下全面废止 `dev-token-*` 通路与 `X-User-Id` 请求头信任；彻底消除 `user-1` / `system` 硬编码超级用户特权，所有数据操作均严格校验资源归属。
+- **SSE 流安全接入 (Stream Ticket & Cookie)**：禁止在 URL 查询参数中传输长期 Bearer Token。前端使用同源 Cookie 或通过 `POST /api/auth/stream-ticket` 换取 60 秒一次性短时票据进行 SSE 连接。
+- **服务端派生工作区锁属主**：锁获取接口不再信任客户端传入的 `ownerId`，由服务端依据认证主体自动绑定；锁状态、续租与释放操作均实行多租户隔离校验。
+- **持久化 Token 吊销与认证审计**：用户登出与令牌轮换废止记录写入数据库持久化表 `invalidated_tokens`，跨实例与服务重启后持续生效；全量审计认证生命周期事件至 `auth_audit_logs`。
+- **防爆破速率限制**：针对注册、登录等高风险认证端点启用滑动窗口速率限制防御。
+
+---
+
+## 五、 漏洞上报 (Reporting Security Vulnerabilities)
 
 如发现任何潜在的安全隐患、越权访问风险或逻辑缺陷，请不要公开在 GitHub Issues 中讨论，欢迎通过 GitHub 仓库主页的 **Security -> Advisories** 渠道发起私密上报，我们将尽快确认并推送安全补丁。

@@ -18,19 +18,32 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import org.springframework.beans.factory.annotation.Autowired;
+
 @Service
 public class ProviderApplicationService implements ProviderApplication {
 
     private final ProviderRepository providerRepository;
     private final DynamicProviderRouter router;
     private final Environment environment;
+    private final ResourceAccessGuard accessGuard;
 
     public ProviderApplicationService(ProviderRepository providerRepository,
                                     DynamicProviderRouter router,
                                     Environment environment) {
+        this(providerRepository, router, environment, null);
+    }
+
+    @Autowired
+    public ProviderApplicationService(ProviderRepository providerRepository,
+                                    DynamicProviderRouter router,
+                                    Environment environment,
+                                    @Autowired(required = false) ResourceAccessGuard accessGuard) {
         this.providerRepository = providerRepository;
         this.router = router;
         this.environment = environment;
+        this.accessGuard = accessGuard;
     }
 
     @Override
@@ -55,9 +68,13 @@ public class ProviderApplicationService implements ProviderApplication {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "Provider type and model must not be null");
         }
 
-        String userId = RequestContext.get() != null && RequestContext.get().getUserId() != null
-                ? RequestContext.get().getUserId()
-                : "user-1";
+        String userId = RequestContext.get() != null ? RequestContext.get().getUserId() : null;
+        if (userId == null || userId.isBlank()) {
+            if (accessGuard != null && !accessGuard.isAllowSuperuserBypass()) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to create provider");
+            }
+            userId = "user-1";
+        }
 
         String id = "prov-" + UUID.randomUUID().toString().substring(0, 8);
         ProviderEntity entity = new ProviderEntity();
@@ -89,6 +106,10 @@ public class ProviderApplicationService implements ProviderApplication {
         ProviderEntity entity = providerRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PROVIDER_NOT_FOUND, "Provider not found: " + id));
 
+        if (accessGuard != null && entity.getOwnerId() != null) {
+            accessGuard.checkOwnership(entity.getOwnerId(), RequestContext.get().getUserId());
+        }
+
         if (cmd.getBaseUrl() != null) entity.setBaseUrl(cmd.getBaseUrl());
         if (cmd.getSecretRef() != null) entity.setSecretRef(cmd.getSecretRef());
         if (cmd.getModel() != null) entity.setModel(cmd.getModel());
@@ -109,8 +130,10 @@ public class ProviderApplicationService implements ProviderApplication {
     @Override
     @Transactional
     public void deleteProvider(String id) {
-        if (!providerRepository.existsById(id)) {
-            throw new BusinessException(ErrorCode.PROVIDER_NOT_FOUND, "Provider not found: " + id);
+        ProviderEntity entity = providerRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROVIDER_NOT_FOUND, "Provider not found: " + id));
+        if (accessGuard != null && entity.getOwnerId() != null) {
+            accessGuard.checkOwnership(entity.getOwnerId(), RequestContext.get().getUserId());
         }
         providerRepository.deleteById(id);
         router.unregisterProvider(id);

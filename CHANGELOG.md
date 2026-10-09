@@ -2,6 +2,28 @@
 
 所有关键架构升级、特性新增与重要缺陷修复均按版本记录于此。
 
+## [v2.0.0-stage-a] - 2026-10-09
+
+### 🛡️ 阶段 A 里程碑：可信身份收敛与多租户资源边界防御 (Stage A Identity & Resource Boundary Defense)
+- **生产环境身份密钥与凭据收敛 (External Hardened Secret & Zero Dev Bypass)**：
+  - `TokenProvider` 强化生产环境启动校验：在 `prod` Profile 下强制要求 `AGENTHUB_AUTH_SECRET` 外部注入，长度 >= 32 字符，严禁默认缺省值与示例占位值；
+  - 封禁生产路径下的 `dev-token-*` 开发凭证与 `X-User-Id` 请求头伪造旁路，拦截一切伪造身份；
+  - 移除 `ResourceAccessGuard` 硬编码超级用户 `user-1` 与 `system` 越权后门，非属主资源访问严格校验所有权。
+- **SSE 短时单次 Stream Ticket 签发与同源 Cookie 鉴权**：
+  - 新增 `POST /api/auth/stream-ticket` 接口，签发 60 秒一次性凭证，并在首度校验后单次原子消费，阻断 URL 查询参数明文传递长期 JWT 导致的日志泄露；
+  - `AuthFilter` 统一支持标准 `Authorization: Bearer <token>`、同源 HttpOnly `agenthub_token` Cookie 与短时 `ticket`。
+- **全链路多租户资源所有权隔离矩阵**：
+  - **工作区锁服务端派生所有权**：移除客户端可伪造的 `ownerId`，统一通过 `RequestContext.currentUserId` 派生，并在工作区文件操作及加锁、续租、释放、状态探测时严格核验工作区项目属主；
+  - **部署与沙箱隔离**：`DeploymentApplicationService` 严格校验关联 Project 属主，全面阻断跨租户创建、读取、启停、查日志与列表探测越权；
+  - **Provider 凭据保护**：`ProviderApplicationService` 增补属主核验，杜绝非属主篡改与删除。
+- **持久化令牌吊销与认证安全审计**：
+  - Flyway 新增 `V9__phase_a_security_revocation_and_audit.sql`，建立 `invalidated_tokens` 与 `auth_audit_logs` 数据库表；
+  - 落地 `InvalidatedTokenEntity` 与 `InvalidatedTokenRepository`，TokenProvider 启动与注销时持久化加载并记录吊销凭据，重启与多实例强一致生效；
+  - 落地 `AuthAuditService` 与 `AuthRateLimiter`，记录全生命周期认证审计流水，并对注册与登录端点启用滑动窗口防爆破限流。
+- **自动化测试防御与容器基线验证**：
+  - 新增 `PhaseASecurityAndResourceBoundaryIntegrationTest` 覆盖 9 大黑盒端到端安全场景，100% 绿灯；
+  - `docker-compose.prod.yml` 引入外部 `AGENTHUB_AUTH_SECRET` 约束，修复 Redis 容器密码探针认证。
+
 ---
 
 ## [v1.9.0] - 2026-10-09

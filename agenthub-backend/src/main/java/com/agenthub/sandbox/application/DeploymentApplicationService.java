@@ -22,6 +22,12 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.agenthub.project.infrastructure.entity.ProjectEntity;
+import com.agenthub.project.infrastructure.repository.ProjectRepository;
+import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import com.agenthub.shared.context.RequestContext;
+import org.springframework.beans.factory.annotation.Autowired;
+
 /**
  * Orchestrator application service for sandbox deployments, port allocations,
  * and health check verification.
@@ -36,17 +42,47 @@ public class DeploymentApplicationService implements DeploymentApplication {
     private final PortAllocationService portAllocationService;
     private final HealthCheckProbeService healthCheckProbeService;
     private final SandboxProviderFactory sandboxProviderFactory;
+    private final ProjectRepository projectRepository;
+    private final ResourceAccessGuard accessGuard;
 
     public DeploymentApplicationService(DeploymentRepository deploymentRepository,
                                       WorkspaceResolver workspaceResolver,
                                       PortAllocationService portAllocationService,
                                       HealthCheckProbeService healthCheckProbeService,
                                       SandboxProviderFactory sandboxProviderFactory) {
+        this(deploymentRepository, workspaceResolver, portAllocationService, healthCheckProbeService, sandboxProviderFactory, null, null);
+    }
+
+    @Autowired
+    public DeploymentApplicationService(DeploymentRepository deploymentRepository,
+                                      WorkspaceResolver workspaceResolver,
+                                      PortAllocationService portAllocationService,
+                                      HealthCheckProbeService healthCheckProbeService,
+                                      SandboxProviderFactory sandboxProviderFactory,
+                                      @Autowired(required = false) ProjectRepository projectRepository,
+                                      @Autowired(required = false) ResourceAccessGuard accessGuard) {
         this.deploymentRepository = deploymentRepository;
         this.workspaceResolver = workspaceResolver;
         this.portAllocationService = portAllocationService;
         this.healthCheckProbeService = healthCheckProbeService;
         this.sandboxProviderFactory = sandboxProviderFactory;
+        this.projectRepository = projectRepository;
+        this.accessGuard = accessGuard;
+    }
+
+    private void checkProjectAccess(String projectId) {
+        if (RequestContext.get().isSystem()) {
+            return;
+        }
+        if (projectRepository != null && accessGuard != null && projectId != null) {
+            String currentUserId = RequestContext.get().getUserId();
+            ProjectEntity project = projectRepository.findById(projectId).orElse(null);
+            if (project != null) {
+                accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
+            } else if (currentUserId == null || currentUserId.isBlank()) {
+                accessGuard.checkOwnership("unauthenticated-resource", null);
+            }
+        }
     }
 
     @Override
@@ -56,6 +92,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
         }
 
         String projectId = request.getProjectId();
+        checkProjectAccess(projectId);
         Path workspaceRoot = workspaceResolver.getWorkspaceRoot(projectId);
 
         String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
@@ -164,6 +201,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
     public DeploymentResponse stopDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
+        checkProjectAccess(entity.getProjectId());
 
         if (DeploymentStatus.RUNNING.name().equals(entity.getStatus()) ||
                 DeploymentStatus.BUILDING.name().equals(entity.getStatus())) {
@@ -192,12 +230,14 @@ public class DeploymentApplicationService implements DeploymentApplication {
     public DeploymentResponse getDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
+        checkProjectAccess(entity.getProjectId());
         return toResponse(entity);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<DeploymentResponse> listDeployments(String projectId) {
+        checkProjectAccess(projectId);
         return deploymentRepository.findByProjectIdOrderByStartedAtDesc(projectId)
                 .stream()
                 .map(this::toResponse)
@@ -209,6 +249,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
     public String getDeploymentLogs(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
+        checkProjectAccess(entity.getProjectId());
         return entity.getLogOutput() != null ? entity.getLogOutput() : "";
     }
 

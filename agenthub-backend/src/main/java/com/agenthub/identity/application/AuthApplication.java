@@ -12,4 +12,5 @@ public interface AuthApplication {
     void logout(String token);
     UserView getCurrentUser();
     UserView getUserById(String userId);
+    String createStreamTicket(String userId, String email);
 }
