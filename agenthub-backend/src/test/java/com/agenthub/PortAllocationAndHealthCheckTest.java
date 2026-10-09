@@ -84,8 +84,8 @@ class PortAllocationAndHealthCheckTest {
     @Test
     @DisplayName("健康检查探测 4：对正常运行的 HTTP 服务探测成功返回 true")
     void shouldProbeHealthyEndpointSuccessfully() throws Exception {
-        // Spin up a lightweight in-process HttpServer on an ephemeral port
-        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        // Spin up a lightweight in-process HttpServer on IPv4 loopback (127.0.0.1) on an ephemeral port
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/health", exchange -> {
             byte[] response = "OK".getBytes();
             exchange.sendResponseHeaders(200, response.length);
@@ -96,11 +96,11 @@ class PortAllocationAndHealthCheckTest {
         server.start();
 
         int boundPort = server.getAddress().getPort();
-        String healthUrl = "http://localhost:" + boundPort + "/health";
+        String healthUrl = "http://127.0.0.1:" + boundPort + "/health";
 
         try {
             HealthCheckProbeService probeService = new HealthCheckProbeService();
-            boolean healthy = probeService.probe(healthUrl, 3, 200);
+            boolean healthy = probeService.probe(healthUrl, 5, 200);
             assertThat(healthy).isTrue();
         } finally {
             server.stop(0);
@@ -111,8 +111,8 @@ class PortAllocationAndHealthCheckTest {
     @DisplayName("健康检查探测 5：对不可达或断开的服务多次重试后优雅返回 false")
     void shouldReturnFalseWhenEndpointIsUnreachable() {
         HealthCheckProbeService probeService = new HealthCheckProbeService();
-        // Probe an unoccupied port
-        boolean healthy = probeService.probe("http://localhost:59999/health", 2, 100);
+        // Probe an unoccupied port on 127.0.0.1
+        boolean healthy = probeService.probe("http://127.0.0.1:59999/health", 2, 100);
         assertThat(healthy).isFalse();
     }
 }

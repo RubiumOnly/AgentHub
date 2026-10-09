@@ -52,9 +52,13 @@ public class EnvironmentSanitizer {
             }
         }
 
-        // 2. Set explicit sandbox execution markers
+        // 2. Set explicit sandbox execution markers and baseline PATH fallback
         cleanEnv.put("AGENTHUB_SANDBOX", "true");
         cleanEnv.put("CI", "true");
+        if (!cleanEnv.containsKey("PATH")) {
+            boolean isWin = System.getProperty("os.name", "").toLowerCase().contains("win");
+            cleanEnv.put("PATH", isWin ? "C:\\Windows\\System32;C:\\Windows" : "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+        }
 
         // 3. Merge user-provided custom environment variables with safety validation
         if (userEnv != null) {

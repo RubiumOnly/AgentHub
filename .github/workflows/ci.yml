@@ -24,6 +24,17 @@ jobs:
         run: mvn clean test
         working-directory: agenthub-backend
 
+      - name: Output Test Failure Diagnostics
+        if: failure()
+        run: |
+          for f in $(find target/surefire-reports -name "*.txt" 2>/dev/null); do
+            if grep -E "FAILURE|ERROR" "$f" >/dev/null 2>&1; then
+              echo "=== Failure Report: $f ==="
+              cat "$f"
+            fi
+          done
+        working-directory: agenthub-backend
+
   frontend-build:
     name: Frontend Build & Typecheck (Next.js 14)
     runs-on: ubuntu-latest
