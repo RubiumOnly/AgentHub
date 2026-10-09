@@ -342,7 +342,7 @@ Artifact / 日志位置：
 ```text
 阶段：阶段 B（前端去 Mock 化与真实产品主旅程）
 验收日期：2026-10-09
-Git commit：待提交（见当次 commit SHA）
+Git commit：fc01c86 (feat(ui): 完成阶段 B 前端去 Mock 化、真实认证闭环与产品主旅程联动)
 运行环境：OS: Windows 11 / JDK: 17.0.15 / Node: 20.x / Next.js: 14.2.13
 执行命令：
   - npm run build (agenthub-frontend)
