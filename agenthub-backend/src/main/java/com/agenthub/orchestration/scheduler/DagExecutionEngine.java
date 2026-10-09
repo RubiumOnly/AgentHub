@@ -184,9 +184,15 @@ public class DagExecutionEngine {
                 AtomicBoolean isAborted = new AtomicBoolean(false);
                 CountDownLatch completionLatch = new CountDownLatch(dsl.getNodes().size());
 
-                // Task execution routine
+                // Task execution routine with duplicate dispatch guard
+                Set<String> scheduledNodes = Collections.newSetFromMap(new ConcurrentHashMap<>());
                 java.util.function.Consumer<WorkflowNodeDsl>[] taskLauncher = new java.util.function.Consumer[1];
                 taskLauncher[0] = (node) -> {
+                    if (node == null) return;
+                    if (!scheduledNodes.add(node.getId())) {
+                        log.debug("Node [{}] already scheduled, skipping duplicate dispatch", node.getId());
+                        return;
+                    }
                     executionPool.submit(() -> {
                         nodeStatuses.put(node.getId(), StepRunStatus.RUNNING);
                         executeNode(runId, node, stepEntityMap.get(node.getId()), stepEntityMap, topology, inDegrees,
@@ -195,11 +201,19 @@ public class DagExecutionEngine {
                     });
                 };
 
-                // Trigger all initial ready nodes (in-degree == 0) concurrently
+                // Trigger all initial ready root nodes (incoming dependencies is empty) concurrently
+                List<WorkflowNodeDsl> rootNodes = new ArrayList<>();
                 for (String id : topology.getSortedNodeIds()) {
-                    if (inDegrees.get(id).get() == 0) {
-                        taskLauncher[0].accept(nodeMap.get(id));
+                    Set<String> inc = topology.getIncoming().get(id);
+                    if (inc == null || inc.isEmpty()) {
+                        WorkflowNodeDsl n = nodeMap.get(id);
+                        if (n != null) {
+                            rootNodes.add(n);
+                        }
                     }
+                }
+                for (WorkflowNodeDsl rootNode : rootNodes) {
+                    taskLauncher[0].accept(rootNode);
                 }
 
                 // Wait for all nodes to complete, abort, cancel, or timeout
@@ -318,6 +332,26 @@ public class DagExecutionEngine {
 
             if (preds != null && !preds.isEmpty()) {
                 String joinPolicy = node.getJoinPolicy() != null ? node.getJoinPolicy().trim().toLowerCase() : "all_succeeded";
+
+                // Defensive wait: ensure all predecessors have settled into their terminal status across thread pools
+                for (String p : preds) {
+                    long waitLimit = System.currentTimeMillis() + 3000L;
+                    while (System.currentTimeMillis() < waitLimit) {
+                        StepRunStatus pStatus = nodeStatuses.get(p);
+                        if (pStatus != null && pStatus != StepRunStatus.RUNNING && pStatus != StepRunStatus.PENDING) {
+                            break;
+                        }
+                        if (cancelToken.isCancelled() || isAborted.get()) {
+                            break;
+                        }
+                        try {
+                            Thread.sleep(5);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
 
                 java.util.function.Predicate<String> isPredSatisfied = (p) -> {
                     StepRunStatus pStatus = nodeStatuses.get(p);
@@ -500,9 +534,15 @@ public class DagExecutionEngine {
         Set<String> successors = topology.getOutgoing().get(nodeId);
         if (successors != null) {
             for (String succId : successors) {
-                int rem = inDegrees.get(succId).decrementAndGet();
-                if (rem == 0) {
-                    launcher.accept(nodeMap.get(succId));
+                AtomicInteger deg = inDegrees.get(succId);
+                if (deg != null) {
+                    int rem = deg.decrementAndGet();
+                    if (rem == 0) {
+                        WorkflowNodeDsl succNode = nodeMap.get(succId);
+                        if (succNode != null) {
+                            launcher.accept(succNode);
+                        }
+                    }
                 }
             }
         }

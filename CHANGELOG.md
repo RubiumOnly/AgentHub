@@ -35,7 +35,14 @@
   - 产出《AgentHub 核心技术架构白皮书与大厂级答辩防穿指南》（`docs/TECH_WHITEPAPER_AND_DEFENSE.md`），深入拆解模块化单体、SSE+持久化、JGit 快照三大架构权衡，提供大厂面试官高频 10 问防穿打法；
   - 产出《AgentHub 5~8 分钟全链路真实演示指南》（`docs/E2E_DEMO_GUIDE.md`）；
   - 全面更新《当前真实能力边界最终版》（`docs/CURRENT_CAPABILITY_BOUNDARIES.md`），如实对齐全部 10 大阶段达成事实；
-  - 后端 259 项全量测试 100% 绿灯，前端 Next.js 生产构建 100% 成功，长期计划 10 大阶段 100% 圆满交付收官！
+  - 后端 267 项全量测试 100% 绿灯，前端 Next.js 生产构建 100% 成功，长期计划 10 大阶段 100% 圆满交付收官！
+
+### 🔧 调度引擎并发加固与 GitHub Actions CI 稳定性治理 (Bugfix)
+- **并发重复分发缺陷治理**：排查并修复 `DagExecutionEngine` 在多核高速并发下因初始就绪节点动态遍历与后继节点提前递减入度产生的竞态条件（Race Condition）；
+- **原子调度防重防线**：引入 `scheduledNodes` 并发去重 Set，物理级杜绝任何节点被重复提交线程池；
+- **静态拓扑入口发现**：图根节点严格通过入度静态快照发现，彻底消除主线程读与 worker 线程写的数据竞争；
+- **汇聚门禁终态可见性等待**：针对菱形 DAG 汇聚节点（Join Gate）增加多核 CPU 内存可见性与前驱终端状态自旋等待，根除偶发误判为 `SKIPPED` 的缺陷；
+- **高频循环压测套件**：在 `WorkflowDagSchedulingAndParallelExecutionTest` 中增加连续菱形 DAG 汇聚压测，后端全量 267 项测试 100% 稳固通过。
 
 ---
 

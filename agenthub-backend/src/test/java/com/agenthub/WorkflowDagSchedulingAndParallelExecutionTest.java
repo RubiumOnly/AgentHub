@@ -166,4 +166,43 @@ class WorkflowDagSchedulingAndParallelExecutionTest {
         WorkflowRunStatus finalStatus = future.get(10, TimeUnit.SECONDS);
         assertThat(finalStatus).isEqualTo(WorkflowRunStatus.SUCCEEDED);
     }
+
+    @Test
+    @DisplayName("测试菱形 DAG 高频重复执行与高并发汇聚稳定性，杜绝任何偶发 SKIPPED 竞态")
+    void shouldExecuteDiamondDagRepeatedlyWithoutRaceCondition(@TempDir File workspaceDir) throws Exception {
+        for (int i = 0; i < 5; i++) {
+            WorkflowRunView run = executionApplication.startRun(new StartRunCommand("proj-default", null, null));
+            String runId = run.getId();
+
+            WorkflowDsl dsl = new WorkflowDsl("wf-diamond-stress-" + i, "菱形并发与数据拓扑高压测试");
+            WorkflowNodeDsl startNode = new WorkflowNodeDsl("start", "工作流起点", "START");
+            WorkflowNodeDsl backendNode = new WorkflowNodeDsl("backend", "后端架构", "AGENT", "MOCK", "编写后端服务接口");
+            WorkflowNodeDsl frontendNode = new WorkflowNodeDsl("frontend", "前端工程", "AGENT", "MOCK", "编写前端用户界面");
+            WorkflowNodeDsl qaNode = new WorkflowNodeDsl("qa", "QA测试审查", "AGENT", "MOCK", "审查代码");
+            WorkflowNodeDsl endNode = new WorkflowNodeDsl("end", "工作流终点", "END");
+
+            dsl.setNodes(List.of(startNode, backendNode, frontendNode, qaNode, endNode));
+            dsl.setEdges(List.of(
+                    new WorkflowEdgeDsl("start", "backend"),
+                    new WorkflowEdgeDsl("start", "frontend"),
+                    new WorkflowEdgeDsl("backend", "qa"),
+                    new WorkflowEdgeDsl("frontend", "qa"),
+                    new WorkflowEdgeDsl("qa", "end")
+            ));
+
+            CompletableFuture<WorkflowRunStatus> future = dagExecutionEngine.executeDag(
+                    runId, dsl, workspaceDir.getAbsolutePath(), Map.of(), 60
+            );
+
+            WorkflowRunStatus status = future.get(10, TimeUnit.SECONDS);
+            assertThat(status).isEqualTo(WorkflowRunStatus.SUCCEEDED);
+
+            List<StepRunView> stepRuns = executionApplication.listStepRuns(runId);
+            for (StepRunView step : stepRuns) {
+                assertThat(step.getStatus())
+                        .withFailMessage("Step %s in iteration %d should be SUCCEEDED but was %s", step.getNodeId(), i, step.getStatus())
+                        .isEqualTo("SUCCEEDED");
+            }
+        }
+    }
 }
