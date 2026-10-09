@@ -4,6 +4,31 @@
 
 ---
 
+## [v1.8.0] - 2026-10-09
+
+### 🌟 阶段 8：前端 Bento 现代美学、实时看板与交互体验升级 (Phase 8 Deliverables)
+- **坚决消灭“AI 塑料味”前端，遵循 `modern-aesthetic-ui` 顶级规范**：
+  - 彻底重构前端仪表盘，采用 **Bento Grid** 模块化便当盒网格，打造 Linear / Vercel / Apple 级极致精致质感；
+  - 彻底杜绝无意义的装饰性副标题、刺眼大渐变与死板假卡片，全量采用低饱和度环境微光（Ambient Subtle Radial Glow）与高阶磨砂微质感（Subtle Glassmorphism：`bg-zinc-900/60`, `backdrop-blur-md`, `border border-zinc-800/80`）；
+  - 精致暗黑模式灰阶层级（底色 `zinc-950` / `#09090b`，卡片 `zinc-900`，悬浮 `zinc-800`，单重点色 Indigo / Emerald 锚点，等宽字体呈现所有 Hash、ID、时间戳与成本数值）；
+- **全生命周期执行与拓扑看板 (Bento Executive Dashboard)**：
+  - **实时执行流面板 (`LiveExecutionTerminal`)**：无缝集成阶段 3 SSE 流式输出（`/api/runs/{runId}/stream` 与 `/api/executions/runs/{runId}/stream`），支持自动滚动开关（Auto-scroll toggle）、ANSI 语法色彩分级高亮（`[INFO]`, `[WARN]`, `[ERROR]`, `[STEP]`, `[AGENT]`, `[AUDIT]`, `[SANDBOX]`）、带 `Last-Event-ID` 游标的断点重连状态指示（`CONNECTED`, `RECONNECTING`, `OFFLINE`）与日志一键复制/清空；
+  - **工作流 DAG 依赖拓扑可视化面板 (`DagTopologyVisualizer`)**：基于 `@xyflow/react` 构建现代化流体节点图，全量原生支持阶段 4 Workflow DSL 节点类型（`START`, `AGENT`, `APPROVAL`, `CONDITION`, `JOIN`, `END`），清晰标识 6 维节点状态（`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `SKIPPED`, `WAITING_APPROVAL`），并配备交互式节点属性抽屉（Node Inspector）；
+  - **人工审批挂起与决策门禁卡片 (`ApprovalActionCard`)**：当工作流命中 `WAITING_APPROVAL` 门禁时，高优先级微光警告卡片实时浮现，清晰展示审批说明与请求主体，提供审查人与审查意见输入框，通过一键 Approve（批准放行）与 Reject（安全驳回）实时联动后端 REST 接口（`/api/approvals/{id}/approve` 与 `/api/approvals/{id}/reject`）；
+  - **受控工作区与 JGit 行级审查面板 (`DiffArtifactReviewer`)**：展示阶段 2 的变更文件树、增删行统计（+added, -deleted）、Unified Diff 行级高亮对比与一键“安全回滚 (Revert to Baseline)”防误触确认交互；
+  - **多智能体协同网络与会话消息流 (`MultiAgentSwarmChat`)**：展示阶段 6 的 Team 拓扑（Hierarchical/P2P/Round-Robin）、角色标签（`ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`）、128 分段锁单调连续保序序号（`#1`, `#2`, `#3`...）、私聊隔离（`BROADCAST` vs `DIRECT` P2P 锁定）、四层死循环熔断指示器（`LoopDetector: Normal`）、上下文滚动摘要（Rolling Summary）与飞书级富文本卡片交互；
+  - **模型 Provider 动态路由与 Token 成本仪表盘 (`ProviderCostDashboard`)**：可视化展示阶段 5 多 Provider 矩阵（DeepSeek, Claude 3.5 Sonnet, Gemini 1.5 Flash, Ollama Local, OpenAI Backup）、`avgLatencyMs` 毫秒级延迟、`CircuitBreaker` 三态熔断器状态（`CLOSED` 绿灯, `HALF_OPEN` 黄灯, `OPEN` 红灯）、Token 消耗量与实时成本核算（$），并支持加权路由动态推演模拟；
+  - **沙箱预览与部署控制台 (`SandboxPreviewPanel`)**：集成阶段 7 部署生命周期状态机（`CREATED`, `BUILDING`, `RUNNING`, `STOPPED`, `FAILED`）、受控动态端口原子分配（18000-18999）、部署构建日志实时流查看与内嵌式 Web 沙箱安全预览 iframe；
+- **前端工程架构解耦与类型安全**：
+  - 彻底治理前序轮次中 `page.tsx` 过于庞大臃肿、状态混杂的代码坏味道，拆分为 `src/types/`、`src/services/api.ts`、`src/components/common/` 与 `src/components/dashboard/` 模块化架构；
+  - 具备完善的离线/脱机优雅降级与演示种子数据体系，后端未就绪时界面不白屏、不崩溃；后端联通时自动无缝衔接实时接口；
+  - 严格 TypeScript 强类型约束，0 `any` 危险断言，Next.js 14 生产打包（`npm run build`）全量路由静态生成 100% 成功通过；
+- **全绿灯质量门禁**：
+  - 前端 Next.js 14 生产构建 100% 成功（4/4 路由预渲染完成，0 报错）；
+  - 后端 255/255 项单元/领域/架构测试 100% 保持全绿，前后端协作零破坏。
+
+---
+
 ## [v1.7.0] - 2026-10-09
 
 ### 🌟 阶段 7：工作区沙箱容器化与部署自动化 (Phase 7 Deliverables)

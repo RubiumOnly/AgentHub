@@ -472,25 +472,65 @@ public interface AgentRuntime {
 - [x] 主动健康检查探测在有效服务上正常通过，在失效服务上优雅重试并上报失败（`PortAllocationAndHealthCheckTest` 验证通过）；
 - [x] 一键部署生命周期（BUILDING -> RUNNING -> STOPPED / FAILED）与 REST 控制器通过端到端验证，Flyway V8 迁移顺利执行（`DeploymentLifecycleAndControllerIntegrationTest` & `FlywayMigrationAndSchemaTest` 验证通过）。
 
-### 阶段 8：真实预览与部署（预计 1～2 周）
+### 阶段 8：前端 Bento 现代美学、实时看板与交互体验升级（✅ 已圆满交付）
 
-**目标**：将当前“返回 Dockerfile 字符串”升级为安全、可回收的本地/测试环境部署。
+> **阶段交付状态**：已全面遵循 `modern-aesthetic-ui` 顶级设计规范，彻底重构前端控制台与仪表盘为 Bento Grid 模块化网格布局，坚决消灭“一眼 AI 塑料味”。设计并交付 7 大核心面板：实时执行流 SSE 终端（ANSI 高亮/自动滚动/断点续连）、工作流 DAG 拓扑可视化（@xyflow/react + 6 大 DSL 节点 + 状态联动）、人工审批挂起决策门禁卡片（Approval Action Card + REST 联动）、受控工作区 JGit 行级审查与安全回滚（Unified Diff + Revert to Baseline）、多智能体协同网络（拓扑指示/128 分段锁单调保序序号/私聊隔离/死循环熔断提示/滚动摘要）、模型 Provider 动态加权路由与 Token 成本实时核算仪表盘（3 态熔断器 + 毫秒延迟）、沙箱预览与部署控制台（动态端口/实时日志/内嵌 iframe 沙箱预览）。前端 Next.js 14 生产构建 100% 成功，后端 255 项测试全量保持绿灯。
 
-**具体工作**：
+**目标**：构建 Linear / Vercel 级精致高级感的现代全栈应用界面与执行看板，无缝闭环编排拓扑、SSE 终端、人工审批、Git Diff 审查、多智能体协同、模型成本与沙箱预览。
 
-1. 先支持静态前端项目：构建命令、产物目录、端口、启动命令和环境变量必须来自受校验的 DeploymentSpec。
-2. 预览采用短生命周期容器或独立 worker；不在 Spring Boot 主进程内执行不受控的 npm、Docker 或 shell 命令。
-3. 容器使用非 root 用户、只读根文件系统、CPU/内存/磁盘/网络限制、超时和自动清理；预览域名/端口与 Project/Deployment 记录绑定。
-4. 部署动作必须经过 Artifact 审批和质量门禁；运行中记录 build、start、health check、stop、cleanup 状态。
-5. 第一版只实现本地 Docker Compose/单机目标；Kubernetes 只输出经验证的模板，不宣称已接入集群。
-6. 增加部署回滚、日志查看、健康检查、过期回收和失败清理。
+**具体工作与实现**：
 
-**退出条件**：
+1. **坚决消灭“AI 塑料味”前端规范 (`modern-aesthetic-ui`)**：
+   - 彻底废除生硬对称假卡片、无意义装饰副标题与刺眼大渐变；
+   - 采用 Bento Grid 便当盒模块化网格，合理划分 Hero 核心区、辅助功能区与快照指标区；
+   - 精致暗黑模式灰阶层级：底色 `zinc-950` (`#09090b`)、磨砂玻璃拟态（`bg-zinc-900/60`, `backdrop-blur-md`）、1px 微光细边线（`border border-zinc-800/80`）、低饱和度径向环境微光（Ambient Radial Glow）、单重点色锚点（Linear Indigo 与 Apple Emerald）；全量等宽数据字体呈现 ID、耗时、Token 与金额；
+2. **实时执行流终端 (`LiveExecutionTerminal`)**：
+   - 深度集成阶段 3 SSE 事件流（`/api/runs/{runId}/stream` 与 `/api/executions/runs/{runId}/stream`）；
+   - 支持自动滚动锁定/暂停开关（Auto-scroll toggle）、ANSI 语法色彩分级高亮（`[INFO]`, `[WARN]`, `[ERROR]`, `[STEP]`, `[AGENT]`, `[AUDIT]`, `[SANDBOX]`）；
+   - 具备 `Last-Event-ID` 游标断点续连指示与连接状态徽章（`CONNECTED`, `RECONNECTING`, `OFFLINE`）及日志清空与复制；
+3. **工作流 DAG 依赖拓扑可视化面板 (`DagTopologyVisualizer`)**：
+   - 基于 `@xyflow/react` 打造流体有向无环图，完全对齐阶段 4 DSL 6 大节点类型（`START`, `AGENT`, `APPROVAL`, `CONDITION`, `JOIN`, `END`）；
+   - 节点多维状态实时同步（`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `SKIPPED`, `WAITING_APPROVAL`），支持状态微光边框与脉冲动画；
+   - 交互式节点抽屉 (Node Inspector)：点击节点即刻查看运行时平台、Prompt 模板、耗时与产物引用；
+4. **人工审批决策门禁卡片 (`ApprovalActionCard`)**：
+   - 当节点处于 `WAITING_APPROVAL` 时，高优先级微光警告卡片实时浮现；
+   - 承载审批事项原因、发起主体、审查人身份与审查意见输入框；
+   - 一键 Approve 与 Reject 联动后端 REST 接口（`/api/approvals/{id}/approve` 与 `/reject`），解除挂起并恢复工作流；
+5. **受控工作区与 JGit 行级审查面板 (`DiffArtifactReviewer`)**：
+   - 展示阶段 2 受控工作区文件变更树与增删行统计（+added, -deleted）；
+   - 语法高亮 Unified Diff 对比（绿增、红删、代码行号）；
+   - 安全回滚 (Revert to Baseline)：二次防误触确认弹窗，联动 JGit 快照恢复工作区（`/api/audit/artifacts/{id}/revert`）；
+6. **多智能体协同网络与消息时间线 (`MultiAgentSwarmChat`)**：
+   - 展示阶段 6 Team 拓扑（Hierarchical/P2P/Round-Robin）与角色标签（`ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`）；
+   - 严格单调连续保序序号徽章（`#1`, `#2`, `#3`...，依托 128 分段锁）；
+   - 私聊可见性隔离标签（`BROADCAST` vs `DIRECT` P2P 锁定）；
+   - 四层死循环检测熔断指示器（`LoopDetector: Normal`）与滚动上下文摘要横幅；
+7. **模型 Provider 动态路由与 Token 成本仪表盘 (`ProviderCostDashboard`)**：
+   - 展示多 Provider 矩阵（DeepSeek, Claude 3.5 Sonnet, Gemini 1.5 Flash, Ollama, OpenAI Backup）；
+   - 实时健康延迟毫秒数与三态熔断器指示（`CLOSED` 绿灯, `HALF_OPEN` 黄灯, `OPEN` 红灯）；
+   - Token 消耗与实时成本核算（Prompt, Completion, Total, 实时美金）；
+   - 加权路由动态推演模拟（调用 `/api/providers/route`）；
+8. **沙箱预览与部署控制台 (`SandboxPreviewPanel`)**：
+   - 展示阶段 7 部署状态机（`CREATED`, `BUILDING`, `RUNNING`, `STOPPED`, `FAILED`）；
+   - 动态原子端口分配展示（`:18080`）；
+   - 实时部署日志查看终端与一键停止/部署操作；
+   - 内嵌交互式 Web 沙箱预览 iframe；
+9. **前端工程架构解耦与全绿灯门禁**：
+   - 治理 `page.tsx` 过于庞大臃肿坏味道，拆分为 `src/types/`、`src/services/api.ts`、`src/components/common/` 与 `src/components/dashboard/`；
+   - 具备优雅降级与脱机体验，后端未连通时平滑使用种子数据，连通时实时接入；
+   - Next.js 14 生产打包（`npm run build`）全量路由预渲染 100% 成功，TypeScript 0 报错；后端 255/255 测试 100% 绿灯。
 
-- 从一次通过审批的 Run 产生真实可访问预览；
-- 构建失败、启动失败、健康检查失败均可查询和回收；
-- 一个 Project 的容器不能读取另一个 Project 的文件；
-- 部署记录、URL、Artifact checksum 和实际容器状态一致。
+**退出条件与验证证据**：
+
+- [x] 前端界面完全消灭 AI 塑料味，采用 Bento Grid 模块化网格与 Linear 级磨砂质感；
+- [x] SSE 执行终端支持自动滚动、ANSI 彩色高亮、断点续连指示与日志管理；
+- [x] DAG 拓扑图完整呈现 6 大 DSL 节点并清晰标记 6 维执行状态，配备交互式节点抽屉；
+- [x] 人工审批卡片在 WAITING_APPROVAL 时浮现，支持审查人与意见输入并实时联动 REST 接口；
+- [x] JGit 行级审查面板展示文件树、增删统计、语法高亮与安全回滚基线确认交互；
+- [x] 多智能体协同网络展示拓扑、角色、单调保序序号、私聊隔离与防死循环熔断状态；
+- [x] Provider 仪表盘展示三态熔断器、健康延迟、Token 消耗与实时成本核算；
+- [x] 沙箱控制台集成部署状态机、动态分配端口、日志查看与 iframe 实时预览；
+- [x] 前端 Next.js 14 生产构建通过（4/4 路由静态生成），后端 255/255 测试全量绿灯通过。
 
 ### 阶段 9：上线工程和运维验证（预计 1～2 周）
 

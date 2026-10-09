@@ -4,29 +4,39 @@
 
 @layer base {
   :root {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
   }
 }
 
 body {
   color: hsl(var(--foreground));
-  background: #090d16;
+  background-color: #09090b;
   font-feature-settings: "rlig" 1, "calt" 1;
+  overflow-x: hidden;
 }
 
 /* Custom subtle scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Linear & Vercel subtle backdrop glow */
+.ambient-glow {
+  background: radial-gradient(
+    circle at 50% 0%,
+    rgba(99, 102, 241, 0.08) 0%,
+    rgba(9, 9, 11, 0) 70%
+  );
 }

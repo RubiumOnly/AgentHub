@@ -422,4 +422,55 @@ flowchart TD
   - `POST /api/deployments/{id}/stop`：主动停止部署并释放占用端口；
   - `GET /api/deployments?projectId={id}`：查询项目历史部署记录。
 
+---
+
+## 十一、 前端 Bento 现代美学、实时看板与交互体验架构 (Phase 8 升级)
+
+### 1. 核心设计准则：消灭“AI 塑料味”，践行 `modern-aesthetic-ui`
+- **便当盒模块化网格 (Bento Grid)**：放弃千篇一律对称栅格，按照 Hero 核心区（拓扑图 + SSE 终端）、功能协同区（多 Agent 消息流 + Diff 审查）、指标快照区（KPI 5 维微卡片、Provider 路由与沙箱控制台）进行非对称信息密度层级划分；
+- **微质感与环境光影 (Subtle Glassmorphism & Ambient Glow)**：
+  - 沉稳碳素黑基底：采用 `zinc-950` (`#09090b`) 底色与极低饱和度径向环境微光（Radial Ambient Glow，透明度 5%-8%）；
+  - 磨砂玻璃容器：`bg-zinc-900/60`、`backdrop-blur-md` 结合 1px 微光细边线（`border border-zinc-800/80`），消除刺眼生硬的彩虹弥散渐变；
+- **单重点色与排版层级**：以沉稳冷灰为主色调，单重点色采用 Linear 级 Indigo (`#6366f1`) 与 Apple 级 Emerald (`#10b981`) 标识关键状态；全量以等宽数据字体（JetBrains Mono / Geist Mono）精准呈现 Run ID、Token 数、费用、延迟与 Git Commit Hash。
+
+### 2. Bento 全景看板 7 大核心面板组件体系 (`src/components/dashboard/*`)
+1. **实时执行流终端 (`LiveExecutionTerminal`)**：
+   - 接入阶段 3 的 SSE 流式事件通道（`/api/runs/{runId}/stream` 与 `/api/executions/runs/{runId}/stream`）；
+   - 支持自动滚动锁定/暂停开关、ANSI 日志色彩分级（`[INFO]`, `[WARN]`, `[ERROR]`, `[STEP]`, `[AGENT]`, `[AUDIT]`, `[SANDBOX]`）；
+   - 具备 `Last-Event-ID` 游标断点续连指示与连接状态徽章（`CONNECTED`, `RECONNECTING`, `OFFLINE`）；
+2. **工作流 DAG 依赖拓扑可视化面板 (`DagTopologyVisualizer`)**：
+   - 基于 `@xyflow/react` 打造流体有向无环图；
+   - 原生支持阶段 4 DSL 6 大节点类型：`START`, `AGENT`, `APPROVAL`, `CONDITION`, `JOIN`, `END`；
+   - 节点多维状态实时同步：`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `SKIPPED`, `WAITING_APPROVAL`；
+   - 交互式节点抽屉 (Node Inspector)：点击节点即刻查看运行时平台、Prompt 模板、耗时与产物引用；
+3. **人工审批决策门禁卡片 (`ApprovalActionCard`)**：
+   - 审批挂起 (`WAITING_APPROVAL`) 时，琥珀色微光高亮卡片自动浮现；
+   - 承载审批事项原因、发起主体、审查人身份与审查意见输入框；
+   - 一键 Approve 与 Reject 联动后端 REST 接口（`/api/approvals/{id}/approve` 与 `/reject`）；
+4. **受控工作区与 JGit 行级审查面板 (`DiffArtifactReviewer`)**：
+   - 展示阶段 2 受控工作区文件变更树与增删行统计（+added, -deleted）；
+   - 语法高亮 Unified Diff 对比（绿增、红删、代码行号）；
+   - 安全回滚 (Revert to Baseline)：二次防误触确认弹窗，联动 JGit 快照恢复工作区；
+5. **多智能体协同网络与消息时间线 (`MultiAgentSwarmChat`)**：
+   - 展示阶段 6 Team 拓扑（Hierarchical/P2P/Round-Robin）与角色标签（`ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`）；
+   - 严格单调连续保序序号徽章（`#1`, `#2`, `#3`...，依托 128 分段锁）；
+   - 私聊可见性隔离标签（`BROADCAST` vs `DIRECT` P2P 锁定）；
+   - 四层死循环检测熔断指示器（`LoopDetector: Normal`）与滚动上下文摘要横幅；
+6. **模型 Provider 动态路由与 Token 成本仪表盘 (`ProviderCostDashboard`)**：
+   - 展示多 Provider 矩阵（DeepSeek, Claude 3.5 Sonnet, Gemini 1.5 Flash, Ollama, OpenAI Backup）；
+   - 实时健康延迟毫秒数与三态熔断器指示（`CLOSED` 绿灯, `HALF_OPEN` 黄灯, `OPEN` 红灯）；
+   - Token 消耗与实时成本核算（Prompt, Completion, Total, 实时美金）；
+   - 加权路由动态推演模拟（调用 `/api/providers/route`）；
+7. **沙箱预览与部署控制台 (`SandboxPreviewPanel`)**：
+   - 展示阶段 7 部署状态机（`CREATED`, `BUILDING`, `RUNNING`, `STOPPED`, `FAILED`）；
+   - 动态原子端口分配展示（`:18080`）；
+   - 实时部署日志查看终端与一键停止/部署操作；
+   - 内嵌交互式 Web 沙箱预览 iframe。
+
+### 3. 前端工程健壮性与类型安全
+- **强类型建模 (`src/types/index.ts`)**：全量对齐阶段 1-7 后端 DTO，0 `any` 弱类型；
+- **自愈式降级与脱机体验 (`src/services/api.ts`)**：具备离线/无后端优雅降级机制，支持后端联通与断线自动识别；
+- **Next.js 14 生产构建门禁**：通过 TypeScript `tsc` 与 Next.js `npm run build`，4/4 路由静态预渲染 100% 成功。
+
+
 
