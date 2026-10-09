@@ -460,7 +460,7 @@ public interface AgentRuntime {
    - 新增 4 个高性能索引（`idx_deployments_status`, `idx_deployments_proj_status`, `idx_deployments_port`, `idx_deployments_created`）；
 7. **全绿灯测试矩阵与架构守护**：
    - 4 大新增测试套件：`SandboxSecurityGuardAndFirewallTest`、`SandboxProviderAndExecutionTest`、`PortAllocationAndHealthCheckTest` 与 `DeploymentLifecycleAndControllerIntegrationTest`；
-   - 后端 243/243 项测试 100% 绿灯；前端 Next.js 14 生产构建 100% 成功。
+   - 后端 255/255 项测试 100% 绿灯；前端 Next.js 14 生产构建 100% 成功。
 
 **退出条件与验证证据**：
 

@@ -19,13 +19,14 @@ public class CommandSecurityGuard {
 
     // High-risk destructive and injection patterns
     private static final List<Pattern> DANGEROUS_PATTERNS = List.of(
-            // Destructive file deletion
-            Pattern.compile("(?i)\\brm\\s+(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)\\s+[/~]"),
-            Pattern.compile("(?i)\\brm\\s+(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)\\s+\\*"),
+            // Destructive file deletion (supports -rf, -fr, separated -r -f, --recursive --force, and quoted targets)
+            Pattern.compile("(?i)\\brm\\s+.*(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*|(-r|-R|--recursive)\\b.*(-f|--force)\\b|(-f|--force)\\b.*(-r|-R|--recursive)\\b).*[\"']?([/~]|\\*)"),
+            Pattern.compile("(?i)\\brm\\s+(-[a-z]*r[a-z]*|--recursive)\\s+[\"']?([/~]|\\*)"),
             Pattern.compile("(?i)\\brm\\s+.*--no-preserve-root"),
-            Pattern.compile("(?i)\\bdel\\s+.*[a-zA-Z]:\\\\"),
-            Pattern.compile("(?i)\\bformat\\s+[a-zA-Z]:"),
-            Pattern.compile("(?i)\\brmdir\\s+/[sq]\\s+[a-zA-Z]:\\\\"),
+            Pattern.compile("(?i)\\bdel\\s+.*[\"']?[a-zA-Z]:\\\\"),
+            Pattern.compile("(?i)\\bformat\\s+[\"']?[a-zA-Z]:"),
+            Pattern.compile("(?i)\\brmdir\\s+/[sq]\\s+.*[\"']?[a-zA-Z]:\\\\"),
+            Pattern.compile("(?i)\\b(Remove-Item|ri)\\b.*(-Recurse|-r)\\b.*(-Force|-f)\\b.*[\"']?([a-zA-Z]:\\\\|[/~])"),
             // Low-level disk formatting and overwrite
             Pattern.compile("(?i)\\bmkfs(\\.[a-z0-9]+)?\\b"),
             Pattern.compile("(?i)\\bdd\\s+if="),
@@ -36,7 +37,9 @@ public class CommandSecurityGuard {
             Pattern.compile("(?i)\\b(curl|wget)\\s+.*\\|\\s*python[0-9]*\\b"),
             Pattern.compile("(?i)\\bpowershell.*(-enc|-encodedcommand)\\b"),
             // Malicious shell chaining
-            Pattern.compile("(?i)(;|\\&\\&|\\|\\||\\|)\\s*rm\\s+(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)"),
+            Pattern.compile("(?i)(;|\\&\\&|\\|\\||\\|)\\s*rm\\s+.*(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*|(-r|-R|--recursive)\\b.*(-f|--force)\\b|(-f|--force)\\b.*(-r|-R|--recursive)\\b).*[\"']?([/~]|\\*)"),
+            Pattern.compile("(?i)(;|\\&\\&|\\|\\||\\|)\\s*rm\\s+(-[a-z]*r[a-z]*|--recursive)\\s+[\"']?([/~]|\\*)"),
+            Pattern.compile("(?i)(;|\\&\\&|\\|\\||\\|)\\s*del\\s+.*[\"']?[a-zA-Z]:\\\\"),
             Pattern.compile("(?i)(;|\\&\\&|\\|\\||\\|)\\s*mkfs\\b"),
             Pattern.compile("(?i)(;|\\&\\&|\\|\\||\\|)\\s*dd\\s+if="),
             // Fork bomb & system halt
@@ -131,14 +134,21 @@ public class CommandSecurityGuard {
 
     public String extractBaseExecutable(String command) {
         String trimmed = command.trim();
+        // Remove surrounding quotes if present (e.g. "node" or 'git')
+        if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+                (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+            if (trimmed.length() >= 2) {
+                trimmed = trimmed.substring(1, trimmed.length() - 1).trim();
+            }
+        }
         // Strip path separators if command was given as /usr/bin/node or C:\Program Files\nodejs\node.exe
         int lastSlash = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
         if (lastSlash >= 0 && lastSlash < trimmed.length() - 1) {
             trimmed = trimmed.substring(lastSlash + 1);
         }
-        // Remove .exe / .cmd / .bat suffixes for normalization
+        // Remove .exe / .cmd / .bat suffixes for normalization (case-insensitive)
         String lower = trimmed.toLowerCase();
-        if (lower.endsWith(".cmd") || lower.endsWith(".bat")) {
+        if (lower.endsWith(".cmd") || lower.endsWith(".bat") || lower.endsWith(".exe")) {
             trimmed = trimmed.substring(0, trimmed.length() - 4);
         }
         return trimmed;

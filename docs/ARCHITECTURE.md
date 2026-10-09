@@ -377,12 +377,13 @@ flowchart TD
 
 ### 2. 安全策略与命令防火墙 (`CommandSecurityGuard`)
 - **高危破坏性命令拦截矩阵**：
-  - 阻断破坏性文件删除：`rm -rf /`, `rm -rf ~`, `rm -rf *`, `del /s /q C:\`, `format D:`, `rmdir /s /q C:\`；
+  - 阻断破坏性文件删除：`rm -rf /`, `rm -rf ~`, `rm -rf *`, `del /s /q C:\`, `format D:`, `rmdir /s /q C:\`，支持分立参数（`-r -f`, `-f -r`, `--recursive --force`）、带单双引号路径及 PowerShell `Remove-Item -Recurse -Force`；
   - 阻断低级磁盘破坏：`mkfs`, `dd if=...`, `fdisk`, `chmod -R 777 /`；
   - 阻断远程管道脚本注入：`curl ... | sh`, `wget ... | bash`, `curl ... | python`；
   - 阻断恶意命令串联与逃逸：`; rm -rf`, `&& rm -rf`, `|| rm -rf`, PowerShell `-enc/-EncodedCommand`, Fork Bomb (`:(){ :|:& };:`)，主机越权 (`> /dev/sd*`, `> /etc/`)；
+  - 深入解析合法 Shell 包裹参数（`sh -c`, `bash -c`, `cmd /c`, `powershell -c`），拦截其内部包裹的恶意命令与脚本；
 - **白名单机制 (`Executable Whitelist`)**：
-  - 严格放行标准开发工具：`node`, `npm`, `npx`, `yarn`, `pnpm`, `java`, `javac`, `mvn`, `gradle`, `python`, `git`, `echo` 等；
+  - 严格放行标准开发工具：`node`, `npm`, `npx`, `yarn`, `pnpm`, `java`, `javac`, `mvn`, `gradle`, `python`, `git`, `echo` 等，并对可执行文件名自动剥离首尾引号及 `.exe`, `.cmd`, `.bat` 后缀；
   - 严格拦截非白名单与黑名单程序：`sudo`, `su`, `useradd`, `nc`, `netcat`, `nmap`, `iptables`, `chroot`。
 
 ### 3. 环境变量隔离与敏感凭证防护 (`EnvironmentSanitizer`)
@@ -396,9 +397,10 @@ flowchart TD
 ### 4. 资源配额与看门狗超时监控 (`SandboxResourceQuota` & Watchdog)
 - **看门狗超时监控 (Watchdog Timeout Kill)**：
   - 单命令执行设定硬超时阈值；
-  - 超时自动触发多平台进程树递归强平（Process Tree Kill，包括 Windows/Linux 子孙进程级联终止），进程标记退出码 137 并设置 `isTimedOut = true`；
+  - 超时自动触发多平台进程树递归强平（Process Tree Kill，包括 Windows 环境 `taskkill /F /T /PID` 级联终止与 Linux 子孙进程级联终止），同步等待句柄完全释放，彻底防止临时文件锁定；进程标记退出码 137 并设置 `isTimedOut = true`；
 - **输出缓冲区截断防撑爆 (Output Buffer Truncation)**：
   - 实时限制子进程输出捕获字节上限（默认 1MB，支持自定义）；
+  - 缓冲区线程安全并发保护与守护线程池支持；
   - 超出配额时自动截断后续字符，并追加 `[SANDBOX WARNING: Output truncated...]` 警示，彻底消除海量日志输出导致 JVM 内存溢出 OOM 隐患。
 
 ### 5. 端口分配管理与健康检查探测 (`PortAllocationService` & `HealthCheckProbeService`)

@@ -29,7 +29,12 @@ public class LocalProcessSandbox implements SandboxProvider {
     private final CommandSecurityGuard securityGuard;
     private final EnvironmentSanitizer environmentSanitizer;
     private final ConcurrentHashMap<String, Process> activeProcesses = new ConcurrentHashMap<>();
-    private final ExecutorService ioExecutor = Executors.newCachedThreadPool();
+    private final ExecutorService ioExecutor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.setName("local-sandbox-io-" + t.getId());
+        return t;
+    });
 
     public LocalProcessSandbox(CommandSecurityGuard securityGuard, EnvironmentSanitizer environmentSanitizer) {
         this.securityGuard = securityGuard != null ? securityGuard : new CommandSecurityGuard();
@@ -166,9 +171,43 @@ public class LocalProcessSandbox implements SandboxProvider {
     }
 
     private void killProcessTree(Process process) {
+        if (process == null) {
+            return;
+        }
         try {
-            process.toHandle().descendants().forEach(ProcessHandle::destroyForcibly);
+            long pid = process.pid();
+            // On Windows, proactively invoke taskkill /F /T /PID to recursively kill shell process subtrees
+            if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+                try {
+                    Process taskkill = new ProcessBuilder("taskkill", "/F", "/T", "/PID", String.valueOf(pid))
+                            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                            .redirectError(ProcessBuilder.Redirect.DISCARD)
+                            .start();
+                    taskkill.waitFor(2, TimeUnit.SECONDS);
+                } catch (Exception ignored) {}
+            }
+
+            // Standard JVM ProcessHandle tree termination
+            List<ProcessHandle> descendants = process.toHandle().descendants().toList();
+            for (ProcessHandle handle : descendants) {
+                try {
+                    handle.destroyForcibly();
+                } catch (Exception ignored) {}
+            }
             process.destroyForcibly();
+
+            // Close streams to release OS file locks
+            try { process.getInputStream().close(); } catch (Exception ignored) {}
+            try { process.getErrorStream().close(); } catch (Exception ignored) {}
+            try { process.getOutputStream().close(); } catch (Exception ignored) {}
+
+            // Wait for all handles to actually terminate before returning
+            for (ProcessHandle handle : descendants) {
+                try {
+                    handle.onExit().get(1, TimeUnit.SECONDS);
+                } catch (Exception ignored) {}
+            }
+            process.waitFor(2, TimeUnit.SECONDS);
         } catch (Exception e) {
             log.warn("Error while killing sandbox process tree: {}", e.getMessage());
         }
@@ -203,15 +242,17 @@ public class LocalProcessSandbox implements SandboxProvider {
             int read;
             try {
                 while ((read = inputStream.read(buf)) != -1) {
-                    if (buffer.size() + read <= maxBytes) {
-                        buffer.write(buf, 0, read);
-                    } else {
-                        int remaining = maxBytes - buffer.size();
-                        if (remaining > 0) {
-                            buffer.write(buf, 0, remaining);
+                    synchronized (buffer) {
+                        if (buffer.size() + read <= maxBytes) {
+                            buffer.write(buf, 0, read);
+                        } else {
+                            int remaining = maxBytes - buffer.size();
+                            if (remaining > 0) {
+                                buffer.write(buf, 0, remaining);
+                            }
+                            truncated.set(true);
+                            // Consume remaining bytes without buffering to avoid blocking the child process
                         }
-                        truncated.set(true);
-                        // Consume remaining bytes without buffering to avoid blocking the child process
                     }
                 }
             } catch (Exception ignored) {
@@ -223,7 +264,10 @@ public class LocalProcessSandbox implements SandboxProvider {
         }
 
         public String getOutput() {
-            String out = buffer.toString(StandardCharsets.UTF_8);
+            String out;
+            synchronized (buffer) {
+                out = buffer.toString(StandardCharsets.UTF_8);
+            }
             if (truncated.get()) {
                 out += "\n[SANDBOX WARNING: Output truncated due to exceeding limit of " + maxBytes + " bytes]";
             }

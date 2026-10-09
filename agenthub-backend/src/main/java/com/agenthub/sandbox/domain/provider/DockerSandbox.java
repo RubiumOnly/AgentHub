@@ -28,7 +28,12 @@ public class DockerSandbox implements SandboxProvider {
     private final CommandSecurityGuard securityGuard;
     private final EnvironmentSanitizer environmentSanitizer;
     private final ConcurrentHashMap<String, Process> activeProcesses = new ConcurrentHashMap<>();
-    private final ExecutorService ioExecutor = Executors.newCachedThreadPool();
+    private final ExecutorService ioExecutor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.setName("docker-sandbox-io-" + t.getId());
+        return t;
+    });
 
     private Boolean dockerAvailableCache = null;
 
@@ -218,6 +223,14 @@ public class DockerSandbox implements SandboxProvider {
                 log.warn("Error terminating docker sandbox process: {}", e.getMessage());
             }
         }
+        // Proactively cleanup docker container if created
+        try {
+            new ProcessBuilder("docker", "rm", "-f", "agenthub-" + executionId)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start()
+                    .waitFor(2, TimeUnit.SECONDS);
+        } catch (Exception ignored) {}
     }
 
     private static class BoundedOutputReader implements Runnable {
@@ -237,14 +250,16 @@ public class DockerSandbox implements SandboxProvider {
             int read;
             try {
                 while ((read = inputStream.read(buf)) != -1) {
-                    if (buffer.size() + read <= maxBytes) {
-                        buffer.write(buf, 0, read);
-                    } else {
-                        int remaining = maxBytes - buffer.size();
-                        if (remaining > 0) {
-                            buffer.write(buf, 0, remaining);
+                    synchronized (buffer) {
+                        if (buffer.size() + read <= maxBytes) {
+                            buffer.write(buf, 0, read);
+                        } else {
+                            int remaining = maxBytes - buffer.size();
+                            if (remaining > 0) {
+                                buffer.write(buf, 0, remaining);
+                            }
+                            truncated.set(true);
                         }
-                        truncated.set(true);
                     }
                 }
             } catch (Exception ignored) {
@@ -256,7 +271,10 @@ public class DockerSandbox implements SandboxProvider {
         }
 
         public String getOutput() {
-            String out = buffer.toString(StandardCharsets.UTF_8);
+            String out;
+            synchronized (buffer) {
+                out = buffer.toString(StandardCharsets.UTF_8);
+            }
             if (truncated.get()) {
                 out += "\n[SANDBOX WARNING: Output truncated due to exceeding limit of " + maxBytes + " bytes]";
             }

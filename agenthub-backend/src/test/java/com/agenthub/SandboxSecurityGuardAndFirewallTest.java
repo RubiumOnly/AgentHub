@@ -30,14 +30,22 @@ class SandboxSecurityGuardAndFirewallTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "rm -rf /",
+            "rm -rf \"/\"",
+            "rm -rf '/'",
             "rm -rf ~",
             "rm -rf *",
+            "rm -rf '*'",
             "rm -fr /",
             "rm -r -f /",
+            "rm -f -r /",
+            "rm -r -f \"/\"",
+            "rm --recursive --force /",
             "rm -rf --no-preserve-root /",
             "del /f /s /q C:\\",
+            "del /f /s /q \"C:\\\"",
             "format D:",
-            "rmdir /s /q C:\\"
+            "rmdir /s /q C:\\",
+            "powershell Remove-Item -Recurse -Force C:\\"
     })
     @DisplayName("安全防火墙 1：严格阻断破坏性文件系统删除与格式化命令")
     void shouldBlockDestructiveFileSystemCommands(String destructiveCmd) {
@@ -132,16 +140,41 @@ class SandboxSecurityGuardAndFirewallTest {
     }
 
     @Test
-    @DisplayName("安全防火墙 6：白名单内的标准构建与开发工具可安全放行")
+    @DisplayName("安全防火墙 6：白名单内的标准构建与开发工具（含.exe/.cmd后缀及路径引号）可安全放行")
     void shouldAllowWhitelistedStandardDevelopmentTools() {
         // Safe development and build commands
         securityGuard.validateCommand("npm", List.of("run", "build"));
         securityGuard.validateCommand("node", List.of("server.js"));
-        securityGuard.validateCommand("mvn", List.of("clean", "package"));
-        securityGuard.validateCommand("java", List.of("-version"));
-        securityGuard.validateCommand("python", List.of("main.py"));
+        securityGuard.validateCommand("node.exe", List.of("server.js"));
+        securityGuard.validateCommand("\"git.exe\"", List.of("status"));
+        securityGuard.validateCommand("python.exe", List.of("main.py"));
+        securityGuard.validateCommand("mvn.cmd", List.of("clean", "package"));
+        securityGuard.validateCommand("java.exe", List.of("-version"));
         securityGuard.validateCommand("git", List.of("status"));
         securityGuard.validateCommand("echo", List.of("Hello AgentHub Sandbox"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "sh -c \"rm -r -f /\"",
+            "bash -c \"rm -rf '/'\"",
+            "cmd /c del /f /s /q \"C:\\\"",
+            "powershell -c \"Remove-Item -Recurse -Force C:\\\""
+    })
+    @DisplayName("安全防火墙 7：严格阻断包装在合法 Shell 内部的破坏性脚本参数")
+    void shouldBlockShellWrappedDestructiveCommands(String shellWrappedCmd) {
+        String[] tokens = shellWrappedCmd.split("\\s+", 3);
+        String shell = tokens[0];
+        List<String> args = tokens.length > 1
+                ? List.of(tokens[1], tokens.length > 2 ? tokens[2] : "")
+                : List.of();
+
+        assertThatThrownBy(() -> securityGuard.validateCommand(shell, args))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    BusinessException be = (BusinessException) ex;
+                    assertThat(be.getErrorCode()).isEqualTo(ErrorCode.SANDBOX_COMMAND_BLOCKED);
+                });
     }
 
     @Test

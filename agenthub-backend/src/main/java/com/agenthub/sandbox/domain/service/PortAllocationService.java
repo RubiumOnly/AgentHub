@@ -122,8 +122,9 @@ public class PortAllocationService {
     }
 
     private boolean isSocketAvailable(int port) {
-        try (ServerSocket socket = new ServerSocket(port)) {
+        try (ServerSocket socket = new ServerSocket()) {
             socket.setReuseAddress(true);
+            socket.bind(new java.net.InetSocketAddress(port));
             return true;
         } catch (IOException e) {
             return false;

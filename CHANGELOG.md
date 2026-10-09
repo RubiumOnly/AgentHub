@@ -32,7 +32,14 @@
 - **全绿灯防御测试矩阵与架构守护**：
   - 新增 4 大测试套件：`SandboxSecurityGuardAndFirewallTest`、`SandboxProviderAndExecutionTest`、`PortAllocationAndHealthCheckTest` 与 `DeploymentLifecycleAndControllerIntegrationTest`；
   - 更新 `FlywayMigrationAndSchemaTest`，验证 V8 迁移顺利生效；
-  - 后端测试套件由 187 项提升至 243 项（243/243 全部通过，0 错误，0 失败）；前端 Next.js 14 生产构建 100% 成功。
+  - 后端测试套件由 187 项提升至 255 项（255/255 全部通过，0 错误，0 失败）；前端 Next.js 14 生产构建 100% 成功。
+- **沙箱内核深度加固与架构治理 (Deep Hardening & Robustness)**：
+  - 修复 `LocalProcessSandbox` 在 Windows 环境下看门狗超时强平后因异步句柄释放延迟导致的临时目录锁定问题，引入 `taskkill /F /T /PID` 级联递归终止与 `waitFor` 同步收割，彻底消除文件锁定与资源泄露；
+  - 修复 `CommandSecurityGuard.extractBaseExecutable` 遗漏 `.exe` 后缀规范化导致的 Windows 标准工具（`node.exe`, `git.exe`, `python.exe` 等）白名单误杀 Bug；
+  - 强化 `CommandSecurityGuard` 命令防火墙正则防护矩阵：支持分立参数（`-r -f`, `-f -r`, `--recursive --force`）、带单双引号路径及 Shell 内部包裹脚本（`sh -c`, `bash -c`, `cmd /c`, `powershell -c`）的高危破坏性指令拦截；
+  - 重构 `DeploymentApplicationService.createAndDeploy`：遵循 `java-spring-architect` 生产架构准则，剔除长耗时构建命令及网络健康检查探针对 `@Transactional` 的侵入，防止 HikariCP 连接池耗尽；并在停止部署时联动触发沙箱进程与容器资源回收；
+  - 修复 `PortAllocationService` 中 `ServerSocket` 构造器先绑定后调用 `setReuseAddress` 的无效配置问题；
+  - 增强 `BoundedOutputReader` 缓冲区并发读写线程安全保护，采用守护线程池防止 JVM 关闭阻塞。
 
 ---
 

@@ -50,7 +50,6 @@ public class DeploymentApplicationService implements DeploymentApplication {
     }
 
     @Override
-    @Transactional
     public DeploymentResponse createAndDeploy(CreateDeploymentRequest request) {
         if (request == null || request.getProjectId() == null || request.getProjectId().isBlank()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "Project ID cannot be empty for deployment");
@@ -168,6 +167,14 @@ public class DeploymentApplicationService implements DeploymentApplication {
 
         if (DeploymentStatus.RUNNING.name().equals(entity.getStatus()) ||
                 DeploymentStatus.BUILDING.name().equals(entity.getStatus())) {
+            // Forcibly destroy sandbox process or container
+            try {
+                sandboxProviderFactory.getProvider(entity.getSandboxType()).destroy(deploymentId);
+                sandboxProviderFactory.getProvider(entity.getSandboxType()).destroy(deploymentId + "-build");
+            } catch (Exception e) {
+                log.warn("Error stopping sandbox container/process for deployment [{}]: {}", deploymentId, e.getMessage());
+            }
+
             if (entity.getPort() != null) {
                 portAllocationService.releasePort(entity.getPort());
             }
@@ -206,8 +213,32 @@ public class DeploymentApplicationService implements DeploymentApplication {
     }
 
     private List<String> parseCommandTokens(String commandLine) {
-        String[] parts = commandLine.trim().split("\\s+");
-        return Arrays.asList(parts);
+        List<String> tokens = new ArrayList<>();
+        if (commandLine == null || commandLine.isBlank()) {
+            return tokens;
+        }
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        char quoteChar = 0;
+
+        for (int i = 0; i < commandLine.length(); i++) {
+            char c = commandLine.charAt(i);
+            if ((c == '"' || c == '\'') && (!inQuotes || c == quoteChar)) {
+                inQuotes = !inQuotes;
+                quoteChar = inQuotes ? c : 0;
+            } else if (Character.isWhitespace(c) && !inQuotes) {
+                if (current.length() > 0) {
+                    tokens.add(current.toString());
+                    current.setLength(0);
+                }
+            } else {
+                current.append(c);
+            }
+        }
+        if (current.length() > 0) {
+            tokens.add(current.toString());
+        }
+        return tokens;
     }
 
     private DeploymentResponse toResponse(DeploymentEntity entity) {
