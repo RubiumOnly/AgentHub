@@ -61,11 +61,11 @@ export function HeaderNav({
         <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-800/80 text-zinc-300">
           <span
             className={`w-2 h-2 rounded-full ${
-              backendUp ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+              backendUp ? "bg-emerald-400 animate-pulse" : "bg-amber-400/80"
             }`}
           />
           <span className="font-mono text-[11px]">
-            Spring Boot 3.3 : {backendUp ? "UP" : "CONNECTED"}
+            Spring Boot 3.3 : {backendUp ? "UP" : "STANDBY (OFFLINE)"}
           </span>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ReactFlow,
   Controls,
@@ -80,13 +80,13 @@ function CustomWorkflowNode({ data }: { data: WorkflowNodeData }) {
       case "RUNNING":
         return "border-sky-500 shadow-md shadow-sky-500/20 ring-1 ring-sky-500/40";
       case "WAITING_APPROVAL":
-        return "border-amber-500 shadow-lg shadow-amber-500/25 ring-2 ring-amber-500/50 animate-pulse";
+        return "border-amber-500 shadow-lg shadow-amber-500/25 ring-2 ring-amber-500/50 animate-pulse bg-amber-950/20";
       case "SUCCEEDED":
         return "border-emerald-500/60 shadow-sm shadow-emerald-500/10";
       case "FAILED":
-        return "border-rose-500/80 shadow-md shadow-rose-500/20";
+        return "border-rose-500/80 shadow-md shadow-rose-500/20 bg-rose-950/20";
       case "SKIPPED":
-        return "border-zinc-700/50 opacity-60";
+        return "border-zinc-700/60 border-dashed opacity-50 bg-zinc-900/30";
       default:
         return "border-zinc-800 hover:border-zinc-700";
     }
@@ -120,7 +120,9 @@ function CustomWorkflowNode({ data }: { data: WorkflowNodeData }) {
 
       {/* Subtitle / Details */}
       <div className="text-[10px] text-zinc-400 truncate font-mono">
-        {data.agentPlatform
+        {data.conditionExpression
+          ? `Rule: ${data.conditionExpression}`
+          : data.agentPlatform
           ? `Platform: ${data.agentPlatform}`
           : data.approverRole
           ? `Gate: ${data.approverRole}`
@@ -224,9 +226,23 @@ const INITIAL_NODES: Node<WorkflowNodeData>[] = [
     },
   },
   {
-    id: "node-security-gate",
+    id: "node-qa-eval",
     type: "customWorkflow",
     position: { x: 970, y: 140 },
+    data: {
+      id: "node-qa-eval",
+      label: "条件分支决策",
+      nodeType: "CONDITION",
+      conditionExpression: "通过率 >= 95% && 0 越权隐患",
+      status: "SUCCEEDED",
+      durationMs: 120,
+      attempt: 1,
+    },
+  },
+  {
+    id: "node-security-gate",
+    type: "customWorkflow",
+    position: { x: 1220, y: 70 },
     data: {
       id: "node-security-gate",
       label: "安全决策门禁",
@@ -238,9 +254,23 @@ const INITIAL_NODES: Node<WorkflowNodeData>[] = [
     },
   },
   {
+    id: "node-qa-fallback",
+    type: "customWorkflow",
+    position: { x: 1220, y: 220 },
+    data: {
+      id: "node-qa-fallback",
+      label: "缺陷自愈回退",
+      nodeType: "AGENT",
+      agentPlatform: "SPRING_AI_API",
+      promptTemplate: "执行缺陷回滚重试与自愈补丁",
+      status: "SKIPPED",
+      attempt: 0,
+    },
+  },
+  {
     id: "node-sandbox-deploy",
     type: "customWorkflow",
-    position: { x: 1220, y: 140 },
+    position: { x: 1480, y: 140 },
     data: {
       id: "node-sandbox-deploy",
       label: "沙箱容器部署",
@@ -254,7 +284,7 @@ const INITIAL_NODES: Node<WorkflowNodeData>[] = [
   {
     id: "node-end",
     type: "customWorkflow",
-    position: { x: 1460, y: 140 },
+    position: { x: 1720, y: 140 },
     data: {
       id: "node-end",
       label: "产物交付 (End)",
@@ -271,8 +301,11 @@ const INITIAL_EDGES: Edge[] = [
   { id: "e-be-join", source: "node-backend-architect", target: "node-join-sync", animated: false, style: { stroke: "#10b981", strokeWidth: 2 } },
   { id: "e-fe-join", source: "node-frontend-engineer", target: "node-join-sync", animated: false, style: { stroke: "#10b981", strokeWidth: 2 } },
   { id: "e-join-qa", source: "node-join-sync", target: "node-qa-audit", animated: false, style: { stroke: "#10b981", strokeWidth: 2 } },
-  { id: "e-qa-gate", source: "node-qa-audit", target: "node-security-gate", animated: true, style: { stroke: "#f59e0b", strokeWidth: 2 } },
+  { id: "e-qa-eval", source: "node-qa-audit", target: "node-qa-eval", animated: false, style: { stroke: "#10b981", strokeWidth: 2 } },
+  { id: "e-eval-gate", source: "node-qa-eval", target: "node-security-gate", animated: true, style: { stroke: "#f59e0b", strokeWidth: 2 } },
+  { id: "e-eval-fallback", source: "node-qa-eval", target: "node-qa-fallback", animated: false, style: { stroke: "#52525b", strokeWidth: 1.5, strokeDasharray: "4 4" } },
   { id: "e-gate-deploy", source: "node-security-gate", target: "node-sandbox-deploy", animated: false, style: { stroke: "#52525b", strokeWidth: 2 } },
+  { id: "e-fallback-deploy", source: "node-qa-fallback", target: "node-sandbox-deploy", animated: false, style: { stroke: "#52525b", strokeWidth: 1.5, strokeDasharray: "4 4" } },
   { id: "e-deploy-end", source: "node-sandbox-deploy", target: "node-end", animated: false, style: { stroke: "#52525b", strokeWidth: 2 } },
 ];
 
@@ -296,6 +329,80 @@ export function DagTopologyVisualizer({
   const [selectedNodeData, setSelectedNodeData] = useState<WorkflowNodeData | null>(null);
 
   const nodeTypes = useMemo(() => ({ customWorkflow: CustomWorkflowNode }), []);
+
+  // Synchronize dynamic status from steps prop into nodes and edges reactively
+  useEffect(() => {
+    if (!steps || steps.length === 0) return;
+
+    setNodes((currentNodes) =>
+      currentNodes.map((n) => {
+        const matchingStep = steps.find(
+          (s) => s.nodeId === n.id || s.id === n.id
+        );
+        if (!matchingStep) return n;
+
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            status: matchingStep.status || n.data.status,
+            durationMs:
+              matchingStep.durationMs !== undefined
+                ? matchingStep.durationMs
+                : n.data.durationMs,
+            attempt:
+              matchingStep.attempt !== undefined
+                ? matchingStep.attempt
+                : n.data.attempt,
+            errorMessage: matchingStep.errorMessage || n.data.errorMessage,
+            outputRef: matchingStep.outputRef || n.data.outputRef,
+          },
+        };
+      })
+    );
+
+    setEdges((currentEdges) =>
+      currentEdges.map((e) => {
+        const targetStep = steps.find(
+          (s) => s.nodeId === e.target || s.id === e.target
+        );
+        if (!targetStep) return e;
+
+        if (targetStep.status === "RUNNING") {
+          return {
+            ...e,
+            animated: true,
+            style: { stroke: "#0284c7", strokeWidth: 2.5 },
+          };
+        } else if (targetStep.status === "WAITING_APPROVAL") {
+          return {
+            ...e,
+            animated: true,
+            style: { stroke: "#f59e0b", strokeWidth: 2.5 },
+          };
+        } else if (targetStep.status === "SUCCEEDED") {
+          return {
+            ...e,
+            animated: false,
+            style: { stroke: "#10b981", strokeWidth: 2 },
+          };
+        } else if (targetStep.status === "FAILED") {
+          return {
+            ...e,
+            animated: false,
+            style: { stroke: "#f43f5e", strokeWidth: 2 },
+          };
+        } else if (targetStep.status === "SKIPPED") {
+          return {
+            ...e,
+            animated: false,
+            style: { stroke: "#52525b", strokeWidth: 1.5, strokeDasharray: "4 4" },
+          };
+        }
+        return e;
+      })
+    );
+  }, [steps]);
 
   const onNodesChange: OnNodesChange<Node<WorkflowNodeData>> = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),

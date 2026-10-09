@@ -25,6 +25,87 @@ export interface LogEntry {
   message: string;
 }
 
+// --- ANSI Escape Code Parser & Renderer ---
+function renderAnsiMessage(text: string): React.ReactNode {
+  if (!text || (!text.includes("\u001b[") && !text.includes("\x1b["))) {
+    return text;
+  }
+
+  const ansiRegex = /\u001b\[([0-9;]*)m|\x1b\[([0-9;]*)m/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let currentColor = "";
+  let isBold = false;
+  let match;
+
+  while ((match = ansiRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const chunk = text.substring(lastIndex, match.index);
+      parts.push(
+        <span
+          key={lastIndex}
+          className={`${currentColor} ${isBold ? "font-bold" : ""}`}
+        >
+          {chunk}
+        </span>
+      );
+    }
+
+    const codeStr = match[1] || match[2] || "0";
+    const codes = codeStr.split(";").map((c) => parseInt(c, 10));
+
+    for (const code of codes) {
+      if (code === 0) {
+        currentColor = "";
+        isBold = false;
+      } else if (code === 1) {
+        isBold = true;
+      } else if (code === 30) {
+        currentColor = "text-zinc-500";
+      } else if (code === 31) {
+        currentColor = "text-rose-400";
+      } else if (code === 32) {
+        currentColor = "text-emerald-400";
+      } else if (code === 33) {
+        currentColor = "text-amber-300";
+      } else if (code === 34) {
+        currentColor = "text-sky-400";
+      } else if (code === 35) {
+        currentColor = "text-purple-400";
+      } else if (code === 36) {
+        currentColor = "text-cyan-400";
+      } else if (code === 37) {
+        currentColor = "text-zinc-100";
+      } else if (code === 90) {
+        currentColor = "text-zinc-500";
+      } else if (code === 91) {
+        currentColor = "text-rose-300";
+      } else if (code === 92) {
+        currentColor = "text-emerald-300";
+      } else if (code === 93) {
+        currentColor = "text-amber-200";
+      } else if (code === 94) {
+        currentColor = "text-sky-300";
+      }
+    }
+
+    lastIndex = ansiRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(
+      <span
+        key={lastIndex}
+        className={`${currentColor} ${isBold ? "font-bold" : ""}`}
+      >
+        {text.substring(lastIndex)}
+      </span>
+    );
+  }
+
+  return parts;
+}
+
 const DEFAULT_LOGS: LogEntry[] = [
   {
     id: "log-1",
@@ -32,7 +113,7 @@ const DEFAULT_LOGS: LogEntry[] = [
     seq: 1,
     level: "INFO",
     source: "Kernel",
-    message: "WorkflowRun [run-exec-94218a] queued. IdempotencyKey verified.",
+    message: "WorkflowRun [run-exec-94218a] queued. \u001b[32mIdempotencyKey verified\u001b[0m.",
   },
   {
     id: "log-2",
@@ -40,7 +121,7 @@ const DEFAULT_LOGS: LogEntry[] = [
     seq: 2,
     level: "STEP",
     source: "Orchestrator",
-    message: "Step [START] transitioned PENDING -> SUCCEEDED in 45ms.",
+    message: "Step [START] transitioned \u001b[34mPENDING\u001b[0m -> \u001b[32mSUCCEEDED\u001b[0m in 45ms.",
   },
   {
     id: "log-3",
@@ -48,7 +129,7 @@ const DEFAULT_LOGS: LogEntry[] = [
     seq: 3,
     level: "AGENT",
     source: "BackendArchitect",
-    message: "Dispatched to DeepSeek Provider (latency=245ms). Emitted AuthController.java spec.",
+    message: "Dispatched to \u001b[33mDeepSeek Provider\u001b[0m (latency=\u001b[32m245ms\u001b[0m). Emitted AuthController.java spec.",
   },
   {
     id: "log-4",
@@ -56,7 +137,7 @@ const DEFAULT_LOGS: LogEntry[] = [
     seq: 4,
     level: "AGENT",
     source: "FrontendEngineer",
-    message: "Generated modern Bento components with Tailwind + Lucide Icons.",
+    message: "\u001b[36m[UI DESIGN]\u001b[0m Generated modern Bento components with Tailwind + Lucide Icons.",
   },
   {
     id: "log-5",
@@ -64,7 +145,7 @@ const DEFAULT_LOGS: LogEntry[] = [
     seq: 5,
     level: "AUDIT",
     source: "QAAuditor",
-    message: "JGit Unified Diff generated: 3 files changed (+148, -8 lines). Hash snapshot taken.",
+    message: "JGit Unified Diff generated: 3 files changed (\u001b[32m+148\u001b[0m, \u001b[31m-8\u001b[0m lines). Hash snapshot taken.",
   },
   {
     id: "log-6",
@@ -72,7 +153,7 @@ const DEFAULT_LOGS: LogEntry[] = [
     seq: 6,
     level: "WARN",
     source: "ApprovalEngine",
-    message: "Node [node-security-gate] triggered: WAITING_APPROVAL. Suspended execution awaiting human signature.",
+    message: "Node [node-security-gate] triggered: \u001b[33;1mWAITING_APPROVAL\u001b[0m. Suspended execution awaiting human signature.",
   },
 ];
 
@@ -147,8 +228,14 @@ export function LiveExecutionTerminal({
         }
       };
 
+      let errCount = 0;
       es.onerror = () => {
-        setConnectionStatus("RECONNECTING");
+        errCount++;
+        if (errCount > 2) {
+          setConnectionStatus("OFFLINE");
+        } else {
+          setConnectionStatus("RECONNECTING");
+        }
       };
     } catch {
       setConnectionStatus("OFFLINE");
@@ -312,9 +399,9 @@ export function LiveExecutionTerminal({
                 </span>
               )}
 
-              {/* Log Message */}
+              {/* Log Message with ANSI Colors */}
               <span className="text-zinc-200 break-all flex-1 whitespace-pre-wrap">
-                {log.message}
+                {renderAnsiMessage(log.message)}
               </span>
             </div>
           ))

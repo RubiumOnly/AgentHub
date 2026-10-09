@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { BentoCard } from "@/components/common/BentoCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DeploymentResponse, CreateDeploymentRequest } from "@/types";
-import { apiClient } from "@/services/api";
+import { apiClient, DEFAULT_PREVIEW_URL } from "@/services/api";
 import {
   Server,
   Play,
@@ -37,8 +37,7 @@ export function SandboxPreviewPanel({
 
   const currentStatus = deployment?.status || "RUNNING";
   const currentPort = deployment?.port || 18080;
-  const previewUrl =
-    deployment?.url || "http://localhost:8080/api/sandbox/preview/default";
+  const previewUrl = deployment?.url || DEFAULT_PREVIEW_URL;
 
   // Fetch deployment logs
   const fetchLogs = async () => {
@@ -127,6 +126,14 @@ export function SandboxPreviewPanel({
               <Square className="w-3 h-3 fill-rose-300" />
               <span>停止服务</span>
             </button>
+          ) : currentStatus === "BUILDING" ? (
+            <button
+              disabled
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-sky-950/40 text-sky-300 border border-sky-500/30 text-[11px] font-medium"
+            >
+              <Clock className="w-3 h-3 animate-spin" />
+              <span>构建中...</span>
+            </button>
           ) : (
             <button
               onClick={handleDeploy}
@@ -202,6 +209,7 @@ export function SandboxPreviewPanel({
               key={iframeKey}
               src={previewUrl}
               title="AgentHub Sandbox Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms"
               className="w-full flex-1 border-0 bg-white dark:bg-zinc-950"
             />
           </div>

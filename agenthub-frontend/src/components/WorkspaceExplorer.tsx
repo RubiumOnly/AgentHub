@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Folder, FileText, RefreshCw, Save, Check, FileCode } from "lucide-react";
+import { apiClient } from "@/services/api";
 
 interface FileNode {
   name: string;
@@ -19,27 +20,28 @@ export default function WorkspaceExplorer({ workspacePath }: { workspacePath: st
 
   const fetchFiles = async () => {
     try {
-      const res = await fetch(`http://localhost:8080/api/workspace/files?path=${encodeURIComponent(workspacePath)}`);
-      const data = await res.json();
-      if (data.data) {
-        setFiles(data.data);
-        if (data.data.length > 0 && !selectedFile) {
-          const firstNonDir = data.data.find((f: FileNode) => !f.isDirectory);
+      const data = await apiClient.listFiles(workspacePath);
+      if (data && data.length > 0) {
+        setFiles(data);
+        if (!selectedFile) {
+          const firstNonDir = data.find((f: FileNode) => !f.isDirectory);
           if (firstNonDir) {
             loadFileContent(firstNonDir.relativePath);
           }
         }
+        return;
       }
     } catch {
       // Fallback workspace file seeds
-      setFiles([
-        { name: "pom.xml", relativePath: "pom.xml", isDirectory: false, size: 4210 },
-        { name: "application.yml", relativePath: "src/main/resources/application.yml", isDirectory: false, size: 840 },
-        { name: "AuthController.java", relativePath: "src/main/java/com/agenthub/identity/AuthController.java", isDirectory: false, size: 2890 },
-      ]);
-      if (!selectedFile) {
-        loadFileContent("src/main/java/com/agenthub/identity/AuthController.java");
-      }
+    }
+
+    setFiles([
+      { name: "pom.xml", relativePath: "pom.xml", isDirectory: false, size: 4210 },
+      { name: "application.yml", relativePath: "src/main/resources/application.yml", isDirectory: false, size: 840 },
+      { name: "AuthController.java", relativePath: "src/main/java/com/agenthub/identity/AuthController.java", isDirectory: false, size: 2890 },
+    ]);
+    if (!selectedFile) {
+      loadFileContent("src/main/java/com/agenthub/identity/AuthController.java");
     }
   };
 
@@ -47,11 +49,16 @@ export default function WorkspaceExplorer({ workspacePath }: { workspacePath: st
     setSelectedFile(relPath);
     try {
       const fullPath = workspacePath.replace(/\\/g, "/") + "/" + relPath;
-      const res = await fetch(`http://localhost:8080/api/workspace/file/content?filePath=${encodeURIComponent(fullPath)}`);
-      const data = await res.json();
-      setFileContent(data.data || "");
+      const content = await apiClient.getFileContent(fullPath);
+      if (content) {
+        setFileContent(content);
+        return;
+      }
     } catch {
-      setFileContent(`package com.agenthub.identity;
+      // Fallback
+    }
+
+    setFileContent(`package com.agenthub.identity;
 
 import org.springframework.web.bind.annotation.*;
 
@@ -64,7 +71,6 @@ public class AuthController {
         return "authenticated";
     }
 }`);
-    }
   };
 
   const handleSave = async () => {
@@ -72,13 +78,11 @@ public class AuthController {
     setIsSaving(true);
     try {
       const fullPath = workspacePath.replace(/\\/g, "/") + "/" + selectedFile;
-      await fetch("http://localhost:8080/api/workspace/file/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filePath: fullPath, content: fileContent }),
-      });
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      const success = await apiClient.saveFile(fullPath, fileContent);
+      if (success) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+      }
     } catch (err) {
       console.error("Save failed:", err);
     } finally {

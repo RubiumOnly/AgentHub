@@ -28,6 +28,7 @@ export const API_BASE =
 
 export const DEFAULT_WORKSPACE_PATH = "d:/work/agenthub/data/workspaces/default";
 export const DEFAULT_PROJECT_ID = "proj-default";
+export const DEFAULT_PREVIEW_URL = `${API_BASE}/api/sandbox/preview/default`;
 
 // --- Realistic Fallback Seeds for Offline / Resilience ---
 export const MOCK_RUN: WorkflowRunView = {
@@ -84,6 +85,23 @@ export const MOCK_STEPS: StepRunView[] = [
     outputRef: "art-jgit-diff-snapshot",
     startedAt: new Date(Date.now() - 104000).toISOString(),
     finishedAt: new Date(Date.now() - 102160).toISOString(),
+  },
+  {
+    id: "step-4b-condition",
+    runId: "run-exec-94218a",
+    nodeId: "node-qa-eval",
+    status: "SUCCEEDED",
+    attempt: 1,
+    durationMs: 120,
+    startedAt: new Date(Date.now() - 102150).toISOString(),
+    finishedAt: new Date(Date.now() - 102030).toISOString(),
+  },
+  {
+    id: "step-4c-fallback",
+    runId: "run-exec-94218a",
+    nodeId: "node-qa-fallback",
+    status: "SKIPPED",
+    attempt: 0,
   },
   {
     id: "step-5-approval",
@@ -347,6 +365,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T | nul
       ...options,
       headers: {
         "Content-Type": "application/json",
+        "X-User-Id": "user-1",
         ...(options?.headers || {}),
       },
     });

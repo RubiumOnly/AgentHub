@@ -108,11 +108,19 @@ export function MultiAgentSwarmChat({
   className = "",
 }: MultiAgentSwarmChatProps) {
   const [messages, setMessages] = useState<MessageView[]>(INITIAL_SWARM_MESSAGES);
+  const [filter, setFilter] = useState<"ALL" | "BROADCAST" | "DIRECT" | "CARDS">("ALL");
   const [inputText, setInputText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [showSummary, setShowSummary] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const filteredMessages = messages.filter((m) => {
+    if (filter === "BROADCAST") return m.messageType === "BROADCAST";
+    if (filter === "DIRECT") return m.messageType === "DIRECT";
+    if (filter === "CARDS") return !!m.cardPayload;
+    return true;
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -209,9 +217,35 @@ export function MultiAgentSwarmChat({
         </div>
       )}
 
+      {/* View Filter Bar & Turns Status */}
+      <div className="flex items-center space-x-1 border-b border-zinc-800/80 bg-zinc-950/70 px-3 py-1.5 text-[11px] shrink-0">
+        <span className="text-zinc-500 font-mono text-[10px] mr-1">视图过滤:</span>
+        {[
+          { id: "ALL", label: "全部消息" },
+          { id: "BROADCAST", label: "广播流 (Broadcast)" },
+          { id: "DIRECT", label: "私聊隔离 (P2P)" },
+          { id: "CARDS", label: "协同卡片" },
+        ].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id as any)}
+            className={`px-2 py-0.5 rounded text-[10px] font-mono transition ${
+              filter === f.id
+                ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 font-semibold"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        <span className="ml-auto text-[10px] font-mono text-zinc-500">
+          已用轮次: {messages.length} / {team?.maxTurns || 12}
+        </span>
+      </div>
+
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-zinc-950/60 font-sans">
-        {messages.map((m, idx) => {
+        {filteredMessages.map((m, idx) => {
           const isUser = m.senderType === "USER";
           const isDirect = m.messageType === "DIRECT";
 

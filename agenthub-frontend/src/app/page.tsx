@@ -123,11 +123,13 @@ export default function AgentHubExecutiveApp() {
   const handleRunWorkflow = async () => {
     setIsRunningWorkflow(true);
     try {
-      // Execute or refresh workflow state
+      // Reset approval and steps to demonstrate live execution
+      setApproval(MOCK_APPROVAL);
+      setSteps(MOCK_STEPS);
       setTimeout(() => {
         syncDashboardData();
         setIsRunningWorkflow(false);
-      }, 1500);
+      }, 1200);
     } catch {
       setIsRunningWorkflow(false);
     }
@@ -143,6 +145,13 @@ export default function AgentHubExecutiveApp() {
       });
     }
 
+    if (run) {
+      setRun({
+        ...run,
+        status: decision === "APPROVED" ? "RUNNING" : "FAILED",
+      });
+    }
+
     // Update steps
     setSteps((prev) =>
       prev.map((s) => {
@@ -150,6 +159,7 @@ export default function AgentHubExecutiveApp() {
           return {
             ...s,
             status: decision === "APPROVED" ? "SUCCEEDED" : "FAILED",
+            errorMessage: decision === "REJECTED" ? "安全架构师拒绝合并与沙箱部署" : undefined,
           };
         }
         if (
@@ -159,6 +169,15 @@ export default function AgentHubExecutiveApp() {
           return {
             ...s,
             status: "RUNNING",
+          };
+        }
+        if (
+          decision === "REJECTED" &&
+          (s.nodeId === "node-sandbox-deploy" || s.nodeId === "node-end" || s.id === "step-6-deploy" || s.id === "step-7-end")
+        ) {
+          return {
+            ...s,
+            status: "SKIPPED",
           };
         }
         return s;

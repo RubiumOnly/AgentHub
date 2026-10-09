@@ -26,6 +26,13 @@
 - **全绿灯质量门禁**：
   - 前端 Next.js 14 生产构建 100% 成功（4/4 路由预渲染完成，0 报错）；
   - 后端 255/255 项单元/领域/架构测试 100% 保持全绿，前后端协作零破坏。
+- **阶段 8 严苛自检加固与全链路缺陷修复 (Audited Hardening & Defect Fixes)**：
+  - **DAG 拓扑补齐与动态状态联动**：补齐阶段 4 DSL `CONDITION` 条件分支节点与 `SKIPPED` 回退分支，修复 `DagTopologyVisualizer` 缺少响应式 `useEffect` 导致在审批通过/驳回后节点状态与连线样式无法动态更新的缺陷；
+  - **REST API 全局认证注入**：在 `services/api.ts` 的 `fetchJson` 中自动注入默认 `X-User-Id` 鉴权请求头，根治后端 `AuthFilter` 对未授权调用抛出 401 Unauthorized 的隐患；
+  - **工作区资源探测解耦**：彻底重构 `WorkspaceExplorer`，消除 3 处对 `http://localhost:8080` 的硬编码直连，统一收口至 `apiClient`；
+  - **实时终端 ANSI 语义解析器**：落地 `renderAnsiMessage` 词法解析器，支持真实 ANSI 颜色转义代码解析与分级渲染，加固连续重试失败后的平滑 OFFLINE 离线状态降级；
+  - **多智能体消息多维度过滤**：在 `MultiAgentSwarmChat` 中新增全部、广播流、私聊隔离 (P2P)、协同卡片 4 态过滤器，并动态显示轮次水位；
+  - **沙箱安全沙盒与构建状态补全**：为内嵌 iframe 补齐 `sandbox` 安全沙箱隔离策略，为一键部署操作增加 `BUILDING` 状态防重复点击防护，动态对齐 `DEFAULT_PREVIEW_URL`。
 
 ---
 
