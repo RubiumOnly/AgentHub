@@ -299,7 +299,7 @@ Artifact / 日志位置：
 ```text
 阶段：阶段 A（可信身份与资源边界收敛）
 验收日期：2026-10-09
-Git commit：待提交（见当次 commit SHA）
+Git commit：a821ef0 (feat(security): 完成阶段 A 身份可信收敛与多租户资源边界防御并补齐持久化吊销审计)
 运行环境：OS: Windows 11 / JDK: 17.0.15 / Node: 20.x / Compose: v2.x / DB: H2 (MySQL Mode) + MySQL 8 兼容迁移
 执行命令：
   - mvn clean test
