@@ -4,6 +4,17 @@
 
 ---
 
+## [v1.8.1] - 2026-10-09
+
+### 🐛 缺陷修复：消除 Linux CI 健康检查 IPv6 解析竞态与远程全量 2/2 绿灯
+- **Linux CI IPv4/IPv6 回环解析竞态消除**：
+  - 修复 `PortAllocationAndHealthCheckTest` 中 `HttpServer` 与 `HealthCheckProbeService` 使用 `localhost` 在 Linux 双栈环境下偶发连接拒绝的竞态问题，统一明确绑定并探测 `127.0.0.1`，探测宽限重试提升至 5 次；
+  - 为 `EnvironmentSanitizer` 增加跨平台基础 `PATH` 兜底（Windows `System32`，Linux 标准 bin 目录），杜绝极端沙箱环境下 PATH 丢失；
+  - 优化 `.github/workflows/ci.yml`，在测试异常时自动输出 Surefire 诊断报告，保证全链路透明可追溯；
+  - 远程 GitHub Actions CI 两个 Job（`Backend Tests & Build` 与 `Frontend Build & Typecheck`）全部成功通过（Run ID `37879461247`，2/2 绿灯）。
+
+---
+
 ## [v1.8.0] - 2026-10-09
 
 ### 🌟 阶段 8：前端 Bento 现代美学、实时看板与交互体验升级 (Phase 8 Deliverables)
