@@ -1,0 +1,178 @@
+version: "3.8"
+
+services:
+  agenthub-mysql:
+    image: mysql:8.0
+    container_name: agenthub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required in production}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-agenthub}
+      MYSQL_USER: ${MYSQL_USER:-agenthub_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required in production}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=caching_sha2_password
+      - --max-connections=200
+      - --innodb-buffer-pool-size=512M
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - agenthub-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+
+  agenthub-redis:
+    image: redis:7-alpine
+    container_name: agenthub-redis
+    restart: unless-stopped
+    command: >
+      sh -c '
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+        else
+          redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+        fi
+      '
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - agenthub-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  agenthub-backend:
+    build:
+      context: ./agenthub-backend
+      dockerfile: Dockerfile
+    image: agenthub/agenthub-backend:1.0.0
+    container_name: agenthub-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:mysql://agenthub-mysql:3306/${MYSQL_DATABASE:-agenthub}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-agenthub_app}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required in production}
+      AGENTHUB_WORKSPACE_BASE_DIR: /var/lib/agenthub/workspaces
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      TZ: Asia/Shanghai
+    volumes:
+      - workspaces-data:/var/lib/agenthub/workspaces
+      - logs-backend:/app/logs
+    networks:
+      - agenthub-network
+    depends_on:
+      agenthub-mysql:
+        condition: service_healthy
+      agenthub-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+  agenthub-frontend:
+    build:
+      context: ./agenthub-frontend
+      dockerfile: Dockerfile
+    image: agenthub/agenthub-frontend:1.0.0
+    container_name: agenthub-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_BASE_URL: ""
+    networks:
+      - agenthub-network
+    depends_on:
+      agenthub-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  agenthub-gateway:
+    image: nginx:1.25-alpine
+    container_name: agenthub-gateway
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/agenthub.conf:/etc/nginx/nginx.conf:ro
+      - logs-nginx:/var/log/nginx
+    networks:
+      - agenthub-network
+    depends_on:
+      - agenthub-backend
+      - agenthub-frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/nginx-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+
+networks:
+  agenthub-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+  workspaces-data:
+    driver: local
+  logs-backend:
+    driver: local
+  logs-nginx:
+    driver: local

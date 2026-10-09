@@ -30,6 +30,9 @@ public class RunEventBroadcaster {
     private final Map<String, List<SseEmitter>> activeEmitters = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> runSequenceCounters = new ConcurrentHashMap<>();
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.agenthub.infrastructure.metrics.AgentHubMetricsCollector metricsCollector;
+
     public RunEventBroadcaster(RunEventRepository runEventRepository) {
         this.runEventRepository = runEventRepository;
     }
@@ -48,6 +51,9 @@ public class RunEventBroadcaster {
     public SseEmitter subscribe(String runId, Long lastEventId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         activeEmitters.computeIfAbsent(runId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        if (metricsCollector != null) {
+            metricsCollector.incrementActiveSseConnections();
+        }
 
         emitter.onCompletion(() -> removeEmitter(runId, emitter));
         emitter.onTimeout(() -> removeEmitter(runId, emitter));
@@ -130,7 +136,10 @@ public class RunEventBroadcaster {
     private void removeEmitter(String runId, SseEmitter emitter) {
         List<SseEmitter> list = activeEmitters.get(runId);
         if (list != null) {
-            list.remove(emitter);
+            boolean removed = list.remove(emitter);
+            if (removed && metricsCollector != null) {
+                metricsCollector.decrementActiveSseConnections();
+            }
             if (list.isEmpty()) {
                 activeEmitters.remove(runId);
             }

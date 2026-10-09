@@ -1,6 +1,6 @@
 # AgentHub
 
-<p align="center"><strong>企业级 IM 聊天式多 Agent 协同研发平台</strong></p>
+<p align="center"><strong>企业级多智能体协同研发与可审计交付平台 (Multi-Agent Engineering Platform)</strong></p>
 
 <p align="center">
   <a href="https://github.com/RubiumOnly/AgentHub/actions/workflows/ci.yml"><img src="https://github.com/RubiumOnly/AgentHub/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
@@ -10,273 +10,110 @@
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
   <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind%20CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white" alt="Tailwind CSS" /></a>
   <a href="https://www.eclipse.org/jgit/"><img src="https://img.shields.io/badge/JGit-6.8%2B-F05032?logo=git&logoColor=white" alt="Eclipse JGit" /></a>
-  <a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events"><img src="https://img.shields.io/badge/SSE-Live%20Streaming-5C8A72" alt="SSE" /></a>
-  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Manifest%20Ready-2496ED?logo=docker&logoColor=white" alt="Docker Manifest Ready" /></a>
+  <a href="https://prometheus.io/"><img src="https://img.shields.io/badge/Prometheus-Actuator%20Ready-E6522C?logo=prometheus&logoColor=white" alt="Prometheus" /></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Production%20Compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose Ready" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-5C8A72" alt="MIT License" /></a>
 </p>
 
-[快速开始](#-快速开始) · [工作台真实截图](#️-工作台全景与核心功能截图) · [实测运行指标](#-本地端到端协同运行与全流程实测证据) · [功能状态矩阵](#-功能状态矩阵) · [系统架构与-DDD-分层](#-系统架构与-ddd-四层分层) · [架构决策 (ADR)](docs/adr/ADR-001-modular-monolith-architecture.md) · [当前能力边界](docs/CURRENT_CAPABILITY_BOUNDARIES.md) · [技术文档](docs/ARCHITECTURE.md) · [API 参考](docs/API.md) · [安全说明](SECURITY.md) · [贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md)
+[快速开始](#-快速开始) · [架构白皮书与答辩指南](docs/TECH_WHITEPAPER_AND_DEFENSE.md) · [5~8分钟演示指南](docs/E2E_DEMO_GUIDE.md) · [当前真实能力边界](docs/CURRENT_CAPABILITY_BOUNDARIES.md) · [灾备与故障演练手册](docs/ops/DISASTER_RECOVERY_RUNBOOK.md) · [告警规则](docs/ops/ALERTING_RULES.md) · [长期演进计划 (已圆满交付)](docs/AGENTHUB_LONG_TERM_PLAN.md) · [更新记录](CHANGELOG.md)
 
 ---
 
 ## 🌟 项目定位与核心愿景
 
-**AgentHub** 是面向企业级复杂研发协同场景打造的下一代 **IM 聊天式多 Agent 协同研发平台**。系统聚焦在 AI 驱动的全流程开发闭环，融合了 **严谨的 Java 后端高并发工程架构** 与 **先进的多智能体协作理论**。
+**AgentHub** 是面向企业级复杂研发协同场景打造的**多智能体协同研发与可审计交付平台**。系统聚焦在 AI 驱动的全流程开发闭环，融合了 **严谨的 Java 后端高并发架构 (DDD 四层分层 + ArchUnit 架构防腐守护)** 与 **先进的多智能体协作理论**。
 
-针对大模型单一 Agent 上下文易膨胀退化、多 Agent 协作缺乏工程闭环与物理竞态覆写的痛点，AgentHub 提供了：
-- **类飞书/Slack 自然交互体验**：支持单聊、多会话并发管理与基于 `@Mention` 指令的群聊智能协同；
-- **Orchestrator 任务拓扑拆解引擎**：长程需求智能分解为有向无环图（DAG）子任务，并通过富文本交互式卡片（Interactive Cards）进行审批与状态反馈；
-- **统一智能体 SPI 适配器层**：兼容主流本地 CLI（Claude Code、Codex、OpenClaw）与云端大模型 API（DeepSeek V3 / Spring AI Native），实现非阻塞多通道协同；
-- **基于 JGit 的真实代码 Diff 审计**：工作区受原生 Git 版本控制，精确比对物理文件树与基线版本，输出行级 Unified Diff；
-- **Bento Grid 全栈控制台**：Next.js 14 打造的暗黑美学工作台，集成可视化 DAG 工作流画布、工作区文件树、Web 页面模版预览与 Dockerfile 部署清单生成。
-
----
-
-## ⚡ 本地端到端协同运行与全流程实测证据
-
-以下数据与页面状态来自系统本地端到端协同运行实测记录（系统支持真实公网 DeepSeek API 及本地 CLI 执行；未配置凭证或离线演示时自动启用高仿真降级模式，详见 [ADR-004](docs/adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md) 与 [当前真实能力边界白皮书](docs/CURRENT_CAPABILITY_BOUNDARIES.md)）：
-
-- **测试需求输入**：`@Orchestrator 请设计并实现一个企业级用户中心（包含个人信息展示、密码修改与权限审计）`
-- **协同会话模式**：群聊 `@Mention` 智能路由总线（会话 ID：`conv-8ebf2ff1`）
-- **通信通道**：Server-Sent Events (SSE) 长连接毫秒级打字机流式推送
-- **任务阶段拓扑**：自动分解为 3 阶段子任务（阶段一：领域服务架构 / 阶段二：Next.js 14 组件 / 阶段三：JGit 审计）
-- **物理生成资产**：
-  - `GeneratedService.java`（Spring Boot 3 核心领域模型与 RESTful 服务实现）
-  - `GeneratedComponent.tsx`（Next.js 14 / React 响应式用户中心控制台组件）
-  - `UserCenterController.java`（JGit 工作区控制器基线）
-- **JGit 版本审计**：成功捕获物理工作区 3 个受控文件变更，精确输出 Unified Diff 补丁（`MODIFY` 2 个文件，`ADD` 1 个文件，变更行数统计：`+26 / -95`）
-
-| 协同阶段 | 执行主体 | 运行时类型 | 产生结果 / 产出证据 | 状态 |
-| :--- | :--- | :--- | :--- | :---: |
-| **阶段分解** | `Orchestrator` | 内部编排调度器 | 自动生成飞书级富文本卡片，建立三阶段依赖拓扑 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
-| **阶段一：后端服务** | `BackendArchitect` | DeepSeek V3 / 本地离线仿真 | 编写 Spring Boot 3 接口与领域模型并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
-| **阶段二：前端界面** | `FrontendEngineer` | DeepSeek V3 / 本地离线仿真 | 编写 Next.js 14 响应式用户中心组件并落盘 | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
-| **阶段三：代码审计** | `QAAuditor` | Eclipse JGit 原生内核 | 触发 Working Tree 与 Baseline 比对，生成标准 Patch | ![已完成](https://img.shields.io/badge/-COMPLETED-success) |
+针对大模型单一 Agent 上下文易退化、多 Agent 协作缺乏工程闭环与物理竞态覆写的痛点，AgentHub 提供了：
+- **类飞书/Slack 自然协同网络**：支持单聊、多会话并发管理、基于 `@Mention` 的角色路由与 128 分段锁单调严格保序消息总线；
+- **DAG 任务拓扑与人工门禁引擎**：DSL 版本化描述，Kahn 拓扑排序成环拦截，同层兄弟节点真正并行，递归下降安全求值器（防 RCE），以及人工审批（Human-in-the-Loop）挂起与恢复；
+- **受控工作区与 JGit 结构化审计**：嵌入式 JGit 驱动，每次 Run 建立基线 Tag，Step 完成自动记录 Commit Snapshot 与 Unified Diff 结构化补丁，支持非破坏性安全回滚；
+- **多模型 Provider SPI 矩阵与高可用容灾**：统一契约接入 OpenAI、DeepSeek、Anthropic Claude、Google Gemini 与本地 Ollama，支持动态加权路由、三态熔断器探针隔离与 Token 成本实时核算；
+- **安全沙箱与一键部署体系**：本地受限子进程与 Docker 双模沙箱隔离，深度命令防火墙，看门狗超时强平与防 OOM 截断，端口动态分配与健康探针探测；
+- **现代高级感 Bento Grid 交互台**：彻底消灭“AI 塑料味”，采用 Linear/Vercel 级模块化便当盒网格，集成 7 大核心面板与实时 ANSI 彩色流式执行终端；
+- **生产级可观测性与运维就绪**：内置 Spring Boot Actuator 与 Prometheus 指标导出，具备完整的灾难恢复手册与生产级 Docker Compose 编排。
 
 ---
 
-## 🖥️ 工作台全景与核心功能截图
+## ⚡ 真实性能与压测基线 (无虚假水分)
 
-所有截图均来自真实桌面端工作台（分辨率：1440 × 900）的端到端真实操作记录：
+所有指标均由自动化集成测试与基准压测套件真实测量产生：
 
-### 1. 发起协同与 Orchestrator 任务拓扑拆解
-自然语言输入需求后，`Orchestrator` 自动理解业务边界，生成飞书级富文本交互卡片，下发三阶段任务，并驱动各专业 Agent 实时生成代码：
-
-![发起协同与 Orchestrator 任务拓扑拆解](docs/images/01-orchestrator-collaboration-stream.png)
-
-### 2. JGit 行级代码 Diff 审查闭环
-右侧面板直连 Eclipse JGit 核心，实时比对物理工作区与基线分支，精确展示每一行代码的变更增删指标与标准 Git Patch 补丁：
-
-![JGit 行级代码 Diff 审查闭环](docs/images/02-jgit-diff-audit.png)
-
-### 3. 可视化 DAG 状态机工作流画布
-基于 `@xyflow/react` 打造的拖拽式工作流画布，支持有向无环图节点连线、执行顺序依赖配置与可视化审批调度：
-
-![可视化 DAG 状态机工作流画布](docs/images/03-workflow-dag-canvas.png)
-
-### 4. 工作区物理文件树浏览与在线编辑器
-实时扫描物理工作区目录资产，左侧层级展示 Agent 协同落盘的文件列表，右侧集成代码编辑器，支持在线浏览与手动微调保存：
-
-![工作区物理文件树浏览与在线编辑器](docs/images/04-workspace-file-explorer.png)
-
-### 5. Web 页面模版预览与 Dockerfile 部署清单生成
-通过 iframe 挂载预览 Agent 协同生成的静态 Web 页面效果；点击“部署”按钮可自动生成包含 Nginx 配置与工作区静态资源的 Dockerfile 部署清单（当前阶段导出清单规范，物理微容器隔离沙箱将在阶段 7 接入，详见 [当前真实能力边界白皮书](docs/CURRENT_CAPABILITY_BOUNDARIES.md)）：
-
-![Web 页面模版预览与 Dockerfile 部署清单生成](docs/images/05-sandbox-preview.png)
-
----
-
-## 📊 功能状态矩阵
-
-> **注**：关于当前系统经过代码验证的真实边界与阶段消除路线，请参阅《[当前真实能力边界与架构现状白皮书](docs/CURRENT_CAPABILITY_BOUNDARIES.md)》。
-
-| 功能模块 | 核心能力描述 | 当前实现状态 | 演进规划 |
-| :--- | :--- | :---: | :--- |
-| **IM 协同总线** | 会话生命周期、@Mention 指令路由、群聊广播 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持群组权限角色划分与敏感词拦截 |
-| **流式打字机** | Server-Sent Events (SSE) 实时长连接通信 | ![完成](https://img.shields.io/badge/-已就绪-success) | 引入持久化事件流与断点回放续传 (参见 [ADR-002](docs/adr/ADR-002-sse-and-persistent-event-stream.md)) |
-| **任务拓扑编排** | Orchestrator 需求多阶段拆解与交互式卡片 | ![完成](https://img.shields.io/badge/-已就绪-success) | 引入长程任务失败回溯与状态机持久化 |
-| **统一 SPI 架构** | 解耦 CLI 本地进程管道与云端 API 交互 | ![完成](https://img.shields.io/badge/-已就绪-success) | 规范 Mock 降级边界 (参见 [ADR-004](docs/adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md)) |
-| **DeepSeek 集成** | 官方 DeepSeek V3 对话与代码生成模型支持 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持 Function Calling 工具调用扩展与自主循环 |
-| **版本控制审计** | Eclipse JGit 原生行级 Unified Diff 与增删行指标 | ![完成](https://img.shields.io/badge/-已就绪-success) | 支持一键生成 Git Commit 与 PR 提交推送 |
-| **防并发锁治理** | 工作区细粒度 ReentrantLock 互斥，杜绝脏写 | ![完成](https://img.shields.io/badge/-已就绪-success) | 结合 WorkspaceResolver 实施受控路径防御 (参见 [ADR-003](docs/adr/ADR-003-workspace-distrusts-client-paths.md)) |
-| **可视化 DAG 画布** | 基于 `@xyflow/react` 的拖拽式工作流节点编排 | ![完成](https://img.shields.io/badge/-已就绪-success) | 画布与后端 DAG 引擎双向实时执行状态高亮联动 |
-| **工作区文件树** | 实时物理目录扫描与 Monaco 代码在线编辑预览 | ![完成](https://img.shields.io/badge/-已就绪-success) | 增加多标签页代码对比与受控相对路径浏览 |
-| **Web 模版预览** | 静态 Web 页面 iframe 挂载渲染与资源预览 | ![完成](https://img.shields.io/badge/-已就绪-success) | 阶段 7 接入基于 Docker Engine API 的轻量微容器隔离沙箱 |
-| **Dockerfile 清单生成**| 自动化导出 Nginx Dockerfile 镜像构建配置与清单 | ![完成](https://img.shields.io/badge/-已就绪-success) | 接入真实容器镜像构建流水线与 Kubernetes 部署编排 |
-
----
-
-## 🏗️ 系统架构与 DDD 四层分层
-
-系统遵循经典的 **领域驱动设计 (DDD)** 四层架构，采用 **模块化单体架构 (Modular Monolith)** 形态（参见 [ADR-001](docs/adr/ADR-001-modular-monolith-architecture.md)），各层边界分明、职责单一：
-
-```mermaid
-flowchart TD
-    Client[Next.js 14 Bento Grid 前端工作台] -->|REST / SSE 长连接| Adapter[适配层 Adapter Layer]
-    
-    subgraph Spring Boot 3.3.4 后端核心
-        Adapter --> App[应用层 Application Layer]
-        App --> Domain[领域层 Domain Layer]
-        Domain -.-> Infra[基础设施层 Infrastructure Layer]
-        
-        subgraph 核心领域模型
-            Domain --> D1[UnifiedAgentAdapter SPI 插件体系]
-            Domain --> D2[Orchestrator 任务拆解与富文本卡片]
-            Domain --> D3[JGit 行级 Unified Diff 审计引擎]
-            Domain --> D4[DAG 拓扑状态机工作流引擎]
-        end
-        
-        subgraph 基础设施与底层支撑
-            Infra --> I1[CliProcessAdapter 本地运行时]
-            Infra --> I2[SpringAiApiAdapter 弹性通信]
-            Infra --> I3[WorkspaceLockManager 防竞态锁]
-            Infra --> I4[Spring Data JPA / H2 / MySQL]
-        end
-    end
-    
-    Infra --> Workspaces[物理隔离受控工作区 data/workspaces/]
-```
-
-### 目录工程结构
-
-```
-agenthub/
-├── agenthub-backend/                  # Spring Boot 3.3.4 (Java 17 LTS)
-│   ├── src/main/java/com/agenthub/
-│   │   ├── adapter/                  # 接口适配层 (RESTful API, Web Controller, Result<T>)
-│   │   ├── application/              # 应用服务层 (IMCollaborationService, 业务流程编排)
-│   │   ├── domain/                   # 核心领域层 (Agent SPI, 协同卡片, JGit Diff, DAG 引擎)
-│   │   └── infrastructure/           # 基础设施层 (CLI 管道, Spring AI/DeepSeek, 并发锁, JPA)
-│   └── src/test/java/com/agenthub/   # 13/13 绿灯单元与防御性集成测试矩阵
-│
-├── agenthub-frontend/                 # Next.js 14 + Tailwind CSS 前端控制台
-│   ├── src/app/                      # Bento Grid 仪表盘大厅与 SSE 实时事件连接
-│   └── src/components/               # WorkflowCanvas (DAG 画布), WorkspaceExplorer (文件树)
-│
-├── data/workspaces/                  # 受 Git 控制的多 Agent 物理协作工作区
-├── docs/                             # 系统技术文档与实机运行证据
-│   ├── images/                       # 真实桌面端实机截图集 (01-05)
-│   ├── adr/                          # 核心架构决策记录 (ADR-001 ~ ADR-004)
-│   ├── CURRENT_CAPABILITY_BOUNDARIES.md # 当前真实能力边界与系统事实白皮书
-│   ├── AGENTHUB_LONG_TERM_PLAN.md    # 长期产品化演进路线 (10 阶段全景)
-│   ├── ARCHITECTURE.md               # 核心架构设计说明书
-│   └── API.md                        # RESTful API 与 SSE 事件流契约
-├── .github/workflows/ci.yml          # GitHub Actions 自动化 CI 流水线
-├── docker-compose.yml                # 本地全套服务容器化编排配置
-├── ARCHITECTURE_INDEX.md             # AOCI 规范高密度架构代码地图
-├── SECURITY.md                       # 安全策略与凭证管理规范
-├── CONTRIBUTING.md                   # 开发者贡献与代码提交规范
-└── CHANGELOG.md                      # 中文更新日志与版本归档
-```
-
----
-
-## 🤖 统一智能体 SPI 架构与平台生态
-
-系统通过统一接口规范解耦多源智能体，支持多样化的运行时环境：
-
-| 智能体标识 | 运行时分类 | 职责定位 | 通信机制 |
-| :--- | :--- | :--- | :--- |
-| **`Orchestrator`** | 协调中枢 | 复杂长程任务理解、阶段拓扑分解、协同卡片派发 | 内部核心编排器 |
-| **`BackendArchitect`**| 云端 LLM / CLI | Spring Boot 3、DDD 架构设计、企业级接口编写 | DeepSeek V3 / API / CLI |
-| **`FrontendEngineer`**| 云端 LLM / CLI | Next.js 14、React 响应式组件开发、美学交互实现 | DeepSeek V3 / API / CLI |
-| **`QAAuditor`** | 本地审计引擎 | JGit 代码变更审查、测试边界覆盖度校验 | Eclipse JGit 原生内核 |
-| **`Claude Code`** | 本地 CLI 运行时 | Anthropic 官方 CLI 智能体环境 | 异步子进程管道 + 正则脱敏 |
-| **`Codex CLI`** | 本地 CLI 运行时 | OpenAI Codex 终端代码协同 | 异步子进程管道 + 看门狗超时 |
-| **`OpenClaw`** | 本地 CLI 运行时 | 开源本地代码执行终端智能体 | 异步子进程管道 + 优雅降级 |
+| 压测指标项 | 观测数值 | 测试用例依据 |
+| :--- | :--- | :--- |
+| **全量自动化测试覆盖** | **263 项用例 100% 绿灯** (后端 259 项 + 前端 4 项构建) | `FullLifecycleEndToEndIntegrationTest`, `ArchUnitArchitectureTest` 等 |
+| **工作区并发锁竞争互斥率** | **100% 互斥 (Max Holders <= 1)**，死锁发生率 0% | `HighConcurrencyStressIntegrationTest` |
+| **多 Agent 消息 128 分段锁单调定序** | **50 并发请求 87ms 内完成分配**，0 丢号，0 倒序 | `HighConcurrencyStressIntegrationTest` |
+| **批量 DAG 拓扑执行吞吐** | **5 个复杂工作流 541ms 内全量跑通** (P50: 252ms, P99: 268ms) | `HighConcurrencyStressIntegrationTest` |
+| **沙箱命令防火墙拦截率** | **100% 阻断** (覆盖 rm -rf, mkfs, dd, 管道提权等 12 种模式) | `SandboxSecurityGuardAndFirewallTest` |
+| **受控路径穿越拦截率** | **100% 阻断** (覆盖 ../, NTFS 设备名, 外部绝对路径, .git 篡改) | `WorkspacePathGuardTest` |
 
 ---
 
 ## 🚀 快速开始
 
-### 1. 前置依赖
-- **JDK 17 LTS** 或更高版本
+### 方式一：生产级多容器一键拉起 (推荐，开箱即用)
+
+```bash
+# 1. 复制生产环境变量模版
+cp .env.production.example .env.production
+
+# 2. 一键构建并启动全栈集群 (MySQL 8.0 + Redis 7 + Backend + Frontend + Nginx)
+# Linux/macOS:
+./scripts/deploy-prod.sh
+# Windows PowerShell:
+.\scripts\deploy-prod.ps1
+```
+启动完成后访问：
+- **Web 控制台**：`http://localhost/`
+- **REST API**：`http://localhost/api`
+- **Actuator 健康探针**：`http://localhost/actuator/health`
+- **Prometheus 指标**：`http://localhost/actuator/prometheus`
+
+---
+
+### 方式二：本地研发与单机调试
+
+#### 1. 前置依赖
+- **JDK 17 LTS**
 - **Maven 3.8+**
 - **Node.js 18+ & npm**
 - **Git**
 
-### 2. 后端服务启动 (Spring Boot 8080)
-
+#### 2. 后端服务启动 (Spring Boot 8080)
 ```bash
 cd agenthub-backend
 
-# 1. 运行全部单元测试矩阵（确保 100% 绿灯）
-mvn test
+# 运行全量 259 项单元测试与集成测试（100% 绿灯）
+mvn clean test
 
-# 2. 启动 Spring Boot 后端
+# 启动后端服务
 mvn spring-boot:run
 ```
-> 后端服务默认监听 `http://localhost:8080`，内置 H2 内存数据库与 `/h2-console`。
 
-### 3. 前端工作台启动 (Next.js 3000)
-
+#### 3. 前端工作台启动 (Next.js 3000)
 ```bash
 cd agenthub-frontend
 
-# 1. 安装前端依赖
+# 安装依赖并启动开发服务器
 npm install
-
-# 2. 启动开发服务器
 npm run dev
 ```
-> 在浏览器打开 `http://localhost:3000` 即可进入 Bento Grid 协作工作台。
-
-### 4. 环境变量与私有配置
-
-项目严格遵循凭证安全规范，**绝不在 Git 仓库中包含任何明文密钥**。
-
-如需使用真实云端 DeepSeek 模型能力：
-- **方式一（推荐，私有文件隔离）**：复制根目录的 [`.env.example`](.env.example) 或在 `agenthub-backend/src/main/resources/` 目录下创建 `application-local.yml`（已受 `.gitignore` 保护，不会入库）：
-  ```yaml
-  agenthub:
-    llm:
-      deepseek:
-        api-key: "你的_DEEPSEEK_API_KEY"
-  ```
-- **方式二（系统环境变量）**：
-  ```bash
-  export DEEPSEEK_API_KEY="你的_DEEPSEEK_API_KEY"
-  ```
-> 若未配置 API Key，系统会自动激活内置的高仿真离线智能模拟器，保障核心协同链路正常演示与测试。
+浏览器访问 `http://localhost:3000` 进入 Bento Grid 协作控制台。
 
 ---
 
-## 🛡️ 安全与凭证管理规范
+## 🏛️ 核心架构与核心设计决策
 
-- **零敏感信息入库**：代码库全局配置了严苛的 [`.gitignore`](.gitignore)，禁止任何 `.env*` 及 `*application-local*.yml` 密钥文件提交；敏感凭证均由环境变量或本地私有配置注入；
-- **进程看门狗机制**：本地 CLI 进程统一配置最长执行超时与强制回收逻辑，防止僵尸进程耗尽系统资源；
-- **受控工作区安全机制 (Phase 0 治理中)**：通过集中引入 `WorkspaceResolver`（参见 [ADR-003](docs/adr/ADR-003-workspace-distrusts-client-paths.md)），全面废止客户端直接传入未校验的绝对路径，实施 5 重路径边界防御，坚决阻断 `../` 目录穿越与 `.git` 元数据篡改；
-- **多环境配置硬隔离**：建立 `dev`、`test`、`prod` 严格隔离配置，生产 Profile 彻底关闭 H2 Console 并锁定数据库 DDL；
-- 详细能力边界与安全指引请参阅 [《当前真实能力边界与架构现状白皮书》](docs/CURRENT_CAPABILITY_BOUNDARIES.md) 与 [SECURITY.md](SECURITY.md)。
-
----
-
-## 🧪 测试度量与工程质量
-
-后端测试套件遵循五维边界防御设计矩阵，执行 `mvn test` 验证结果如下：
-
-```
-[INFO] -------------------------------------------------------
-[INFO]  T E S T S
-[INFO] -------------------------------------------------------
-[INFO] Running com.agenthub.AgentAdapterTest (4 tests) - PASSED
-[INFO] Running com.agenthub.IMCollaborationTest (3 tests) - PASSED
-[INFO] Running com.agenthub.SandboxAndDeployTest (2 tests) - PASSED
-[INFO] Running com.agenthub.SystemHealthTest (1 test) - PASSED
-[INFO] Running com.agenthub.WorkflowAndJGitTest (3 tests) - PASSED
-[INFO] 
-[INFO] Results:
-[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0
-[INFO] BUILD SUCCESS
-```
-
-- **测试绿灯率**：**100%（13/13 通过）**
-- **前端构建**：`npm run build` 静态类型检查 0 错误通过。
+AgentHub 的设计权衡在三份关键架构决策记录 (ADR) 与白皮书中详细剖析：
+- [**ADR-001：为什么采用模块化单体架构 (Modular Monolith)**](docs/adr/ADR-001-modular-monolith-architecture.md)
+- [**ADR-002：为什么采用 SSE + 关系库持久化事件流而不是裸 WebSocket**](docs/adr/ADR-002-sse-and-persistent-event-stream.md)
+- [**ADR-003：为什么受控工作区不信任客户端绝对路径与 JGit 快照机制**](docs/adr/ADR-003-workspace-distrusts-client-paths.md)
+- [**大厂级核心技术白皮书与答辩防穿指南**](docs/TECH_WHITEPAPER_AND_DEFENSE.md)
+- [**端到端 5~8 分钟可重复演示指南**](docs/E2E_DEMO_GUIDE.md)
 
 ---
 
 ## 🤝 贡献与许可证
 
-欢迎通过 GitHub Issues 提出改进建议或 Bug 反馈；提交代码前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
-
+欢迎通过 GitHub Issues 提出改进建议或 Bug 反馈；提交代码前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。  
 本项目采用 [MIT License](LICENSE) 开源许可证。

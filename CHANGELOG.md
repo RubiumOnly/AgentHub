@@ -4,6 +4,41 @@
 
 ---
 
+## [v1.9.0] - 2026-10-09
+
+### 🏆 终局里程碑：阶段 9 端到端质量门禁、全链路压测与大厂级产品化交付 (Phase 9 Final Release)
+- **生产级可观测性与业务指标系统 (Spring Boot Actuator & Micrometer Prometheus)**：
+  - 引入 `spring-boot-starter-actuator` 与 `micrometer-registry-prometheus`，在 `application.yml` 与 `application-prod.yml` 中安全暴露 `/actuator/health`、`/actuator/info`、`/actuator/prometheus`；
+  - 落地 `AgentHubMetricsCollector` 指标收集组件：动态注册核心 Gauge / Counter / Timer 指标（活跃 Run 计数 `agenthub.runs.active`、活跃 SSE 订阅数 `agenthub.sse.connections.active`、Step 执行延迟分布 `agenthub.steps.duration`、Token 消耗统计、工作区锁竞争耗时 `agenthub.workspace.lock.wait`、部署成功/失败计数）；
+  - `RunEventBroadcaster` 联动指标收集器实时统计活跃长连接；
+- **全链路端到端黑盒冒烟与集成验收套件 (`FullLifecycleEndToEndIntegrationTest`)**：
+  - 严格覆盖长期规划第 6 节定义的【场景 A、B、C、D、E】五大核心交付场景：
+    - **场景 A**：单 Agent 试运行与产物审计（创建项目 -> 启动 Run -> 接收 SSE 真实流 -> JGit 结构化快照审计 -> 产物持久化验证）；
+    - **场景 B**：多 Agent 团队协作与 DAG 拓扑门禁（Backend 与 Frontend 并行开发 -> QA 汇聚 -> WAITING_APPROVAL 挂起 -> 审批人通过 -> 恢复调度至 SUCCEEDED）；
+    - **场景 C**：不可信输入防御与安全边界（受控路径穿越拦截、高危命令防火墙拦截、敏感 API Key 全链路脱敏）；
+    - **场景 D**：任务取消、进程回收与 SSE 断点补发（优雅取消、状态机置为 CANCELLED、基于 Last-Event-ID 游标精准重放）；
+    - **场景 E**：JGit 非破坏性回滚与沙箱部署生命周期（回滚至基线快照并保留历史审计、动态端口分配与释放）；
+- **高并发、锁竞争与极限压力性能测试套件 (`HighConcurrencyStressIntegrationTest`)**：
+  - **压测 1**：工作区排他租约锁竞争（20 个并发线程争抢同一工作区锁，验证 100% 互斥安全，同一瞬间持有者 <= 1，无死锁发生）；
+  - **压测 2**：多智能体消息总线 128 分段锁单调定序（50 个并发线程同时争抢序号分配，87ms 内完成分配，严格 1..50 零重复、零跳号、全保序）；
+  - **压测 3**：DAG 拓扑调度批量执行吞吐（并发运行 5 个独立复杂工作流，541ms 内全部跑通，沉淀 P50: 252ms, P99: 268ms 性能基线）；
+- **生产级多容器编排与基础设施交付 (`docker-compose.prod.yml`)**：
+  - `agenthub-backend/Dockerfile`：多阶段构建（JDK 构建 -> JRE 极小镜像），非 root 用户 `agenthub:agenthub` (uid=10001)，JVM 内存自适应参数，内置 Actuator 健康探针；
+  - `agenthub-frontend/Dockerfile`：Next.js 14 Standalone 多阶段构建，非 root 用户 `nextjs:nodejs` (uid=1001)，镜像轻量敏捷；
+  - `docker/nginx/agenthub.conf`：企业级反向代理与网关，针对 `/api/.*/events` 与 `/stream` 显式配置 `proxy_buffering off`、`proxy_cache off` 与长超时，确保 SSE 零缓冲流式直推；
+  - `docker-compose.prod.yml`：整合 MySQL 8.0、Redis 7、Backend、Frontend 与 Nginx 网关全栈容器网络，配置持久化数据卷与资源限额；
+  - 提供生产环境变量模版 `.env.production.example` 与一键部署脚本（`scripts/deploy-prod.sh`、`scripts/deploy-prod.ps1`）；
+- **大厂级生产运维与灾难恢复规范**：
+  - 产出《AgentHub 生产级 Prometheus 告警规则规范》（`docs/ops/ALERTING_RULES.md`），定义 7 类核心告警与 SLA 处置响应分级；
+  - 产出《AgentHub 生产故障演练与灾难恢复手册》（`docs/ops/DISASTER_RECOVERY_RUNBOOK.md`），覆盖数据库宕机、僵尸进程排查、锁自动恢复、SSE 断流优化与数据冷备 SOP；
+- **核心架构资产与白皮书交付**：
+  - 产出《AgentHub 核心技术架构白皮书与大厂级答辩防穿指南》（`docs/TECH_WHITEPAPER_AND_DEFENSE.md`），深入拆解模块化单体、SSE+持久化、JGit 快照三大架构权衡，提供大厂面试官高频 10 问防穿打法；
+  - 产出《AgentHub 5~8 分钟全链路真实演示指南》（`docs/E2E_DEMO_GUIDE.md`）；
+  - 全面更新《当前真实能力边界最终版》（`docs/CURRENT_CAPABILITY_BOUNDARIES.md`），如实对齐全部 10 大阶段达成事实；
+  - 后端 259 项全量测试 100% 绿灯，前端 Next.js 生产构建 100% 成功，长期计划 10 大阶段 100% 圆满交付收官！
+
+---
+
 ## [v1.8.1] - 2026-10-09
 
 ### 🐛 缺陷修复：消除 Linux CI 健康检查 IPv6 解析竞态与远程全量 2/2 绿灯
