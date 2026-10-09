@@ -380,7 +380,7 @@ Artifact / 日志位置：
 ```text
 阶段：阶段 C（单一可靠执行内核与重启恢复）
 验收日期：2026-10-09
-Git commit：待提交 (feat(scheduler): 完成阶段 C 单一可靠执行内核、数据库租约与崩溃重启恢复)
+Git commit：cbadb09 (feat(scheduler): 完成阶段 C 单一可靠执行内核、数据库分布式租约与崩溃重启恢复，加固阶段 A/B)
 运行环境：OS: Windows 11 / JDK: 17.0.15 / Node: 20.x / Next.js: 14.2.13 / DB: H2 (MySQL Mode) + MySQL 8 兼容迁移
 执行命令：
   - mvn clean test (agenthub-backend)
