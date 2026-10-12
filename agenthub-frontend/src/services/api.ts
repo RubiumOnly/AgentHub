@@ -27,6 +27,7 @@ import {
   AuthTokenView,
   CreateProjectRequest,
   StartRunRequest,
+  RunEvidenceBundleView,
 } from "@/types";
 
 // Dynamic API Base URL: defaults to same-origin relative path "" for portable Nginx reverse proxy,
@@ -620,6 +621,26 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify({ reason: reason || "Manual cancellation from Bento UI" }),
     });
+  },
+
+  async getRunEvidence(runId: string): Promise<RunEvidenceBundleView> {
+    return fetchJson<RunEvidenceBundleView>(`${API_BASE}/api/executions/runs/${runId}/evidence`);
+  },
+
+  async exportRunEvidenceFile(runId: string): Promise<RunEvidenceBundleView> {
+    const bundle = await this.getRunEvidence(runId);
+    if (typeof window !== "undefined") {
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `evidence-bundle-${runId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+    return bundle;
   },
 
   // 6. Human-in-the-Loop Approvals

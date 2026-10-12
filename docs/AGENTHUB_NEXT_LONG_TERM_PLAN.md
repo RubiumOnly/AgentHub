@@ -560,3 +560,61 @@ Artifact / 日志位置：
   - 生产环境首次上线前，运维人员需按 .env.production.example 与 DISASTER_RECOVERY_RUNBOOK.md 注入真实强随机密钥及 TLS 证书，并配置宿主机定时任务运行 backup-prod.sh。
 状态：自动化测试与模拟演练通过
 ```
+
+---
+
+### 阶段 F 验收记录
+
+```text
+阶段：阶段 F（产品质量、性能边界和求职作品证据）
+验收日期：2026-10-12
+Git commit：基于前置基线 5653236 -> 本次主交付提交 feat(phase-f): deliver sanitized run evidence bundle, cross-platform e2e scripts, and calibrated docs
+运行环境：
+  - 本地环境：OS: Windows 11 (10.0.26100) / CPU: x86_64 / JDK: Eclipse Temurin 17.0.15 / Node: v20.x / Next.js: 14.2.13 / Compose: Docker Compose v2.x / Git Bash: GNU bash 5.2
+  - CI 容器门禁环境：GitHub Actions ubuntu-latest (Linux x86_64) / MySQL 8.0 Service Container / prom/prometheus:v2.51.0 (promtool) / Docker Engine 26+
+执行命令：
+  - cd agenthub-backend && mvn clean test
+  - cd agenthub-frontend && npx tsc --noEmit && npm run build
+  - docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
+  - bash ./scripts/run-e2e-demo.sh --mode demo (跨平台 Bash E2E 契约演练)
+  - powershell -ExecutionPolicy Bypass -File .\scripts\run-e2e-demo.ps1 -Mode demo (跨平台 PowerShell E2E 契约演练)
+测试汇总：
+  - Backend: 301/301 passed (0 failures, 0 errors, Surefire clean，含新增 PhaseFProductQualityAndEvidenceBundleIntegrationTest 4 项全链路集成测试，覆盖 E2E_DEMO_GUIDE.md 11 步真实 HTTP 契约、多维敏感凭据脱敏、simulated=true/false 区分、确定性 SHA-256 校验和幂等性与单字节防篡改、多租户 1001/1002/6002 安全边界，以及仓库样例证据包与文档诚实性校验)
+  - Frontend: Next.js 14.2.13 生产构建与 TypeScript 严格类型检查 100% 通过 (4/4 页面静态预渲染，0 类型报错，0 ESLint 报错)
+  - Compose & Scripts: docker-compose.prod.yml 配置解析与变量展开通过；scripts/run-e2e-demo.{sh,ps1} 双平台一键演练脚本与真实 Controller 路由 100% 对齐
+核心交付与黑盒流程：
+  1. 脱敏运行证据包（Sanitized Run Evidence Bundle）全栈交付：
+     - 新增 RunEvidenceBundleView DTO（schemaVersion = "agenthub.evidence.v1"），完整聚合脱敏后的项目与工作区基线摘要、Workflow DSL 快照、Run/Step 状态轨迹、单调递增事件序列、Provider/Runtime 计量与 Token 账单摘要、JGit 结构化 Diff、产物审查记录、测试验证汇总、人工审批记录、沙箱预览部署生命周期轨迹及确定性 SHA-256 checksum；
+     - 升级 SecretMasker：在原有 Bearer/sk-/URL 参数脱敏基础上，新增环境变量键值赋值（*_API_KEY=、*_SECRET=、*_PASSWORD=、*_ACCESS_TOKEN=）与 JSON 敏感字段（"apiKey"、"secret"、"password"、"authSecret" 等）自动脱敏，确保证据包零明文密钥泄露；
+     - 在 ExecutionController 与 RunAliasController 暴露 GET /api/executions/runs/{runId}/evidence、GET /api/executions/runs/{runId}/evidence/download 及 /api/runs/{runId}/evidence* 别名接口，强制执行 ResourceAccessGuard 多租户归属权校验；
+     - 实现确定性 SHA-256 校验和（ExecutionApplicationService.computeDeterministicChecksum / verifyEvidenceBundleChecksum），剥离导出时间戳抖动并按固定字典序序列化核心载荷，保证同一完成态 Run 跨时间重复导出 Checksum 100% 幂等，且任意单字节篡改（如翻转 simulated 标记或篡改运行状态）100% 检出；
+     - 在前端控制台 HeaderNav.tsx、page.tsx 与 api.ts 接入“导出证据包”按钮，支持一键下载带校验和的 JSON 证据包；在 docs/evidence/sample-run-evidence-bundle.json 入库真实可校验的样例证据包（SHA-256: 6a864184f3d6bb2e3ad7252cba9902bb113459d2e1efdee7fab554eca7c0341d）。
+  2. 显式区分离线演示模式（Demo Mode）与真实模型模式（Live Provider Mode）：
+     - 升级 DagExecutionEngine、ProviderDrivenAgentRuntime、MockAgentRuntime 与 AgentExecutionRequest：在 STEP_STARTED / STEP_COMPLETED 事件载荷与 Token 计量链路中显式记录 runtimeType 与 simulated 布尔标记；
+     - 当使用 MockAgentRuntime 时，证据包强制标记 simulated=true、executionMode="DEMO_SIMULATED"；仅当绑定真实 Provider 产生活跃 TokenUsageAuditEntity 计量记录且无未标记模拟节点时，方标记为 simulated=false、executionMode="LIVE_PROVIDER"。
+  3. 重写 docs/E2E_DEMO_GUIDE.md 并交付跨平台一键演示脚本：
+     - 彻底剔除旧版指南中不存在的 /api/v1/workflows/run、/api/v1/sandboxes/create 等失效路径及默认弱密码假设；
+     - 交付 scripts/run-e2e-demo.sh（Bash）与 scripts/run-e2e-demo.ps1（PowerShell），支持 --mode demo|live / -Mode demo|live 参数切换，完整覆盖注册/登录 -> 创建项目 -> 解析工作区 -> 校验与创建 DAG 定义 -> 启动 Run 与签发 SSE Ticket -> 人工审批放行 -> 工作区文件写入与 JGit 快照提交（新增 POST /api/workspaces/{workspaceId}/git/snapshot）-> 结构化 Diff 审计 -> 产物采纳 -> 静态预览沙箱部署与健康探针验证 -> 停止回收 -> 导出脱敏证据包；
+     - 在 WorkflowNodeDsl（@JsonAlias({"runtime", "platform"})、@JsonAlias({"prompt"})）与 WorkflowEdgeDsl（@JsonAlias({"from", "fromNodeId"})、@JsonAlias({"to", "toNodeId"})）增加向后兼容别名映射。
+  4. 文档事实校准、性能压测溯源、ADR 体系与未实现边界坦诚声明：
+     - 全面重写与校准 README.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/TECH_WHITEPAPER_AND_DEFENSE.md、docs/ARCHITECTURE.md 与 docs/API.md，删去无法复现的夸张形容词与“10,000+ QPS”未实测口号，所有并发/延迟/恢复指标严格锚定本地 JUnit + H2 压测套件（HighConcurrencyStressIntegrationTest、PersistentExecutionRecoveryAndLeaseTest 等）并注明硬件/软件环境与样本量；
+     - 新增 docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md 并校准 docs/adr/ADR-002-sse-and-persistent-event-stream.md，形成模块化单体（ADR-001）、持久化 SSE 事件流（ADR-002）、受控 JGit 工作区与路径防御（ADR-003/004）、数据库租约与崩溃恢复（ADR-005）完整架构决策证据链；
+     - 在 README.md、CURRENT_CAPABILITY_BOUNDARIES.md 与白皮书中显式列出当前未交付边界（无跨机房分布式调度集群、无 S3/MinIO 对象存储后端、无 Kubernetes/Firecracker MicroVM 硬件级虚拟化、非物理级多租户隔离）。
+失败/恢复演练与验证记录：
+  - 演练 1（E2E 演示指南 11 步全链路 HTTP 契约演练）：通过 MockMvc 完整执行注册、项目创建、DSL 校验、DAG 执行、SSE Ticket 签发、人工审批放行、工作区写入、JGit 快照、结构化 Diff、Artifact 采纳、静态预览部署（分配端口 18000 并通过 HTTP 200 健康探针）与停止回收、以及证据包导出，全链路 100% 绿灯；
+  - 演练 2（多维密钥注入与脱敏拦截验证）：在 DSL Prompt、审批原因、工作区 Markdown 文件中注入 sk-proj-*、DEEPSEEK_API_KEY=sk-live-*、{"apiKey":"sk-json-secret-*"} 与 Bearer JWT，导出的证据包 JSON 中实现 100% 脱敏（零明文残留）；
+  - 演练 3（Demo vs Live 模式区分与单字节防篡改演练）：验证 PROVIDER_DRIVEN + TokenUsageAuditEntity 场景准确输出 simulated=false / LIVE_PROVIDER；对已导出证据包篡改 simulated 布尔值、篡改 Run 状态或修改 Checksum 末位字符，verifyEvidenceBundleChecksum 均 100% 返回 false 拦截；
+  - 演练 4（多租户证据包越权访问阻断）：未携带 Token 访问返回 1001，租户 B 越权访问租户 A 的运行证据包返回 1002，访问不存在 Run 返回 6002。
+Artifact / 日志位置：
+  - docs/evidence/sample-run-evidence-bundle.json
+  - scripts/run-e2e-demo.sh, scripts/run-e2e-demo.ps1
+  - docs/E2E_DEMO_GUIDE.md, docs/CURRENT_CAPABILITY_BOUNDARIES.md, docs/TECH_WHITEPAPER_AND_DEFENSE.md, README.md
+  - docs/adr/ADR-002-sse-and-persistent-event-stream.md, docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md
+  - agenthub-backend/target/surefire-reports/TEST-com.agenthub.PhaseFProductQualityAndEvidenceBundleIntegrationTest.xml
+未覆盖场景：
+  - 跨机房多活集群压测、S3/MinIO 外部对象存储大体积产物归档、以及基于 Firecracker MicroVM / Kata Containers 的内核级多租户强隔离属于后续演进路线，已在 CURRENT_CAPABILITY_BOUNDARIES.md 中明确声明为当前未交付边界。
+剩余风险：
+  - 在使用 --mode live / -Mode live 运行真实大模型演练时，需预先注入有效的外部 LLM Provider API Key 并注意上游厂商速率限制与 Token 计费。
+状态：自动化测试与全链路证据核验通过（阶段 A–F 全部收官）
+```
+

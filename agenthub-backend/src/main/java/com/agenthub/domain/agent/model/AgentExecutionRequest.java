@@ -11,6 +11,8 @@ public class AgentExecutionRequest {
     private String sessionId;
     private Map<String, String> environmentVariables;
     private int timeoutSeconds;
+    private String runId;
+    private String stepRunId;
 
     public AgentExecutionRequest() {
         this.timeoutSeconds = 300;
@@ -84,5 +86,21 @@ public class AgentExecutionRequest {
 
     public void setTimeoutSeconds(int timeoutSeconds) {
         this.timeoutSeconds = timeoutSeconds;
+    }
+
+    public String getRunId() {
+        return runId;
+    }
+
+    public void setRunId(String runId) {
+        this.runId = runId;
+    }
+
+    public String getStepRunId() {
+        return stepRunId;
+    }
+
+    public void setStepRunId(String stepRunId) {
+        this.stepRunId = stepRunId;
     }
 }

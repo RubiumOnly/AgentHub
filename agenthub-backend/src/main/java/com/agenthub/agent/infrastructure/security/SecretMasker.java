@@ -14,8 +14,10 @@ public final class SecretMasker {
 
     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)(sk-[a-zA-Z0-9_-]{8,}|key-[a-zA-Z0-9_-]{8,}|AIza[0-9A-Za-z-_]{35})");
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)(Bearer\\s+)([a-zA-Z0-9._-]{8,})");
-    private static final Pattern HEADER_API_KEY_PATTERN = Pattern.compile("(?i)((?:x-api-key|x-goog-api-key|api-key):\\s*)([^\\r\\n,;\"'\\s]+)");
-    private static final Pattern QUERY_PARAM_KEY_PATTERN = Pattern.compile("(?i)([?&](?:key|apiKey|token|secret)=)([^&]+)");
+    private static final Pattern HEADER_API_KEY_PATTERN = Pattern.compile("(?i)((?:x-api-key|x-goog-api-key|api-key):\\s*)([^\\r\\n,;\"'\\s}]+)");
+    private static final Pattern QUERY_PARAM_KEY_PATTERN = Pattern.compile("(?i)([?&](?:key|apiKey|token|secret)=)([^&\"'\\s}]+)");
+    private static final Pattern ENV_ASSIGNMENT_PATTERN = Pattern.compile("(?i)(\\b[A-Z0-9_]*(?:API_KEY|SECRET|PASSWORD|ACCESS_TOKEN)\\s*=\\s*['\"]?)([^\\r\\n,;\"'\\s}]+)");
+    private static final Pattern JSON_SECRET_FIELD_PATTERN = Pattern.compile("(?i)(\"(?:apiKey|api_key|secret|password|authSecret|accessToken|refreshToken)\"\\s*:\\s*\")([^\"]+)(\")");
 
     private SecretMasker() {}
 
@@ -92,7 +94,35 @@ public final class SecretMasker {
             String rawSecret = queryMatcher.group(2);
             queryMatcher.appendReplacement(sb, Matcher.quoteReplacement(paramPrefix + maskSecret(rawSecret)));
         }
+        headerMatcher = null;
         queryMatcher.appendTail(sb);
+        masked = sb.toString();
+
+        // Mask ENV assignment secrets (e.g. DEEPSEEK_API_KEY=..., OPENAI_API_KEY=...)
+        Matcher envMatcher = ENV_ASSIGNMENT_PATTERN.matcher(masked);
+        sb = new StringBuffer();
+        while (envMatcher.find()) {
+            String prefix = envMatcher.group(1);
+            String rawSecret = envMatcher.group(2);
+            if (!rawSecret.contains("***") && !rawSecret.contains("[REDACTED_SECRET]")) {
+                envMatcher.appendReplacement(sb, Matcher.quoteReplacement(prefix + maskSecret(rawSecret)));
+            }
+        }
+        envMatcher.appendTail(sb);
+        masked = sb.toString();
+
+        // Mask JSON secret fields (e.g. "apiKey": "...", "password": "...")
+        Matcher jsonMatcher = JSON_SECRET_FIELD_PATTERN.matcher(masked);
+        sb = new StringBuffer();
+        while (jsonMatcher.find()) {
+            String prefix = jsonMatcher.group(1);
+            String rawSecret = jsonMatcher.group(2);
+            String suffix = jsonMatcher.group(3);
+            if (!rawSecret.contains("***") && !rawSecret.contains("[REDACTED_SECRET]")) {
+                jsonMatcher.appendReplacement(sb, Matcher.quoteReplacement(prefix + maskSecret(rawSecret) + suffix));
+            }
+        }
+        jsonMatcher.appendTail(sb);
         masked = sb.toString();
 
         return masked;

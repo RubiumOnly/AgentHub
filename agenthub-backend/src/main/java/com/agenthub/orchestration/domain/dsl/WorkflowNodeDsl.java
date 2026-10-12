@@ -1,5 +1,7 @@
 package com.agenthub.orchestration.domain.dsl;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,7 +12,9 @@ public class WorkflowNodeDsl implements Serializable {
     private String id;
     private String name;
     private String type = "AGENT"; // START, AGENT, CONDITION, APPROVAL, JOIN, END
+    @JsonAlias({"runtime", "platform"})
     private String agentPlatform;  // CLAUDE_CODE, CODEX, DEEPSEEK, OPENCLAW, SPRING_AI_API, MOCK
+    @JsonAlias({"prompt"})
     private String promptTemplate;
     private Map<String, Object> inputs = new HashMap<>();
     private String condition;      // condition expression

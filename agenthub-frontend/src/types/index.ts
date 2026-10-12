@@ -364,3 +364,65 @@ export interface StartRunRequest {
   inputs?: Record<string, any>;
 }
 
+export interface RunEvidenceBundleView {
+  schemaVersion: string;
+  bundleId: string;
+  exportedAt: string;
+  simulated: boolean;
+  executionMode: "DEMO_SIMULATED" | "LIVE_PROVIDER" | string;
+  project: {
+    id: string;
+    name: string;
+    ownerId?: string;
+    workspaceId?: string;
+    gitBaselineCommit?: string;
+  };
+  workflowDslSnapshot?: string;
+  run: WorkflowRunView;
+  steps: StepRunView[];
+  events: RunEventView[];
+  providerRuntime: {
+    runtimeTypes: string[];
+    providerTypes: string[];
+    models: string[];
+    simulated: boolean;
+    totalPromptTokens: number;
+    totalCompletionTokens: number;
+    totalTokens: number;
+    totalEstimatedCost: number;
+    tokenUsageRecords: any[];
+  };
+  gitDiff?: StructuredDiff;
+  artifacts: ArtifactView[];
+  testReportSummary: {
+    status: string;
+    totalSteps: number;
+    succeededSteps: number;
+    failedSteps: number;
+    skippedSteps: number;
+    cancelledSteps: number;
+    verificationSummary: string;
+    logs: string[];
+  };
+  approvals: ApprovalView[];
+  deployments: {
+    id: string;
+    projectId: string;
+    artifactId?: string;
+    status: string;
+    target: string;
+    sandboxType: string;
+    templateType: string;
+    url?: string;
+    port?: number;
+    healthCheckPath?: string;
+    lifecycleTrace?: string;
+    terminationReason?: string;
+    errorMessage?: string;
+    startedAt?: string;
+    finishedAt?: string;
+  }[];
+  checksum: string;
+}
+
+

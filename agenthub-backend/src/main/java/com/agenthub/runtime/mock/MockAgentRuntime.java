@@ -43,8 +43,12 @@ public class MockAgentRuntime implements AgentRuntime {
     @Override
     public ExecutionHandle start(AgentExecutionRequest request, RuntimeEventSink sink, CancelToken cancelToken) {
         String handleId = "handle-mock-" + UUID.randomUUID().toString().substring(0, 8);
-        String runId = request.getAgentName() != null ? request.getAgentName() : "run-default";
-        String stepRunId = "step-mock-" + UUID.randomUUID().toString().substring(0, 8);
+        String runId = (request.getRunId() != null && !request.getRunId().isBlank())
+                ? request.getRunId()
+                : (request.getAgentName() != null ? request.getAgentName() : "run-default");
+        String stepRunId = (request.getStepRunId() != null && !request.getStepRunId().isBlank())
+                ? request.getStepRunId()
+                : ("step-mock-" + UUID.randomUUID().toString().substring(0, 8));
         ExecutionHandle handle = new ExecutionHandle(handleId, runId, stepRunId, "MOCK");
 
         CompletableFuture.runAsync(() -> {

@@ -3,13 +3,16 @@ package com.agenthub.execution.api;
 import com.agenthub.adapter.common.Result;
 import com.agenthub.execution.application.ExecutionApplication;
 import com.agenthub.execution.dto.RunEventView;
+import com.agenthub.execution.dto.RunEvidenceBundleView;
 import com.agenthub.execution.dto.StartRunCommand;
 import com.agenthub.execution.dto.StepRunView;
 import com.agenthub.execution.dto.WorkflowRunView;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -157,5 +160,28 @@ public class ExecutionController {
         }
         StepRunView step = executionApplication.retryStep(stepRunId);
         return Result.ok(step);
+    }
+
+    /**
+     * Phase F: Export sanitized, tamper-evident Run Evidence Bundle JSON.
+     */
+    @GetMapping("/runs/{runId}/evidence")
+    public Result<RunEvidenceBundleView> getRunEvidence(@PathVariable("runId") String runId) {
+        RunEvidenceBundleView bundle = executionApplication.exportRunEvidenceBundle(runId);
+        return Result.ok(bundle);
+    }
+
+    /**
+     * Phase F: Download sanitized Run Evidence Bundle as a standalone JSON attachment.
+     */
+    @GetMapping(value = "/runs/{runId}/evidence/download", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<RunEvidenceBundleView> downloadRunEvidence(@PathVariable("runId") String runId) {
+        RunEvidenceBundleView bundle = executionApplication.exportRunEvidenceBundle(runId);
+        String safeFilename = "evidence-bundle-" + runId.replaceAll("[^a-zA-Z0-9_-]", "") + ".json";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFilename + "\"")
+                .header("X-Evidence-Checksum", bundle.getChecksum())
+                .header("X-Execution-Mode", bundle.getExecutionMode())
+                .body(bundle);
     }
 }

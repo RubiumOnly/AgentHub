@@ -67,30 +67,28 @@
 2. **持久化先于推流 (Persist-Before-Emit 范式)**：
    - 领域服务或执行引擎生成事件时，必须在事务中先将事件持久化至数据库，随后触发内部事件总线推送到连接池中的 `SseEmitter`。
 3. **断点续传与重放协议**：
-   - 客户端建立 SSE 连接时（例如 `/api/agents/chat/stream?runId=xxx&afterSequence=128`），可携带 HTTP Header `Last-Event-ID: 128`；
-   - 服务端首先执行 SQL 查询：`SELECT * FROM run_events WHERE run_id = :runId AND sequence > :afterSeq ORDER BY sequence ASC`，迅速补发历史丢失事件；
-   - 补发完毕后，平滑衔接进入实时推流通道；
+   - 客户端建立 SSE 连接时（`GET /api/executions/runs/{runId}/stream` 或别名 `GET /api/runs/{runId}/stream`，通过一次性 `ticket` 票据鉴权），可携带 HTTP Header `Last-Event-ID: 128` 或查询参数 `lastEventId=128`；
+   - 服务端首先执行 SQL 查询：`SELECT * FROM run_events WHERE run_id = :runId AND sequence_num > :afterSeq ORDER BY sequence_num ASC`，按单调递增序号补发已落库的历史增量事件；
+   - 补发完毕后，平滑衔接进入当前节点内存 `SseEmitter` 实时推流通道；
    - 每个 SSE 数据块均按照 W3C 规范输出：
      ```http
      id: 129
      event: TOKEN
-     data: {"text": "public class UserService"}
+     data: {"token": "public class UserService"}
      ```
 4. **客户端上行与操作通道**：
    - 用户的发送消息、确认审批卡片、终止执行等操作继续走独立的 RESTful POST 接口，享受标准的 HTTP 状态码、统一异常捕获与拦截器鉴权。
 
 ### 正面收益 (Positive Consequences)
 
-* **零事件丢失与完美离线回放**：用户无论何时刷新页面、离线重连，前端只需根据最大收到 sequence 请求补发，UI 即可百分之百恢复到最新真实进度。
-* **原生 HTTP 协议兼容性**：SSE 基于标准 HTTP 传输，与浏览器原生 `EventSource` / `fetch` 完美兼容；自然穿透 Nginx 反向代理、无需配置 WebSocket 的 `Upgrade` 请求头与复杂心跳维护。
-* **清晰的单向数据流与职责划分**：上行接口保持标准的 RESTful 无状态与安全审计；下行流保持高吞吐单向订阅，符合现代 CQRS 读写分离原则。
+* **确定性增量回放与断点续传**：在单节点部署或连接重连至同一数据库时，客户端只需携带已接收的最大 `sequence_num`（`Last-Event-ID`），即可从 `run_events` 持久化表精确补齐已提交事务的增量事件，避免重复消费与顺序错乱。
+* **原生 HTTP 协议兼容性**：SSE 基于标准 HTTP 传输，与浏览器原生 `EventSource` / `fetch` 兼容；自然穿透 Nginx 反向代理（配置 `proxy_buffering off`），无需 WebSocket `Upgrade` 握手。
+* **清晰的单向数据流与职责划分**：上行接口保持标准的 RESTful 无状态与安全审计；下行流保持单向订阅，符合 CQRS 读写分离原则。
 
-### 负面代价与应对 (Negative Consequences & Mitigation)
+### 负面代价与已知边界 (Negative Consequences & Known Boundaries)
 
-* **事件表存储膨胀**：打字机高频 Token 可能会生成大量细碎事件记录。
-  * *应对策略*：Token 级高频打字机采用内存小批次聚合（每 50ms 或每 10 个 Token 聚合为一次落库更新），任务完成后提供归档与定期清理策略。
-* **双通道交互感知**：客户端交互（如审批按钮）需要独立调用 REST 接口，而非通过同一 WebSocket 链路发送。
-  * *应对策略*：REST 接口具备天然的幂等设计与状态码返回，相比 WebSocket 私有帧交互更为稳健透明。
+* **单机内存广播边界（非跨节点分布式总线）**：当前 `RunEventBroadcaster` 的实时连接池（`SseEmitter`）驻留在单节点 JVM 内存中。若未来扩展为多实例水平集群且未引入 Redis Stream / Kafka 跨节点广播，连接到实例 B 的客户端只能通过 `GET /api/executions/runs/{runId}/events?afterSeq=...` 轮询或重连回放获取实例 A 写入数据库的事件。
+* **事件表存储增长**：高频 Token 事件会增加 `run_events` 表行数，需配合归档或脱敏运行证据包（Evidence Bundle）导出后定期清理。
 
 ---
 

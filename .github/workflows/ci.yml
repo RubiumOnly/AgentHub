@@ -48,7 +48,7 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: root_ci_password_2026
           SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQLDialect
         run: |
-          mvn test -Duser.timezone=UTC -Dtest="FlywayMigrationAndSchemaTest,PersistentExecutionRecoveryAndLeaseTest,ConversationMonotonicSequenceAndConcurrencyTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest,FullLifecycleEndToEndIntegrationTest"
+          mvn test -Duser.timezone=UTC -Dtest="FlywayMigrationAndSchemaTest,PersistentExecutionRecoveryAndLeaseTest,ConversationMonotonicSequenceAndConcurrencyTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest,PhaseFProductQualityAndEvidenceBundleIntegrationTest,FullLifecycleEndToEndIntegrationTest"
         working-directory: agenthub-backend
 
       - name: Output Test Failure Diagnostics

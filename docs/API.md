@@ -85,6 +85,8 @@
   - Response: `Result<Void>`
 - `GET /api/auth/me`：获取当前登录用户的个人信息
   - Response: `Result<UserView>` (`{"id": "...", "username": "...", "email": "...", "status": "ACTIVE"}`)
+- `POST /api/auth/stream-ticket`：签发单次有效、60 秒过期的 SSE 流式订阅票据（避免在 URL 查询参数中暴露长期 Bearer Token）
+  - Response: `Result<Map<String, Object>>` (`{"ticket": "st-...", "expiresInSeconds": 60}`)
 
 ### 2. 项目与代码工作区 (Project & Workspace)
 - `POST /api/projects`：创建研发项目（自动绑定受控工作区）
@@ -107,6 +109,7 @@
 - `DELETE /api/workspaces/{workspaceId}/file?path={relPath}`：受控删除文件或目录；
 - `GET /api/workspaces/{workspaceId}/download?path={relPath}`：受控下载单文件二进制流或文本内容；
 - `GET /api/workspaces/{workspaceId}/archive`：将工作区受控文件归档打包为 ZIP 压缩包下载（自动排除 `.git` 元数据）；
+- `POST /api/workspaces/{workspaceId}/git/snapshot`：将当前工作区改动提交为 JGit 快照 Commit 并生成待验收 `ArtifactEntity`；
 - `GET /api/workspaces/{workspaceId}/diff`：获取结构化 Diff 对象（`Result<StructuredDiff>`，包含变更文件数、增减行数、Unified Diff Patch、冲突与二进制状态）；
 - `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁（Body: `{"ownerId":"...","waitTimeoutMs":3000,"leaseTtlMs":60000}`，支持多节点 DB 表 `workspace_locks` 同步与超时自动回收防死锁）；
 - `POST /api/workspaces/{workspaceId}/lock/renew`：为已持有的工作区租约锁续期（Body: `{"ownerId":"...","additionalTtlMs":60000}`）；
@@ -124,7 +127,10 @@
 - `POST /api/im/conversations/{id}/messages`：发送消息与触发智能体路由（入参 `SendMessageCommand`）；
 - `GET /api/im/conversations/{id}/stream`：**SSE 实时事件流通道**。
 
-### 6. 工作流执行引擎与事件回放 (Workflow Execution & Event Replay)
+### 6. 工作流定义、执行引擎、事件回放与脱敏证据包 (Workflow Execution & Evidence Bundle)
+- `POST /api/workflows/definitions/validate`：校验 DAG 工作流 DSL 拓扑合法性（Kahn 环路检测与节点契约验证）
+- `POST /api/workflows/definitions`：创建并持久化版本化工作流定义
+- `GET /api/workflows/definitions`：查询工作流定义列表（支持 `?projectId=...`）
 - `POST /api/executions/runs`（或 `POST /api/runs`）：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
   - Request: `{"projectId": "proj-default", "definitionId": "def-default", "idempotencyKey": "idemp-uuid"}`
   - Response: `Result<WorkflowRunView>`
@@ -140,14 +146,19 @@
   - Request: `{"eventType": "STEP_COMPLETED", "payload": "..."}`
   - Response: `Result<RunEventView>`
 - `GET /api/executions/runs/{runId}/stream`（或 `GET /api/runs/{runId}/stream`）：**Run 专属 SSE 实时事件流通道**
-  - 请求头：支持 `Last-Event-ID: <seq>`；亦支持查询参数 `?lastEventId=<seq>`；
+  - 请求头：支持 `Last-Event-ID: <seq>`；亦支持查询参数 `?lastEventId=<seq>&ticket=<streamTicket>`；
   - 特性：自动按单调递增 `sequenceNum` 补发断点遗漏事件，并持续流式推送运行过程中的实时事件。
+- `GET /api/executions/runs/{runId}/evidence`（或 `GET /api/runs/{runId}/evidence`）：**导出脱敏运行证据包 (`Result<RunEvidenceBundleView>`)**
+  - 包含脱敏 DSL 快照、Run/Step 状态、单调事件序列、Provider/Runtime 审计、`simulated` 标识、JGit 结构化 Diff、审批记录、部署健康轨迹与确定性 SHA-256 `checksum`。
+- `GET /api/executions/runs/{runId}/evidence/download`（或 `GET /api/runs/{runId}/evidence/download`）：下载独立 JSON 附件格式脱敏运行证据包（附带 `X-Evidence-Checksum` 与 `X-Execution-Mode` 响应头）。
 - `POST /api/executions/runs/{runId}/cancel`（或 `POST /api/runs/{runId}/cancel`）：取消运行实例
   - Request: `{"reason": "用户手动终止"}`
   - 级联触发 CancelToken，强平子进程与中断执行线程，将 Run 及未完成 Step 状态收敛为 `CANCELLED`。
 - `POST /api/executions/runs/{runId}/pause`：暂停运行实例
 - `POST /api/executions/runs/{runId}/resume`：恢复运行实例
 - `POST /api/executions/steps/{stepRunId}/retry`（或 `POST /api/executions/runs/{runId}/steps/{stepRunId}/retry`）：重试失败的 Step 节点
+- `GET /api/approvals/runs/{runId}`：查询指定 Run 关联的人工审批门禁列表
+- `POST /api/approvals/{approvalId}/approve` & `POST /api/approvals/{approvalId}/reject`：审批通过或驳回阻塞节点
 
 ### 7. 产物审计、审查与安全回滚 (Artifacts & Safe Rollback)
 - `GET /api/audit/artifacts/run/{runId}`：获取指定 Run 的所有交付物与快照记录；

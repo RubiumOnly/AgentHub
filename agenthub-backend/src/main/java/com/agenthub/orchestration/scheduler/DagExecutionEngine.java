@@ -675,12 +675,17 @@ public class DagExecutionEngine {
                 stepRunRepository.save(current);
             } catch (Exception ignored) {}
 
-            stateMachine.transitionStep(stepEntity.getId(), StepRunStatus.RUNNING, "scheduler", "Attempt " + attempts, null);
-            broadcaster.publishEvent(runId, "STEP_STARTED", "{\"stepRunId\":\"" + stepEntity.getId() + "\",\"nodeId\":\"" + node.getId() + "\",\"attempt\":" + attempts + "}");
-
             AgentPlatformType platformType = AgentPlatformType.fromString(node.getAgentPlatform());
             String runtimeType = node.getAgentPlatform() != null ? node.getAgentPlatform() : "SPRING_AI_API";
             AgentRuntime runtime = runtimeRegistry.getRuntime(runtimeType);
+            boolean simulatedRuntime = runtime != null && runtime.describe() != null && runtime.describe().isSimulated();
+
+            stateMachine.transitionStep(stepEntity.getId(), StepRunStatus.RUNNING, "scheduler", "Attempt " + attempts, null);
+            broadcaster.publishEvent(runId, "STEP_STARTED",
+                    "{\"stepRunId\":\"" + stepEntity.getId() + "\",\"nodeId\":\"" + node.getId()
+                            + "\",\"attempt\":" + attempts
+                            + ",\"runtimeType\":\"" + escapeJson(runtimeType) + "\""
+                            + ",\"simulated\":" + simulatedRuntime + "}");
 
             AgentExecutionRequest req = new AgentExecutionRequest(
                     node.getId(),
@@ -688,6 +693,8 @@ public class DagExecutionEngine {
                     workspacePath,
                     prompt
             );
+            req.setRunId(runId);
+            req.setStepRunId(stepEntity.getId());
 
             CompletableFuture<String> stepFuture = new CompletableFuture<>();
             RuntimeEventSink sink = new RuntimeEventSink() {
@@ -740,7 +747,10 @@ public class DagExecutionEngine {
 
                 context.recordNodeOutput(node.getId(), result);
                 markStepSucceeded(stepEntity, node, result, context);
-                broadcaster.publishEvent(runId, "STEP_COMPLETED", "{\"stepRunId\":\"" + stepEntity.getId() + "\",\"nodeId\":\"" + node.getId() + "\"}");
+                broadcaster.publishEvent(runId, "STEP_COMPLETED",
+                        "{\"stepRunId\":\"" + stepEntity.getId() + "\",\"nodeId\":\"" + node.getId()
+                                + "\",\"runtimeType\":\"" + escapeJson(runtimeType) + "\""
+                                + ",\"simulated\":" + simulatedRuntime + "}");
                 return true;
 
             } catch (Exception e) {

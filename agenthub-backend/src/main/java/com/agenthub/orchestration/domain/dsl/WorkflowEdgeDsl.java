@@ -1,10 +1,14 @@
 package com.agenthub.orchestration.domain.dsl;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.io.Serializable;
 
 public class WorkflowEdgeDsl implements Serializable {
     private String id;
+    @JsonAlias({"from", "fromNodeId"})
     private String source;
+    @JsonAlias({"to", "toNodeId"})
     private String target;
     private String condition;
 

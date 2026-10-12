@@ -366,6 +366,16 @@ export default function AgentHubExecutiveApp() {
     syncDashboardData();
   };
 
+  const handleExportEvidence = async () => {
+    const targetRunId = run?.id || selectedRunId;
+    if (!targetRunId) return;
+    try {
+      await apiClient.exportRunEvidenceFile(targetRunId);
+    } catch (err: any) {
+      setSyncErrorMessage(`导出运行证据包失败: ${err.message || "请求异常"}`);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#09090b] text-zinc-100 font-sans ambient-glow selection:bg-indigo-600 selection:text-white">
       {/* 1. Global Navigation Header */}
@@ -386,6 +396,7 @@ export default function AgentHubExecutiveApp() {
         onLogout={handleLogout}
         onRefreshAll={syncDashboardData}
         onRunWorkflow={handleRunWorkflow}
+        onExportEvidence={handleExportEvidence}
         isRunning={isRunningWorkflow}
       />
 

@@ -1,0 +1,263 @@
+{
+  "schemaVersion": "agenthub.evidence.v1",
+  "bundleId": "evd-run-e2e-sample-20261012",
+  "exportedAt": "2026-10-12T11:30:00",
+  "simulated": true,
+  "executionMode": "DEMO_SIMULATED",
+  "project": {
+    "id": "proj-e2e-sample-001",
+    "name": "AgentHub Audited E2E Demo",
+    "ownerId": "usr-auditor-001",
+    "workspaceId": "ws-e2e-sample-001",
+    "gitBaselineCommit": "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+  },
+  "workflowDslSnapshot": "{\"version\":\"1.0\",\"name\":\"Audited Delivery Pipeline\",\"nodes\":[{\"id\":\"plan-arch\",\"type\":\"AGENT\",\"name\":\"Architecture Planner\",\"agentPlatform\":\"MOCK\",\"promptTemplate\":\"Analyze repository structure and generate release plan. Key check: sk-***REDACTED***\"},{\"id\":\"approve-deploy\",\"type\":\"APPROVAL\",\"name\":\"Human Release Gate\",\"approvalTitle\":\"Approve production release artifact\"},{\"id\":\"verify-delivery\",\"type\":\"AGENT\",\"name\":\"Delivery Verifier\",\"agentPlatform\":\"MOCK\",\"promptTemplate\":\"Verify JGit diff and sandbox health probe\"}],\"edges\":[{\"source\":\"plan-arch\",\"target\":\"approve-deploy\"},{\"source\":\"approve-deploy\",\"target\":\"verify-delivery\"}]}",
+  "run": {
+    "id": "run-e2e-sample-20261012",
+    "projectId": "proj-e2e-sample-001",
+    "definitionId": "def-e2e-sample-001",
+    "status": "SUCCEEDED",
+    "idempotencyKey": "e2e-demo-sample-20261012",
+    "startedAt": "2026-10-12T11:28:00",
+    "finishedAt": "2026-10-12T11:28:18",
+    "createdAt": "2026-10-12T11:28:00",
+    "updatedAt": "2026-10-12T11:28:18",
+    "cancelReason": null,
+    "cancelledAt": null,
+    "correlationId": "corr-e2e-sample-20261012"
+  },
+  "steps": [
+    {
+      "id": "step-e2e-001",
+      "runId": "run-e2e-sample-20261012",
+      "nodeId": "plan-arch",
+      "status": "SUCCEEDED",
+      "attempt": 1,
+      "inputRef": "Analyze repository structure and generate release plan. Key check: sk-***REDACTED***",
+      "outputRef": "Completed Architecture Planner execution in controlled workspace",
+      "errorMessage": null,
+      "createdAt": "2026-10-12T11:28:00",
+      "updatedAt": "2026-10-12T11:28:04",
+      "startedAt": "2026-10-12T11:28:01",
+      "finishedAt": "2026-10-12T11:28:04",
+      "durationMs": 3000,
+      "correlationId": "corr-e2e-sample-20261012"
+    },
+    {
+      "id": "step-e2e-002",
+      "runId": "run-e2e-sample-20261012",
+      "nodeId": "approve-deploy",
+      "status": "SUCCEEDED",
+      "attempt": 1,
+      "inputRef": "Approve production release artifact",
+      "outputRef": "Human approval granted by usr-auditor-001",
+      "errorMessage": null,
+      "createdAt": "2026-10-12T11:28:00",
+      "updatedAt": "2026-10-12T11:28:12",
+      "startedAt": "2026-10-12T11:28:04",
+      "finishedAt": "2026-10-12T11:28:12",
+      "durationMs": 8000,
+      "correlationId": "corr-e2e-sample-20261012"
+    },
+    {
+      "id": "step-e2e-003",
+      "runId": "run-e2e-sample-20261012",
+      "nodeId": "verify-delivery",
+      "status": "SUCCEEDED",
+      "attempt": 1,
+      "inputRef": "Verify JGit diff and sandbox health probe",
+      "outputRef": "Completed Delivery Verifier execution in controlled workspace",
+      "errorMessage": null,
+      "createdAt": "2026-10-12T11:28:00",
+      "updatedAt": "2026-10-12T11:28:18",
+      "startedAt": "2026-10-12T11:28:12",
+      "finishedAt": "2026-10-12T11:28:18",
+      "durationMs": 6000,
+      "correlationId": "corr-e2e-sample-20261012"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-e2e-001",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 1,
+      "eventType": "RUN_STARTED",
+      "payload": "{\"runId\":\"run-e2e-sample-20261012\",\"status\":\"RUNNING\"}",
+      "createdAt": "2026-10-12T11:28:00"
+    },
+    {
+      "id": "evt-e2e-002",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 2,
+      "eventType": "STEP_STARTED",
+      "payload": "{\"stepRunId\":\"step-e2e-001\",\"nodeId\":\"plan-arch\",\"attempt\":1,\"runtimeType\":\"MOCK\",\"simulated\":true}",
+      "createdAt": "2026-10-12T11:28:01"
+    },
+    {
+      "id": "evt-e2e-003",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 3,
+      "eventType": "STEP_COMPLETED",
+      "payload": "{\"stepRunId\":\"step-e2e-001\",\"nodeId\":\"plan-arch\",\"status\":\"SUCCEEDED\",\"durationMs\":3000,\"runtimeType\":\"MOCK\",\"simulated\":true}",
+      "createdAt": "2026-10-12T11:28:04"
+    },
+    {
+      "id": "evt-e2e-004",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 4,
+      "eventType": "APPROVAL_REQUESTED",
+      "payload": "{\"stepRunId\":\"step-e2e-002\",\"nodeId\":\"approve-deploy\",\"status\":\"WAITING_APPROVAL\"}",
+      "createdAt": "2026-10-12T11:28:04"
+    },
+    {
+      "id": "evt-e2e-005",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 5,
+      "eventType": "APPROVAL_DECIDED",
+      "payload": "{\"stepRunId\":\"step-e2e-002\",\"nodeId\":\"approve-deploy\",\"decision\":\"APPROVED\",\"reviewedBy\":\"usr-auditor-001\"}",
+      "createdAt": "2026-10-12T11:28:12"
+    },
+    {
+      "id": "evt-e2e-006",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 6,
+      "eventType": "STEP_STARTED",
+      "payload": "{\"stepRunId\":\"step-e2e-003\",\"nodeId\":\"verify-delivery\",\"attempt\":1,\"runtimeType\":\"MOCK\",\"simulated\":true}",
+      "createdAt": "2026-10-12T11:28:12"
+    },
+    {
+      "id": "evt-e2e-007",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 7,
+      "eventType": "STEP_COMPLETED",
+      "payload": "{\"stepRunId\":\"step-e2e-003\",\"nodeId\":\"verify-delivery\",\"status\":\"SUCCEEDED\",\"durationMs\":6000,\"runtimeType\":\"MOCK\",\"simulated\":true}",
+      "createdAt": "2026-10-12T11:28:18"
+    },
+    {
+      "id": "evt-e2e-008",
+      "runId": "run-e2e-sample-20261012",
+      "sequenceNum": 8,
+      "eventType": "RUN_COMPLETED",
+      "payload": "{\"runId\":\"run-e2e-sample-20261012\",\"status\":\"SUCCEEDED\"}",
+      "createdAt": "2026-10-12T11:28:18"
+    }
+  ],
+  "providerRuntime": {
+    "runtimeTypes": [
+      "MOCK"
+    ],
+    "providerTypes": [
+      "MOCK_SIMULATOR"
+    ],
+    "models": [
+      "mock-offline-v1"
+    ],
+    "simulated": true,
+    "totalPromptTokens": 410,
+    "totalCompletionTokens": 520,
+    "totalTokens": 930,
+    "totalEstimatedCost": 0.00279,
+    "tokenUsageRecords": []
+  },
+  "gitDiff": {
+    "workspaceId": "ws-e2e-sample-001",
+    "baselineCommit": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "currentCommit": "9f3c7a1d82e4b0516c7a9d0e2f1a3b4c5d6e7f80",
+    "totalFilesChanged": 2,
+    "totalLinesAdded": 18,
+    "totalLinesDeleted": 0,
+    "entries": [
+      {
+        "oldPath": "/dev/null",
+        "newPath": "deliverables/release-summary.md",
+        "changeType": "ADD",
+        "diffContent": "@@ -0,0 +1,12 @@\n+# AgentHub Audited Release Summary\n+- Run ID: run-e2e-sample-20261012\n+- Mode: DEMO_SIMULATED (simulated=true)\n+- Sanitized Credential Check: \"apiKey\": \"***REDACTED***\"\n",
+        "linesAdded": 12,
+        "linesDeleted": 0,
+        "binary": false,
+        "rename": false,
+        "hasConflict": false,
+        "reviewStatus": "ACCEPTED",
+        "checksum": "a8f5c2d9e1b407639281746509182736455463728190a1b2c3d4e5f60718293a"
+      },
+      {
+        "oldPath": "/dev/null",
+        "newPath": "index.html",
+        "changeType": "ADD",
+        "diffContent": "@@ -0,0 +1,6 @@\n+<!DOCTYPE html>\n+<html><head><title>AgentHub Sandbox Preview</title></head>\n+<body><h1>Audited Delivery Preview Ready</h1></body></html>\n",
+        "linesAdded": 6,
+        "linesDeleted": 0,
+        "binary": false,
+        "rename": false,
+        "hasConflict": false,
+        "reviewStatus": "ACCEPTED",
+        "checksum": "b7e4d1c8f0a396528170635498071625344352617089b0c1d2e3f4a59607182b"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "art-e2e-001",
+      "runId": "run-e2e-sample-20261012",
+      "stepRunId": "step-e2e-001",
+      "artifactType": "CODE_CHANGE",
+      "pathOrRef": "deliverables/release-summary.md",
+      "checksum": "a8f5c2d9e1b407639281746509182736455463728190a1b2c3d4e5f60718293a",
+      "metadataJson": "{\"nodeId\":\"plan-arch\",\"simulated\":true}",
+      "reviewStatus": "ACCEPTED",
+      "reviewedBy": "usr-auditor-001",
+      "reviewedAt": "2026-10-12T11:29:00",
+      "reviewComment": "Verified JGit diff and secret sanitization",
+      "createdAt": "2026-10-12T11:28:04"
+    }
+  ],
+  "testReportSummary": {
+    "status": "PASSED",
+    "totalSteps": 3,
+    "succeededSteps": 3,
+    "failedSteps": 0,
+    "skippedSteps": 0,
+    "cancelledSteps": 0,
+    "verificationSummary": "Run run-e2e-sample-20261012 (DEMO_SIMULATED) completed with status SUCCEEDED: 3/3 steps succeeded, 0 failed, 0 skipped, 0 cancelled, 2 files changed.",
+    "logs": [
+      "[LOG#2] Architecture Planner initialized in controlled JGit workspace",
+      "[LOG#7] Delivery Verifier confirmed 2 changed files and 0 secret leaks"
+    ]
+  },
+  "approvals": [
+    {
+      "id": "appr-e2e-001",
+      "runId": "run-e2e-sample-20261012",
+      "stepRunId": "step-e2e-002",
+      "status": "APPROVED",
+      "requestedBy": "system-scheduler",
+      "reviewedBy": "usr-auditor-001",
+      "decisionReason": "Approved after reviewing structured JGit diff",
+      "decision": "APPROVED",
+      "comments": "All security and workspace boundary checks passed",
+      "reviewedAt": "2026-10-12T11:28:12",
+      "createdAt": "2026-10-12T11:28:04",
+      "updatedAt": "2026-10-12T11:28:12"
+    }
+  ],
+  "deployments": [
+    {
+      "id": "dep-e2e-sample-001",
+      "projectId": "proj-e2e-sample-001",
+      "artifactId": "art-e2e-001",
+      "status": "STOPPED",
+      "target": "LOCAL",
+      "sandboxType": "PROCESS",
+      "templateType": "STATIC_PREVIEW",
+      "url": "http://127.0.0.1:38142/",
+      "port": 38142,
+      "healthCheckPath": "/",
+      "lifecycleTrace": "CREATING -> STARTING -> HEALTH_CHECK_PASSED(200 OK in 45ms) -> RUNNING -> STOPPING -> STOPPED(PORT_RELEASED)",
+      "terminationReason": "USER_REQUESTED_STOP",
+      "errorMessage": null,
+      "startedAt": "2026-10-12T11:29:10",
+      "finishedAt": "2026-10-12T11:29:45"
+    }
+  ],
+  "checksum": "6a864184f3d6bb2e3ad7252cba9902bb113459d2e1efdee7fab554eca7c0341d"
+}

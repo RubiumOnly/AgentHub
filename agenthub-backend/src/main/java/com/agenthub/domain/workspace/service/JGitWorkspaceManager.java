@@ -236,6 +236,16 @@ public class JGitWorkspaceManager {
                 df.setDetectRenames(true);
 
                 List<DiffEntry> entries = df.scan(oldTreeIter, newTreeIter);
+                if (entries.isEmpty()) {
+                    ObjectId parentCommitId = repo.resolve("HEAD~1");
+                    ObjectId parentTreeId = repo.resolve("HEAD~1^{tree}");
+                    if (parentCommitId != null && parentTreeId != null) {
+                        baselineHash = parentCommitId.getName();
+                        oldTreeIter.reset(reader, parentTreeId);
+                        newTreeIter = new FileTreeIterator(repo);
+                        entries = df.scan(oldTreeIter, newTreeIter);
+                    }
+                }
                 for (DiffEntry entry : entries) {
                     out.reset();
                     df.format(entry);

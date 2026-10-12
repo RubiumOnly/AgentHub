@@ -1,15 +1,23 @@
 package com.agenthub.project.api;
 
 import com.agenthub.adapter.common.Result;
+import com.agenthub.audit.application.ArtifactApplication;
+import com.agenthub.audit.dto.ArtifactView;
 import com.agenthub.domain.workspace.model.StructuredDiff;
+import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
+import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.infrastructure.concurrency.WorkspaceLockManager;
 import com.agenthub.project.application.WorkspaceApplication;
 import com.agenthub.project.dto.WorkspaceFileDetailView;
 import com.agenthub.project.dto.WorkspaceFileNode;
 import com.agenthub.shared.context.RequestContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/workspaces")
@@ -17,16 +25,38 @@ public class WorkspaceController {
 
     private final WorkspaceApplication workspaceApplication;
     private final WorkspaceLockManager lockManager;
+    private final JGitWorkspaceManager gitManager;
+    private final WorkspaceResolver workspaceResolver;
+    private final ArtifactApplication artifactApplication;
 
     public WorkspaceController(WorkspaceApplication workspaceApplication,
                                WorkspaceLockManager lockManager) {
+        this(workspaceApplication, lockManager, null, null, null);
+    }
+
+    @Autowired
+    public WorkspaceController(WorkspaceApplication workspaceApplication,
+                               WorkspaceLockManager lockManager,
+                               @Autowired(required = false) JGitWorkspaceManager gitManager,
+                               @Autowired(required = false) WorkspaceResolver workspaceResolver,
+                               @Autowired(required = false) ArtifactApplication artifactApplication) {
         this.workspaceApplication = workspaceApplication;
         this.lockManager = lockManager;
+        this.gitManager = gitManager;
+        this.workspaceResolver = workspaceResolver;
+        this.artifactApplication = artifactApplication;
     }
 
     public static class SaveFileRequest {
         public String path;
         public String content;
+    }
+
+    public static class GitSnapshotRequest {
+        public String runId;
+        public String stepRunId;
+        public String author;
+        public String message;
     }
 
     public static class RenameFileRequest {
@@ -65,7 +95,7 @@ public class WorkspaceController {
         return Result.ok(view);
     }
 
-    @PostMapping("/{workspaceId}/file")
+    @RequestMapping(value = {"/{workspaceId}/file", "/{workspaceId}/files"}, method = {RequestMethod.POST, RequestMethod.PUT})
     public Result<Void> saveFile(
             @PathVariable("workspaceId") String workspaceId,
             @RequestBody SaveFileRequest req) throws Exception {
@@ -111,11 +141,47 @@ public class WorkspaceController {
                 .body(zipBytes);
     }
 
-    @GetMapping("/{workspaceId}/diff")
+    @GetMapping({"/{workspaceId}/diff", "/{workspaceId}/git/diff-structured"})
     public Result<StructuredDiff> getStructuredDiff(
             @PathVariable("workspaceId") String workspaceId) throws Exception {
         StructuredDiff diff = workspaceApplication.computeStructuredDiff(workspaceId);
         return Result.ok(diff);
+    }
+
+    @PostMapping({"/{workspaceId}/git/snapshot", "/{workspaceId}/git/commit"})
+    public Result<Map<String, Object>> createGitSnapshot(
+            @PathVariable("workspaceId") String workspaceId,
+            @RequestBody(required = false) GitSnapshotRequest req) throws Exception {
+        workspaceApplication.checkWorkspaceAccess(workspaceId);
+        if (gitManager == null || workspaceResolver == null) {
+            throw new IllegalStateException("JGitWorkspaceManager or WorkspaceResolver is not configured");
+        }
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
+        String effectiveRunId = (req != null && req.runId != null && !req.runId.isBlank()) ? req.runId : "manual-" + workspaceId;
+        String effectiveStepId = (req != null && req.stepRunId != null && !req.stepRunId.isBlank()) ? req.stepRunId : "step-" + System.currentTimeMillis();
+        String effectiveMessage = (req != null && req.message != null && !req.message.isBlank()) ? req.message : "Workspace snapshot commit";
+        String effectiveAuthor = (req != null && req.author != null && !req.author.isBlank()) ? req.author : "operator@agenthub.local";
+
+        JGitWorkspaceManager.StepSnapshotResult snap = gitManager.createStepSnapshot(
+                wsRoot.toFile(), effectiveRunId, effectiveStepId, effectiveMessage, effectiveAuthor);
+
+        ArtifactView recordedArtifact = null;
+        if (req != null && req.runId != null && !req.runId.isBlank() && artifactApplication != null) {
+            recordedArtifact = artifactApplication.recordStepSnapshot(
+                    req.runId, effectiveStepId, workspaceId,
+                    snap.getCommitHash(), snap.getTagName(),
+                    snap.getChangedFiles(), snap.getFileChecksums(), effectiveAuthor);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("commitHash", snap.getCommitHash());
+        result.put("tagName", snap.getTagName());
+        result.put("changedFiles", snap.getChangedFiles());
+        result.put("fileChecksums", snap.getFileChecksums());
+        if (recordedArtifact != null) {
+            result.put("artifactId", recordedArtifact.getId());
+        }
+        return Result.ok(result);
     }
 
     @PostMapping("/{workspaceId}/lock/acquire")

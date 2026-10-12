@@ -14,6 +14,7 @@ import {
   LogIn,
   AlertTriangle,
   Play,
+  FileCheck2,
 } from "lucide-react";
 
 interface HeaderNavProps {
@@ -31,6 +32,7 @@ interface HeaderNavProps {
   onLogout: () => void;
   onRefreshAll?: () => void;
   onRunWorkflow?: () => void;
+  onExportEvidence?: () => void;
   isRunning?: boolean;
 }
 
@@ -49,6 +51,7 @@ export function HeaderNav({
   onLogout,
   onRefreshAll,
   onRunWorkflow,
+  onExportEvidence,
   isRunning = false,
 }: HeaderNavProps) {
   return (
@@ -168,6 +171,18 @@ export function HeaderNav({
             className="p-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Export Sanitized Evidence Bundle */}
+        {onExportEvidence && activeRunId && (
+          <button
+            onClick={onExportEvidence}
+            title="导出脱敏运行证据包 (SHA-256 校验)"
+            className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-800 hover:border-indigo-500/40 bg-zinc-900/80 text-zinc-300 hover:text-indigo-300 transition-colors"
+          >
+            <FileCheck2 className="w-3.5 h-3.5 text-indigo-400" />
+            <span>导出证据包</span>
           </button>
         )}
 

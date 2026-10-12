@@ -1,6 +1,7 @@
 package com.agenthub.execution.application;
 
 import com.agenthub.execution.dto.RunEventView;
+import com.agenthub.execution.dto.RunEvidenceBundleView;
 import com.agenthub.execution.dto.StartRunCommand;
 import com.agenthub.execution.dto.StepRunView;
 import com.agenthub.execution.dto.WorkflowRunView;
@@ -22,4 +23,8 @@ public interface ExecutionApplication {
     WorkflowRunView resumeRun(String runId);
     StepRunView retryStep(String stepRunId);
     SseEmitter subscribeRunStream(String runId, Long lastEventId);
+
+    // Phase F Extensions: Sanitized Run Evidence Bundle & Tamper-Evident Checksum
+    RunEvidenceBundleView exportRunEvidenceBundle(String runId);
+    boolean verifyEvidenceBundleChecksum(RunEvidenceBundleView bundle);
 }
