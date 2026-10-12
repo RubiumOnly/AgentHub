@@ -49,6 +49,10 @@ agenthub:
       worker-enabled: ${AGENTHUB_DOCKER_WORKER_ENABLED:false}
       host: "${AGENTHUB_DOCKER_HOST:}"
       context: "${AGENTHUB_DOCKER_CONTEXT:}"
+  management:
+    security-enabled: ${AGENTHUB_MANAGEMENT_SECURITY_ENABLED:false}
+    scrape-token: "${ACTUATOR_PROMETHEUS_TOKEN:}"
+    allow-trusted-network: ${AGENTHUB_MANAGEMENT_ALLOW_TRUSTED_NETWORK:true}
   cli:
     timeout-ms: ${AGENTHUB_CLI_TIMEOUT_MS:300000}
   llm:

@@ -8,8 +8,25 @@ on:
 
 jobs:
   backend-test:
-    name: Backend Tests & Build (Java 17)
+    name: Backend Tests, MySQL 8 Migration & Concurrency Gate (Java 17)
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_ci_password_2026
+          MYSQL_DATABASE: agenthub
+          MYSQL_USER: agenthub
+          MYSQL_PASSWORD: agenthub_ci_password_2026
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_ci_password_2026 --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+          --character-set-server=utf8mb4
+          --collation-server=utf8mb4_unicode_ci
     steps:
       - uses: actions/checkout@v4
 
@@ -20,8 +37,19 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Run Backend Unit & Integration Tests
+      - name: Run Backend Unit & Integration Tests (Full Suite)
         run: mvn clean test
+        working-directory: agenthub-backend
+
+      - name: Run Real MySQL 8.0 Empty-DB Flyway Migration (V1-V12) & Core Integration Gate
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/agenthub?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+          SPRING_DATASOURCE_USERNAME: agenthub
+          SPRING_DATASOURCE_PASSWORD: agenthub_ci_password_2026
+          SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQLDialect
+        run: |
+          mvn test -Dtest="FlywayMigrationAndSchemaTest,PersistentExecutionRecoveryAndLeaseTest,ConversationMonotonicSequenceAndConcurrencyTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest,FullLifecycleEndToEndIntegrationTest"
         working-directory: agenthub-backend
 
       - name: Output Test Failure Diagnostics
@@ -36,7 +64,7 @@ jobs:
         working-directory: agenthub-backend
 
   frontend-build:
-    name: Frontend Build & Typecheck (Next.js 14)
+    name: Frontend Build, Typecheck & Lint Gate (Next.js 14)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +80,130 @@ jobs:
         run: npm ci --prefer-offline --no-audit
         working-directory: agenthub-frontend
 
-      - name: Build Next.js Dashboard
+      - name: TypeScript Strict Typecheck
+        run: npx tsc --noEmit
+        working-directory: agenthub-frontend
+
+      - name: Build Next.js Production Standalone Bundle
         run: npm run build
         working-directory: agenthub-frontend
+
+  production-ops-and-container-gate:
+    name: Production Config, Compose, Prometheus, Docker Images & DR Drill Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Production Secret Rules & Pre-Deploy Gate Script
+        run: |
+          set -euo pipefail
+          echo "=== 1. Verifying .env.production.example rejects deployment ==="
+          if bash ./scripts/deploy-prod.sh --env-file .env.production.example --validate-only; then
+            echo "[FAIL] .env.production.example with placeholder values must be rejected!"
+            exit 1
+          fi
+          echo "[PASS] Placeholder .env.production.example was properly rejected."
+
+          echo "=== 2. Generating strong .env.production.ci and validating ==="
+          SHORT_SHA="${GITHUB_SHA::7}"
+          printf '%s\n' \
+            "IMAGE_TAG=${SHORT_SHA}" \
+            "DB_ROOT_PASSWORD=ProdRootDbSecret_998877665544_Strong!" \
+            "DB_USERNAME=agenthub_prod" \
+            "DB_PASSWORD=ProdAppDbSecret_112233445566_Strong!" \
+            "REDIS_PASSWORD=" \
+            "JWT_SECRET=8f9a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c" \
+            "ACTUATOR_PROMETHEUS_TOKEN=PromObsToken_2026_SecureMetricsKey_998877" \
+            "CORS_ALLOWED_ORIGINS=https://agenthub.company.com" \
+            "NEXT_PUBLIC_API_BASE_URL=https://agenthub.company.com/api" \
+            "AGENTHUB_DOCKER_WORKER_ENABLED=false" \
+            "AGENTHUB_DOCKER_HOST=" \
+            "NGINX_HTTP_PORT=80" \
+            "NGINX_HTTPS_PORT=443" \
+            "OPENAI_API_KEY=" \
+            "ANTHROPIC_API_KEY=" \
+            "SPRING_PROFILES_ACTIVE=prod" \
+            > .env.production.ci
+
+          bash ./scripts/deploy-prod.sh --env-file .env.production.ci --validate-only
+          docker compose --env-file .env.production.ci -f docker-compose.prod.yml config --quiet
+          rm -f .env.production.ci
+
+      - name: Validate Prometheus Scrape & Alert Rules via promtool
+        run: |
+          docker run --rm \
+            -v "$PWD/docker/prometheus:/etc/prometheus:ro" \
+            --entrypoint promtool \
+            prom/prometheus:v2.51.0 \
+            check config /etc/prometheus/prometheus.yml
+
+          docker run --rm \
+            -v "$PWD/docker/prometheus:/etc/prometheus:ro" \
+            --entrypoint promtool \
+            prom/prometheus:v2.51.0 \
+            check rules /etc/prometheus/agenthub-alerts.yml
+
+      - name: Build Immutable SHA-Tagged Production Images & Verify Non-Root Security
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::7}"
+          docker build -t "agenthub/agenthub-backend:${SHORT_SHA}" ./agenthub-backend
+          docker build \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=/api \
+            --build-arg NEXT_PUBLIC_AGENTHUB_DEMO_MODE=false \
+            -t "agenthub/agenthub-frontend:${SHORT_SHA}" \
+            ./agenthub-frontend
+
+          BACKEND_UID=$(docker run --rm --entrypoint id "agenthub/agenthub-backend:${SHORT_SHA}" -u)
+          FRONTEND_UID=$(docker run --rm --entrypoint id "agenthub/agenthub-frontend:${SHORT_SHA}" -u)
+          echo "Backend container UID=${BACKEND_UID}, Frontend container UID=${FRONTEND_UID}"
+          if [ "${BACKEND_UID}" != "10001" ]; then
+            echo "[FAIL] Backend container must run as UID 10001, got ${BACKEND_UID}"
+            exit 1
+          fi
+          if [ "${FRONTEND_UID}" != "1001" ]; then
+            echo "[FAIL] Frontend container must run as UID 1001, got ${FRONTEND_UID}"
+            exit 1
+          fi
+
+      - name: Run Automated Backup, Encryption, Tamper Detection & Clean Restore Drill
+        run: |
+          set -euo pipefail
+          DR_TMP=$(mktemp -d)
+          mkdir -p "${DR_TMP}/workspaces/ws-drill-01/src" "${DR_TMP}/backups" "${DR_TMP}/restored"
+          echo "console.log('agenthub-phase-e-drill');" > "${DR_TMP}/workspaces/ws-drill-01/src/index.js"
+          printf '%s\n' \
+            "-- AgentHub SQL Dump" \
+            "CREATE TABLE workflow_runs (id VARCHAR(64) PRIMARY KEY, status VARCHAR(32));" \
+            "INSERT INTO workflow_runs VALUES ('run-ci-drill-001', 'SUCCEEDED');" \
+            > "${DR_TMP}/seed-db.sql"
+
+          bash ./scripts/backup-prod.sh \
+            --backup-root "${DR_TMP}/backups" \
+            --workspace-source "${DR_TMP}/workspaces" \
+            --db-dump-file "${DR_TMP}/seed-db.sql" \
+            --encryption-key "CiDrillStrongPassphrase_2026!" \
+            --retention-days 7
+
+          LATEST_BKP=$(ls -1dt "${DR_TMP}/backups"/bkp-* | head -n 1)
+          bash ./scripts/restore-prod.sh \
+            --backup-dir "${LATEST_BKP}" \
+            --encryption-key "CiDrillStrongPassphrase_2026!" \
+            --verify-only
+
+          bash ./scripts/restore-prod.sh \
+            --backup-dir "${LATEST_BKP}" \
+            --workspace-target "${DR_TMP}/restored/workspaces" \
+            --db-restore-file "${DR_TMP}/restored/restored-db.sql" \
+            --encryption-key "CiDrillStrongPassphrase_2026!"
+
+          diff -u "${DR_TMP}/workspaces/ws-drill-01/src/index.js" "${DR_TMP}/restored/workspaces/ws-drill-01/src/index.js"
+          diff -u "${DR_TMP}/seed-db.sql" "${DR_TMP}/restored/restored-db.sql"
+
+          echo "corrupted" >> "${LATEST_BKP}/workspaces/ws-drill-01/src/index.js"
+          if bash ./scripts/restore-prod.sh --backup-dir "${LATEST_BKP}" --encryption-key "CiDrillStrongPassphrase_2026!" --verify-only; then
+            echo "[FAIL] Tampered backup must be rejected by restore-prod.sh!"
+            exit 1
+          fi
+          echo "[PASS] Tampered backup was accurately detected and blocked."
+          rm -rf "${DR_TMP}"

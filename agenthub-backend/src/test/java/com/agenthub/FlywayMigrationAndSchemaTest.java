@@ -28,7 +28,7 @@ class FlywayMigrationAndSchemaTest {
     void shouldSuccessfullyApplyFlywayMigrations() {
         MigrationInfo[] applied = flyway.info().applied();
         assertThat(applied).isNotEmpty();
-        assertThat(applied.length).isGreaterThanOrEqualTo(8);
+        assertThat(applied.length).isGreaterThanOrEqualTo(12);
 
         assertThat(applied[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(applied[0].getDescription()).contains("init schema");
@@ -50,12 +50,13 @@ class FlywayMigrationAndSchemaTest {
     }
 
     @Test
-    @DisplayName("测试所有 19 张核心领域表在数据库中均已成功创建（包含 token_usages 审计表）")
+    @DisplayName("测试所有核心领域表在数据库中均已成功创建（兼容 H2 PUBLIC 与 MySQL 8 Schema）")
     void shouldVerifyAll19FoundationTablesExist() {
         List<String> expectedTables = List.of(
                 "USERS",
                 "PROJECTS",
                 "WORKSPACES",
+                "WORKSPACE_LOCKS",
                 "AGENT_DEFINITIONS",
                 "PROVIDERS",
                 "AGENT_INSTANCES",
@@ -71,16 +72,19 @@ class FlywayMigrationAndSchemaTest {
                 "ARTIFACTS",
                 "APPROVALS",
                 "DEPLOYMENTS",
-                "TOKEN_USAGES"
+                "TOKEN_USAGES",
+                "INVALIDATED_TOKENS",
+                "AUTH_AUDIT_LOGS"
         );
 
         for (String table : expectedTables) {
             Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_NAME) = ? AND UPPER(TABLE_SCHEMA) = 'PUBLIC'",
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_NAME) = ? " +
+                    "AND UPPER(TABLE_SCHEMA) NOT IN ('INFORMATION_SCHEMA', 'MYSQL', 'PERFORMANCE_SCHEMA', 'SYS')",
                     Integer.class,
                     table
             );
-            assertThat(count).as("Table %s should exist in database schema", table).isEqualTo(1);
+            assertThat(count).as("Table %s should exist in database schema", table).isGreaterThanOrEqualTo(1);
         }
     }
 

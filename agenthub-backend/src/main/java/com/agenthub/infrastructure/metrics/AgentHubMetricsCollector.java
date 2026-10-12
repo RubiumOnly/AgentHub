@@ -31,6 +31,8 @@ public class AgentHubMetricsCollector {
     private final ConcurrentMap<String, Timer> stepTimerCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Counter> tokenCounterCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Counter> deploymentCounterCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, AtomicInteger> circuitBreakerStateGauges = new ConcurrentHashMap<>();
+    private final AtomicInteger workspaceDiskAvailablePercent = new AtomicInteger(85);
 
     private final Timer workspaceLockWaitTimer;
 
@@ -46,15 +48,25 @@ public class AgentHubMetricsCollector {
                 .description("Number of currently active SSE streaming subscribers")
                 .register(meterRegistry);
 
-        // Core Timers
+        Gauge.builder("agenthub.workspace.disk.avail.ratio", workspaceDiskAvailablePercent, v -> v.get() / 100.0)
+                .tag("mountpoint", "/var/lib/agenthub")
+                .description("Available disk space ratio on controlled workspace mountpoint")
+                .register(meterRegistry);
+
+        // Core Timers (publish both client percentiles and Prometheus histogram buckets for histogram_quantile)
         this.workspaceLockWaitTimer = Timer.builder("agenthub.workspace.lock.wait")
                 .description("Time spent waiting for workspace lease lock acquisition")
                 .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+                .publishPercentileHistogram()
                 .register(meterRegistry);
     }
 
     public void incrementActiveRuns() {
         activeRunsGauge.incrementAndGet();
+    }
+
+    public void setActiveRunsForDrill(int count) {
+        activeRunsGauge.set(Math.max(0, count));
     }
 
     public void decrementActiveRuns() {
@@ -75,6 +87,31 @@ public class AgentHubMetricsCollector {
 
     public int getActiveSseConnections() {
         return activeSseConnectionsGauge.get();
+    }
+
+    public void recordProviderCircuitBreakerState(String provider, String state, boolean active) {
+        String safeProvider = (provider == null || provider.isBlank()) ? "DEFAULT" : provider.toLowerCase();
+        String safeState = (state == null || state.isBlank()) ? "CLOSED" : state.toUpperCase();
+        String key = safeProvider + ":" + safeState;
+        AtomicInteger gaugeVal = circuitBreakerStateGauges.computeIfAbsent(key, k -> {
+            AtomicInteger holder = new AtomicInteger(0);
+            Gauge.builder("agenthub.provider.circuit.breaker.state", holder, AtomicInteger::get)
+                    .tag("provider", safeProvider)
+                    .tag("state", safeState)
+                    .description("Circuit breaker state indicator (1 = active in state, 0 = inactive)")
+                    .register(meterRegistry);
+            return holder;
+        });
+        gaugeVal.set(active ? 1 : 0);
+    }
+
+    public void recordWorkspaceDiskAvailablePercent(int percent) {
+        int clamped = Math.max(0, Math.min(100, percent));
+        workspaceDiskAvailablePercent.set(clamped);
+    }
+
+    public double getWorkspaceDiskAvailableRatio() {
+        return workspaceDiskAvailablePercent.get() / 100.0;
     }
 
     public void recordRunCompleted(String status, long durationMs) {
@@ -105,6 +142,7 @@ public class AgentHubMetricsCollector {
                         .tag("node_type", t)
                         .description("Execution duration distribution of workflow steps")
                         .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+                        .publishPercentileHistogram()
                         .register(meterRegistry)
         ).record(durationMs, TimeUnit.MILLISECONDS);
     }

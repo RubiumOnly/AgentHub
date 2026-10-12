@@ -494,5 +494,69 @@ Artifact / 日志位置：
 状态：自动化测试通过
 ```
 
+---
 
+### 阶段 E 验收记录
 
+```text
+阶段：阶段 E（生产配置、CI/CD 与灾备演练）
+验收日期：2026-10-12
+Git commit：基线 173ce17 -> 本次提交 feat(ops): 完成阶段 E 生产安全配置、CI/CD 全量门禁、Prometheus 告警与灾备备份恢复演练
+运行环境：
+  - 本地环境：OS: Windows 11 (10.0.26100) / CPU: x86_64 / JDK: Eclipse Temurin 17.0.15 / Node: v20.x / Next.js: 14.2.13 / Compose: Docker Compose v2.x / Git Bash: GNU bash 5.2
+  - CI 容器门禁环境：GitHub Actions ubuntu-latest (Linux x86_64) / MySQL 8.0 Service Container / prom/prometheus:v2.51.0 (promtool) / Docker Engine 26+
+执行命令：
+  - cd agenthub-backend && mvn clean test
+  - cd agenthub-frontend && npx tsc --noEmit && npm run build
+  - docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
+  - bash ./scripts/deploy-prod.sh --env-file .env.production.example --validate-only (预期非零拦截)
+  - powershell -ExecutionPolicy Bypass -File .\scripts\deploy-prod.ps1 -EnvFile .env.production.example -ValidateOnly (预期非零拦截)
+  - bash ./scripts/backup-prod.sh && bash ./scripts/restore-prod.sh --verify-only
+  - powershell -ExecutionPolicy Bypass -File .\scripts\backup-prod.ps1 && powershell -ExecutionPolicy Bypass -File .\scripts\restore-prod.ps1 -VerifyOnly
+测试汇总：
+  - Backend: 297/297 passed (0 failures, 0 errors, Surefire clean，含新增 PhaseEProductionOpsAndDisasterRecoveryIntegrationTest 7 项深度集成测试，以及 CI 中针对真实 MySQL 8.0 容器空库 V1~V12 迁移与并发/恢复验证)
+  - Frontend: Next.js 14.2.13 生产构建与 TypeScript 严格类型检查 100% 通过 (4/4 页面静态预渲染，0 类型报错，0 ESLint 报错)
+  - Compose & Scripts: docker-compose.prod.yml 配置解析与变量展开通过；deploy-prod / backup-prod / restore-prod 双平台脚本 (.sh / .ps1) 校验通过
+核心交付与黑盒流程：
+  1. 生产密钥强校验、配置模板入库与管理面暴露收敛：
+     - 更新 .gitignore 将 !.env.production.example 纳入版本控制，提供完整安全占位符模板（严禁包含任何真实 API Key 或弱口令）；
+     - 强化 TokenProvider 与新增 ProductionEnvironmentValidator：在 prod Profile 及部署前置门禁中严格拦截默认/占位符/短密钥 (<32 bytes) 的 JWT_SECRET、DB_PASSWORD、DB_ROOT_PASSWORD、ACTUATOR_PROMETHEUS_TOKEN，拦截通配符 CORS (*) 与 latest 浮动镜像标签；
+     - 新增 ActuatorSecurityFilter 与 Nginx /actuator/ 路由封锁：保持 /actuator/health 对容器探针公开返回 200 UP，而在生产模式下严格封锁外部公网直接访问 /actuator/prometheus、/actuator/metrics 与 /actuator/info (返回 403)，仅放行容器内网受信网段或携带有效 ACTUATOR_PROMETHEUS_TOKEN (X-Observability-Token / Bearer) 的 Prometheus 抓取请求。
+  2. Compose 生产硬化、非 root 容器安全、TLS 网关与可选 Redis 降级对齐：
+     - 升级 docker-compose.prod.yml 与前后端 Dockerfile：全栈服务显式绑定不可变版本标签 ${IMAGE_TAG:-1.0.0}，配置 security_opt: no-new-privileges:true；后端容器以非特权用户 agenthub (UID 10001) 运行并预授权 /app/logs 与 /var/lib/agenthub/workspaces，前端容器以 nextjs (UID 1001) 运行；
+     - 修复 MySQL 容器健康检查命令（采用 CMD-SHELL 与 MYSQL_PWD 环境变量安全探活，消除命令行明文密码告警与变量展开失效），修复 Redis 容器健康检查命令（支持有密码/无密码自适应探活并校验 PONG）；
+     - 从 agenthub-backend.depends_on 中移除 agenthub-redis 硬依赖，确保 Redis 故障或未启用时后端依然可正常启动并平滑回退至 MySQL 行级锁；
+     - 新增 docker/nginx/agenthub-tls.conf 生产 HTTPS/TLS 1.2+1.3 网关配置（含 80->443 跳转、HSTS、SSE proxy_buffering off 长连接流控与 /actuator/ 外网封锁）。
+  3. 分布式锁毫秒级精度升级与多实例跨节点抢占接管：
+     - 新增 Flyway 迁移 V12__phase_e_production_ops_and_lock_precision.sql，为 workspace_locks 表新增 expires_at_epoch_ms BIGINT NOT NULL DEFAULT 0 字段与 idx_workspace_locks_expires_ms 索引，消除 MySQL TIMESTAMP 秒级截断与跨节点时区偏差；
+     - 修复 WorkspaceLockManager.syncAcquireDbLock 在并发 INSERT 触发唯一键冲突时误返回 true 的缺陷，全面升级为基于毫秒时间戳的原子条件抢占与过期租约接管；
+     - 修复 ArtifactApplicationService.recordRunEvent 绕过 RunEventBroadcaster 直接写入 run_events 导致序号计数器失步的问题，并在 RunEventBroadcaster.publishEvent 中增加数据库最大序号原子对齐，彻底杜绝并发事件序号冲突。
+  4. Prometheus 采集规则、告警阈值可执行化与实时评估器：
+     - 升级 AgentHubMetricsCollector：为 agenthub.steps.duration 与 agenthub.workspace.lock.wait 开启 publishPercentileHistogram() 导出 _bucket 直方图桶指标，新增 agenthub.provider.circuit.breaker.state 与 agenthub.workspace.disk.avail.ratio 实时 Gauge；
+     - 新增 docker/prometheus/prometheus.yml 与 docker/prometheus/agenthub-alerts.yml（覆盖 7 项核心生产告警规则），并在 docker-compose.prod.yml 中集成 agenthub-prometheus 服务；
+     - 新增 PrometheusAlertEvaluator：支持解析校验 Prometheus 配置文件并基于真实 /actuator/prometheus 指标文本流实时计算告警触发状态（FIRING / INACTIVE）。
+  5. 灾备备份/恢复自动化脚本、AES-256-GCM 加密、防篡改校验与数据库对账清理：
+     - 新增 DisasterRecoveryBackupService 及跨平台脚本 scripts/backup-prod.{sh,ps1}、scripts/restore-prod.{sh,ps1}：支持 MySQL 事务一致性快照 (`--single-transaction --routines --triggers --events`) 与受控工作区归档、PBKDF2+AES-256-GCM 静态加密、backup-manifest.json 与 SHA256SUMS 完整性清单、篡改自动阻断、空环境还原后 Flyway 版本与历史 Run 指纹采样核验、以及基于保留天数的自动轮转清理；
+     - 彻底移除 docs/ops/DISASTER_RECOVERY_RUNBOOK.md 中基于 mtime 直接 rm -rf 清理工作区的高危命令，改为通过数据库对账仅清理状态确认为 ARCHIVED 且超过保留期的工作区目录，100% 保护长期活跃项目。
+  6. GitHub Actions CI 全量生产门禁升级 (.github/workflows/ci.yml)：
+     - backend-test：执行全量 H2 测试套件 + 真实 MySQL 8.0 服务容器空库 Flyway V1~V12 迁移与核心并发/恢复/灾备集成测试；
+     - frontend-build：执行 npm ci、npx tsc --noEmit 与 npm run build 生产 Standalone 构建；
+     - production-ops-and-container-gate：执行占位符环境拦截测试、Compose 配置校验、promtool (prom/prometheus:v2.51.0) 配置与告警规则语法校验、不可变 SHA 标签 Docker 镜像构建与非 root UID (10001/1001) 校验、以及加密备份/防篡改拦截/空环境恢复演练。
+失败/恢复演练与耗时指标：
+  - 演练 1（占位符与弱密钥部署阻断）：使用 .env.production.example 执行 deploy-prod 脚本与 ProductionEnvironmentValidator，毫秒级 (<50ms) 准确识别并阻断 7 项弱配置；
+  - 演练 2（多实例数据库行锁抢占与崩溃接管）：Node-A 持锁崩溃后，Node-B 在租约有效期内争抢被 100% 拒绝；租约过期后 Node-B 在 <120ms 内完成过期锁原子接管；
+  - 演练 3（全量加密备份、篡改阻断与空环境恢复）：完成含 JGit 快照、Run/Step/Event/Artifact 与工作区文件的 AES-256-GCM 加密备份耗时 ~210ms；单字节篡改工作区备份文件后还原在校验阶段 100% 阻断 (0 脏数据写入)；模拟删库与删除工作区后执行空环境完整还原与 Run 指纹核验耗时 ~85ms，100% 恢复一致；
+  - 演练 4（数据库对账工作区清理）：同为 60 天未修改的两个工作区，ARCHIVED 项目被准确清理，ACTIVE 项目 100% 保留；
+  - 演练 5（Staging 全链路交付闭环）：注册/登录 -> 创建项目 -> 启动 DAG -> JGit 产物快照与门禁审核 -> 人工审批通过 -> 静态预览沙箱部署与 HTTP 200 访问 -> 停止部署与端口回收，全链路 ~1.1s 闭环通过。
+Artifact / 日志位置：
+  - agenthub-backend/target/surefire-reports/TEST-com.agenthub.PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.xml
+  - agenthub-backend/target/surefire-reports/
+  - agenthub-frontend/.next/
+  - docker/prometheus/prometheus.yml, docker/prometheus/agenthub-alerts.yml
+  - scripts/deploy-prod.{sh,ps1}, scripts/backup-prod.{sh,ps1}, scripts/restore-prod.{sh,ps1}
+未覆盖场景：
+  - 真实公网 CA 签发证书（Let's Encrypt / 企业级硬件 HSM）自动续期与多可用区跨地域对象存储（S3/OSS）异地容灾上传需在实际云主机环境中按运维手册挂载配置。
+剩余风险：
+  - 生产环境首次上线前，运维人员需按 .env.production.example 与 DISASTER_RECOVERY_RUNBOOK.md 注入真实强随机密钥及 TLS 证书，并配置宿主机定时任务运行 backup-prod.sh。
+状态：自动化测试与模拟演练通过
+```

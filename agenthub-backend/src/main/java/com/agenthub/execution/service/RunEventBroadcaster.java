@@ -105,7 +105,9 @@ public class RunEventBroadcaster {
      */
     @Transactional
     public RunEventEntity publishEvent(String runId, String eventType, String payload) {
-        long seq = getSequenceCounter(runId).incrementAndGet();
+        AtomicLong counter = getSequenceCounter(runId);
+        Long dbMax = runEventRepository.findMaxSequenceNum(runId);
+        long seq = counter.updateAndGet(prev -> Math.max(prev, dbMax != null ? dbMax : 0L) + 1);
         String eventId = "evt-" + UUID.randomUUID().toString().substring(0, 8);
         RunEventEntity event = new RunEventEntity(eventId, runId, seq, eventType, payload);
         RunEventEntity saved;
@@ -113,8 +115,8 @@ public class RunEventBroadcaster {
             saved = runEventRepository.save(event);
         } catch (Exception ex) {
             Long latestMax = runEventRepository.findMaxSequenceNum(runId);
-            long nextSeq = (latestMax != null ? latestMax : seq) + 1;
-            getSequenceCounter(runId).set(nextSeq);
+            long nextSeq = Math.max(seq, latestMax != null ? latestMax : 0L) + 1;
+            counter.set(nextSeq);
             event = new RunEventEntity("evt-" + UUID.randomUUID().toString().substring(0, 8), runId, nextSeq, eventType, payload);
             saved = runEventRepository.save(event);
         }

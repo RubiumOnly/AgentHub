@@ -119,45 +119,63 @@ public class WorkspaceLockManager {
         if (jdbcTemplate == null) return true;
         String dbKey = getDbKey(key);
         long now = System.currentTimeMillis();
+        long expiresEpochMs = now + leaseTtlMs;
         Timestamp nowTs = new Timestamp(now);
-        Timestamp expiresTs = new Timestamp(now + leaseTtlMs);
+        Timestamp expiresTs = new Timestamp(expiresEpochMs);
 
         try {
             var rows = jdbcTemplate.query(
-                    "SELECT owner_id, expires_at FROM workspace_locks WHERE workspace_key = ?",
-                    (rs, rowNum) -> new Object[]{rs.getString("owner_id"), rs.getTimestamp("expires_at")},
+                    "SELECT owner_id, expires_at, expires_at_epoch_ms FROM workspace_locks WHERE workspace_key = ?",
+                    (rs, rowNum) -> new Object[]{
+                            rs.getString("owner_id"),
+                            rs.getTimestamp("expires_at"),
+                            rs.getLong("expires_at_epoch_ms")
+                    },
                     dbKey
             );
 
             if (rows.isEmpty()) {
-                jdbcTemplate.update(
-                        "INSERT INTO workspace_locks (workspace_key, owner_id, acquired_at, expires_at, lease_ttl_ms) VALUES (?, ?, ?, ?, ?)",
-                        dbKey, ownerId, nowTs, expiresTs, leaseTtlMs
+                int inserted = jdbcTemplate.update(
+                        "INSERT INTO workspace_locks (workspace_key, owner_id, acquired_at, expires_at, lease_ttl_ms, expires_at_epoch_ms) VALUES (?, ?, ?, ?, ?, ?)",
+                        dbKey, ownerId, nowTs, expiresTs, leaseTtlMs, expiresEpochMs
                 );
-                return true;
+                return inserted > 0;
             } else {
                 Object[] row = rows.get(0);
                 String currentOwner = (String) row[0];
                 Timestamp currentExpires = (Timestamp) row[1];
+                Long currentExpiresEpochMs = (Long) row[2];
+                long effectiveExpiresMs = (currentExpiresEpochMs != null && currentExpiresEpochMs > 0)
+                        ? currentExpiresEpochMs
+                        : (currentExpires != null ? currentExpires.getTime() : 0L);
 
                 if (ownerId.equals(currentOwner)) {
                     jdbcTemplate.update(
-                            "UPDATE workspace_locks SET expires_at = ?, lease_ttl_ms = ? WHERE workspace_key = ? AND owner_id = ?",
-                            expiresTs, leaseTtlMs, dbKey, ownerId
+                            "UPDATE workspace_locks SET expires_at = ?, lease_ttl_ms = ?, expires_at_epoch_ms = ? WHERE workspace_key = ? AND owner_id = ?",
+                            expiresTs, leaseTtlMs, expiresEpochMs, dbKey, ownerId
                     );
                     return true;
-                } else if (currentExpires != null && currentExpires.getTime() < now) {
+                } else if (effectiveExpiresMs < now) {
                     int updated = jdbcTemplate.update(
-                            "UPDATE workspace_locks SET owner_id = ?, acquired_at = ?, expires_at = ?, lease_ttl_ms = ? WHERE workspace_key = ? AND expires_at < ?",
-                            ownerId, nowTs, expiresTs, leaseTtlMs, dbKey, nowTs
+                            "UPDATE workspace_locks SET owner_id = ?, acquired_at = ?, expires_at = ?, lease_ttl_ms = ?, expires_at_epoch_ms = ? " +
+                            "WHERE workspace_key = ? AND (expires_at_epoch_ms < ? OR (expires_at_epoch_ms = 0 AND expires_at < ?))",
+                            ownerId, nowTs, expiresTs, leaseTtlMs, expiresEpochMs, dbKey, now, nowTs
                     );
                     return updated > 0;
                 } else {
                     return false;
                 }
             }
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Concurrent INSERT from another node/instance won the primary key race
+            log.debug("Concurrent DB lock contention won by another instance for key [{}]: {}", dbKey, e.getMessage());
+            return false;
         } catch (Exception e) {
-            log.debug("Database workspace lock sync non-fatal error: {}", e.getMessage());
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase(Locale.ROOT) : "";
+            if (msg.contains("duplicate") || msg.contains("unique") || msg.contains("primary") || msg.contains("constraint")) {
+                return false;
+            }
+            log.debug("Database workspace lock sync non-fatal fallback: {}", e.getMessage());
             return true;
         }
     }
@@ -166,11 +184,13 @@ public class WorkspaceLockManager {
         if (jdbcTemplate == null) return true;
         String dbKey = getDbKey(key);
         long now = System.currentTimeMillis();
-        Timestamp newExpiresTs = new Timestamp(now + additionalTtlMs);
+        long newExpiresEpochMs = now + additionalTtlMs;
+        Timestamp newExpiresTs = new Timestamp(newExpiresEpochMs);
         try {
             int updated = jdbcTemplate.update(
-                    "UPDATE workspace_locks SET expires_at = ?, lease_ttl_ms = ? WHERE workspace_key = ? AND owner_id = ? AND expires_at >= ?",
-                    newExpiresTs, additionalTtlMs, dbKey, ownerId, new Timestamp(now)
+                    "UPDATE workspace_locks SET expires_at = ?, lease_ttl_ms = ?, expires_at_epoch_ms = ? " +
+                    "WHERE workspace_key = ? AND owner_id = ? AND (expires_at_epoch_ms >= ? OR (expires_at_epoch_ms = 0 AND expires_at >= ?))",
+                    newExpiresTs, additionalTtlMs, newExpiresEpochMs, dbKey, ownerId, now, new Timestamp(now)
             );
             return updated > 0;
         } catch (Exception e) {
@@ -186,6 +206,34 @@ public class WorkspaceLockManager {
             jdbcTemplate.update("DELETE FROM workspace_locks WHERE workspace_key = ? AND owner_id = ?", dbKey, ownerId);
         } catch (Exception e) {
             log.debug("Database workspace lock release non-fatal error: {}", e.getMessage());
+        }
+    }
+
+    public Optional<String> getDatabaseLockOwner(String workspacePath) {
+        if (jdbcTemplate == null) return Optional.empty();
+        String dbKey = getDbKey(normalizeKey(workspacePath));
+        long now = System.currentTimeMillis();
+        try {
+            var rows = jdbcTemplate.query(
+                    "SELECT owner_id, expires_at, expires_at_epoch_ms FROM workspace_locks WHERE workspace_key = ?",
+                    (rs, rowNum) -> new Object[]{
+                            rs.getString("owner_id"),
+                            rs.getTimestamp("expires_at"),
+                            rs.getLong("expires_at_epoch_ms")
+                    },
+                    dbKey
+            );
+            if (rows.isEmpty()) return Optional.empty();
+            Object[] row = rows.get(0);
+            String owner = (String) row[0];
+            Timestamp expiresTs = (Timestamp) row[1];
+            Long expiresMs = (Long) row[2];
+            long effectiveMs = (expiresMs != null && expiresMs > 0)
+                    ? expiresMs
+                    : (expiresTs != null ? expiresTs.getTime() : 0L);
+            return effectiveMs >= now ? Optional.ofNullable(owner) : Optional.empty();
+        } catch (Exception e) {
+            return Optional.empty();
         }
     }
 

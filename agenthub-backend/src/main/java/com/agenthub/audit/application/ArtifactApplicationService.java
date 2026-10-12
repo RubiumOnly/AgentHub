@@ -42,6 +42,9 @@ public class ArtifactApplicationService implements ArtifactApplication {
     private final ResourceAccessGuard accessGuard;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.agenthub.execution.service.RunEventBroadcaster broadcaster;
+
     public ArtifactApplicationService(ArtifactRepository artifactRepository,
                                     WorkflowRunRepository workflowRunRepository,
                                     ProjectRepository projectRepository,
@@ -270,7 +273,12 @@ public class ArtifactApplicationService implements ArtifactApplication {
 
     private void recordRunEvent(String runId, String eventType, String payload) {
         try {
-            long nextSeq = runEventRepository.countByRunId(runId) + 1;
+            if (broadcaster != null) {
+                broadcaster.publishEvent(runId, eventType, payload);
+                return;
+            }
+            Long maxSeq = runEventRepository.findMaxSequenceNum(runId);
+            long nextSeq = (maxSeq != null ? maxSeq : runEventRepository.countByRunId(runId)) + 1;
             String eventId = "evt-" + UUID.randomUUID().toString().substring(0, 8);
             RunEventEntity event = new RunEventEntity(eventId, runId, nextSeq, eventType, payload);
             runEventRepository.save(event);

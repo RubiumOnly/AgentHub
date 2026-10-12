@@ -67,12 +67,16 @@ public class TokenProvider {
             if (secretKey.length() < 32) {
                 throw new IllegalStateException("FATAL: agenthub.auth.secret must be at least 32 characters in production!");
             }
-            String lower = secretKey.toLowerCase();
+            String lower = secretKey.toLowerCase(Locale.ROOT);
             if (lower.contains("phase1-2026-superstrong")
                     || lower.contains("changeme")
                     || lower.contains("your-")
                     || lower.contains("placeholder")
-                    || lower.contains("secret-key-only-for-local")) {
+                    || lower.contains("provide_strong_random")
+                    || lower.contains("example")
+                    || lower.contains("secret-key-only-for-local")
+                    || lower.equals("password")
+                    || lower.contains("123456")) {
                 throw new IllegalStateException("FATAL: agenthub.auth.secret must not use sample, placeholder or default values in production!");
             }
             log.info("TokenProvider initialized for PRODUCTION with external hardened secret.");

@@ -8,15 +8,12 @@ FROM maven:3.9.6-eclipse-temurin-17-alpine AS builder
 
 WORKDIR /build
 
-# Copy Maven POM and dependency cache
+# Copy Maven POM and source code, then build production jar
 COPY pom.xml .
-RUN mvn dependency:go-offline -B || true
-
-# Copy source code and build jar
 COPY src ./src
-RUN mvn clean package -DskipTests -B
+RUN mvn clean package -DskipTests -B -q
 
-# Stage 2: Minimal Distroless/Alpine Runtime
+# Stage 2: Minimal Alpine JRE Runtime
 FROM eclipse-temurin:17-jre-alpine AS runner
 
 # Install curl/wget for health check and git for JGit/runtime tooling
@@ -24,13 +21,13 @@ RUN apk add --no-cache bash curl wget git tzdata \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
 
-# Security hardening: Create non-root dedicated service user
+# Security hardening: Create non-root dedicated service user (UID/GID 10001)
 RUN addgroup -g 10001 -S agenthub && adduser -u 10001 -S agenthub -G agenthub
 
 WORKDIR /app
 
-# Create necessary directories and assign ownership
-RUN mkdir -p /app/data /var/lib/agenthub/workspaces \
+# Create necessary directories (including /app/logs for volume mount) and assign ownership
+RUN mkdir -p /app/data /app/logs /var/lib/agenthub/workspaces \
     && chown -R agenthub:agenthub /app /var/lib/agenthub
 
 # Copy jar from builder
