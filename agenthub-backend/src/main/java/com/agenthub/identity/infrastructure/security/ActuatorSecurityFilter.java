@@ -119,16 +119,25 @@ public class ActuatorSecurityFilter implements Filter {
 
         // 3. Check trusted internal network (loopback / private Docker bridge subnet) ONLY when not proxied from external IP
         if (allowTrustedNetwork) {
+            if (!isPrivateOrLoopbackIp(httpRequest.getRemoteAddr())) {
+                return false;
+            }
             String xff = httpRequest.getHeader("X-Forwarded-For");
-            String realIp = httpRequest.getHeader("X-Real-IP");
             if (xff != null && !xff.isBlank()) {
-                String clientIp = xff.split(",")[0].trim();
-                return isPrivateOrLoopbackIp(clientIp);
+                String[] hops = xff.split(",");
+                for (String hop : hops) {
+                    if (!isPrivateOrLoopbackIp(hop.trim())) {
+                        return false;
+                    }
+                }
             }
+            String realIp = httpRequest.getHeader("X-Real-IP");
             if (realIp != null && !realIp.isBlank()) {
-                return isPrivateOrLoopbackIp(realIp.trim());
+                if (!isPrivateOrLoopbackIp(realIp.trim())) {
+                    return false;
+                }
             }
-            return isPrivateOrLoopbackIp(httpRequest.getRemoteAddr());
+            return true;
         }
 
         return false;

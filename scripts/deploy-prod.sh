@@ -126,6 +126,18 @@ for API_KEY_NAME in DEEPSEEK_API_KEY ANTHROPIC_API_KEY OPENAI_API_KEY GEMINI_API
     fi
 done
 
+IMAGE_TAG_VAL=$(get_env_val "IMAGE_TAG")
+if [ "$(echo "$IMAGE_TAG_VAL" | tr '[:upper:]' '[:lower:]')" = "latest" ]; then
+    echo "[FATAL] IMAGE_TAG must not use floating 'latest' tag in production."
+    VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
+CORS_VAL=$(get_env_val "CORS_ALLOWED_ORIGINS")
+if [[ "$CORS_VAL" == *"*"* ]]; then
+    echo "[FATAL] CORS_ALLOWED_ORIGINS must not use wildcard '*' in production."
+    VIOLATIONS=$((VIOLATIONS + 1))
+fi
+
 if [ "$VIOLATIONS" -gt 0 ]; then
     echo "[ABORT] Production pre-flight check failed with $VIOLATIONS security violation(s). Refusing to start."
     exit 1

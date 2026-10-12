@@ -277,10 +277,13 @@ public class DisasterRecoveryBackupService {
             }
         }
 
-        // Verify every workspace file checksum
-        Path backupWorkspacesDir = backupDir.resolve("workspaces");
+        // Verify every workspace file checksum and path containment
+        Path backupWorkspacesDir = backupDir.resolve("workspaces").toAbsolutePath().normalize();
         for (Map.Entry<String, String> entry : manifest.workspaceFileChecksums.entrySet()) {
-            Path file = backupWorkspacesDir.resolve(entry.getKey());
+            Path file = backupWorkspacesDir.resolve(entry.getKey()).normalize();
+            if (!file.startsWith(backupWorkspacesDir)) {
+                throw new IllegalStateException("Path traversal detected in backup manifest entry: " + entry.getKey());
+            }
             if (!Files.exists(file)) {
                 throw new IllegalStateException("Backed-up workspace file missing: " + entry.getKey());
             }
@@ -289,6 +292,34 @@ public class DisasterRecoveryBackupService {
                 throw new IllegalStateException("Workspace file checksum mismatch for [" + entry.getKey()
                         + "]: expected=" + entry.getValue() + ", actual=" + actualHash);
             }
+        }
+
+        // Cross-check SHA256SUMS file contents against manifest and disk files
+        List<String> sumLines = Files.readAllLines(sha256SumsPath, StandardCharsets.UTF_8);
+        boolean dbSumFound = false;
+        for (String rawLine : sumLines) {
+            String line = rawLine.trim();
+            if (line.isEmpty()) continue;
+            String[] parts = line.split("\\s+", 2);
+            if (parts.length < 2) {
+                throw new IllegalStateException("Malformed line in SHA256SUMS: " + line);
+            }
+            String expectedHash = parts[0].trim();
+            String relFile = parts[1].trim();
+            Path targetPath = backupDir.toAbsolutePath().normalize().resolve(relFile).normalize();
+            if (!targetPath.startsWith(backupDir.toAbsolutePath().normalize()) || !Files.exists(targetPath)) {
+                throw new IllegalStateException("SHA256SUMS references missing or escaping file: " + relFile);
+            }
+            String diskHash = sha256Hex(Files.readAllBytes(targetPath));
+            if (!diskHash.equalsIgnoreCase(expectedHash)) {
+                throw new IllegalStateException("SHA256SUMS checksum mismatch for [" + relFile + "]: expected=" + expectedHash + ", actual=" + diskHash);
+            }
+            if (relFile.equals(manifest.dbSnapshotFileName)) {
+                dbSumFound = true;
+            }
+        }
+        if (!dbSumFound) {
+            throw new IllegalStateException("SHA256SUMS is missing entry for database snapshot file: " + manifest.dbSnapshotFileName);
         }
 
         return manifest;
@@ -360,11 +391,15 @@ public class DisasterRecoveryBackupService {
         // 4. Restore physical workspace files and verify checksums on target disk
         int restoredFilesCount = 0;
         if (targetWorkspaceRoot != null) {
-            Files.createDirectories(targetWorkspaceRoot);
-            Path backupWorkspacesDir = backupDir.resolve("workspaces");
+            Path normalizedTargetRoot = targetWorkspaceRoot.toAbsolutePath().normalize();
+            Files.createDirectories(normalizedTargetRoot);
+            Path backupWorkspacesDir = backupDir.resolve("workspaces").toAbsolutePath().normalize();
             for (Map.Entry<String, String> entry : manifest.workspaceFileChecksums.entrySet()) {
-                Path srcFile = backupWorkspacesDir.resolve(entry.getKey());
-                Path destFile = targetWorkspaceRoot.resolve(entry.getKey());
+                Path srcFile = backupWorkspacesDir.resolve(entry.getKey()).normalize();
+                Path destFile = normalizedTargetRoot.resolve(entry.getKey()).normalize();
+                if (!srcFile.startsWith(backupWorkspacesDir) || !destFile.startsWith(normalizedTargetRoot)) {
+                    throw new IllegalStateException("Path traversal detected while restoring workspace file: " + entry.getKey());
+                }
                 Files.createDirectories(destFile.getParent());
                 byte[] bytes = Files.readAllBytes(srcFile);
                 Files.write(destFile, bytes);
@@ -519,9 +554,12 @@ public class DisasterRecoveryBackupService {
                 continue;
             }
 
-            // Verify no active lock is held
-            if (workspaceLockManager.isLocked(dir.toString())
-                    || workspaceLockManager.getDatabaseLockOwner(dir.toString()).isPresent()) {
+            // Verify no active lock is held across physical path, directory name, workspaceId, or projectId
+            boolean lockHeld = Stream.of(dir.toString(), dirName, ws.getId(), ws.getProjectId())
+                    .filter(Objects::nonNull)
+                    .anyMatch(k -> workspaceLockManager.isLocked(k)
+                            || workspaceLockManager.getDatabaseLockOwner(k).isPresent());
+            if (lockHeld) {
                 log.info("Skipping workspace directory [{}] during cleanup: workspace lock is active", dirName);
                 continue;
             }

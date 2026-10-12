@@ -89,6 +89,16 @@ foreach ($apiKeyName in @("DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_K
     }
 }
 
+$imgTagVal = $EnvMap["IMAGE_TAG"]
+if (-not [string]::IsNullOrWhiteSpace($imgTagVal) -and $imgTagVal.Trim().ToLowerInvariant() -eq "latest") {
+    $Violations += "IMAGE_TAG must not use floating 'latest' tag in production"
+}
+
+$corsVal = $EnvMap["CORS_ALLOWED_ORIGINS"]
+if (-not [string]::IsNullOrWhiteSpace($corsVal) -and $corsVal.Contains("*")) {
+    $Violations += "CORS_ALLOWED_ORIGINS must not use wildcard '*' in production"
+}
+
 if ($Violations.Count -gt 0) {
     foreach ($v in $Violations) {
         Write-Host "[FATAL] $v" -ForegroundColor Red

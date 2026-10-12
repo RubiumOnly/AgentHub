@@ -501,7 +501,7 @@ Artifact / 日志位置：
 ```text
 阶段：阶段 E（生产配置、CI/CD 与灾备演练）
 验收日期：2026-10-12
-Git commit：基线 173ce17 -> 本次提交 feat(ops): 完成阶段 E 生产安全配置、CI/CD 全量门禁、Prometheus 告警与灾备备份恢复演练
+Git commit：主提交 ccff39b (feat(ops): 完成阶段 E 生产安全配置、CI/CD 全量门禁、Prometheus 告警与灾备备份恢复演练) -> 加固提交 fix(ops): 加固阶段 E 生产环境变量门禁、Actuator 防伪造鉴权、跨节点锁防脑裂、Prometheus 全规则评估与灾备演练
 运行环境：
   - 本地环境：OS: Windows 11 (10.0.26100) / CPU: x86_64 / JDK: Eclipse Temurin 17.0.15 / Node: v20.x / Next.js: 14.2.13 / Compose: Docker Compose v2.x / Git Bash: GNU bash 5.2
   - CI 容器门禁环境：GitHub Actions ubuntu-latest (Linux x86_64) / MySQL 8.0 Service Container / prom/prometheus:v2.51.0 (promtool) / Docker Engine 26+
@@ -521,7 +521,7 @@ Git commit：基线 173ce17 -> 本次提交 feat(ops): 完成阶段 E 生产安�
   1. 生产密钥强校验、配置模板入库与管理面暴露收敛：
      - 更新 .gitignore 将 !.env.production.example 纳入版本控制，提供完整安全占位符模板（严禁包含任何真实 API Key 或弱口令）；
      - 强化 TokenProvider 与新增 ProductionEnvironmentValidator：在 prod Profile 及部署前置门禁中严格拦截默认/占位符/短密钥 (<32 bytes) 的 JWT_SECRET、DB_PASSWORD、DB_ROOT_PASSWORD、ACTUATOR_PROMETHEUS_TOKEN，拦截通配符 CORS (*) 与 latest 浮动镜像标签；
-     - 新增 ActuatorSecurityFilter 与 Nginx /actuator/ 路由封锁：保持 /actuator/health 对容器探针公开返回 200 UP，而在生产模式下严格封锁外部公网直接访问 /actuator/prometheus、/actuator/metrics 与 /actuator/info (返回 403)，仅放行容器内网受信网段或携带有效 ACTUATOR_PROMETHEUS_TOKEN (X-Observability-Token / Bearer) 的 Prometheus 抓取请求。
+     - 新增 ActuatorSecurityFilter 与 Nginx /actuator/ 路由封锁：保持 /actuator/health 对容器探针公开返回 200 UP，而在生产模式下严格封锁外部公网直接访问 /actuator/prometheus、/actuator/metrics 与 /actuator/info (返回 403)，强制校验直连 remoteAddr 与 X-Forwarded-For 全链路跳数防伪造，仅放行真实容器内网受信网段或携带有效 ACTUATOR_PROMETHEUS_TOKEN (X-Observability-Token / Bearer) 的 Prometheus 抓取请求。
   2. Compose 生产硬化、非 root 容器安全、TLS 网关与可选 Redis 降级对齐：
      - 升级 docker-compose.prod.yml 与前后端 Dockerfile：全栈服务显式绑定不可变版本标签 ${IMAGE_TAG:-1.0.0}，配置 security_opt: no-new-privileges:true；后端容器以非特权用户 agenthub (UID 10001) 运行并预授权 /app/logs 与 /var/lib/agenthub/workspaces，前端容器以 nextjs (UID 1001) 运行；
      - 修复 MySQL 容器健康检查命令（采用 CMD-SHELL 与 MYSQL_PWD 环境变量安全探活，消除命令行明文密码告警与变量展开失效），修复 Redis 容器健康检查命令（支持有密码/无密码自适应探活并校验 PONG）；
@@ -529,15 +529,15 @@ Git commit：基线 173ce17 -> 本次提交 feat(ops): 完成阶段 E 生产安�
      - 新增 docker/nginx/agenthub-tls.conf 生产 HTTPS/TLS 1.2+1.3 网关配置（含 80->443 跳转、HSTS、SSE proxy_buffering off 长连接流控与 /actuator/ 外网封锁）。
   3. 分布式锁毫秒级精度升级与多实例跨节点抢占接管：
      - 新增 Flyway 迁移 V12__phase_e_production_ops_and_lock_precision.sql，为 workspace_locks 表新增 expires_at_epoch_ms BIGINT NOT NULL DEFAULT 0 字段与 idx_workspace_locks_expires_ms 索引，消除 MySQL TIMESTAMP 秒级截断与跨节点时区偏差；
-     - 修复 WorkspaceLockManager.syncAcquireDbLock 在并发 INSERT 触发唯一键冲突时误返回 true 的缺陷，全面升级为基于毫秒时间戳的原子条件抢占与过期租约接管；
+     - 修复 WorkspaceLockManager.syncAcquireDbLock 在并发 INSERT 触发唯一键冲突时误返回 true 的缺陷，并修复跨节点租约过期接管后旧节点重入 tryAcquireLock / renewLease 忽略数据库返回结果导致脑裂的隐患，全面升级为基于毫秒时间戳的原子条件抢占与过期租约接管；
      - 修复 ArtifactApplicationService.recordRunEvent 绕过 RunEventBroadcaster 直接写入 run_events 导致序号计数器失步的问题，并在 RunEventBroadcaster.publishEvent 中增加数据库最大序号原子对齐，彻底杜绝并发事件序号冲突。
   4. Prometheus 采集规则、告警阈值可执行化与实时评估器：
      - 升级 AgentHubMetricsCollector：为 agenthub.steps.duration 与 agenthub.workspace.lock.wait 开启 publishPercentileHistogram() 导出 _bucket 直方图桶指标，新增 agenthub.provider.circuit.breaker.state 与 agenthub.workspace.disk.avail.ratio 实时 Gauge；
-     - 新增 docker/prometheus/prometheus.yml 与 docker/prometheus/agenthub-alerts.yml（覆盖 7 项核心生产告警规则），并在 docker-compose.prod.yml 中集成 agenthub-prometheus 服务；
-     - 新增 PrometheusAlertEvaluator：支持解析校验 Prometheus 配置文件并基于真实 /actuator/prometheus 指标文本流实时计算告警触发状态（FIRING / INACTIVE）。
+     - 新增 docker/prometheus/prometheus.yml 与 docker/prometheus/agenthub-alerts.yml（覆盖 8 项核心生产告警规则），并在 docker-compose.prod.yml 中集成 agenthub-prometheus 服务；
+     - 新增 PrometheusAlertEvaluator：支持解析校验 Prometheus 配置文件并基于真实 /actuator/prometheus 指标文本流实时计算全部 8 项告警触发状态（FIRING / INACTIVE），修复带标签指标解析双重计数问题。
   5. 灾备备份/恢复自动化脚本、AES-256-GCM 加密、防篡改校验与数据库对账清理：
-     - 新增 DisasterRecoveryBackupService 及跨平台脚本 scripts/backup-prod.{sh,ps1}、scripts/restore-prod.{sh,ps1}：支持 MySQL 事务一致性快照 (`--single-transaction --routines --triggers --events`) 与受控工作区归档、PBKDF2+AES-256-GCM 静态加密、backup-manifest.json 与 SHA256SUMS 完整性清单、篡改自动阻断、空环境还原后 Flyway 版本与历史 Run 指纹采样核验、以及基于保留天数的自动轮转清理；
-     - 彻底移除 docs/ops/DISASTER_RECOVERY_RUNBOOK.md 中基于 mtime 直接 rm -rf 清理工作区的高危命令，改为通过数据库对账仅清理状态确认为 ARCHIVED 且超过保留期的工作区目录，100% 保护长期活跃项目。
+     - 新增 DisasterRecoveryBackupService 及跨平台脚本 scripts/backup-prod.{sh,ps1}、scripts/restore-prod.{sh,ps1}：支持 MySQL 事务一致性快照 (`--single-transaction --routines --triggers --events`) 与受控工作区归档、PBKDF2+AES-256-GCM 静态加密、backup-manifest.json 与 SHA256SUMS 双向完整性校验、路径穿越防护、篡改自动阻断、空环境还原后 Flyway 版本与历史 Run 指纹采样核验、以及基于保留天数的自动轮转清理；
+     - 彻底移除 docs/ops/DISASTER_RECOVERY_RUNBOOK.md 中基于 mtime 直接 rm -rf 清理工作区的高危命令，改为通过数据库对账（含 workspaceId/projectId 多键锁核验）仅清理状态确认为 ARCHIVED 且无活跃任务/锁的工作区目录，100% 保护长期活跃与持锁项目。
   6. GitHub Actions CI 全量生产门禁升级 (.github/workflows/ci.yml)：
      - backend-test：执行全量 H2 测试套件 + 真实 MySQL 8.0 服务容器空库 Flyway V1~V12 迁移与核心并发/恢复/灾备集成测试；
      - frontend-build：执行 npm ci、npx tsc --noEmit 与 npm run build 生产 Standalone 构建；

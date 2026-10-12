@@ -285,17 +285,34 @@ public class WorkspaceLockManager {
                     return true;
                 }
 
-                // 2. Lock is reentrant for the same owner
-                if (ownerId.equals(entry.ownerId)) {
-                    syncAcquireDbLock(key, ownerId, leaseTtlMs);
+                // 2. Lock is reentrant for the same owner (only while lease is still valid and confirmed in DB)
+                if (ownerId.equals(entry.ownerId) && now <= entry.expiresAt) {
+                    if (!syncAcquireDbLock(key, ownerId, leaseTtlMs)) {
+                        entry.ownerId = null;
+                        entry.expiresAt = 0;
+                        entry.holdCount = 0;
+                        long remainingWait = deadline - now;
+                        if (remainingWait <= 0) return false;
+                        long waitTime = Math.min(remainingWait, 50);
+                        try {
+                            entry.condition.await(waitTime, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return false;
+                        }
+                        continue;
+                    }
                     entry.holdCount++;
                     entry.expiresAt = Math.max(entry.expiresAt, now + leaseTtlMs);
                     return true;
                 }
 
-                // 3. Held by another owner, but lease has expired (Deadlock recovery)
+                // 3. Held by another owner (or expired previous lease), lease has expired (Deadlock recovery)
                 if (now > entry.expiresAt) {
                     if (!syncAcquireDbLock(key, ownerId, leaseTtlMs)) {
+                        entry.ownerId = null;
+                        entry.expiresAt = 0;
+                        entry.holdCount = 0;
                         long remainingWait = deadline - now;
                         if (remainingWait <= 0) return false;
                         long waitTime = Math.min(remainingWait, 50);
@@ -348,7 +365,12 @@ public class WorkspaceLockManager {
         try {
             long now = System.currentTimeMillis();
             if (ownerId.equals(entry.ownerId) && now <= entry.expiresAt) {
-                syncRenewDbLock(key, ownerId, additionalTtlMs);
+                if (!syncRenewDbLock(key, ownerId, additionalTtlMs)) {
+                    entry.ownerId = null;
+                    entry.expiresAt = 0;
+                    entry.holdCount = 0;
+                    return false;
+                }
                 entry.leaseTtlMs = additionalTtlMs;
                 entry.expiresAt = now + additionalTtlMs;
                 return true;

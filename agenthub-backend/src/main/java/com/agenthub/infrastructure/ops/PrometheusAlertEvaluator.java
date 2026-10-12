@@ -160,8 +160,11 @@ public class PrometheusAlertEvaluator {
         for (AlertRuleDefinition rule : rules) {
             String expr = rule.expr();
             if ("AgentHubHighPendingRuns".equals(rule.alert())) {
-                double activeRuns = samples.getOrDefault("agenthub_runs_active",
-                        metricsCollector != null ? (double) metricsCollector.getActiveRuns() : 0.0);
+                double activeRuns = samples.entrySet().stream()
+                        .filter(e -> e.getKey().equals("agenthub_runs_active") || e.getKey().startsWith("agenthub_runs_active{"))
+                        .mapToDouble(Map.Entry::getValue)
+                        .max()
+                        .orElse(metricsCollector != null ? (double) metricsCollector.getActiveRuns() : 0.0);
                 if (activeRuns > 20.0) {
                     firing.add(new FiringAlert(rule.alert(), rule.severity(), rule.summary(), expr, activeRuns));
                 }
@@ -176,7 +179,7 @@ public class PrometheusAlertEvaluator {
                 }
             } else if ("AgentHubDiskUsageCritical".equals(rule.alert())) {
                 double availRatio = samples.entrySet().stream()
-                        .filter(e -> e.getKey().startsWith("agenthub_workspace_disk_avail_ratio"))
+                        .filter(e -> e.getKey().equals("agenthub_workspace_disk_avail_ratio") || e.getKey().startsWith("agenthub_workspace_disk_avail_ratio{"))
                         .mapToDouble(Map.Entry::getValue)
                         .min()
                         .orElse(metricsCollector != null ? metricsCollector.getWorkspaceDiskAvailableRatio() : 1.0);
@@ -185,15 +188,58 @@ public class PrometheusAlertEvaluator {
                 }
             } else if ("AgentHubRunFailureSpike".equals(rule.alert())) {
                 double failedTotal = samples.entrySet().stream()
-                        .filter(e -> e.getKey().startsWith("agenthub_runs_total") && e.getKey().contains("status=\"FAILED\""))
+                        .filter(e -> e.getKey().startsWith("agenthub_runs_total{") && e.getKey().contains("status=\"FAILED\""))
                         .mapToDouble(Map.Entry::getValue)
                         .sum();
                 double allTotal = samples.entrySet().stream()
-                        .filter(e -> e.getKey().startsWith("agenthub_runs_total"))
+                        .filter(e -> e.getKey().startsWith("agenthub_runs_total{"))
                         .mapToDouble(Map.Entry::getValue)
                         .sum();
                 if (allTotal > 0 && (failedTotal / allTotal) > 0.05) {
                     firing.add(new FiringAlert(rule.alert(), rule.severity(), rule.summary(), expr, failedTotal / allTotal));
+                }
+            } else if ("AgentHubStepLatencyDegradation".equals(rule.alert())) {
+                double p99StepSeconds = samples.entrySet().stream()
+                        .filter(e -> (e.getKey().startsWith("agenthub_steps_duration_seconds{") && e.getKey().contains("quantile=\"0.99\""))
+                                || e.getKey().startsWith("agenthub_steps_duration_seconds_max"))
+                        .mapToDouble(Map.Entry::getValue)
+                        .max()
+                        .orElse(0.0);
+                if (p99StepSeconds > 30.0) {
+                    firing.add(new FiringAlert(rule.alert(), rule.severity(), rule.summary(), expr, p99StepSeconds));
+                }
+            } else if ("AgentHubWorkspaceLockContentionHigh".equals(rule.alert())) {
+                double p95LockWaitSeconds = samples.entrySet().stream()
+                        .filter(e -> (e.getKey().startsWith("agenthub_workspace_lock_wait_seconds{") && e.getKey().contains("quantile=\"0.95\""))
+                                || e.getKey().startsWith("agenthub_workspace_lock_wait_seconds_max"))
+                        .mapToDouble(Map.Entry::getValue)
+                        .max()
+                        .orElse(0.0);
+                if (p95LockWaitSeconds > 2.0) {
+                    firing.add(new FiringAlert(rule.alert(), rule.severity(), rule.summary(), expr, p95LockWaitSeconds));
+                }
+            } else if ("AgentHubSseConnectionDropSpike".equals(rule.alert())) {
+                double sseDelta = samples.entrySet().stream()
+                        .filter(e -> e.getKey().startsWith("agenthub_sse_connections_active_delta"))
+                        .mapToDouble(Map.Entry::getValue)
+                        .min()
+                        .orElse(0.0);
+                if (sseDelta < -50.0) {
+                    firing.add(new FiringAlert(rule.alert(), rule.severity(), rule.summary(), expr, sseDelta));
+                }
+            } else if ("AgentHubHikariConnectionPoolSaturated".equals(rule.alert())) {
+                double activeConn = samples.entrySet().stream()
+                        .filter(e -> e.getKey().equals("hikaricp_connections_active") || e.getKey().startsWith("hikaricp_connections_active{"))
+                        .mapToDouble(Map.Entry::getValue)
+                        .max()
+                        .orElse(0.0);
+                double maxConn = samples.entrySet().stream()
+                        .filter(e -> e.getKey().equals("hikaricp_connections_max") || e.getKey().startsWith("hikaricp_connections_max{"))
+                        .mapToDouble(Map.Entry::getValue)
+                        .max()
+                        .orElse(0.0);
+                if (maxConn > 0 && (activeConn / maxConn) > 0.85) {
+                    firing.add(new FiringAlert(rule.alert(), rule.severity(), rule.summary(), expr, activeConn / maxConn));
                 }
             }
         }
@@ -218,9 +264,10 @@ public class PrometheusAlertEvaluator {
                 String valStr = matcher.group(3);
                 try {
                     double val = Double.parseDouble(valStr);
-                    result.put(name, val);
                     if (labels != null && !labels.isBlank()) {
                         result.put(name + "{" + labels + "}", val);
+                    } else {
+                        result.put(name, val);
                     }
                 } catch (NumberFormatException ignored) {
                 }

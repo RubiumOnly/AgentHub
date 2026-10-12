@@ -211,18 +211,23 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
                 .anyMatch(v -> v.contains("REDIS_PASSWORD"))
                 .anyMatch(v -> v.contains("ACTUATOR_PROMETHEUS_TOKEN"));
 
-        // 测试弱密码、过短密钥与未替换的 API Key 占位符拦截
+        // 测试弱密码、过短密钥、未替换的 API Key 占位符、IMAGE_TAG=latest 与通配符 CORS(*) 拦截
         Map<String, String> weakEnv = new LinkedHashMap<>();
         weakEnv.put("AGENTHUB_AUTH_SECRET", "short-secret");
         weakEnv.put("MYSQL_ROOT_PASSWORD", "123456");
         weakEnv.put("MYSQL_PASSWORD", "password");
         weakEnv.put("REDIS_PASSWORD", "ChangeMe_Redis_123");
         weakEnv.put("OPENAI_API_KEY", "sk-your-openai-key-here");
+        weakEnv.put("IMAGE_TAG", "latest");
+        weakEnv.put("CORS_ALLOWED_ORIGINS", "*");
 
         ProductionEnvironmentValidator.ValidationResult weakResult =
                 productionEnvironmentValidator.validateEnvMap(weakEnv);
         assertThat(weakResult.valid()).isFalse();
-        assertThat(weakResult.violations()).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(weakResult.violations())
+                .hasSizeGreaterThanOrEqualTo(7)
+                .anyMatch(v -> v.contains("IMAGE_TAG"))
+                .anyMatch(v -> v.contains("CORS_ALLOWED_ORIGINS"));
 
         // 测试合规高强度生产配置通过
         Map<String, String> hardenedEnv = new LinkedHashMap<>();
@@ -231,6 +236,8 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
         hardenedEnv.put("MYSQL_PASSWORD", "MysqlApp#987654321_Prod!");
         hardenedEnv.put("REDIS_PASSWORD", "RedisCache#987654321_Prod!");
         hardenedEnv.put("ACTUATOR_PROMETHEUS_TOKEN", "PromScrapeToken#2026_Secure_998877");
+        hardenedEnv.put("IMAGE_TAG", "59fc5d9");
+        hardenedEnv.put("CORS_ALLOWED_ORIGINS", "https://agenthub.company.com");
         hardenedEnv.put("DEEPSEEK_API_KEY", "");
         hardenedEnv.put("OPENAI_API_KEY", "");
 
@@ -244,8 +251,9 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("阶段E测试2：生产模式下 /actuator/health 公开可探测，/actuator/prometheus 与 /actuator/metrics 严格要求受信网络或鉴权凭据")
+    @DisplayName("阶段E测试2：生产模式下 /actuator/health 公开可探测，/actuator/prometheus 与 /actuator/metrics 严格要求受信网络或鉴权凭据并防御 XFF 伪造")
     void shouldEnforceActuatorAndPrometheusAccessControlInProduction() throws Exception {
+        RequestContext.clear();
         String validScrapeToken = "ObsScrapeToken_Prod_2026_SecureKey_99!";
         actuatorSecurityFilter.configureForTesting(true, validScrapeToken, true);
 
@@ -258,6 +266,26 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
         // 2. 外部非受信 IP 未携带凭据访问 /actuator/prometheus 必须被 403 拦截
         mockMvc.perform(get("/actuator/prometheus")
                         .header("X-Forwarded-For", "203.0.113.88"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(1002));
+
+        // 2b. 外部直连 IP (remoteAddr=203.0.113.88) 伪造 X-Forwarded-For: 127.0.0.1 必须被 403 拦截
+        mockMvc.perform(get("/actuator/prometheus")
+                        .header("X-Forwarded-For", "127.0.0.1")
+                        .with(req -> {
+                            req.setRemoteAddr("203.0.113.88");
+                            return req;
+                        }))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(1002));
+
+        // 2c. 经代理转发但携带多跳伪造头 X-Forwarded-For: 127.0.0.1, 203.0.113.88 必须被 403 拦截
+        mockMvc.perform(get("/actuator/prometheus")
+                        .header("X-Forwarded-For", "127.0.0.1, 203.0.113.88")
+                        .with(req -> {
+                            req.setRemoteAddr("172.18.0.5");
+                            return req;
+                        }))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(1002));
 
@@ -353,7 +381,7 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("阶段E测试4：校验 Prometheus 配置文件与告警规则，并注入异常指标触发实时测试告警")
+    @DisplayName("阶段E测试4：校验 Prometheus 配置文件与告警规则，并注入异常指标触发实时测试告警（含全部 8 项规则评估验证）")
     void shouldValidatePrometheusConfigAndTriggerAlertRules() throws Exception {
         Path promYml = resolveRepoFile("docker/prometheus/prometheus.yml");
         Path alertsYml = resolveRepoFile("docker/prometheus/agenthub-alerts.yml");
@@ -367,7 +395,7 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
         metricsCollector.recordStepExecution("AGENT", "SUCCEEDED", 420);
         metricsCollector.recordWorkspaceLockWait(25);
 
-        // 注入三项异常告警条件：
+        // 注入实时异常告警条件：
         // (1) 活跃并发 Run = 25 (> 20) -> 触发 AgentHubHighPendingRuns
         // (2) Provider deepseek 熔断器 OPEN = 1 -> 触发 AgentHubProviderCircuitBreakerOpen
         // (3) 工作区可用磁盘空间 = 8% (< 15%) -> 触发 AgentHubDiskUsageCritical
@@ -395,6 +423,35 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
                         "AgentHubProviderCircuitBreakerOpen",
                         "AgentHubDiskUsageCritical"
                 );
+
+        // 验证全部 8 条告警规则（含 AgentHubRunFailureSpike 8% > 5% 无双重计数偏差）
+        String syntheticAllAlertsText = """
+                agenthub_runs_active 28.0
+                agenthub_runs_total{status="FAILED"} 8.0
+                agenthub_runs_total{status="SUCCEEDED"} 92.0
+                agenthub_steps_duration_seconds{node_type="AGENT",quantile="0.99"} 45.2
+                agenthub_workspace_lock_wait_seconds{quantile="0.95"} 3.4
+                agenthub_sse_connections_active_delta -65.0
+                agenthub_provider_circuit_breaker_state{provider="deepseek",state="OPEN"} 1.0
+                hikaricp_connections_active{pool="HikariPool-1"} 18.0
+                hikaricp_connections_max{pool="HikariPool-1"} 20.0
+                agenthub_workspace_disk_avail_ratio{mountpoint="/var/lib/agenthub"} 0.10
+                """;
+        List<PrometheusAlertEvaluator.FiringAlert> allFiring =
+                prometheusAlertEvaluator.evaluateAlertsAgainstPrometheusText(
+                        validation.rules(), syntheticAllAlertsText, null);
+        assertThat(allFiring)
+                .extracting(PrometheusAlertEvaluator.FiringAlert::alertName)
+                .containsExactlyInAnyOrder(
+                        "AgentHubHighPendingRuns",
+                        "AgentHubRunFailureSpike",
+                        "AgentHubStepLatencyDegradation",
+                        "AgentHubWorkspaceLockContentionHigh",
+                        "AgentHubSseConnectionDropSpike",
+                        "AgentHubProviderCircuitBreakerOpen",
+                        "AgentHubHikariConnectionPoolSaturated",
+                        "AgentHubDiskUsageCritical"
+                );
     }
 
     // =========================================================================
@@ -402,7 +459,7 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("阶段E测试5：跨实例数据库工作区锁互斥竞争与租约到期毫秒级自动接管")
+    @DisplayName("阶段E测试5：跨实例数据库工作区锁互斥竞争、租约到期毫秒级自动接管与旧节点重入/续租防脑裂拦截")
     void shouldEnforceDatabaseWorkspaceLockMutualExclusionAndExpiryRecovery() throws Exception {
         WorkspaceLockManager nodeA = new WorkspaceLockManager(workspaceResolver, jdbcTemplate);
         WorkspaceLockManager nodeB = new WorkspaceLockManager(workspaceResolver, jdbcTemplate);
@@ -419,15 +476,20 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
         assertThat(acquiredByBWhileActive).isFalse();
         assertThat(nodeB.getDatabaseLockOwner(workspaceKey)).contains("node-alpha");
 
-        // 3. 等待 320ms 使 Node A 租约过期（模拟 Node A 宕机未释放锁）
+        // 3. 等待 320ms 使 Node A 租约过期（模拟 Node A 宕机或 GC 停顿未释放锁）
         Thread.sleep(320);
 
         // 4. Node B 再次申请锁，自动检测 expires_at_epoch_ms 过期并接管所有权
-        boolean recoveredByB = nodeB.tryAcquireLock(workspaceKey, "node-beta", 100, 1000);
+        boolean recoveredByB = nodeB.tryAcquireLock(workspaceKey, "node-beta", 100, 2000);
         assertThat(recoveredByB).isTrue();
         assertThat(nodeB.getDatabaseLockOwner(workspaceKey)).contains("node-beta");
 
-        // 5. Node B 正常释放锁
+        // 5. 防脑裂验证：此时 Node A 恢复响应并尝试以旧 owner ("node-alpha") 重入加锁或续租，必须被数据库拦截返回 false
+        assertThat(nodeA.renewLease(workspaceKey, "node-alpha", 2000)).isFalse();
+        assertThat(nodeA.tryAcquireLock(workspaceKey, "node-alpha", 30, 2000)).isFalse();
+        assertThat(nodeB.getDatabaseLockOwner(workspaceKey)).contains("node-beta");
+
+        // 6. Node B 正常释放锁
         boolean released = nodeB.releaseLock(workspaceKey, "node-beta");
         assertThat(released).isTrue();
         assertThat(nodeB.getDatabaseLockOwner(workspaceKey)).isEmpty();
@@ -497,6 +559,16 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("checksum mismatch");
 
+        // 3b. 篡改 SHA256SUMS 清单本身同样必须被拦截
+        Path tamperedShaDir = backupRoot.resolve("bkp-tampered-sha");
+        FileSystemUtils.copyRecursively(backupDir, tamperedShaDir);
+        Files.writeString(tamperedShaDir.resolve("SHA256SUMS"),
+                "0000000000000000000000000000000000000000000000000000000000000000  db-snapshot.json.enc\n",
+                StandardCharsets.UTF_8);
+        assertThatThrownBy(() -> disasterRecoveryBackupService.verifyBackupIntegrity(tamperedShaDir, passphrase))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SHA256SUMS checksum mismatch");
+
         // 4. 模拟灾难清空：删除创建的业务记录与源工作区目录
         org.eclipse.jgit.lib.RepositoryCache.clear();
         FileSystemUtils.deleteRecursively(sourceWorkspaceRoot);
@@ -534,7 +606,7 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("阶段E测试7：数据库关联工作区安全归档清理（禁止按 mtime 盲删活跃项目）与完整 Staging Run 演练")
+    @DisplayName("阶段E测试7：数据库关联工作区安全归档清理（禁止按 mtime 盲删活跃项目及持锁项目）与完整 Staging Run 演练")
     void shouldEnforceDatabaseReconciledWorkspaceCleanupAndCompleteStagingDrill(@TempDir Path tempDir) throws Exception {
         // --- Part A: 验证数据库关联工作区清理策略 ---
         Path wsRoot = tempDir.resolve("cleanup-workspaces");
@@ -562,11 +634,23 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
         Files.setLastModifiedTime(activeDir, sixtyDaysAgo);
         Files.setLastModifiedTime(archivedDir, sixtyDaysAgo);
 
-        // 执行数据库对账清理（阈值 30 天）
+        // 先对 archivedProj.getWorkspaceId() 加锁，验证即使已归档但持锁期间绝不误删
+        WorkspaceLockManager lockGuard = new WorkspaceLockManager(workspaceResolver, jdbcTemplate);
+        assertThat(lockGuard.tryAcquireLock(archivedProj.getWorkspaceId(), "cleanup-lock-holder", 100, 5000)).isTrue();
+        try {
+            List<String> skippedWhileLocked = disasterRecoveryBackupService.cleanupArchivedWorkspacesWithDbReconciliation(
+                    wsRoot, Duration.ofDays(30));
+            assertThat(skippedWhileLocked).isEmpty();
+            assertThat(Files.exists(archivedDir)).isTrue();
+        } finally {
+            lockGuard.releaseLock(archivedProj.getWorkspaceId(), "cleanup-lock-holder");
+        }
+
+        // 释放锁后再次执行数据库对账清理（阈值 30 天）
         List<String> cleaned = disasterRecoveryBackupService.cleanupArchivedWorkspacesWithDbReconciliation(
                 wsRoot, Duration.ofDays(30));
 
-        // 断言：已归档项目目录被清理，而活跃项目即使超过 60 天也 100% 受到保护！
+        // 断言：已归档且无锁项目目录被清理，而活跃项目即使超过 60 天也 100% 受到保护！
         assertThat(cleaned).containsExactly(archivedProj.getWorkspaceId());
         assertThat(Files.exists(archivedDir)).isFalse();
         assertThat(Files.exists(activeDir)).isTrue();

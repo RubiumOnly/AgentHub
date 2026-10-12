@@ -142,6 +142,16 @@ public class ProductionEnvironmentValidator {
             }
         }
 
+        // 7. Reject floating 'latest' IMAGE_TAG and wildcard '*' CORS_ALLOWED_ORIGINS in production
+        String imageTag = env.get("IMAGE_TAG");
+        if (imageTag != null && "latest".equalsIgnoreCase(imageTag.trim())) {
+            violations.add("IMAGE_TAG must use an immutable version or commit SHA, not floating 'latest'");
+        }
+        String corsOrigins = env.get("CORS_ALLOWED_ORIGINS");
+        if (corsOrigins != null && corsOrigins.contains("*")) {
+            violations.add("CORS_ALLOWED_ORIGINS must not use wildcard '*' in production");
+        }
+
         return new ValidationResult(violations.isEmpty(), violations);
     }
 
