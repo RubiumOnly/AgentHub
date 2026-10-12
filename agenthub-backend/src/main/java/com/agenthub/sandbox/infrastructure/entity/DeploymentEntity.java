@@ -50,6 +50,24 @@ public class DeploymentEntity {
     @Column(name = "container_id", length = 128)
     private String containerId;
 
+    @Column(name = "process_id")
+    private Long processId;
+
+    @Column(name = "working_directory", length = 512)
+    private String workingDirectory;
+
+    @Column(name = "log_cursor", nullable = false)
+    private Long logCursor = 0L;
+
+    @Column(name = "termination_reason", length = 256)
+    private String terminationReason;
+
+    @Column(name = "template_type", nullable = false, length = 64)
+    private String templateType = "STATIC_WEB_TEMPLATE";
+
+    @Column(name = "lifecycle_trace", length = 512)
+    private String lifecycleTrace;
+
     @Column(name = "started_at", nullable = false)
     private LocalDateTime startedAt;
 
@@ -72,6 +90,8 @@ public class DeploymentEntity {
         this.target = target != null ? target : "DOCKER_NGINX";
         this.url = url;
         this.sandboxType = "LOCAL_PROCESS";
+        this.logCursor = 0L;
+        this.templateType = "STATIC_WEB_TEMPLATE";
         this.startedAt = LocalDateTime.now();
         this.finishedAt = LocalDateTime.now();
         this.createdAt = LocalDateTime.now();
@@ -99,13 +119,28 @@ public class DeploymentEntity {
     public String getHealthCheckPath() { return healthCheckPath; }
     public void setHealthCheckPath(String healthCheckPath) { this.healthCheckPath = healthCheckPath; }
     public String getLogOutput() { return logOutput; }
-    public void setLogOutput(String logOutput) { this.logOutput = logOutput; }
+    public void setLogOutput(String logOutput) {
+        this.logOutput = logOutput;
+        this.logCursor = logOutput != null ? (long) logOutput.length() : 0L;
+    }
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     public String getSandboxType() { return sandboxType; }
     public void setSandboxType(String sandboxType) { this.sandboxType = sandboxType; }
     public String getContainerId() { return containerId; }
     public void setContainerId(String containerId) { this.containerId = containerId; }
+    public Long getProcessId() { return processId; }
+    public void setProcessId(Long processId) { this.processId = processId; }
+    public String getWorkingDirectory() { return workingDirectory; }
+    public void setWorkingDirectory(String workingDirectory) { this.workingDirectory = workingDirectory; }
+    public Long getLogCursor() { return logCursor; }
+    public void setLogCursor(Long logCursor) { this.logCursor = logCursor != null ? logCursor : 0L; }
+    public String getTerminationReason() { return terminationReason; }
+    public void setTerminationReason(String terminationReason) { this.terminationReason = terminationReason; }
+    public String getTemplateType() { return templateType; }
+    public void setTemplateType(String templateType) { this.templateType = templateType != null ? templateType : "STATIC_WEB_TEMPLATE"; }
+    public String getLifecycleTrace() { return lifecycleTrace; }
+    public void setLifecycleTrace(String lifecycleTrace) { this.lifecycleTrace = lifecycleTrace; }
     public LocalDateTime getStartedAt() { return startedAt; }
     public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
     public LocalDateTime getFinishedAt() { return finishedAt; }

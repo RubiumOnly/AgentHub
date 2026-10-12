@@ -42,6 +42,13 @@ agenthub:
     allow-superuser-bypass: false
   workspace:
     base-dir: ${AGENTHUB_WORKSPACE_BASE_DIR:./data/workspaces}
+  sandbox:
+    preview-host: "${AGENTHUB_SANDBOX_PREVIEW_HOST:localhost}"
+    external-base-url: "${AGENTHUB_SANDBOX_EXTERNAL_BASE_URL:}"
+    docker:
+      worker-enabled: ${AGENTHUB_DOCKER_WORKER_ENABLED:false}
+      host: "${AGENTHUB_DOCKER_HOST:}"
+      context: "${AGENTHUB_DOCKER_CONTEXT:}"
   cli:
     timeout-ms: ${AGENTHUB_CLI_TIMEOUT_MS:300000}
   llm:

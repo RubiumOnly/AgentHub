@@ -10,6 +10,8 @@ public class CreateDeploymentRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private String projectId;
+    private String artifactId;
+    private String templateType; // STATIC_WEB_TEMPLATE, NODE_SERVICE_TEMPLATE, JAVA_SPRING_TEMPLATE, CUSTOM_SANDBOX_COMMAND
     private String target; // STATIC_PREVIEW, LOCAL_PROCESS, DOCKER_CONTAINER, DOCKER_NGINX
     private String sandboxType; // LOCAL_PROCESS, DOCKER
     private String buildCommand;
@@ -29,6 +31,12 @@ public class CreateDeploymentRequest implements Serializable {
 
     public String getProjectId() { return projectId; }
     public void setProjectId(String projectId) { this.projectId = projectId; }
+
+    public String getArtifactId() { return artifactId; }
+    public void setArtifactId(String artifactId) { this.artifactId = artifactId; }
+
+    public String getTemplateType() { return templateType; }
+    public void setTemplateType(String templateType) { this.templateType = templateType; }
 
     public String getTarget() { return target; }
     public void setTarget(String target) { this.target = target; }

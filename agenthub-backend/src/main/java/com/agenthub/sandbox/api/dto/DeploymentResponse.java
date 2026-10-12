@@ -24,6 +24,13 @@ public class DeploymentResponse implements Serializable {
     private LocalDateTime createdAt;
     private String errorMessage;
     private boolean hasLogs;
+    private Long processId;
+    private String containerId;
+    private String workingDirectory;
+    private Long logCursor;
+    private String terminationReason;
+    private String templateType;
+    private String lifecycleTrace;
 
     public DeploymentResponse() {}
 
@@ -71,4 +78,25 @@ public class DeploymentResponse implements Serializable {
 
     public boolean isHasLogs() { return hasLogs; }
     public void setHasLogs(boolean hasLogs) { this.hasLogs = hasLogs; }
+
+    public Long getProcessId() { return processId; }
+    public void setProcessId(Long processId) { this.processId = processId; }
+
+    public String getContainerId() { return containerId; }
+    public void setContainerId(String containerId) { this.containerId = containerId; }
+
+    public String getWorkingDirectory() { return workingDirectory; }
+    public void setWorkingDirectory(String workingDirectory) { this.workingDirectory = workingDirectory; }
+
+    public Long getLogCursor() { return logCursor; }
+    public void setLogCursor(Long logCursor) { this.logCursor = logCursor; }
+
+    public String getTerminationReason() { return terminationReason; }
+    public void setTerminationReason(String terminationReason) { this.terminationReason = terminationReason; }
+
+    public String getTemplateType() { return templateType; }
+    public void setTemplateType(String templateType) { this.templateType = templateType; }
+
+    public String getLifecycleTrace() { return lifecycleTrace; }
+    public void setLifecycleTrace(String lifecycleTrace) { this.lifecycleTrace = lifecycleTrace; }
 }

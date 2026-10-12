@@ -257,7 +257,17 @@ export interface RouteDecisionView {
   candidateChain?: string[];
 }
 
-export type DeploymentStatus = "CREATED" | "BUILDING" | "RUNNING" | "STOPPED" | "FAILED";
+export type DeploymentStatus =
+  | "CREATED"
+  | "BUILD"
+  | "BUILDING"
+  | "START"
+  | "HEALTH_CHECK"
+  | "RUNNING"
+  | "STOP"
+  | "CLEANUP"
+  | "STOPPED"
+  | "FAILED";
 
 export interface DeploymentResponse {
   id: string;
@@ -275,10 +285,19 @@ export interface DeploymentResponse {
   createdAt?: string;
   errorMessage?: string;
   hasLogs: boolean;
+  processId?: number;
+  containerId?: string;
+  workingDirectory?: string;
+  logCursor?: number;
+  terminationReason?: string;
+  templateType?: string;
+  lifecycleTrace?: string;
 }
 
 export interface CreateDeploymentRequest {
   projectId: string;
+  artifactId?: string;
+  templateType?: string;
   target: string;
   sandboxType: "LOCAL_PROCESS" | "DOCKER";
   buildCommand?: string;

@@ -5,6 +5,8 @@ import com.agenthub.sandbox.domain.model.SandboxExecutionResult;
 import com.agenthub.sandbox.domain.model.SandboxResourceQuota;
 import com.agenthub.sandbox.domain.security.CommandSecurityGuard;
 import com.agenthub.sandbox.domain.security.EnvironmentSanitizer;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,23 +21,42 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Containerized Sandbox provider using Docker.
  * Enforces non-privileged user (1000:1000), read-only root filesystem, tmpfs limits,
- * CPU and memory limits, and strictly mounts only the controlled workspace.
+ * CPU/memory/PIDs limits, capability drop, no-new-privileges, and strictly mounts only
+ * the controlled workspace. Refuses unisolated local daemon assumptions in production.
  */
 public class DockerSandbox implements SandboxProvider {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandbox.class);
 
+    private static final Set<String> FORBIDDEN_ROOT_USERS = Set.of("0", "0:0", "root", "root:root", "0:root", "root:0");
+    private static final Set<String> FORBIDDEN_HOST_MOUNTS = Set.of(
+            "/", "/etc", "/var", "/var/run", "/var/run/docker.sock", "/proc", "/sys", "/root", "/boot",
+            "c:\\", "c:/", "c:\\windows", "c:/windows", "c:\\system32", "c:/system32"
+    );
+
     private final CommandSecurityGuard securityGuard;
     private final EnvironmentSanitizer environmentSanitizer;
     private final ConcurrentHashMap<String, Process> activeProcesses = new ConcurrentHashMap<>();
-    private final ExecutorService ioExecutor = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r);
-        t.setDaemon(true);
-        t.setName("docker-sandbox-io-" + t.getId());
-        return t;
-    });
+    private final ExecutorService ioExecutor = new ThreadPoolExecutor(
+            2,
+            16,
+            60L,
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(128),
+            r -> {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                t.setName("docker-sandbox-io-" + t.getId());
+                return t;
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
 
     private Boolean dockerAvailableCache = null;
+    private boolean productionProfile = false;
+    private boolean dockerWorkerEnabled = false;
+    private String remoteDockerHost = null;
+    private String dockerContext = null;
 
     public DockerSandbox(CommandSecurityGuard securityGuard, EnvironmentSanitizer environmentSanitizer) {
         this.securityGuard = securityGuard != null ? securityGuard : new CommandSecurityGuard();
@@ -46,6 +67,41 @@ public class DockerSandbox implements SandboxProvider {
         this(new CommandSecurityGuard(), new EnvironmentSanitizer());
     }
 
+    public void configureIsolationPolicy(boolean productionProfile, boolean dockerWorkerEnabled,
+                                         String remoteDockerHost, String dockerContext) {
+        this.productionProfile = productionProfile;
+        this.dockerWorkerEnabled = dockerWorkerEnabled;
+        this.remoteDockerHost = remoteDockerHost;
+        this.dockerContext = dockerContext;
+        this.dockerAvailableCache = null;
+    }
+
+    public boolean isRemoteWorkerConfigured() {
+        return dockerWorkerEnabled
+                || (remoteDockerHost != null && !remoteDockerHost.isBlank())
+                || (dockerContext != null && !dockerContext.isBlank());
+    }
+
+    /**
+     * Validates that production environments do not implicitly assume raw local docker.sock access
+     * inside the main backend container.
+     */
+    public void validateIsolationPolicy() {
+        if (productionProfile && !isRemoteWorkerConfigured()) {
+            throw new BusinessException(ErrorCode.SANDBOX_EXECUTION_FAILED,
+                    "Production Docker sandbox requires an explicit isolated Docker Worker configuration " +
+                    "(AGENTHUB_DOCKER_WORKER_ENABLED=true with AGENTHUB_DOCKER_HOST or AGENTHUB_DOCKER_CONTEXT). " +
+                    "Implicit local Docker CLI/daemon assumption inside backend container is forbidden.");
+        }
+        if (remoteDockerHost != null && !remoteDockerHost.isBlank()) {
+            String normalizedHost = remoteDockerHost.trim().toLowerCase(Locale.ROOT);
+            if (normalizedHost.contains("/var/run/docker.sock") && productionProfile) {
+                throw new BusinessException(ErrorCode.SANDBOX_EXECUTION_FAILED,
+                        "Mounting raw host /var/run/docker.sock in production is forbidden; use an isolated Docker Worker or restricted TCP/SSH context.");
+            }
+        }
+    }
+
     @Override
     public String getProviderType() {
         return "DOCKER";
@@ -53,11 +109,18 @@ public class DockerSandbox implements SandboxProvider {
 
     @Override
     public synchronized boolean isAvailable() {
+        if (productionProfile && !isRemoteWorkerConfigured()) {
+            return false;
+        }
         if (dockerAvailableCache != null) {
             return dockerAvailableCache;
         }
         try {
-            Process process = new ProcessBuilder("docker", "--version").start();
+            List<String> checkCmd = new ArrayList<>();
+            checkCmd.add("docker");
+            appendRemoteTargetFlags(checkCmd);
+            checkCmd.add("--version");
+            Process process = new ProcessBuilder(checkCmd).start();
             boolean finished = process.waitFor(3, TimeUnit.SECONDS);
             dockerAvailableCache = finished && process.exitValue() == 0;
         } catch (Exception e) {
@@ -66,19 +129,91 @@ public class DockerSandbox implements SandboxProvider {
         return dockerAvailableCache;
     }
 
+    private void appendRemoteTargetFlags(List<String> cmd) {
+        if (remoteDockerHost != null && !remoteDockerHost.isBlank()) {
+            cmd.add("-H");
+            cmd.add(remoteDockerHost.trim());
+        } else if (dockerContext != null && !dockerContext.isBlank()) {
+            cmd.add("--context");
+            cmd.add(dockerContext.trim());
+        }
+    }
+
+    private void validateContainerUserAndMount(String user, Path workingDir) {
+        if (user != null && FORBIDDEN_ROOT_USERS.contains(user.trim().toLowerCase(Locale.ROOT))) {
+            throw new BusinessException(ErrorCode.SANDBOX_COMMAND_BLOCKED,
+                    "Container execution as privileged root user [" + user + "] is strictly forbidden in sandbox");
+        }
+        if (workingDir != null) {
+            String rawPath = workingDir.toString().replace('\\', '/').trim();
+            if (rawPath.contains("..")) {
+                throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
+                        "Workspace volume mount path must not contain parent traversal segments: " + workingDir);
+            }
+            String normalizedRaw = rawPath.toLowerCase(Locale.ROOT);
+            if (normalizedRaw.endsWith("/") && normalizedRaw.length() > 1) {
+                normalizedRaw = normalizedRaw.substring(0, normalizedRaw.length() - 1);
+            }
+            Path absPath = workingDir.toAbsolutePath().normalize();
+            String normalizedAbs = absPath.toString().replace('\\', '/').toLowerCase(Locale.ROOT);
+            if (normalizedAbs.endsWith("/") && normalizedAbs.length() > 1) {
+                normalizedAbs = normalizedAbs.substring(0, normalizedAbs.length() - 1);
+            }
+            boolean isDriveOrFsRoot = absPath.getNameCount() == 0 || normalizedAbs.matches("^[a-z]:$");
+            if (isDriveOrFsRoot
+                    || FORBIDDEN_HOST_MOUNTS.contains(normalizedRaw)
+                    || FORBIDDEN_HOST_MOUNTS.contains(normalizedAbs)
+                    || normalizedRaw.contains("docker.sock")
+                    || normalizedAbs.contains("docker.sock")) {
+                throw new BusinessException(ErrorCode.WORKSPACE_TRAVERSAL_DENIED,
+                        "Mounting sensitive host directory [" + workingDir + "] into sandbox container is forbidden");
+            }
+        }
+    }
+
     /**
      * Builds the complete list of Docker command-line arguments according to security isolation rules.
      */
     public List<String> buildDockerArgs(SandboxExecutionRequest request, String image) {
+        return buildDockerArgsInternal(request, image, false, null, null);
+    }
+
+    /**
+     * Builds Docker command-line arguments for a detached long-running service container with port mapping.
+     */
+    public List<String> buildDockerServiceArgs(SandboxExecutionRequest request, String image, int hostPort, int containerPort) {
+        return buildDockerArgsInternal(request, image, true, hostPort, containerPort);
+    }
+
+    private List<String> buildDockerArgsInternal(SandboxExecutionRequest request, String image,
+                                                 boolean detachedService, Integer hostPort, Integer containerPort) {
+        String user = request.getContainerUser() != null ? request.getContainerUser() : "1000:1000";
+        Path workingDir = request.getWorkingDirectory();
+        validateContainerUserAndMount(user, workingDir);
+
         List<String> cmd = new ArrayList<>();
         cmd.add("docker");
+        appendRemoteTargetFlags(cmd);
         cmd.add("run");
-        cmd.add("--rm");
+        if (detachedService) {
+            cmd.add("-d");
+        } else {
+            cmd.add("--rm");
+        }
 
-        // 1. Non-root unprivileged execution
-        String user = request.getContainerUser() != null ? request.getContainerUser() : "1000:1000";
+        String containerName = "agenthub-" + (request.getExecutionId() != null ? request.getExecutionId() : UUID.randomUUID());
+        cmd.add("--name");
+        cmd.add(containerName);
+        cmd.add("--label");
+        cmd.add("agenthub.managed=true");
+
+        // 1. Non-root unprivileged execution & capability drop
         cmd.add("--user");
         cmd.add(user);
+        cmd.add("--security-opt=no-new-privileges:true");
+        cmd.add("--cap-drop=ALL");
+        cmd.add("--pids-limit");
+        cmd.add("64");
 
         // 2. Read-only root filesystem with isolated ephemeral tmpfs
         if (request.isReadOnlyRoot()) {
@@ -96,15 +231,17 @@ public class DockerSandbox implements SandboxProvider {
         cmd.add("--cpus");
         cmd.add(quota.getMaxCpu());
 
-        // 4. Network restriction if requested
+        // 4. Network restriction or explicit port binding
         if (request.isNetworkDisabled()) {
             cmd.add("--net=none");
+        } else if (hostPort != null && hostPort > 0 && containerPort != null && containerPort > 0) {
+            cmd.add("-p");
+            cmd.add("127.0.0.1:" + hostPort + ":" + containerPort);
         }
 
         // 5. Strictly mount only the controlled workspace directory
-        Path workingDir = request.getWorkingDirectory();
         if (workingDir != null) {
-            String hostPath = workingDir.toAbsolutePath().toString();
+            String hostPath = workingDir.toAbsolutePath().normalize().toString();
             cmd.add("-v");
             cmd.add(hostPath + ":/workspace:rw");
             cmd.add("-w");
@@ -123,9 +260,11 @@ public class DockerSandbox implements SandboxProvider {
         cmd.add(targetImage);
 
         // 8. Command and arguments
-        cmd.add(request.getCommand());
-        if (request.getArgs() != null) {
-            cmd.addAll(request.getArgs());
+        if (request.getCommand() != null && !request.getCommand().isBlank()) {
+            cmd.add(request.getCommand());
+            if (request.getArgs() != null) {
+                cmd.addAll(request.getArgs());
+            }
         }
 
         return cmd;
@@ -136,13 +275,14 @@ public class DockerSandbox implements SandboxProvider {
         long startTime = System.currentTimeMillis();
         String executionId = request.getExecutionId();
 
-        // 1. Validate security firewall
+        // 1. Validate security firewall & isolation policy
         securityGuard.validateCommand(request.getCommand(), request.getArgs());
+        validateIsolationPolicy();
 
         if (!isAvailable()) {
             return SandboxExecutionResult.failure(executionId, 1, "", "",
                     System.currentTimeMillis() - startTime,
-                    "Docker daemon is not available on this host");
+                    "Docker daemon or isolated Docker Worker is not available on this host");
         }
 
         List<String> dockerCmd = buildDockerArgs(request, "alpine:latest");
@@ -214,6 +354,9 @@ public class DockerSandbox implements SandboxProvider {
 
     @Override
     public void destroy(String executionId) {
+        if (executionId == null) {
+            return;
+        }
         Process proc = activeProcesses.remove(executionId);
         if (proc != null) {
             try {
@@ -225,7 +368,14 @@ public class DockerSandbox implements SandboxProvider {
         }
         // Proactively cleanup docker container if created
         try {
-            new ProcessBuilder("docker", "rm", "-f", "agenthub-" + executionId)
+            List<String> rmCmd = new ArrayList<>();
+            rmCmd.add("docker");
+            appendRemoteTargetFlags(rmCmd);
+            rmCmd.add("rm");
+            rmCmd.add("-f");
+            String containerName = executionId.startsWith("agenthub-") ? executionId : "agenthub-" + executionId;
+            rmCmd.add(containerName);
+            new ProcessBuilder(rmCmd)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start()

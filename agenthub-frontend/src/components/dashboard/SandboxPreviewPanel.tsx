@@ -71,11 +71,10 @@ export function SandboxPreviewPanel({
     try {
       const req: CreateDeploymentRequest = {
         projectId,
+        templateType: "STATIC_WEB_TEMPLATE",
         target: "STATIC_PREVIEW",
         sandboxType: "LOCAL_PROCESS",
-        buildCommand: "npm run build --prefix frontend",
-        startCommand: "npm run start",
-        port: currentPort || 18080,
+        healthCheckPath: "/",
       };
       await apiClient.createDeployment(req);
       setIframeKey((prev) => prev + 1);
@@ -106,10 +105,14 @@ export function SandboxPreviewPanel({
     setIframeKey((prev) => prev + 1);
   };
 
+  const lifecycleLabel =
+    deployment?.lifecycleTrace ||
+    "CREATED ➔ BUILD ➔ START ➔ HEALTH_CHECK ➔ RUNNING ➔ STOP ➔ CLEANUP";
+
   return (
     <BentoCard
       title="沙箱预览与部署控制台 (Sandbox & Preview)"
-      subtitle={`生命周期状态机: CREATED ➔ BUILDING ➔ RUNNING ➔ STOPPED ${
+      subtitle={`生命周期: ${lifecycleLabel} ${
         currentPort ? `| 隔离端口: :${currentPort}` : ""
       }`}
       icon={<Server className="w-4 h-4 text-emerald-400" />}

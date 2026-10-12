@@ -4,6 +4,7 @@ import com.agenthub.sandbox.infrastructure.entity.DeploymentEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,5 +12,6 @@ import java.util.Optional;
 public interface DeploymentRepository extends JpaRepository<DeploymentEntity, String> {
     List<DeploymentEntity> findByProjectIdOrderByStartedAtDesc(String projectId);
     List<DeploymentEntity> findByStatus(String status);
+    List<DeploymentEntity> findByStatusIn(Collection<String> statuses);
     Optional<DeploymentEntity> findByPortAndStatus(Integer port, String status);
 }

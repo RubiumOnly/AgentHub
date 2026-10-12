@@ -19,4 +19,12 @@ public interface DeploymentApplication {
     List<DeploymentResponse> listDeployments(String projectId);
 
     String getDeploymentLogs(String deploymentId);
+
+    default String getDeploymentLogs(String deploymentId, Long fromCursor) {
+        return getDeploymentLogs(deploymentId);
+    }
+
+    default int reconcileOrphanDeployments() {
+        return 0;
+    }
 }

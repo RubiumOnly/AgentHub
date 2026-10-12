@@ -27,7 +27,11 @@ application-local.yml
 *.p12
 credentials.json
 
-# Runtime Workspace Data
+# Runtime Workspace Data & Project-Local Global Prompts
 data/workspaces/
 reference-shrimp-crab/
 .agents/
+.agent/
+AGENTS.md
+GEMINI.md
+

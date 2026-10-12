@@ -72,13 +72,17 @@ public class JGitWorkspaceManager {
         File gitDir = new File(workspaceDir, ".git");
         if (!gitDir.exists()) {
             try (Git git = Git.init().setDirectory(workspaceDir).call()) {
-                File readme = new File(workspaceDir, "README.md");
-                if (!readme.exists()) {
-                    Files.writeString(readme.toPath(), "# AgentHub Project Workspace\nInitial Baseline.", StandardCharsets.UTF_8);
+                try {
+                    File readme = new File(workspaceDir, "README.md");
+                    if (!readme.exists()) {
+                        Files.writeString(readme.toPath(), "# AgentHub Project Workspace\nInitial Baseline.", StandardCharsets.UTF_8);
+                    }
+                    git.add().addFilepattern(".").call();
+                    git.commit().setMessage("Initial project baseline commit").setAuthor(DEFAULT_AUTHOR, DEFAULT_EMAIL).call();
+                    log.info("Initialized Git workspace baseline at: {}", workspaceDir.getAbsolutePath());
+                } finally {
+                    closeRepositoryQuietly(git, workspaceDir);
                 }
-                git.add().addFilepattern(".").call();
-                git.commit().setMessage("Initial project baseline commit").setAuthor(DEFAULT_AUTHOR, DEFAULT_EMAIL).call();
-                log.info("Initialized Git workspace baseline at: {}", workspaceDir.getAbsolutePath());
             }
         }
     }
@@ -86,33 +90,37 @@ public class JGitWorkspaceManager {
     public String createBaseline(File workspaceDir, String runId, String authorEmail) throws Exception {
         initWorkspace(workspaceDir);
         try (Git git = Git.open(workspaceDir)) {
-            String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
-            git.add().addFilepattern(".").call();
-            git.add().setUpdate(true).addFilepattern(".").call();
-
-            Status status = git.status().call();
-            RevCommit commit;
-            if (!status.isClean()) {
-                commit = git.commit()
-                        .setMessage("Baseline commit for Run " + runId)
-                        .setAuthor(DEFAULT_AUTHOR, author)
-                        .call();
-            } else {
-                Repository repo = git.getRepository();
-                ObjectId head = repo.resolve("HEAD");
-                try (RevWalk revWalk = new RevWalk(repo)) {
-                    commit = revWalk.parseCommit(head);
-                }
-            }
-
-            String tagName = "tag-run-baseline-" + runId;
             try {
-                git.tag().setName(tagName).setObjectId(commit).call();
-            } catch (Exception e) {
-                log.debug("Tag {} may already exist: {}", tagName, e.getMessage());
-            }
+                String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
+                git.add().addFilepattern(".").call();
+                git.add().setUpdate(true).addFilepattern(".").call();
 
-            return commit.getName();
+                Status status = git.status().call();
+                RevCommit commit;
+                if (!status.isClean()) {
+                    commit = git.commit()
+                            .setMessage("Baseline commit for Run " + runId)
+                            .setAuthor(DEFAULT_AUTHOR, author)
+                            .call();
+                } else {
+                    Repository repo = git.getRepository();
+                    ObjectId head = repo.resolve("HEAD");
+                    try (RevWalk revWalk = new RevWalk(repo)) {
+                        commit = revWalk.parseCommit(head);
+                    }
+                }
+
+                String tagName = "tag-run-baseline-" + runId;
+                try {
+                    git.tag().setName(tagName).setObjectId(commit).call();
+                } catch (Exception e) {
+                    log.debug("Tag {} may already exist: {}", tagName, e.getMessage());
+                }
+
+                return commit.getName();
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
         }
     }
 
@@ -120,68 +128,76 @@ public class JGitWorkspaceManager {
                                                 String message, String authorEmail) throws Exception {
         initWorkspace(workspaceDir);
         try (Git git = Git.open(workspaceDir)) {
-            String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
-
-            git.add().addFilepattern(".").call();
-            git.add().setUpdate(true).addFilepattern(".").call();
-
-            Status status = git.status().call();
-            List<String> changedFiles = new ArrayList<>();
-            changedFiles.addAll(status.getUntracked());
-            changedFiles.addAll(status.getAdded());
-            changedFiles.addAll(status.getChanged());
-            changedFiles.addAll(status.getModified());
-            changedFiles.addAll(status.getMissing());
-            changedFiles.addAll(status.getRemoved());
-
-            RevCommit commit;
-            if (!status.isClean()) {
-                String commitMsg = String.format("[StepSnapshot] run=%s step=%s: %s",
-                        runId, stepRunId, message != null ? message : "Step completed");
-                commit = git.commit()
-                        .setMessage(commitMsg)
-                        .setAuthor(DEFAULT_AUTHOR, author)
-                        .call();
-            } else {
-                Repository repo = git.getRepository();
-                ObjectId head = repo.resolve("HEAD");
-                try (RevWalk revWalk = new RevWalk(repo)) {
-                    commit = revWalk.parseCommit(head);
-                }
-            }
-
-            String tagName = "snapshot-" + stepRunId;
             try {
-                git.tag().setName(tagName).setObjectId(commit).call();
-            } catch (Exception e) {
-                log.debug("Tag {} already exists: {}", tagName, e.getMessage());
-            }
+                String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
 
-            Map<String, String> checksums = new HashMap<>();
-            for (String fileRel : changedFiles) {
-                File f = new File(workspaceDir, fileRel);
-                if (f.exists() && f.isFile()) {
-                    checksums.put(fileRel, calculateFileChecksum(f.toPath()));
+                git.add().addFilepattern(".").call();
+                git.add().setUpdate(true).addFilepattern(".").call();
+
+                Status status = git.status().call();
+                List<String> changedFiles = new ArrayList<>();
+                changedFiles.addAll(status.getUntracked());
+                changedFiles.addAll(status.getAdded());
+                changedFiles.addAll(status.getChanged());
+                changedFiles.addAll(status.getModified());
+                changedFiles.addAll(status.getMissing());
+                changedFiles.addAll(status.getRemoved());
+
+                RevCommit commit;
+                if (!status.isClean()) {
+                    String commitMsg = String.format("[StepSnapshot] run=%s step=%s: %s",
+                            runId, stepRunId, message != null ? message : "Step completed");
+                    commit = git.commit()
+                            .setMessage(commitMsg)
+                            .setAuthor(DEFAULT_AUTHOR, author)
+                            .call();
+                } else {
+                    Repository repo = git.getRepository();
+                    ObjectId head = repo.resolve("HEAD");
+                    try (RevWalk revWalk = new RevWalk(repo)) {
+                        commit = revWalk.parseCommit(head);
+                    }
                 }
-            }
 
-            return new StepSnapshotResult(
-                    commit.getName(),
-                    tagName,
-                    changedFiles,
-                    checksums,
-                    author,
-                    System.currentTimeMillis()
-            );
+                String tagName = "snapshot-" + stepRunId;
+                try {
+                    git.tag().setName(tagName).setObjectId(commit).call();
+                } catch (Exception e) {
+                    log.debug("Tag {} already exists: {}", tagName, e.getMessage());
+                }
+
+                Map<String, String> checksums = new HashMap<>();
+                for (String fileRel : changedFiles) {
+                    File f = new File(workspaceDir, fileRel);
+                    if (f.exists() && f.isFile()) {
+                        checksums.put(fileRel, calculateFileChecksum(f.toPath()));
+                    }
+                }
+
+                return new StepSnapshotResult(
+                        commit.getName(),
+                        tagName,
+                        changedFiles,
+                        checksums,
+                        author,
+                        System.currentTimeMillis()
+                );
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
         }
     }
 
     public void commitSnapshot(File workspaceDir, String message) throws Exception {
         initWorkspace(workspaceDir);
         try (Git git = Git.open(workspaceDir)) {
-            git.add().addFilepattern(".").call();
-            git.add().setUpdate(true).addFilepattern(".").call();
-            git.commit().setMessage(message).setAuthor(DEFAULT_AUTHOR, DEFAULT_EMAIL).call();
+            try {
+                git.add().addFilepattern(".").call();
+                git.add().setUpdate(true).addFilepattern(".").call();
+                git.commit().setMessage(message).setAuthor(DEFAULT_AUTHOR, DEFAULT_EMAIL).call();
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
         }
     }
 
@@ -265,8 +281,10 @@ public class JGitWorkspaceManager {
                     totalDeleted += deleted;
                 }
             }
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
         }
-    }
 
         return new StructuredDiff(
                 workspaceDir.getName(),
@@ -286,53 +304,57 @@ public class JGitWorkspaceManager {
     public void revertStepFiles(File workspaceDir, String baselineCommitHash, List<String> filePaths, String authorEmail) throws Exception {
         initWorkspace(workspaceDir);
         try (Git git = Git.open(workspaceDir)) {
-            Repository repo = git.getRepository();
-            ObjectId baselineId = repo.resolve(baselineCommitHash);
-            if (baselineId == null || !repo.hasObject(baselineId)) {
-                throw new IllegalArgumentException("Baseline commit hash not found in repository: " + baselineCommitHash);
-            }
+            try {
+                Repository repo = git.getRepository();
+                ObjectId baselineId = repo.resolve(baselineCommitHash);
+                if (baselineId == null || !repo.hasObject(baselineId)) {
+                    throw new IllegalArgumentException("Baseline commit hash not found in repository: " + baselineCommitHash);
+                }
 
-            String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
-            Path wsPath = workspaceDir.toPath().toAbsolutePath().normalize();
+                String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
+                Path wsPath = workspaceDir.toPath().toAbsolutePath().normalize();
 
-            if (filePaths != null) {
-                for (String relPath : filePaths) {
-                    if (relPath == null || relPath.isBlank() || relPath.contains(".git")) continue;
-                    String normalizedPath = relPath.replace('\\', '/').replaceAll("^/+", "");
-                    Path targetPath = wsPath.resolve(normalizedPath).normalize();
-                    if (!targetPath.startsWith(wsPath)) {
-                        log.warn("Path traversal detected in revertStepFiles, skipping: {}", relPath);
-                        continue;
-                    }
-
-                    byte[] baselineContent = readFileAtCommit(repo, baselineCommitHash, normalizedPath);
-                    File fileOnDisk = targetPath.toFile();
-
-                    if (baselineContent != null) {
-                        if (fileOnDisk.getParentFile() != null && !fileOnDisk.getParentFile().exists()) {
-                            fileOnDisk.getParentFile().mkdirs();
+                if (filePaths != null) {
+                    for (String relPath : filePaths) {
+                        if (relPath == null || relPath.isBlank() || relPath.contains(".git")) continue;
+                        String normalizedPath = relPath.replace('\\', '/').replaceAll("^/+", "");
+                        Path targetPath = wsPath.resolve(normalizedPath).normalize();
+                        if (!targetPath.startsWith(wsPath)) {
+                            log.warn("Path traversal detected in revertStepFiles, skipping: {}", relPath);
+                            continue;
                         }
-                        Files.write(fileOnDisk.toPath(), baselineContent);
-                        log.info("Restored file [{}] to baseline commit [{}]", normalizedPath, baselineCommitHash);
-                    } else {
-                        if (fileOnDisk.exists()) {
-                            fileOnDisk.delete();
-                            log.info("Deleted newly added file [{}] on revert", normalizedPath);
+
+                        byte[] baselineContent = readFileAtCommit(repo, baselineCommitHash, normalizedPath);
+                        File fileOnDisk = targetPath.toFile();
+
+                        if (baselineContent != null) {
+                            if (fileOnDisk.getParentFile() != null && !fileOnDisk.getParentFile().exists()) {
+                                fileOnDisk.getParentFile().mkdirs();
+                            }
+                            Files.write(fileOnDisk.toPath(), baselineContent);
+                            log.info("Restored file [{}] to baseline commit [{}]", normalizedPath, baselineCommitHash);
+                        } else {
+                            if (fileOnDisk.exists()) {
+                                fileOnDisk.delete();
+                                log.info("Deleted newly added file [{}] on revert", normalizedPath);
+                            }
                         }
                     }
                 }
-            }
 
-            git.add().addFilepattern(".").call();
-            git.add().setUpdate(true).addFilepattern(".").call();
+                git.add().addFilepattern(".").call();
+                git.add().setUpdate(true).addFilepattern(".").call();
 
-            Status status = git.status().call();
-            if (!status.isClean()) {
-                git.commit()
-                        .setMessage("[Revert] Rollback step files to baseline " + baselineCommitHash)
-                        .setAuthor(DEFAULT_AUTHOR, author)
-                        .call();
-                log.info("Committed revert to baseline {} in workspace {}", baselineCommitHash, workspaceDir.getAbsolutePath());
+                Status status = git.status().call();
+                if (!status.isClean()) {
+                    git.commit()
+                            .setMessage("[Revert] Rollback step files to baseline " + baselineCommitHash)
+                            .setAuthor(DEFAULT_AUTHOR, author)
+                            .call();
+                    log.info("Committed revert to baseline {} in workspace {}", baselineCommitHash, workspaceDir.getAbsolutePath());
+                }
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
             }
         }
     }
@@ -340,31 +362,35 @@ public class JGitWorkspaceManager {
     public List<String> getChangedFilesInCommit(File workspaceDir, String commitHash) throws Exception {
         initWorkspace(workspaceDir);
         try (Git git = Git.open(workspaceDir)) {
-            Repository repo = git.getRepository();
-            ObjectId commitId = repo.resolve(commitHash);
-            if (commitId == null) {
-                return Collections.emptyList();
-            }
-            try (RevWalk rw = new RevWalk(repo)) {
-                RevCommit commit = rw.parseCommit(commitId);
-                RevCommit parent = commit.getParentCount() > 0 ? rw.parseCommit(commit.getParent(0).getId()) : null;
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                try (DiffFormatter df = new DiffFormatter(out)) {
-                    df.setRepository(repo);
-                    List<DiffEntry> diffs = (parent != null)
-                            ? df.scan(parent.getTree(), commit.getTree())
-                            : df.scan(null, commit.getTree());
-                    List<String> files = new ArrayList<>();
-                    for (DiffEntry d : diffs) {
-                        String p = d.getNewPath();
-                        if (p != null && !"/dev/null".equals(p)) {
-                            files.add(p);
-                        } else if (d.getOldPath() != null) {
-                            files.add(d.getOldPath());
-                        }
-                    }
-                    return files;
+            try {
+                Repository repo = git.getRepository();
+                ObjectId commitId = repo.resolve(commitHash);
+                if (commitId == null) {
+                    return Collections.emptyList();
                 }
+                try (RevWalk rw = new RevWalk(repo)) {
+                    RevCommit commit = rw.parseCommit(commitId);
+                    RevCommit parent = commit.getParentCount() > 0 ? rw.parseCommit(commit.getParent(0).getId()) : null;
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    try (DiffFormatter df = new DiffFormatter(out)) {
+                        df.setRepository(repo);
+                        List<DiffEntry> diffs = (parent != null)
+                                ? df.scan(parent.getTree(), commit.getTree())
+                                : df.scan(null, commit.getTree());
+                        List<String> files = new ArrayList<>();
+                        for (DiffEntry d : diffs) {
+                            String p = d.getNewPath();
+                            if (p != null && !"/dev/null".equals(p)) {
+                                files.add(p);
+                            } else if (d.getOldPath() != null) {
+                                files.add(d.getOldPath());
+                            }
+                        }
+                        return files;
+                    }
+                }
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
             }
         }
     }
@@ -434,6 +460,21 @@ public class JGitWorkspaceManager {
             return content.contains("<<<<<<< ") && content.contains("=======");
         } catch (Exception ignored) {
             return false;
+        }
+    }
+
+    private void closeRepositoryQuietly(Git git, File workspaceDir) {
+        if (workspaceDir != null) {
+            File gitDir = new File(workspaceDir, ".git");
+            if (gitDir.exists()) {
+                try (var stream = Files.walk(gitDir.toPath())) {
+                    stream.forEach(p -> {
+                        try {
+                            p.toFile().setWritable(true);
+                        } catch (Exception ignored) {}
+                    });
+                } catch (Exception ignored) {}
+            }
         }
     }
 }

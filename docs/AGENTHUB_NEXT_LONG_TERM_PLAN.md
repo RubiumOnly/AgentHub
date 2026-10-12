@@ -6,6 +6,23 @@
 > 适用方式：本文是下一阶段的执行基线；旧版《长期产品化与简历项目实施计划》保留为历史路线，不再作为当前完成状态的证明。  
 > 范围：只规划产品闭环、真实运行、上线验证与作品证据，不扩展社交、市场、移动端或新的 Agent 平台矩阵。
 
+## 0. 项目执行与 Git/CI 交付铁律（每次对话强制触发）
+
+> **强制约束说明**：本章节与仓库根目录本地全局提示词文件（`AGENTS.md`、`GEMINI.md` 及 `.agents/rules/project-git-and-ci-rules.md`，均已被 `.gitignore` 忽略不入库）协同生效。每次开启新会话或推进本计划中的任何阶段时，必须无条件遵守以下两条铁律：
+
+1. **铁律一：每个阶段至多形成两个 Git 提交（普通提交与加固提交），严禁多余提交，并同步推送远程仓库**
+   - 在本计划每个阶段（Phase）推进全周期中，Git 仓库至多只能形成 **2 个提交**：
+     1. **普通提交（第 1 次提交）**：由阶段主实现一次性提交，**必须同时包含**本阶段全部前后端业务代码、Flyway 迁移、自动化测试、Docker/配置变更以及本计划文档（`docs/AGENTHUB_NEXT_LONG_TERM_PLAN.md`）的阶段验收记录。
+     2. **加固提交（第 2 次提交，仅在后续审查或压测需加固时产生）**：一次性合并包含加固代码、测试与同步文档更新。
+   - **严禁产生专门修改文档的多余提交**：绝对禁止先把代码 `git commit`，随后为了填写 Commit SHA 或补充验收说明再单独提交一次 `docs: 记录阶段 X 验收...`。阶段验收记录中的 `Git commit` 字段直接填写本次提交的规范化 Subject（或前置基线 Commit + 本次提交说明），随代码在**同一个 Commit** 中一次性暂存并提交。
+   - **强制同步推送远程 Git 仓库**：每次完成合规提交（普通提交或加固提交）后，必须立即执行 `git push origin main` 将变更同步推送到远程 Git 仓库，确保本地 `main` 与 `origin/main` 严格一致。
+2. **铁律二：提交前必须确保前后端 CI 构建 100% 成功，有问题必须彻底解决后才能提交并推送，严禁污染 Git 仓库**
+   - 任何涉及代码、配置、测试或构建脚本的提交，在执行 `git commit` 与 `git push` 之前，**必须在本地完整执行并通过与 `.github/workflows/ci.yml` 完全一致的前后端 CI 构建门禁**：
+     - **后端门禁（Java 17 / Maven）**：在 `agenthub-backend` 目录下执行 `mvn clean test`，必须确保全量单元测试与集成测试 **100% 绿灯通过（0 Failures, 0 Errors）**。
+     - **前端门禁（Node.js / Next.js 14）**：在 `agenthub-frontend` 目录下执行 `npm run build`，必须确保 TypeScript 类型检查、ESLint 校验与 Next.js Standalone 生产构建 **0 报错通过**。
+     - **容器编排门禁（若涉及 Docker / Compose）**：执行 `docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet` 确保配置合法。
+   - 若本地构建或测试出现任何编译失败、断言错误、类型报错或偶发失败（Flaky Test），必须在提交前深挖根因并彻底解决，重跑全量构建 100% 绿灯后方可提交并推送。
+
 ## 1. 重新审视后的结论
 
 AgentHub 已经有相当完整的 Java 后端能力骨架：项目和工作区、用户注册登录代码、Provider/Runtime SPI、版本化工作流模型、Run/Step 状态、SSE 事件回放、JGit 审计、人工审批、受限沙箱抽象、Micrometer 指标、生产 Compose 和多类集成测试都已落在仓库中。前端也完成了模块拆分和 Next.js 生产构建。
@@ -271,7 +288,7 @@ AgentHub 已经有相当完整的 Java 后端能力骨架：项目和工作区�
 
 ## 8. 完成态证据索引模板
 
-每次阶段验收时，在本文件末尾追加以下记录，而不是只改标题为“已完成”：
+每次阶段验收时，在本文件末尾追加以下记录，并**必须与当次阶段代码变更合并在同一个 Git 提交中一次性提交（严禁为了回填 Commit SHA 或更新本文档而额外产生单独的 `docs:` 提交）**：
 
 ```text
 阶段：
@@ -417,5 +434,64 @@ Artifact / 日志位置：
   - 阶段 D 待推进：沙箱与应用部署（Deployment）目前依赖进程级运行与静态预览，需在阶段 D 落地真实受限沙箱容器与交付闭环。
 状态：自动化测试通过
 ```
+
+---
+
+### 阶段 D 验收记录
+
+```text
+阶段：阶段 D（真实沙箱部署与项目交付闭环）
+验收日期：2026-10-12
+Git commit：基线 dbcf862 -> 本次单次合并提交 feat(sandbox): 完成阶段 D 真实沙箱部署生命周期、产物门禁绑定与容器隔离闭环
+运行环境：OS: Windows 11 / JDK: 17.0.15 / Node: 20.x / Next.js: 14.2.13 / Compose: v2.x / DB: H2 (MySQL Mode) + MySQL 8 兼容迁移
+执行命令：
+  - mvn clean test (agenthub-backend)
+  - npm run build (agenthub-frontend)
+  - docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
+测试汇总：
+  - Backend: 289/289 passed (0 failures, 0 errors, Surefire clean)
+  - Frontend: Next.js 14.2.13 生产构建通过 (4/4 静态路由与客户端 Chunk 打包正常，0 类型报错，0 ESLint 报错)
+  - Compose: prod 配置解析与变量展开验证通过
+核心交付与黑盒流程：
+  1. 真实可访问的部署运行时与完整生命周期状态机：
+     - 新增 Flyway 迁移 V11__phase_d_sandbox_lifecycle_and_isolation.sql，为 deployments 表扩展 process_id、working_directory、log_cursor、termination_reason、template_type 与 lifecycle_trace 字段及 idx_deployments_artifact 索引；
+     - 完整落地 CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING -> STOP -> CLEANUP -> STOPPED/FAILED 状态机并全程记录 lifecycle_trace；
+     - 新增 DeploymentLifecycleWorker：STATIC_PREVIEW 在受控工作区落盘真实交付物（优先读取工作区 dist/index.html 或 index.html，缺失时生成带项目/产物指纹的真实 HTML）并在分配端口上启动真实内嵌 HTTP Server 监听 127.0.0.1:<port>；LOCAL_PROCESS 通过 LocalProcessSandbox.startBackgroundService 拉起真实持续运行的受限子进程；DOCKER_CONTAINER 通过 DockerSandbox 构建受限服务容器参数并启动；
+     - RUNNING 状态严格保证对应真实存活进程/HTTP 服务与通过的 HTTP 健康探针，外部 HTTP 客户端可直接访问 http://127.0.0.1:<port> 获取真实预览页面与 /health 响应。
+  2. 项目、产物与质量门禁强绑定及受控部署模板白名单：
+     - 部署强制绑定 projectId -> workspace -> artifactId，校验项目归属权（ResourceAccessGuard）；
+     - 校验 Artifact 存在性、跨项目归属及质量门禁状态（拒绝 REJECTED / REVERTED 产物进入部署，返回 400 PARAM_ERROR；拒绝跨项目产物绑定，返回 1002 FORBIDDEN）；
+     - 收敛 DeploymentTemplateType 受控白名单（STATIC_WEB_TEMPLATE、NODE_SERVICE_TEMPLATE、JAVA_SPRING_TEMPLATE、CUSTOM_SANDBOX_COMMAND），拒绝不受信任的任意模板类型，且所有启动与构建命令均经 CommandSecurityGuard 与 EnvironmentSanitizer 双重净化。
+  3. 端口分配竞态修复、外部占用探测与孤儿部署自动对账回收：
+     - 修复 PortAllocationService.isSocketAvailable 端口探测竞态：禁用 SO_REUSEADDR 并同时探测 127.0.0.1 与 0.0.0.0，新增 allocateOrReserveSpecificPort 拦截宿主机已占用端口与基础设施保留端口（80, 443, 3000, 3306, 6379, 8080）；
+     - 启动失败、健康探针失败或调用 POST /api/deployments/{id}/stop 时，自动终止底层 HTTP Server / 子进程树 / 容器并立即释放端口；
+     - 落地 reconcileOrphanDeployments() 与 @Scheduled 周期性孤儿部署巡检：应用重启或底层进程意外退出后，自动将失活的 RUNNING 部署对账收敛为 FAILED（terminationReason=ORPHAN_RECONCILED，轨迹追加 STOP->CLEANUP->FAILED）并回收端口；
+     - 消除 LocalProcessSandbox 与 DockerSandbox 中的 Executors.newCachedThreadPool() 无界线程池隐患，统一替换为有界 ThreadPoolExecutor；修复 JGitWorkspaceManager 在 Windows 下 .git 只读对象文件导致临时目录清理偶发失败的问题。
+  4. Docker 沙箱强隔离与生产环境远程 Worker 边界：
+     - DockerSandbox 强制校验非 root 容器用户（阻断 0、0:0、root 等特权用户）、--cap-drop=ALL、--security-opt=no-new-privileges:true、--pids-limit 64、--read-only + 受限 tmpfs、CPU/Memory 配额；
+     - 严格拦截挂载宿主机根目录（/ 或 Windows 盘符根）、/etc、/var/run/docker.sock 及包含 .. 的越权挂载；
+     - 生产 Profile 下强制校验远程隔离 Docker Worker 配置（AGENTHUB_DOCKER_WORKER_ENABLED + AGENTHUB_DOCKER_HOST/CONTEXT），严禁在主后端容器内隐式假设本地 Docker CLI/daemon 或挂载宿主机 /var/run/docker.sock。
+  5. 前端沙箱交付面板升级与 Dockerfile 语法修复：
+     - 修复 agenthub-frontend/Dockerfile 中非法的 COPY --from=builder /app/public ./public 2>/dev/null || true 语法，补齐受控 agenthub-frontend/public/robots.txt；
+     - 升级 SandboxPreviewPanel.tsx：支持选择受控部署模板、绑定已通过门禁的 Artifact ID、展示生命周期轨迹徽章（CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING）、真实 PID/容器标识、终止原因以及增量日志游标拉取（GET /api/deployments/{id}/logs?offset=...）。
+失败/恢复演练：
+  - 新增 PhaseDSandboxLifecycleAndDeliveryIntegrationTest (6/6 集成测试全部绿灯)：
+    1. 真实静态产物落盘、独立分配端口 HTTP Server 外部客户端直连验证、增量日志 offset 游标拉取、停止部署后端口连接拒绝与端口池释放；
+    2. 拒绝 REJECTED 质量门禁产物部署 (400)、拒绝跨项目 Artifact 绑定 (1002)、拒绝非法部署模板类型 (400)；
+    3. 外部 ServerSocket 占用端口时准确识别并拒绝分配，保留端口 (8080) 拦截，以及服务未监听端口导致健康检查失败时自动走完 CLEANUP->FAILED 并释放端口；
+    4. 模拟后端重启遗留孤儿 RUNNING 部署，执行 reconcileOrphanDeployments() 自动回收为 FAILED (ORPHAN_RECONCILED) 并释放端口；
+    5. DockerSandbox 生产环境无隔离 Worker 熔断拦截、禁止挂载 /var/run/docker.sock、远程 Worker (tcp://10.0.0.50:2375) 参数生成、root 用户拦截与宿主根目录挂载拦截；
+    6. /api/sandbox/preview/{projectId} 跨租户越权访问拦截 (1002) 与前端 Dockerfile 语法合规性校验。
+Artifact / 日志位置：
+  - target/surefire-reports/TEST-com.agenthub.PhaseDSandboxLifecycleAndDeliveryIntegrationTest.xml
+  - target/surefire-reports/
+  - agenthub-frontend/.next/
+未覆盖场景：
+  - 真实 Linux 宿主机下的外部独立 Docker Worker 守护进程实机容器拉起、MySQL 8 容器化联调、TLS 反向代理与生产备份恢复演练（属于阶段 E 规划范畴）。
+剩余风险：
+  - 阶段 E 待推进：需在阶段 E 完成生产 Compose 全栈容器镜像构建、MySQL/Redis/Nginx/TLS 联调、CI/CD 流水线门禁强化与灾备恢复演练。
+状态：自动化测试通过
+```
+
 
 

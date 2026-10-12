@@ -2,9 +2,14 @@ package com.agenthub.domain.sandbox.service;
 
 import com.agenthub.domain.sandbox.model.DeploymentManifest;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
+import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import com.agenthub.project.infrastructure.entity.ProjectEntity;
+import com.agenthub.project.infrastructure.repository.ProjectRepository;
 import com.agenthub.sandbox.application.SandboxApplication;
 import com.agenthub.sandbox.infrastructure.entity.DeploymentEntity;
 import com.agenthub.sandbox.infrastructure.repository.DeploymentRepository;
+import com.agenthub.shared.context.RequestContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,22 +27,52 @@ public class PreviewSandboxService implements SandboxApplication {
 
     private final WorkspaceResolver workspaceResolver;
     private final DeploymentRepository deploymentRepository;
+    private final ProjectRepository projectRepository;
+    private final ResourceAccessGuard accessGuard;
 
     public PreviewSandboxService(WorkspaceResolver workspaceResolver,
                                  DeploymentRepository deploymentRepository) {
+        this(workspaceResolver, deploymentRepository, null, null);
+    }
+
+    @Autowired
+    public PreviewSandboxService(WorkspaceResolver workspaceResolver,
+                                 DeploymentRepository deploymentRepository,
+                                 @Autowired(required = false) ProjectRepository projectRepository,
+                                 @Autowired(required = false) ResourceAccessGuard accessGuard) {
         this.workspaceResolver = workspaceResolver;
         this.deploymentRepository = deploymentRepository;
+        this.projectRepository = projectRepository;
+        this.accessGuard = accessGuard;
+    }
+
+    private void checkProjectAccess(String projectId) {
+        if (RequestContext.get().isSystem()) {
+            return;
+        }
+        if (projectRepository != null && accessGuard != null && projectId != null) {
+            String currentUserId = RequestContext.get().getUserId();
+            ProjectEntity project = projectRepository.findById(projectId).orElse(null);
+            if (project != null) {
+                accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
+            } else if (currentUserId == null || currentUserId.isBlank()) {
+                accessGuard.checkOwnership("unauthenticated-resource", null);
+            }
+        }
     }
 
     @Override
     public String renderPreviewHtml(String projectId) {
+        checkProjectAccess(projectId);
         workspaceResolver.getWorkspaceRoot(projectId);
-        try {
-            Path indexHtml = workspaceResolver.resolvePathForRead(projectId, "index.html");
-            if (Files.exists(indexHtml) && !Files.isDirectory(indexHtml)) {
-                return Files.readString(indexHtml, StandardCharsets.UTF_8);
-            }
-        } catch (Exception ignored) {}
+        for (String candidateRel : new String[]{"dist/index.html", "index.html", ".agenthub-preview/index.html"}) {
+            try {
+                Path candidatePath = workspaceResolver.resolvePathForRead(projectId, candidateRel);
+                if (Files.exists(candidatePath) && !Files.isDirectory(candidatePath)) {
+                    return Files.readString(candidatePath, StandardCharsets.UTF_8);
+                }
+            } catch (Exception ignored) {}
+        }
 
         // Return a sleek, live reactive preview template representing the deliverables
         return "<!DOCTYPE html>\n" +
@@ -66,6 +101,7 @@ public class PreviewSandboxService implements SandboxApplication {
     @Override
     @Transactional
     public DeploymentManifest deployProject(String projectId) {
+        checkProjectAccess(projectId);
         workspaceResolver.getWorkspaceRoot(projectId);
         String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
         String dockerfile = "# AgentHub Production Deployment Container\n" +

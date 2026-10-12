@@ -5,8 +5,13 @@ package com.agenthub.sandbox.domain.model;
  */
 public enum DeploymentStatus {
     CREATED,
+    BUILD,
     BUILDING,
+    START,
+    HEALTH_CHECK,
     RUNNING,
+    STOP,
+    CLEANUP,
     STOPPED,
     FAILED
 }

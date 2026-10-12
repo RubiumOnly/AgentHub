@@ -32,6 +32,13 @@ agenthub:
     allow-superuser-bypass: false
   workspace:
     base-dir: "${AGENTHUB_WORKSPACE_BASE_DIR:/var/lib/agenthub/workspaces}"
+  sandbox:
+    preview-host: "${AGENTHUB_SANDBOX_PREVIEW_HOST:127.0.0.1}"
+    external-base-url: "${AGENTHUB_SANDBOX_EXTERNAL_BASE_URL:}"
+    docker:
+      worker-enabled: ${AGENTHUB_DOCKER_WORKER_ENABLED:false}
+      host: "${AGENTHUB_DOCKER_HOST:}"
+      context: "${AGENTHUB_DOCKER_CONTEXT:}"
 
 management:
   endpoints:

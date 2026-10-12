@@ -17,10 +17,12 @@ public class SandboxController {
         this.sandboxApplication = sandboxApplication;
     }
 
-    @GetMapping(value = "/preview/{projectId}", produces = MediaType.TEXT_HTML_VALUE + ";charset=UTF-8")
+    @GetMapping("/preview/{projectId}")
     public ResponseEntity<String> getPreviewHtml(@PathVariable("projectId") String projectId) {
         String html = sandboxApplication.renderPreviewHtml(projectId);
-        return ResponseEntity.ok(html);
+        return ResponseEntity.ok()
+                .contentType(new MediaType(MediaType.TEXT_HTML, java.nio.charset.StandardCharsets.UTF_8))
+                .body(html);
     }
 
     @PostMapping("/deploy/{projectId}")

@@ -34,8 +34,11 @@ public class DeploymentController {
     }
 
     @GetMapping("/{id}/logs")
-    public Result<String> getDeploymentLogs(@PathVariable("id") String id) {
-        String logs = deploymentApplication.getDeploymentLogs(id);
+    public Result<String> getDeploymentLogs(@PathVariable("id") String id,
+                                            @RequestParam(value = "cursor", required = false) Long cursor) {
+        String logs = cursor != null
+                ? deploymentApplication.getDeploymentLogs(id, cursor)
+                : deploymentApplication.getDeploymentLogs(id);
         return Result.ok(logs);
     }
 

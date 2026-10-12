@@ -29,12 +29,67 @@ public class LocalProcessSandbox implements SandboxProvider {
     private final CommandSecurityGuard securityGuard;
     private final EnvironmentSanitizer environmentSanitizer;
     private final ConcurrentHashMap<String, Process> activeProcesses = new ConcurrentHashMap<>();
-    private final ExecutorService ioExecutor = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r);
-        t.setDaemon(true);
-        t.setName("local-sandbox-io-" + t.getId());
-        return t;
-    });
+    private final ConcurrentHashMap<String, BackgroundServiceHandle> activeServices = new ConcurrentHashMap<>();
+    private final ExecutorService ioExecutor = new ThreadPoolExecutor(
+            4,
+            32,
+            60L,
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(256),
+            r -> {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                t.setName("local-sandbox-io-" + t.getId());
+                return t;
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
+
+    public static class BackgroundServiceHandle {
+        private final String executionId;
+        private final Process process;
+        private final long pid;
+        private final BoundedOutputReader stdoutReader;
+        private final BoundedOutputReader stderrReader;
+        private final long startedAtMs;
+
+        public BackgroundServiceHandle(String executionId, Process process,
+                                       BoundedOutputReader stdoutReader, BoundedOutputReader stderrReader) {
+            this.executionId = executionId;
+            this.process = process;
+            long resolvedPid = -1L;
+            try {
+                resolvedPid = process.pid();
+            } catch (Exception ignored) {}
+            this.pid = resolvedPid;
+            this.stdoutReader = stdoutReader;
+            this.stderrReader = stderrReader;
+            this.startedAtMs = System.currentTimeMillis();
+        }
+
+        public String getExecutionId() { return executionId; }
+        public Process getProcess() { return process; }
+        public long getPid() { return pid; }
+        public boolean isAlive() { return process != null && process.isAlive(); }
+        public Integer getExitCodeIfTerminated() {
+            if (process != null && !process.isAlive()) {
+                return process.exitValue();
+            }
+            return null;
+        }
+        public String getCombinedLogs() {
+            String out = stdoutReader != null ? stdoutReader.getOutput() : "";
+            String err = stderrReader != null ? stderrReader.getOutput() : "";
+            if (err == null || err.isBlank()) {
+                return out;
+            }
+            if (out == null || out.isBlank()) {
+                return err;
+            }
+            return out + "\n" + err;
+        }
+        public long getStartedAtMs() { return startedAtMs; }
+    }
 
     public LocalProcessSandbox(CommandSecurityGuard securityGuard, EnvironmentSanitizer environmentSanitizer) {
         this.securityGuard = securityGuard != null ? securityGuard : new CommandSecurityGuard();
@@ -53,6 +108,61 @@ public class LocalProcessSandbox implements SandboxProvider {
     @Override
     public boolean isAvailable() {
         return true;
+    }
+
+    /**
+     * Launches a persistent background service process inside the sandbox and returns its live handle.
+     */
+    public BackgroundServiceHandle startBackgroundService(SandboxExecutionRequest request) {
+        String executionId = request.getExecutionId();
+        securityGuard.validateCommand(request.getCommand(), request.getArgs());
+
+        Path workingDir = request.getWorkingDirectory();
+        if (workingDir != null && !Files.exists(workingDir)) {
+            try {
+                Files.createDirectories(workingDir);
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to prepare working directory: " + e.getMessage(), e);
+            }
+        }
+
+        Map<String, String> sanitizedEnv = environmentSanitizer.sanitize(request.getEnvironment());
+        List<String> commandList = buildFullCommand(request.getCommand(), request.getArgs());
+        SandboxResourceQuota quota = request.getResourceQuota() != null
+                ? request.getResourceQuota()
+                : SandboxResourceQuota.defaults();
+
+        ProcessBuilder processBuilder = new ProcessBuilder(commandList);
+        if (workingDir != null) {
+            processBuilder.directory(workingDir.toFile());
+        }
+        processBuilder.environment().clear();
+        processBuilder.environment().putAll(sanitizedEnv);
+
+        try {
+            Process process = processBuilder.start();
+            BoundedOutputReader stdoutReader = new BoundedOutputReader(process.getInputStream(), quota.getMaxOutputBytes());
+            BoundedOutputReader stderrReader = new BoundedOutputReader(process.getErrorStream(), quota.getMaxOutputBytes());
+            ioExecutor.submit(stdoutReader);
+            ioExecutor.submit(stderrReader);
+
+            BackgroundServiceHandle handle = new BackgroundServiceHandle(executionId, process, stdoutReader, stderrReader);
+            activeProcesses.put(executionId, process);
+            activeServices.put(executionId, handle);
+            return handle;
+        } catch (Exception e) {
+            log.error("Failed to start background service [{}]: {}", executionId, e.getMessage());
+            throw new IllegalStateException("Failed to start background service command: " + e.getMessage(), e);
+        }
+    }
+
+    public BackgroundServiceHandle getServiceHandle(String executionId) {
+        return executionId != null ? activeServices.get(executionId) : null;
+    }
+
+    public boolean isServiceAlive(String executionId) {
+        BackgroundServiceHandle handle = getServiceHandle(executionId);
+        return handle != null && handle.isAlive();
     }
 
     @Override
@@ -164,9 +274,36 @@ public class LocalProcessSandbox implements SandboxProvider {
 
     @Override
     public void destroy(String executionId) {
+        if (executionId == null) {
+            return;
+        }
+        BackgroundServiceHandle serviceHandle = activeServices.remove(executionId);
         Process proc = activeProcesses.remove(executionId);
+        if (proc == null && serviceHandle != null) {
+            proc = serviceHandle.getProcess();
+        }
         if (proc != null) {
             killProcessTree(proc);
+        }
+    }
+
+    public void destroyPidIfOrphaned(Long pid) {
+        if (pid == null || pid <= 0) {
+            return;
+        }
+        try {
+            long currentJvmPid = ProcessHandle.current().pid();
+            if (pid == currentJvmPid) {
+                return;
+            }
+            ProcessHandle.of(pid).ifPresent(handle -> {
+                handle.descendants().forEach(desc -> {
+                    try { desc.destroyForcibly(); } catch (Exception ignored) {}
+                });
+                try { handle.destroyForcibly(); } catch (Exception ignored) {}
+            });
+        } catch (Exception e) {
+            log.debug("Failed to destroy orphaned pid [{}]: {}", pid, e.getMessage());
         }
     }
 
