@@ -26,7 +26,7 @@ AgentHub 在架构、API 响应与运行证据包（Evidence Bundle）中严格�
 * **Node.js 20+** & **npm**
 * **Docker & Docker Compose v2**（用于启动 MySQL 8.0 或全栈容器）
 
-### 2.2 方式 A：Docker Compose 生产级编排一键启动
+### 2.2 方式 A：Docker Compose 目标环境编排一键启动
 
 **Linux / macOS (Bash)**:
 ```bash

@@ -133,7 +133,7 @@
 - `POST /api/workflows/definitions`：创建并持久化版本化工作流定义
 - `GET /api/workflows/definitions`：查询工作流定义列表（支持 `?projectId=...`）
 - `POST /api/executions/runs`（或 `POST /api/runs`）：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
-  - Request: `{"projectId": "proj-default", "definitionId": "def-default", "idempotencyKey": "idemp-uuid"}`
+  - Request: `{"projectId": "<project-id>", "definitionId": "<definition-id>", "idempotencyKey": "idemp-uuid"}`
   - Response: `Result<WorkflowRunView>`
 - `GET /api/executions/runs/{runId}`（或 `GET /api/runs/{runId}`）：查询指定工作流运行实例详情与执行状态
   - Response: `Result<WorkflowRunView>`
@@ -169,7 +169,7 @@
 - `POST /api/audit/artifacts/{artifactId}/revert`：安全非破坏性回滚产物（严格还原目标 Step 所影响的文件至基线 commit，杜绝 `git reset --hard` 硬重置，生成可追踪 Revert Commit 并更新状态为 `REVERTED`）。
 
 ### 8. 历史非受控工作区接口退役说明 (`ADR-003`)
-- 早期接收客户端工作区路径参数的 `/api/workspace/*` 接口已在 Phase D 全量下线，所有工作区读写、Diff 与快照操作均统一收敛至基于服务端 `workspaceId` 解析的 `/api/workspaces/{workspaceId}/*`（见第 3 节）。
+- 生产 profile 不注册早期接收客户端工作区路径参数的 `/api/workspace/*` 接口；开发兼容路径只用于迁移诊断，不得产生新的产品数据。所有正式工作区读写、Diff 与快照操作均使用基于服务端 `workspaceId` 解析的 `/api/workspaces/{workspaceId}/*`（见第 3 节）。
 
 ### 9. 模版预览与部署清单生成 (Sandbox & Deploy)
 - `GET /api/sandbox/preview/{id}`：挂载并实时预览 Agent 协同生成的 Web 静态模版页面；
@@ -212,7 +212,7 @@
 
 ### 15. 工作区沙箱与部署自动化 (Sandbox & Deployment Automation)
 - `POST /api/deployments`：创建并启动项目构建与部署
-  - Request: `{"projectId": "proj-default", "artifactId": "art-...", "target": "STATIC_PREVIEW", "sandboxType": "LOCAL_PROCESS", "templateType": "STATIC_WEB_TEMPLATE", "healthCheckPath": "/"}`
+  - Request: `{"projectId": "<project-id>", "artifactId": "<artifact-id>", "target": "STATIC_PREVIEW", "sandboxType": "LOCAL_PROCESS", "templateType": "STATIC_WEB_TEMPLATE", "healthCheckPath": "/"}`
   - Response: `Result<DeploymentResponse>` (`{"id": "dep-...", "status": "RUNNING", "port": 18000, "url": "http://127.0.0.1:18000/", ...}`)
 - `GET /api/deployments/{id}`：查询指定部署详情与实时运行状态 (`CREATED`, `BUILD`, `START`, `HEALTH_CHECK`, `RUNNING`, `STOP`, `CLEANUP`, `STOPPED`, `FAILED`)
   - Response: `Result<DeploymentResponse>`
@@ -265,3 +265,29 @@
 | `RUN_TIMED_OUT` | `{"timeoutSeconds":60}` | 看门狗强平超时 |
 | `RUN_COMPLETED` | `{"status":"SUCCEEDED"}` | 工作流实例完成 |
 
+---
+
+## 四、 REST/SSE 接口与前端调用全景矩阵 (Phase 0 基线盘点)
+
+以下矩阵覆盖当前后端全部 18 个 `@RestController` 与前端 `agenthub-frontend/src/services/api.ts` 调用映射：
+
+| 接口路径族 | Owner 模块 | 来源 Controller | 前端调用入口 (`services/api.ts`) | 认证与资源归属校验 | 幂等与并发语义 | 状态 | 核心验证测试 | 删除 / 收敛日期 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `/api/auth/*` (`register`, `login`, `refresh`, `logout`, `me`, `stream-ticket`) | `identity` | `AuthController` | `login`, `register`, `logout`, `createStreamTicket` | 登录/注册公开但受 `AuthRateLimiter` 限流；其余强制 Bearer/Cookie；`stream-ticket` 60s 单次消费 | 注册邮箱 `UNIQUE(email)`；`logout` 幂等写入 `invalidated_tokens` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留（主链路） |
+| `/api/projects`, `/api/projects/{id}`, `/api/projects/{id}/workspace(s)` | `project` | `ProjectController` | `listProjects`, `createProject`, `getProject`, `getWorkspace` | 强制登录 + `ResourceAccessGuard` 校验 `Project.ownerId` | 查询幂等；创建绑定独立 `workspaceId` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留（主链路） |
+| `/api/workspaces/{workspaceId}/*` (`tree`, `file`, `files`, `file/rename`, `download`, `archive`, `diff`, `git/snapshot`, `lock/*`) | `project` | `WorkspaceController` | `listFiles`, `getFileContent`, `saveFile`, `getStructuredDiff`, `getDiff`, `getLockStatus` | 强制登录 + 服务端解析 `workspaceId` 并校验所属 `Project.ownerId` | `workspace_locks` 毫秒级租约互斥 + JGit commit 树快照 | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留（唯一正式工作区接口） |
+| `/api/workflows/definitions`, `/api/workflows/definitions/validate` | `orchestration` | `WorkflowDefinitionController` | `listDefinitions`, `validateDsl` | 强制登录；关联项目时校验 `Project.ownerId` | `validate` 纯函数无副作用；定义按 `id + version` 存储 | `ACTIVE` | `WorkflowDefinitionAndApprovalControllerIntegrationTest` | 长期保留；Phase 3 升级为 `WorkflowTemplate` |
+| `/api/executions/runs*`, `/api/executions/projects/{projectId}/runs`, `/api/executions/steps/{stepRunId}/retry` | `execution` | `ExecutionController` | `startRun`, `getRun`, `listRunsByProject`, `listStepRuns`, `listEvents`, `cancelRun`, `getRunEvidence`, `exportRunEvidenceFile`, `LiveExecutionTerminal` (SSE) | 强制登录 + `Project.ownerId` 归属校验；SSE 支持一次性 `ticket` 或 Cookie | `startRun` 支持 `idempotencyKey` 防重；SSE 支持 `Last-Event-ID` 断点续传；`evidence` 含确定性 SHA-256 `checksum` | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest`, `PhaseFProductQualityAndEvidenceBundleIntegrationTest` | 长期保留（权威执行入口） |
+| `/api/runs*` (`POST /api/runs`, `GET /api/runs/{runId}`, `/cancel`, `/stream`, `/evidence`, `/evidence/download`) | `execution` | `RunAliasController` | `LiveExecutionTerminal` (兼容别名) | 同 `ExecutionController` | 委托 `ExecutionApplication`，与 `/api/executions/runs` 共享同一状态机与幂等键 | `COMPAT_ALIAS` | `ExecutionSseStreamAndReconnectionTest`, `PhaseFProductQualityAndEvidenceBundleIntegrationTest` | Phase 1 评估与 `/api/executions/runs` 合并为单一路径 |
+| `/api/approvals/runs/{runId}`, `/api/approvals/{id}/approve`, `/api/approvals/{id}/reject` | `orchestration` | `ApprovalController` | `listApprovals`, `approve`, `reject` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 状态机限制仅 `PENDING` 可转换至 `APPROVED`/`REJECTED` | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留（主链路） |
+| `/api/audit/artifacts/run/{runId}`, `/api/audit/artifacts/{id}` (`/accept`, `/reject`, `/revert`) | `audit` | `ArtifactController` | `revertArtifact`（及 E2E 脚本调用 `accept`） | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | `accept`/`reject`/`revert` 状态校验，禁止重复 `revert`（错误码 `3011`） | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留（主链路） |
+| `/api/deployments*` (`POST`, `GET /{id}`, `GET /{id}/logs`, `POST /{id}/stop`, `GET ?projectId=`) | `sandbox` | `DeploymentController` | `listDeployments`, `createDeployment`, `stopDeployment`, `getDeploymentLogs` | 强制登录 + `Project.ownerId` 校验 + 强制绑定 `ACCEPTED` 状态 `Artifact` | 端口池原子分配；`stop` 幂等收敛至 `STOPPED` | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest` | 长期保留（主链路） |
+| `/api/providers*` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /route`, `POST /{id}/test`) | `agent` | `ProviderController` | `listProviders`, `evaluateRoute` | 强制登录；修改/删除校验 `Provider.ownerId` | `route` 无副作用推演；`PUT`/`DELETE` 幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
+| `/api/token-usages/runs/{runId}`, `/steps/{stepRunId}`, `/summary` | `agent` | `TokenUsageController` | `getTokenSummary` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 只读聚合查询，完全幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
+| `/api/agents`, `/api/agents/platforms`, `/api/agents/execute` | `adapter.web` -> `agent` | `AgentRegistryController` | 暂无前端直连（后端内部/管理查询） | `AuthFilter` 统一鉴权 | `GET` 幂等；`/execute` 为早期直调适配器入口 | `LEGACY_CONVERGE` | `AgentAdapterTest` | Phase 1 迁入 `com.agenthub.agent.api`，移除裸 `/execute` |
+| `/api/teams*` (`POST`, `GET`, `GET /{id}`, `/members`, `/coordinate`) | `team` | `TeamController` | `getTeam` | 强制登录 + 关联 `Project.ownerId` 校验 | 查询幂等；`coordinate` 基于当前轮次推演 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest` | 作为协作扩展隔离维护 |
+| `/api/conversations*` (`POST`, `GET`, `/{id}/messages`, `/{id}/stream`, `/{id}/context`, `/{id}/summarize`, `/{id}/coordinate`) | `conversation` | `ConversationController` | 后端标准会话路由（前端当前调 `/api/im/conversations`） | 强制登录 + `Conversation.ownerId` 与 `MessageVisibilityFilter` | 消息通过 128 分段锁 + 悲观写锁保证 `sequence_num` 单调递增 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest`, `ConversationSseStreamAndReconnectionTest` | Phase 1 与 `IMController` 合并，保留单一会话接口 |
+| `/api/im/conversations*` | `adapter.web` -> `conversation` | `IMController` | `listConversations`, `getMessages`, `sendMessage` | 同 `ConversationController` | 委托同一 `ConversationApplication` | `DEPRECATED_DUP` | `IMCollaborationTest`, `RestApiSecurityAndMultiTenancyIntegrationTest` | Phase 1 迁移前端调用至 `/api/conversations` 后下线 |
+| `/api/sandbox/preview/{projectId}`, `/api/sandbox/deploy/{projectId}` | `adapter.web` -> `sandbox` | `SandboxController` | `DEFAULT_PREVIEW_URL` (仅离线/模板静态预览) | `AuthFilter` 鉴权 + 静态 CSP 响应头 | `preview` 只读幂等；真实沙箱部署已收敛至 `/api/deployments` | `LEGACY_CONVERGE` | `SandboxAndDeployTest` | Phase 1 合并至 `DeploymentController` 受控预览路由 |
+| `/api/system/health` | `adapter.web` | `SystemHealthController` | `getHealth` | 公开探针（不暴露内部敏感配置） | 只读完全幂等 | `ACTIVE` | `SystemHealthTest`, `ActuatorAndMetricsIntegrationTest` | Phase 1 迁入 `com.agenthub.ops.api` |
+| `/api/workspace/*` (`diff`, `workflow/execute`, `files`, `file/content`, `file/save`) | `adapter.web` | `WorkflowAndDiffController` | **0 前端调用**（`WorkflowCanvas.tsx` 已于 Phase 0 移除直连） | `prod` profile 强制抛出 `1002 FORBIDDEN` 阻断；非生产记录废弃告警 | 旧版裸路径接口，已冻结 | `DEPRECATED_DISABLED_IN_PROD` | `WorkspacePathGuardTest`, `Phase0BaselineAndDebtFreezeGuardTest` | **Phase 1 删除**（生产已禁用，ArchUnit 禁止新增调用） |

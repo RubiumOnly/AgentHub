@@ -48,7 +48,7 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: root_ci_password_2026
           SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQLDialect
         run: |
-          mvn test -Duser.timezone=UTC -Dtest="FlywayMigrationAndSchemaTest,PersistentExecutionRecoveryAndLeaseTest,ConversationMonotonicSequenceAndConcurrencyTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest,PhaseFProductQualityAndEvidenceBundleIntegrationTest,FullLifecycleEndToEndIntegrationTest"
+          mvn test -Duser.timezone=UTC -Dtest="FlywayMigrationAndSchemaTest,ArchUnitArchitectureTest,Phase0BaselineAndDebtFreezeGuardTest,PersistentExecutionRecoveryAndLeaseTest,ConversationMonotonicSequenceAndConcurrencyTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest,PhaseFProductQualityAndEvidenceBundleIntegrationTest,FullLifecycleEndToEndIntegrationTest"
         working-directory: agenthub-backend
 
       - name: Output Test Failure Diagnostics
@@ -74,6 +74,14 @@ jobs:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: agenthub-frontend/package-lock.json
+
+      - name: Phase 0 Debt Freeze — Verify Zero Localhost, Legacy Workspace Routes & Silent Mock Fallback in Frontend
+        run: |
+          if grep -RIn -E "localhost|127\.0\.0\.1|/api/workspace/|d:/work/agenthub|\"user-1\"|'user-1'|isDemoMode\(\) \|\| !projectId|isDemoMode\(\) \|\| runId === MOCK_RUN\.id" src/; then
+            echo "[FAIL] Hardcoded localhost, legacy /api/workspace/, user-1, host path, or non-demo Mock fallback found in agenthub-frontend/src"
+            exit 1
+          fi
+        working-directory: agenthub-frontend
 
       - name: Install Frontend Dependencies
         run: npm ci --prefer-offline --no-audit

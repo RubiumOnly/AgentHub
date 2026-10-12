@@ -3,7 +3,7 @@
 * **状态 (Status)**: 已采纳 (Accepted)
 * **制定者 (Deciders)**: AgentHub 核心架构组
 * **日期 (Date)**: 2026-10-07
-* **技术背景 (Technical Story)**: `docs/AGENTHUB_LONG_TERM_PLAN.md` 阶段 0 技术事实脱水与 `ORIGINAL_REQUEST.md` R3 真实能力校准
+* **技术背景 (Technical Story)**: AgentHub 产品化长期计划 Phase 0 的技术事实校准与 Mock 边界治理
 
 ---
 
@@ -111,5 +111,5 @@
 ## 六、 参考链接 (Links & References)
 
 * `docs/CURRENT_CAPABILITY_BOUNDARIES.md` - AgentHub 当前真实能力边界与系统事实白皮书
-* `docs/AGENTHUB_LONG_TERM_PLAN.md` - 阶段 0：止血、冻结范围和基线
+* `docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md` - Demo/Live 模式与 Mock 边界治理
 * Google Cloud: *API Design Guide - Errors & Partial Failures*

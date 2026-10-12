@@ -16,6 +16,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Play, Sparkles, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { apiClient, isDemoMode, MOCK_RUN } from "@/services/api";
 
 const initialNodes: Node[] = [
   {
@@ -60,12 +61,26 @@ const initialEdges: Edge[] = [
   { id: "e4-5", source: "qa-node", target: "end", animated: true },
 ];
 
-export default function WorkflowCanvas({ onWorkflowCompleted }: { onWorkflowCompleted?: () => void }) {
+export default function WorkflowCanvas({
+  projectId,
+  definitionId = "wf-enterprise-auth-delivery",
+  onWorkflowCompleted,
+}: {
+  projectId?: string;
+  definitionId?: string;
+  onWorkflowCompleted?: () => void;
+}) {
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [taskPrompt, setTaskPrompt] = useState("开发高内聚用户认证模块与登录表单");
   const [isRunning, setIsRunning] = useState(false);
-  const [executionResult, setExecutionResult] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [executionResult, setExecutionResult] = useState<{
+    executionId: string;
+    status: string;
+    simulated: boolean;
+    finalOutput?: string;
+  } | null>(null);
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -84,37 +99,41 @@ export default function WorkflowCanvas({ onWorkflowCompleted }: { onWorkflowComp
 
   const handleRunWorkflow = async () => {
     setIsRunning(true);
+    setErrorMessage(null);
     setExecutionResult(null);
 
-    // Call backend API
-    const workflowPayload = {
-      workflow: {
-        id: "wf-visual-dag",
-        name: "可视化协作工作流",
-        description: "由用户在画布中编排的多智能体协同流程",
-        nodes: [
-          { id: "start", label: "任务启动", type: "START", nextNodeIds: ["backend-node", "frontend-node"] },
-          { id: "backend-node", label: "后端设计", type: "AGENT", agentPlatform: "SPRING_AI_API", promptTemplate: "设计 RESTful 接口与领域模型: " + taskPrompt, nextNodeIds: ["qa-node"] },
-          { id: "frontend-node", label: "前端构建", type: "AGENT", agentPlatform: "SPRING_AI_API", promptTemplate: "实现响应式界面组件: " + taskPrompt, nextNodeIds: ["qa-node"] },
-          { id: "qa-node", label: "QA审查", type: "AGENT", agentPlatform: "SPRING_AI_API", promptTemplate: "执行代码审查与 Diff 比对: " + taskPrompt, nextNodeIds: ["end"] },
-          { id: "end", label: "产物交付", type: "END", nextNodeIds: [] },
-        ],
-      },
-      workspacePath: "d:/work/agenthub/data/workspaces/default",
-      taskPrompt: taskPrompt,
-    };
-
     try {
-      const res = await fetch("http://localhost:8080/api/workspace/workflow/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(workflowPayload),
+      if (isDemoMode()) {
+        setExecutionResult({
+          executionId: MOCK_RUN.id,
+          status: "DEMO_SIMULATED",
+          simulated: true,
+          finalOutput: `[DEMO_SIMULATED] 离线演示模式：已按目标 "${taskPrompt}" 生成模拟运行视图（未调用真实 Provider）。`,
+        });
+        if (onWorkflowCompleted) onWorkflowCompleted();
+        return;
+      }
+
+      if (!projectId) {
+        setErrorMessage("当前处于真实运行模式，请先选择或创建受控 Project 后再触发工作流执行。");
+        return;
+      }
+
+      const run = await apiClient.startRun({
+        projectId,
+        definitionId,
+        idempotencyKey: `canvas-${Date.now()}`,
       });
-      const data = await res.json();
-      setExecutionResult(data.data);
+      setExecutionResult({
+        executionId: run.id,
+        status: run.status,
+        simulated: false,
+        finalOutput: `Run ${run.id} 已通过受控接口 /api/executions/runs 创建（当前后端状态：${run.status}，目标：${taskPrompt}）。`,
+      });
       if (onWorkflowCompleted) onWorkflowCompleted();
     } catch (err) {
-      console.error("Workflow failed:", err);
+      const msg = err instanceof Error ? err.message : "触发工作流失败，请检查登录状态与后端服务";
+      setErrorMessage(msg);
     } finally {
       setIsRunning(false);
     }
@@ -146,7 +165,7 @@ export default function WorkflowCanvas({ onWorkflowCompleted }: { onWorkflowComp
           {isRunning ? (
             <>
               <Clock className="w-3.5 h-3.5 animate-spin" />
-              <span>多 Agent 协同执行中...</span>
+              <span>提交执行请求中...</span>
             </>
           ) : (
             <>
@@ -172,18 +191,30 @@ export default function WorkflowCanvas({ onWorkflowCompleted }: { onWorkflowComp
         </ReactFlow>
       </div>
 
-      {/* 执行结果弹窗/底部卡片 */}
+      {/* 错误提示卡片 */}
+      {errorMessage && (
+        <div className="p-3 bg-rose-950/80 border-t border-rose-800/70 text-xs text-rose-200 flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* 执行状态投影卡片 */}
       {executionResult && (
         <div className="p-3 bg-slate-900/90 border-t border-slate-800 text-xs">
           <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center space-x-1.5 text-emerald-400 font-semibold">
+            <div className={`flex items-center space-x-1.5 font-semibold ${executionResult.simulated ? "text-amber-400" : "text-emerald-400"}`}>
               <CheckCircle className="w-4 h-4" />
-              <span>工作流执行完毕（ID: {executionResult.executionId} · 状态: {executionResult.status}）</span>
+              <span>
+                {executionResult.simulated ? "离线模拟运行已生成" : "受控工作流运行已提交"}（ID: {executionResult.executionId} · 状态: {executionResult.status}）
+              </span>
             </div>
-            <span className="text-[10px] text-slate-400">已自动触发 JGit 工作区版本快照</span>
+            <span className="text-[10px] text-slate-400">
+              {executionResult.simulated ? "DEMO_SIMULATED（未写入真实工作区）" : "事实状态以 /api/executions/runs 与 SSE 事件流为准"}
+            </span>
           </div>
           <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300 max-h-24 overflow-y-auto">
-            {executionResult.finalOutput || "所有节点成功流转，代码已写入工作区。"}
+            {executionResult.finalOutput}
           </div>
         </div>
       )}

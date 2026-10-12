@@ -3,7 +3,7 @@
 * **状态 (Status)**: 已采纳 (Accepted)
 * **制定者 (Deciders)**: AgentHub 核心架构组
 * **日期 (Date)**: 2026-10-07
-* **技术背景 (Technical Story)**: `docs/AGENTHUB_LONG_TERM_PLAN.md` 阶段 0 基线治理与架构选型
+* **技术背景 (Technical Story)**: AgentHub 产品化长期计划 Phase 0 的基线治理与架构选型
 
 ---
 
@@ -100,7 +100,7 @@ AgentHub 是一个面向复杂研发场景的 Java 多 Agent 协同研发平台�
 
 ## 六、 参考链接 (Links & References)
 
-* `docs/AGENTHUB_LONG_TERM_PLAN.md` - AgentHub 长期产品化演进路线（阶段 0 止血与基线）
+* `docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md` - AgentHub 长期产品化演进路线
 * `docs/ARCHITECTURE.md` - 系统整体 DDD 四层分层与架构设计
 * Martin Fowler: *MonolithFirst* (https://martinfowler.com/bliki/MonolithFirst.html)
 * Architecture Weekly: *Modular Monolith: A Primer*

@@ -412,7 +412,7 @@ export const MOCK_DEPLOYMENT: DeploymentResponse = {
   target: "STATIC_PREVIEW",
   sandboxType: "LOCAL_PROCESS",
   port: 18080,
-  url: "http://localhost:8080/api/sandbox/preview/default",
+  url: DEFAULT_PREVIEW_URL,
   buildCommand: "npm run build --prefix frontend",
   startCommand: "npm run start --port 18080",
   startedAt: new Date(Date.now() - 360000).toISOString(),
@@ -628,7 +628,7 @@ export const apiClient = {
   },
 
   async exportRunEvidenceFile(runId: string): Promise<RunEvidenceBundleView> {
-    if (isDemoMode() || runId === MOCK_RUN.id) {
+    if (isDemoMode()) {
       const demoBundle: RunEvidenceBundleView = {
         schemaVersion: "agenthub.evidence.v1",
         bundleId: `evd-${runId}`,

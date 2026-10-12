@@ -1,4 +1,4 @@
-# AgentHub 生产级 Prometheus 告警规则与观测策略规范
+# AgentHub Prometheus 告警规则与观测策略
 
 > 文档编号：`OPS-ALERT-001`  
 > 归属版本：`v2.0.0 (Phase E Hardened)`  
@@ -19,7 +19,7 @@ AgentHub 采用分层防御的监控告警体系，并在网关与应用层对�
 
 ---
 
-## 2. 生产级 Prometheus Alertmanager 规则定义 (`docker/prometheus/agenthub-alerts.yml`)
+## 2. Prometheus Alertmanager 规则定义 (`docker/prometheus/agenthub-alerts.yml`)
 
 ```yaml
 groups:

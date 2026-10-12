@@ -3,7 +3,7 @@
 * **状态 (Status)**: 已采纳 (Accepted)
 * **制定者 (Deciders)**: AgentHub 核心架构组
 * **日期 (Date)**: 2026-10-07
-* **技术背景 (Technical Story)**: `docs/AGENTHUB_LONG_TERM_PLAN.md` 阶段 0~1 协同通信与事件持久化机制设计
+* **技术背景 (Technical Story)**: AgentHub 产品化长期计划 Phase 1 的协同通信与事件持久化机制设计
 
 ---
 
@@ -115,6 +115,6 @@
 
 ## 六、 参考链接 (Links & References)
 
-* `docs/AGENTHUB_LONG_TERM_PLAN.md` - 阶段 1：状态可恢复性与持久化事件流
+* `docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md` - 执行可靠性与持久化事件流路线
 * `docs/API.md` - 当前 SSE 事件流接口文档
 * WHATWG Server-Sent Events Specification (https://html.spec.whatwg.org/multipage/server-sent-events.html)

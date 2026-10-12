@@ -47,7 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 长期计划阶段 9 终局质量门禁：端到端全链路全场景黑盒与集成测试套件。
- * 严格覆盖 AGENTHUB_LONG_TERM_PLAN.md 第 6 节定义的【场景 A、B、C、D、E】五大核心交付场景。
+ * 严格覆盖 AGENTHUB_PRODUCT_LONG_TERM_PLAN.md 交付主线定义的【场景 A、B、C、D、E】五大核心交付场景。
  */
 @SpringBootTest
 @ActiveProfiles("test")

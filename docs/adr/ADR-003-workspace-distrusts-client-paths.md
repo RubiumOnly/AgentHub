@@ -3,7 +3,7 @@
 * **状态 (Status)**: 已采纳 (Accepted)
 * **制定者 (Deciders)**: AgentHub 核心架构组、安全审计小组
 * **日期 (Date)**: 2026-10-07
-* **技术背景 (Technical Story)**: `docs/AGENTHUB_LONG_TERM_PLAN.md` 阶段 0 安全止血与 `ORIGINAL_REQUEST.md` R2 受控工作区路径治理
+* **技术背景 (Technical Story)**: AgentHub 产品化长期计划 Phase 0 的安全基线与受控工作区路径治理
 
 ---
 
@@ -108,7 +108,6 @@
 
 ## 六、 参考链接 (Links & References)
 
-* `docs/AGENTHUB_LONG_TERM_PLAN.md` - 阶段 0：止血、冻结范围和基线
-* `ORIGINAL_REQUEST.md` - R2：受控工作区路径与安全穿透防御
+* `docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md` - 工作区安全与产品化收敛路线
 * OWASP Top 10: Path Traversal (https://owasp.org/www-community/attacks/Path_Traversal)
 * CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')

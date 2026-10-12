@@ -1,448 +1,129 @@
-# AgentHub 核心架构设计说明书
+# AgentHub 架构说明
 
-本文档系统阐述 AgentHub 平台的领域建模、模块化单体包结构、四层架构分层规范、SPI 插件机制、Flyway 持久化基线与架构防腐守护。
+> 本文是当前架构的事实摘要，不承担长期路线、API 全量契约或技术答辩材料职责。长期路线见 [产品化长期计划](AGENTHUB_PRODUCT_LONG_TERM_PLAN.md)，接口细节见 [API 契约](API.md)，边界和证据见 [当前能力边界](CURRENT_CAPABILITY_BOUNDARIES.md)。
 
-> 核心架构决策请参阅 [ADR-001 ~ ADR-005](adr/ADR-001-modular-monolith-architecture.md)（含 [ADR-005: 数据库驱动租约与崩溃恢复调度](adr/ADR-005-database-driven-lease-and-crash-recovery.md)）。  
-> 长期演进与阶段验收记录请参阅 [《AgentHub 长期演进计划》](AGENTHUB_NEXT_LONG_TERM_PLAN.md)。  
-> 当前系统经过代码验证的真实能力边界请参阅 [《当前能力边界与未实现范围声明》](CURRENT_CAPABILITY_BOUNDARIES.md)。
+## 1. 架构定位
 
----
+AgentHub 当前采用 Java 17 + Spring Boot 3.3.4 的模块化单体。所有核心业务共享一个事务数据库和一个应用进程；只有在真实负载或隔离需求触发后，才考虑把执行 Worker、沙箱或事件广播拆出。
 
-## 一、 领域驱动设计 (DDD) 模块化单体与分层架构
+模块按业务内聚性组织：
 
-AgentHub 采用**模块化单体 (Modular Monolith)** 架构形态，严格划分 9 大业务领域模块与通用支撑模块，杜绝技术层大杂烩堆砌。
+| 模块 | 责任 | 主要事实 |
+| --- | --- | --- |
+| `identity` | 登录、令牌、资源授权、认证审计 | User、Token、AuthAudit |
+| `project` | Project、Workspace、受控路径和项目归属 | Project、Workspace |
+| `orchestration` | Workflow DSL、拓扑校验、审批门禁 | WorkflowDefinition、Approval |
+| `execution` | Run/Step 状态、租约、恢复、事件流 | WorkflowRun、StepRun、RunEvent |
+| `agent` / `runtime` | Provider 路由、Runtime SPI、用量和脱敏 | Provider、TokenUsage |
+| `audit` | Artifact、Diff、审查和证据引用 | Artifact、Evidence |
+| `sandbox` | 受控构建、启动、探针、停止和清理 | Deployment |
+| `team` / `conversation` | 多 Agent 协作和消息上下文 | Team、Conversation、Message |
+| `infrastructure` | JGit、锁、指标、备份和通用适配器 | 共享技术能力 |
+
+Controller 只负责协议转换和权限入口；Application 模块编排用例；Domain 模块承载状态和规则；Infrastructure 模块实现数据库、文件、Provider、进程和外部系统适配。Controller 不得直接注入 Repository 或返回 JPA Entity。
+
+## 2. 核心资源与事件词汇表 (Resource & Event Vocabulary)
+
+发现代码与历史文档存在命名差异时，以实际持久化模型（Flyway V1～V12 + JPA Entity）与 REST/SSE 契约为唯一权威基准：
+
+| 词汇概念 | Owner 模块 | 持久化表 / JPA Entity | 权威 API 入口 | 状态枚举 / 核心不变量 | 当前实现与演进说明 |
+| --- | --- | --- | --- | --- | --- |
+| `Project` | `project` | `projects` / `ProjectEntity` | `/api/projects` | `ACTIVE`, `ARCHIVED`；强制绑定 `owner_id` 与默认 `workspace_id` | 已落地；所有下属资源通过 `Project.ownerId` 校验归属 |
+| `Workspace` | `project` | `workspaces` / `WorkspaceEntity` (+ `workspace_locks`) | `/api/workspaces/{workspaceId}/*` | 仅接受 `workspaceId` + 受检相对路径；JGit 维护 `git_baseline_commit` | 已落地；旧 `/api/workspace/*` 在 `prod` 已禁用，计划 Phase 1 删除 |
+| `WorkflowDefinition` | `orchestration` | `workflow_definitions` / `WorkflowDefinitionEntity` | `/api/workflows/definitions` | Kahn 拓扑校验无环；含 `version`、`schema_version`、`dsl_json`、`checksum` | 已落地；Phase 3 将演进为绑定 `AgentDefinition` 快照的 `WorkflowTemplate` |
+| `Run` (`WorkflowRun`) | `execution` | `workflow_runs` / `WorkflowRunEntity` | `/api/executions/runs`（别名 `/api/runs`） | `PENDING`, `RUNNING`, `PAUSED`, `WAITING_APPROVAL`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `TIMED_OUT` | 已落地；创建时冻结 `dsl_snapshot`，支持 `idempotency_key` 与租约字段 |
+| `StepRun` | `execution` | `step_runs` / `StepRunEntity` | `/api/executions/runs/{runId}/steps` | 状态同 `WorkflowRun` 外加 `SKIPPED`；含 `attempt`、`lease_owner`、`lease_until` | 已落地；重启恢复时已 `SUCCEEDED` 节点直接复用持久化输出，不重跑 |
+| `Event` (`RunEvent` / `ToolCall`) | `execution` | `run_events` / `RunEventEntity` | `/api/executions/runs/{runId}/events` & `/stream` | 唯一约束 `uk_run_events_run_seq (run_id, sequence_num)`；含 `STEP_*`、`TOOL_CALL` 等事件，先落库后推送 SSE | 已落地；与 IM 会话的 `messages` 表物理隔离，分别服务于执行审计与协作 |
+| `Artifact` | `audit` | `artifacts` / `ArtifactEntity` | `/api/audit/artifacts/*` | `review_status`: `PENDING`, `ACCEPTED`, `REJECTED`, `REVERTED`；含 SHA-256 `checksum` | 已落地；绑定 `run_id` 与 JGit 快照 commit，支持非破坏性文件级 `revert` |
+| `Approval` | `orchestration` | `approvals` / `ApprovalEntity` | `/api/approvals/*` | `status`: `PENDING`, `APPROVED`, `REJECTED`；阻塞并唤醒 `WAITING_APPROVAL` 节点 | 已落地；审批决定写入 `decision_reason` / `comments` 并触发 DAG 续跑或终止 |
+| `Deployment` | `sandbox` | `deployments` / `DeploymentEntity` | `/api/deployments` | `CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING -> STOP -> CLEANUP -> STOPPED / FAILED` | 已落地；强制要求 `Artifact` 为 `ACCEPTED` 且通过真实 HTTP 探针才进入 `RUNNING` |
+| `Agent Policy` (`AgentDefinition`) | `agent` / `sandbox` | `agent_definitions` + `providers` + `CommandSecurityGuard` | `/api/agents`, `/api/providers` | 包含 `preferred_provider_type`、`required_capabilities`、`fallback_enabled` 及工具/命令白名单 | 当前分散在 `AgentDefinitionEntity` 与沙箱守卫中；Phase 3 收敛为版本化策略模型 |
+| `Context Source` | `execution` / `conversation` | `workflow_runs.context_data_json` + `conversations.summary` | `/api/conversations/{id}/context` | 包含 DAG 节点输入输出插值、滑动窗口裁剪（`TokenBudgetContextManager`）与滚动摘要 | 当前支持会话窗口与运行上下文；Phase 2/3 将扩展为带版本、安全级别与预算的受控资源 |
+
+## 3. 核心数据流
 
 ```mermaid
-flowchart TD
-    subgraph Client [前端与客户端]
-        Web[Next.js 14 Bento Console]
-        CLI[API / CLI Consumers]
-    end
-
-    subgraph SecurityFilter [安全与请求链路治理]
-        CorrFilter[RequestCorrelationFilter (X-Request-ID/X-Correlation-ID)]
-        AuthFilter[AuthFilter (Bearer Token / Cookie / Stream Ticket 鉴权)]
-        Guard[ResourceAccessGuard (跨租户资源归属越权防御)]
-    end
-
-    subgraph API [用户接口适配层 (Controllers)]
-        AuthCtrl[AuthController]
-        ProjCtrl[ProjectController]
-        WorkspaceCtrl[WorkspaceController]
-        ArtifactCtrl[ArtifactController]
-        ExecCtrl[ExecutionController]
-        IMCtrl[IMController]
-        WfCtrl[WorkflowAndDiffController]
-        AgentCtrl[AgentRegistryController]
-        SandboxCtrl[SandboxController]
-        DeployCtrl[DeploymentController]
-        SysCtrl[SystemHealthController]
-    end
-
-    subgraph Application [应用服务层 (Application Services & Ports)]
-        AuthApp[AuthApplication]
-        ProjApp[ProjectApplication / WorkspaceApplication]
-        ArtifactApp[ArtifactApplication]
-        ConvApp[ConversationApplication]
-        ExecApp[ExecutionApplication]
-        AgentApp[AgentApplication]
-        SandboxApp[SandboxApplication / DeploymentApplication]
-    end
-
-    subgraph Domain [十大领域核心 (Domain Models & Ports)]
-        Identity[identity: UserEntity, TokenProvider, PasswordEncoder]
-        Project[project: ProjectEntity, WorkspaceEntity, PathGuard, Keyed Lock]
-        Agent[agent: AgentDefinition, AgentInstance, Provider]
-        Team[team: TeamEntity, TeamMemberEntity, Topology Strategies]
-        Conv[conversation: Conversation, MessageBus, Monotonic Seq, Loop Detector]
-        Orch[orchestration: WorkflowDefinition DSL]
-        Exec[execution: WorkflowRun, StepRun, RunEvent, StateMachine]
-        Audit[audit: Artifact, JGit Baseline, Diff Engine, Safe Revert]
-        Sandbox[sandbox: SandboxProvider, CommandGuard, PortManager, Deployment]
-        Shared[shared: Result, RequestContext, ErrorCode, BusinessException]
-    end
-
-    subgraph Persistence [持久化与基础设施层]
-        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3-V12 Evolutions)]
-        H2MySQL[H2 (MySQL Mode) / MySQL 8.0]
-        GitFS[JGit Repository / Controlled Workspaces]
-    end
-
-    Client --> SecurityFilter
-    SecurityFilter --> API
-    API --> Application
-    Application --> Domain
-    Domain --> Persistence
+flowchart LR
+    U[用户/前端] --> A[Auth + Resource Guard]
+    A --> P[Project / Workspace]
+    A --> W[Workflow Definition]
+    W --> R[Create Run: immutable snapshot]
+    R --> E[Execution Kernel]
+    E --> S[Step lease + state machine]
+    S --> T[Agent Runtime / Tools]
+    T --> G[JGit workspace]
+    S --> V[Run Events: persist before emit]
+    G --> D[Diff / Artifact / Quality Gates]
+    D --> H[Approval]
+    H --> X[Sandbox Deployment]
+    X --> B[Evidence Bundle]
 ```
 
-### 1. 十大核心领域模块分布 (`com.agenthub.*`)
-
-- **`identity`**：用户登录、注册、密码哈希（PBKDF2WithHmacSHA256）、Token 鉴权（HMAC-SHA256 签名令牌、HttpOnly Cookie 与 SSE 单次短效票据）、跨租户资源归属校验（`ResourceAccessGuard`）；
-- **`project`**：项目边界（`ProjectEntity`）、受控代码工作区（`WorkspaceEntity`）、受控路径解析与目录树安全提取；
-- **`agent`**：智能体平台能力定义（`AgentDefinition`）、实例配置（`AgentInstance`）、模型提供商（`Provider`）；
-- **`team`**：多智能体团队拓扑协作（`TeamEntity`、`TeamMemberEntity`），支持层级管理 (`HIERARCHICAL`)、对等协作 (`PEER_TO_PEER`) 与轮询流水线 (`ROUND_ROBIN`)，提供细粒度角色分工与委派控制；
-- **`conversation`**：即时通讯与消息总线（`ConversationEntity`、`ConversationParticipantEntity`、`MessageEntity`），具备细粒度严格单调递增序号（`sequence_num`）、点对点/广播/系统路由与可见性隔离、三层防循环震荡检测及上下文预算滑动压缩治理；
-- **`orchestration`**：任务编排引擎、版本化工作流 DSL 定义（`WorkflowDefinitionEntity`）；
-- **`execution`**：执行实例状态机（`WorkflowRunEntity`，支持幂等键防重）、节点执行（`StepRunEntity`）、可审计与可重放运行时事件（`RunEventEntity`，支持按序号游标拉取）与脱敏运行证据包导出（`RunEvidenceBundleView`）；
-- **`audit`**：版本审计基线、JGit 原生 Diff 增删行统计器、交付物实体（`ArtifactEntity`）；
-- **`sandbox`**：Web 预览沙箱、Dockerfile 构建清单生成、部署记录（`DeploymentEntity`）；
-- **`shared`**：全局统一响应结构 `Result<T>`（携带 `requestId`）、上下文链路传递 `RequestContext`（MDC 追踪）、全域业务异常错误码规范 `ErrorCode`。
-
-### 2. 接口分层与防腐规范 (Controller - Application 隔离)
-
-所有 Web Controller 必须严格遵循以下契约原则：
-1. **禁止直接依赖持久化仓储 (Repository)**：Controller 仅能依赖对应领域的 `*Application` 接口；
-2. **严禁将 JPA Entity 直接暴露给网络层**：请求参数统一通过 `*Command` / `*Query` 传递，响应体必须映射为 `*View` DTO；
-3. **架构守卫自动测试**：通过 ArchUnit 架构测试套件 (`ArchUnitArchitectureTest`) 在 CI/CD 阶段强制执行依赖方向验证。
-
----
-
-## 二、 数据库版本管理与持久化基线 (Flyway)
-
-系统全面集成 **Flyway** 作为唯一的数据库 Schema 演化机制，杜绝生产环境使用 `hibernate.ddl-auto: update` 带来的脏结构风险。
-
-- **`V1__init_schema.sql`**：统一创建 18 张核心业务表，涵盖 `users`, `projects`, `workspaces`, `agent_definitions`, `agent_instances`, `providers`, `teams`, `team_members`, `conversations`, `conversation_participants`, `messages`, `workflow_definitions`, `workflow_runs`, `step_runs`, `run_events`, `artifacts`, `approvals`, `deployments`；
-  - 核心索引：`idx_messages_conv_seq(conversation_id, sequence_num)`, `idx_run_events_run_seq(run_id, sequence_num)`, `idx_wf_runs_idemp(idempotency_key)`；
-- **`V2__seed_system_baseline.sql`**：注入系统初始安全基线数据（系统用户、默认项目、默认工作区、四大核心智能体定义：Orchestrator、BackendArchitect、FrontendEngineer、QAAuditor）；
-- **`V3__phase2_workspace_audit_artifacts.sql`**：新增产物人工审查状态字段（`review_status`, `reviewed_by`, `reviewed_at`, `review_comment`）以及工作区多实例租约锁持久表 `workspace_locks`；
-- **`V4__phase3_execution_kernel_and_state_machine.sql`**：扩展 `workflow_runs` 取消原因、时间戳，扩展 `step_runs` 开始/结束时间、耗时字段与链路追踪关联；
-- **`V5__phase4_workflow_dag_and_orchestration.sql`**：扩展 `workflow_definitions` (name, description, updated_at), `workflow_runs` (context_data_json), `step_runs` (inputs_json, outputs_json, requires_approval) 及 `approvals` 索引演进；
-- **`V6__phase5_agent_providers_and_routing.sql`**：扩展 `providers`（priority, weight, capabilities, cost_per_million_input, cost_per_million_output, circuit_status, avg_latency_ms）与 `agent_definitions` 表，新增 `token_usages` 审计表与多维高效查询复合索引；
-- **`V7__phase6_multi_agent_teams_and_message_bus.sql`**：扩展 `teams` 表（topology, leader_agent_id, max_turns, config_json, status），扩展 `team_members` 表（role_type, responsibilities, system_prompt_override, can_delegate），扩展 `conversations` 表（team_id, last_sequence_num, summary, token_count, status），扩展 `messages` 表（recipient_id, message_type, protocol_type, token_count, in_reply_to_id），新增复合索引并预置 `team-dev-swarm` 种子基线数据；
-- **`V8__phase7_sandbox_and_deployments.sql` ~ `V12__phase_d_deployment_lifecycle_audit.sql`**：扩展 `deployments` 沙箱类型、模板类型、生命周期轨迹（`lifecycle_trace`）、终止原因（`termination_reason`），扩展 `workflow_runs` / `step_runs` 数据库租约恢复字段（`lease_owner`, `lease_until`, `heartbeat_at`, `dsl_snapshot`）以及多租户归属隔离字段；
-- **兼容性验证**：Schema DDL 经专门设计，100% 兼容 H2 (MySQL Mode) 本地快速回归测试与生产 MySQL 8.0 严苛验证；
-- **事务与查询边界**：生产与测试配置全面启用 `spring.jpa.open-in-view: false`，杜绝因延迟加载穿透导致的隐藏 N+1 查询与事务悬挂问题。
-
----
-
-## 三、 统一认证鉴权与安全防御体系
-
-1. **链路追踪 (Request Tracing)**：`RequestCorrelationFilter` 自动拦截/分配 `X-Request-ID` 与 `X-Correlation-ID`，并将追踪信息绑定至 MDC 日志与 HTTP 响应头；
-2. **身份鉴权 (Authentication)**：基于 HMAC-SHA256 签名令牌与 `revoked_tokens` 吊销表机制。通过 `Authorization: Bearer <token>` 或 `HttpOnly` Cookie 传递；SSE 流式连接通过 `POST /api/auth/stream-ticket` 换取 60 秒单次有效短效票据（严禁在 URL 查询参数中暴露长期 Bearer Token）；
-3. **水平越权防御 (ResourceAccessGuard)**：执行跨用户资源拦截。任何用户试图操作或查询不属于自己的 Project / Workspace / Conversation / WorkflowRun / Deployment 时，一律拦截并返回 `1002 FORBIDDEN`，杜绝多租户数据泄露。
-
----
-
-## 四、 基于 ArchUnit 的架构防腐与质量保障
-
-系统引入 ArchUnit 进行代码架构自动化守卫，测试用例 `ArchUnitArchitectureTest` 覆盖以下规则：
-- 控制器不得越权直接注入或调用 JPA Repository 仓储；
-- 控制器必须收敛于 `adapter.web` 或 `*.api` 包路径下；
-- 应用服务必须收敛于 `*.application` 包路径下；
-- 控制器严禁直接泄露 JPA 实体对象；
-- 全量单元、领域逻辑、集成演练与边界防御测试矩阵（300+ 测试用例）100% 绿灯执行。
-
----
-
-## 五、 受控工作区、JGit 审计与并发租约治理 (Phase 2 升级)
-
-### 1. 受控工作区路径沙箱解析 (`DefaultWorkspaceResolver`)
-- **受控身份体系**：核心文件访问严格基于 `workspaceId + relativePath`，彻底淘汰前端客户端传入绝对路径的越权风险；
-- **深层路径防御矩阵**：
-  - `Path.normalize()`、`toRealPath()` 与多级父目录 Containment 检验；
-  - 符号链接越权检测：禁止通过符号链接跳转至工作区外部目录，违规操作立即抛出 `3004 WORKSPACE_TRAVERSAL_DENIED`；
-  - 设备文件拒绝：严格匹配并拦截 Windows 保留设备名称（`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9` 及其变种文件扩展名）；
-  - `.git` 内部篡改拦截：大小写无关（`.GIT`, `.Git`）与尾随点变种防护；
-- **受控文件操作与配额保护**：
-  - 单文件写入上限硬约束为 10MB；
-  - 文本预览上限硬约束为 2MB，超出部分提供截断保护；
-  - 二进制文件探测机制（基于扩展名与首 4KB 空字节分析），杜绝乱码污染。
-
-### 2. 原生 JGit 审计引擎与结构化 Diff (`JGitWorkspaceManager`)
-- **Run 基线建立**：每次 WorkflowRun 启动时自动初始化工作区 Git 仓库，建立 `Baseline commit for Run <runId>` 并打上专属基线 Tag；
-- **Step 快照与 SHA-256 校验和**：节点产出物通过 `createStepSnapshot` 自动归档，记录变更文件清单、commit 哈希与 SHA-256 指纹；
-- **结构化 Diff 引擎**：向前端输出 `StructuredDiff`，精准提供文件变更类型（ADD, MODIFY, DELETE, RENAME, COPY）、增减行数、Unified Patch、二进制标识、重命名得分与冲突检测（`hasConflict`）。
-
-### 3. 工作区并发 Keyed Lock 与租约模型 (`WorkspaceLockManager`)
-- **锁身份与租期机制**：每个锁必须绑定工作区规范化 Key、执行主体的 `ownerId` 以及租约有效期（`leaseTtlMs`）；
-- **防死锁自动回收机制**：若原持有者进程异常崩溃或未能正常释放，超过租约 TTL 后，新请求到达时将自动触发死锁回收（Deadlock Auto-Recovery），保障工作区不会被永久锁死；
-- **自动续期与释放保护**：支持长程任务执行中通过 `renewLease` 延长锁租期，并严格校验仅持有者本人方可执行解锁操作。
-
-### 4. 产物审查与安全非破坏性回滚 (`ArtifactApplicationService`)
-- **三态审查流程**：支持对 Step 快照产物执行 `accept`、`reject` 与 `revert`，审查记录与决策意见全量归档；
-- **受控安全回滚**：
-  - 坚决杜绝直接执行破坏性的 `git reset --hard`；
-  - 回滚时利用 JGit 仅提取目标 Step 影响的文件还原至基线版本，新创建的文件安全删除，未受影响的文件完整保留；
-  - 自动生成明确的 `[Revert]` Commit，确保 Git 历史记录、工作区代码与数据库 Artifact 审查状态高度一致。
-
----
-
-## 六、 执行内核、状态机与 SSE 流式事件 (Phase 3 升级)
-
-### 1. 严格 Run/Step 状态机 (`ExecutionStateMachine`)
-- **八大标准生命周期状态**：
-  `PENDING`, `RUNNING`, `PAUSED`, `WAITING_APPROVAL`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `TIMED_OUT`。
-- **非法状态转移拦截矩阵**：
-  - 终态防御：`SUCCEEDED`, `CANCELLED`, `TIMED_OUT` 为不可逆终态（除重试/重启指令外），任何非法跨态跃迁严格拦截并抛出 `6007 INVALID_STATE_TRANSITION`；
-  - 步骤重试：支持从 `FAILED` 与 `TIMED_OUT` 状态通过 `retryStep` 指令重新转移至 `PENDING`，自动递增 `attempt` 并清空旧错误与耗时；
-  - 工作流重启：支持工作流从 `FAILED` / `TIMED_OUT` 重启为 `RUNNING`，自动清除旧的 `finishedAt`、`cancelledAt` 与 `cancelReason`；
-  - 状态广播归一：状态机内部转移事件全量委托 `RunEventBroadcaster` 发布，确保 `RUN_STATE_CHANGED` 与 `STEP_STATE_CHANGED` 实时直推 SSE，杜绝序号碰撞与失序；
-  - 全并发线程安全：使用基于 `runId` 的细粒度锁保障并发转移互斥与幂等一致性，并在执行结束后提供生命周期内存清理。
-
-### 2. 工作流取消与中断协作机制 (`CancelToken` & `CancelTokenRegistry`)
-- **协作取消模型**：通过 `CancelToken` 提供非阻塞式取消信号检测（`isCancelled()`, `checkCancelled()` 抛出 `RunCancelledException`）；
-- **级联终止协作**：
-  - 优雅终止：支持注册自定义清理与回滚回调函数；
-  - 跨平台进程树递归强平：结合 `ProcessHandle.descendants()` 递归回收与 Windows `taskkill /PID <pid> /T /F` 双层防御，彻底杜绝孤儿进程残留；
-  - 线程级安全中断：对注册的工作线程自动触发 `interrupt()`；
-  - 看门狗超时：配置执行超时预算，超出阈值自动触发强平看门狗并将状态收敛为 `TIMED_OUT`。
-
-### 3. 真实执行解耦与 Runtime SPI (`AgentRuntime` & `ExecutionScheduler`)
-- **调度与执行分离**：
-  - 调度器 `ExecutionScheduler` 专注于节点拓扑编排、状态流转、重试策略、超时看门狗与事件沉淀，杜绝无界线程池 OOM 隐患，采用具名有界线程池及 `@PreDestroy` 优雅停机回收；
-  - 实际调用由 `AgentRuntime` SPI 接口完成，彻底解除核心业务对底层大模型或 CLI 命令的具体依赖；
-- **多运行时适配矩阵**：
-  - `MockAgentRuntime`：离线确定性模拟、测试守护与极速冒烟验证（明确标记 `simulated = true`）；
-  - `OpenAiCompatibleRuntime`：兼容 DeepSeek、OpenAI、Moonshot 等大模型标准 HTTP 流式接口，含密钥脱敏与推理内容解析防御；
-  - `CliAgentRuntime`：子进程原生运行 Codex CLI / Claude Code / OpenClaw，结合进程树销毁与超时控制；
-  - `AgentRuntimeRegistry`：提供运行时动态路由、自动降级与健康检查。
-
-### 4. 实时 SSE 事件流与 Last-Event-ID 断点重连 (`RunEventBroadcaster`)
-- **真流式事件输出**：提供专属端点 `GET /api/executions/runs/{runId}/stream` 与 `GET /api/runs/{runId}/stream`，彻底淘汰无状态长轮询假实时；
-- **严格单调递增 Sequence**：每个事件均分配唯一的单调递增 `sequenceNum`，并在 `run_events` 表持久化落库；
-- **断点补发机制**：客户端携带 `Last-Event-ID` 头部或 `?lastEventId=` 参数重连时，系统自动从数据库按序号精准补齐遗漏的历史事件后再切入实时广播，具备 `MAX_REPLAY_LIMIT (2000)` 上限防 OOM 保护；
-- **安全票据鉴权与长连接保活心跳**：通过 `POST /api/auth/stream-ticket` 签发一次性短效票据供标准浏览器 `EventSource` 鉴权（禁止 URL 暴露长期 Token）；内置每 20 秒自动化发送 `:heartbeat` 注释包，防御代理与网关超时断联。
-
----
-
-## 七、 工作流编排引擎、DAG 依赖拓扑与数据流调度 (Phase 4 升级)
-
-### 1. 版本化工作流 DSL 与严苛图拓扑校验 (`WorkflowDslValidator`)
-- **领域规范与核心模型**：
-  - `WorkflowDsl`：包含版本标识 (`version`, `schemaVersion`)、全局超时 (`timeoutSeconds`)、入口节点 (`entryNodeId`)、节点集合 (`nodes`) 与有向依赖边集合 (`edges`)；
-  - `WorkflowNodeDsl`：节点类型 (`START`, `AGENT`, `CONDITION`, `APPROVAL`, `JOIN`, `END`)、引用智能体 (`agentRef`)、输入映射 (`inputs`)、分支汇聚策略 (`joinPolicy`) 与重试策略 (`RetryPolicyDsl`)；
-  - `WorkflowEdgeDsl`：源节点 (`fromNodeId`)、目标节点 (`toNodeId`) 以及动态条件求值表达式 (`condition`)。
-- **Kahn 算法拓扑排序与成环检测 (Cycle Detection)**：
-  - 基于入度统计的 Kahn 算法实现有向无环图 (DAG) 拓扑分层与环路检测；
-  - 严格检测并拦截自环 (Self-loop) 以及多节点回路依赖，违规立即抛出专用业务异常 `6001 WORKFLOW_INVALID` 并附带清晰的成环说明；
-  - 孤岛节点与入口节点合法性检验：禁止孤立未连通的游离节点存在，确保所有图结构连通且语义完整。
-
-### 2. 有界线程池真实并发调度内核 (`DagExecutionEngine`)
-- **同层兄弟节点真并发**：
-  - 调度引擎基于具备容量限制的有界线程池执行兄弟节点，杜绝无界线程池导致的 OOM 风险；
-  - 支持多依赖汇聚策略：
-    - `all_succeeded`：所有前置入边依赖必须全部成功方可触发当前节点；
-    - `any_succeeded`：任一前置依赖完成即满足触发条件；
-    - `custom_condition`：结合前置节点输出通过动态表达式判定触发条件；
-- **响应式熔断与快速退出机制**：
-  - 针对子任务失败、人工拒绝审批或用户主动取消场景，通过 `abortRemainingNodes` 级联熔断后续所有未启动节点；
-  - 主循环采用 100ms 快速中断轮询感知机制，彻底消除了下游节点悬挂等待引发的整体任务超时假死。
-
-### 3. 上下游数据流管道与安全无 RCE 表达式解析 (`SafeExpressionEvaluator`)
-- **工作流数据管道与上下文隔离 (`WorkflowExecutionContext`)**：
-  - 提供线程安全的工作流运行时上下文映射；
-  - 动态参数解析管道：支持模板占位符自动解析与点号深度嵌套提取（如 `{{steps.<nodeId>.outputs.<key>}}`、`{{inputs.<key>}}`）；
-  - 单节点入参（`inputs_json`）与出参快照（`outputs_json`）结构化持久化落库，保障执行过程完全可观测与可审计。
-- **零反射递归下降安全求值引擎 (`SafeExpressionEvaluator`)**：
-  - 彻底杜绝使用危险的 Spring EL (SpEL)、OGNL 或 JVM 反射机制，自研基于递归下降（Recursive Descent）词法与语法的 AST 求值引擎；
-  - 严格支持布尔与数值比较（`==`, `!=`, `>`, `<`, `>=`, `<=`）、逻辑运算（`&&`, `||`, `!`）及字符串常量安全提取；
-  - 内置空指针防御与类型自动转换，从根源消除远程代码执行 (RCE) 与表达式注入隐患。
-
-### 4. 动态条件分支与级联跳过剪枝 (Dynamic Branching & Cascade Skip Pruning)
-- **智能条件决策**：在边流转或条件节点求值时，根据上下文变量动态计算 `condition`；
-- **未命中分支优雅跳过**：未命中的边所指向的分支节点，由状态机统一标记为 `SKIPPED` 终态；
-- **下游级联剪枝**：当节点的必要前置依赖全部被跳过或无法满足激活策略时，引擎自动对所有后继受累节点执行级联剪枝（Cascade Skip），防止任务死锁与悬挂。
-
-### 5. 人工确认门禁与挂起恢复机制 (`Human-in-the-Loop Approval`)
-- **敏感/高危节点挂起门禁**：
-  - 当节点标记 `requiresApproval: true` 或节点类型为 `APPROVAL` 时，执行调度自动挂起当前 Step 与 Run，状态收敛为 `WAITING_APPROVAL`；
-  - 自动向 `approvals` 门禁表插入待审批记录，并通过 SSE 实时广播 `APPROVAL_REQUESTED` 领域事件；
-- **REST 审批接口与决策恢复**：
-  - 暴露标准接口：`POST /api/approvals/{id}/approve` 与 `POST /api/approvals/{id}/reject`；
-  - 审批通过后无缝解冻调度器，恢复下游拓扑节点继续执行；
-  - 审批驳回时立即将 Step 状态收敛为 `FAILED`，并级联中止后续节点执行，全链路持久化审查人与驳回意见。
-
----
-
-## 八、 Agent 统一接入层、多 Provider 与动态路由 (Phase 5 升级)
-
-### 1. Provider SPI 抽象与统一交互契约 (`LlmProvider` & Standard SPI)
-- **统一消息与请求响应模型**：
-  - `ChatMessage`：标准化抽象角色（`system`, `user`, `assistant`, `tool`）、消息内容与元数据，抹平各家大模型字段异构；
-  - `ChatRequest` / `ChatResponse`：标准化请求参数（模型名称、上下文消息、温度系数、最大 Token、能力标签要求、流式开关），响应体严格包含唯一标识、完成原因、物理延迟测量（`latencyMs`）、估算成本以及降级追踪标记（`fallbackUsed`, `originalProviderId`）；
-  - `ChatChunk`：标准化流式契约，规范增量内容 (`deltaContent`) 与最终 Token 消耗统计；
-- **真实延迟与消耗精确度量**：
-  - 执行层精确度量端到端网络与推理物理耗时；
-  - 准确统计 `prompt_tokens`、`completion_tokens` 与 `total_tokens`。
-
-### 2. 多 Provider 生态适配矩阵 (Multi-Provider Ecosystem)
-- **`OpenAiCompatibleProvider`**：针对 OpenAI (GPT-4o, GPT-4o-mini) 与 DeepSeek (deepseek-chat, deepseek-reasoner) 的标准 `/v1/chat/completions` REST 接口与 SSE 数据流协议；
-- **`AnthropicProvider`**：针对 Anthropic Claude (claude-3-5-sonnet, claude-3-haiku) 的 `/v1/messages` 消息协议，实现 system prompt 与 messages 分层抽象及 `content_block_delta` 流式解析；
-- **`GeminiProvider`**：针对 Google Gemini (gemini-1.5-pro, gemini-1.5-flash) 的 `generateContent` 与 `streamGenerateContent?alt=sse` REST 协议；
-- **`OllamaProvider`**：针对本地 Ollama 与 vLLM 实例原生 `/api/chat` 接口，支持本地离线零成本调度；
-- **`MockLlmProvider`**：确定性离线仿真引擎，支持 429 限流、5xx 超时故障注入与微秒级延迟仿真。
-
-### 3. 全链路凭证安全与脱敏治理 (`SecretMasker`)
-- **密钥引用与环境变量解耦**：支持 `env:VAR_NAME` 环境变量注入与 `prop:KEY` 配置解耦，数据库 `secret_ref` 绝不明文落库生产密钥；
-- **全链路严密脱敏清洗**：
-  - API Key 自动脱敏为 `sk-***` 或 `[REDACTED_SECRET]`；
-  - 自动识别并过滤网络请求头（`Authorization`, `x-api-key`）与 URL 敏感参数（如 Gemini `?key=...`）；
-  - 全链路运行日志与异常堆栈经过正则扫描自动脱敏，REST 控制器与 DTO 绝不向客户端泄露真实密钥。
-
-### 4. 动态路由策略与高可用选择器 (`DynamicProviderRouter`)
-- **多维动态加权评分与路由过滤**：
-  - **能力匹配 (Capabilities)**：精准匹配任务要求的模型能力（`code`, `general`, `fast`, `reasoning`, `long_context`）；
-  - **熔断状态感知**：自动过滤处于 `OPEN` 熔断状态的不健康 Provider；
-  - **多维综合排序**：优先按优先级 (`priority` 降序)，同优先级按健康检查延迟 (`latencyMs` 升序) 与权重 (`weight` 降序) 挑选最优 Primary Provider；
-- **路由决策预演 (`POST /api/providers/route`)**：支持向平台实时查询任意 prompt 或能力需求下的路由推演结果与完整备份链条。
-
-### 5. 高可用容灾与自动 Fallback 降级 (HA Failover & Circuit Breaking)
-- **三态线程安全熔断器 (`CircuitBreaker`)**：
-  - 状态转移矩阵：`CLOSED` (正常) -> 连续失败超阈值 -> `OPEN` (阻断熔断) -> 超时探测 -> `HALF_OPEN` (半开探测) -> 成功恢复 `CLOSED` / 失败重回 `OPEN`；
-- **自动 Fallback 快速切换**：
-  - 当主 Provider 遇到 429 限流、5xx 超时、连接被拒或熔断阻断时，路由引擎自动拦截并无缝切换至备用 Backup Provider；
-  - 自动向事件流和运行日志沉淀标准化降级告警事件 `FallbackEvent`，记录原失败节点、接管节点与故障原因。
-
-### 6. Token 与成本计量治理 (Token & Cost Accounting)
-- **`ModelPricing` 官方基准牌价与自定义重载**：
-  - 内置 GPT-4o, DeepSeek, Claude 3.5 Sonnet, Gemini 1.5 Flash 官方基准百万 Token 牌价；
-  - 支持本地 Ollama / vLLM 零成本 ($0.00) 计算；
-  - 支持 Provider 数据库记录自定义输入/输出价格精准覆盖；
-- **`token_usages` 数据库审计与平台汇总**：
-  - 单次 LLM 调用持久化至 `token_usages` 审计表，包含模型、Token 计数、测量延迟与折算美元成本；
-  - 提供 `GET /api/token-usages/summary` 与 `/api/token-usages/runs/{runId}` 实时查询端点。
-
----
-
-## 九、 多智能体协同网络、消息总线与上下文治理体系 (Phase 6 升级)
-
-### 1. 多智能体团队协同拓扑与角色编排 (`TeamTopologyStrategy` & `TeamApplicationService`)
-- **三大核心团队协作拓扑**：
-  - **`HIERARCHICAL` (层级主从拓扑)**：由 Leader 智能体统一收口用户目标并派发子任务，非 Leader 成员产出默认汇报回传 Leader，防止无组织发散；
-  - **`PEER_TO_PEER` (对等去中心拓扑)**：团队成员平级协作，支持自主点对点协作及基于 @Mention 自由触发，无单一瓶颈；
-  - **`ROUND_ROBIN` (轮询流水线拓扑)**：智能体严格按照职责链路（如 Architect -> Coder -> Reviewer -> Tester）环形流转，保障软件交付生命周期标准化推进；
-- **细粒度角色分工与委派权限 (`TeamRole`)**：
-  - 标准化抽象 `ORCHESTRATOR`, `ARCHITECT`, `CODER`, `REVIEWER`, `TESTER`, `CUSTOM` 等角色；
-  - 支持成员级 `system_prompt_override`（动态覆盖专家提示词）与 `can_delegate` 权限控制（限制仅特定角色可发起委托或调用下游）。
-
-### 2. 会话消息总线与严格单调递增序号 (`ConversationSequenceManager`)
-- **细粒度无碰撞序号保证**：
-  - 彻底淘汰客户端或自增键随意并发赋值，采用 128 分段公平重入锁 (`Striped ReentrantLock`) 消除内存泄露隐患，并结合数据库悲观写锁 (`PESSIMISTIC_WRITE`) 保障多实例跨节点并发安全；
-  - 严格保障同一会话内所有消息的 `sequence_num` 100% 连续且严格单调递增（1, 2, 3...），从物理层面根除并发写入时的时序颠倒、覆盖与多节点序号碰撞；
-  - 支持高并发压测下的并发消息原子分配与自动事务落库。
-
-### 3. 消息路由策略与可见性隔离机制 (`MessageVisibilityFilter`)
-- **多元消息路由类型 (`MessageType`)**：
-  - **`BROADCAST`**：全员广播消息，会话内所有成员（用户及参与智能体）均可见；
-  - **`DIRECT`**：点对点私聊消息，由发送方直接定向推送至 `recipient_id`，天然隔离旁路噪音；
-  - **`SYSTEM`**：系统/通知级事件消息，用于声明会话状态变更、拓扑流转或门禁告警；
-- **智能可见性过滤矩阵 (`MessageVisibilityFilter`)**：
-  - 严格防御私聊泄露：非接收方且非发送方的第三方智能体及未授权匿名请求查询消息流时，自动过滤 P2P 私聊，杜绝信息越权；
-  - 发送者自身、目标接收方及管理员具有完整可追溯审计视野。
-
-### 4. 跨智能体协议与四层死循环熔断检测 (`LoopDetector`)
-- **标准化交互协议 (`MessageProtocolType`)**：
-  - **`REQUEST_REPLY`**：标准请求-响应协作，通过 `in_reply_to_id` 显式关联上下文；
-  - **`HANDOFF`**：工作交接协议，实现跨角色控制权让渡；
-  - **`SUMMARIZE`**：总结汇报协议，将阶段性结论上报；
-- **四层递进式防死循环与震荡熔断防御矩阵**：
-  - **第 1 层：连续自主轮次硬截断 (`maxTurns`)**：严格继承团队实体 `maxTurns` 配置，仅统计无人类介入的自主智能体连续交互轮次（人机长对话不误杀），达到上限立即阻断流转并抛出 `4008 CONVERSATION_MAX_TURNS_EXCEEDED`；
-  - **第 2 层：高频内容哈希碰撞检测 (`Duplicate Content Collision`)**：对连续发言内容提取规范化哈希指纹，检测到连续重复复读即刻触发循环警报；
-  - **第 3 层：短周期双智能体 Ping-Pong 震荡检测 (`Short-cycle Oscillation`)**：实时检测 A -> B -> A -> B 交互序列，识别无意义往返乒乓对射，及时熔断死循环消耗；
-  - **第 4 层：三智能体环形振荡与自身重复自旋检测**：精准识别 A -> B -> C -> A -> B -> C 环形协作回路及单智能体 A -> A -> A 连续空转，彻底杜绝复杂多智能体协同下的死循环消耗。
-
-### 5. 智能上下文窗口治理与滑动压缩 (`ContextWindowGovernance`)
-- **动态滑动窗口修剪 (`SlidingWindowContextTrimmer`)**：
-  - 优先保护系统核心指令（首条系统提示词）与最近 N 条交互高保真上下文；
-  - 对历史中间消息执行滑动修剪，输出裁剪统计（`trimmedCount`, `retainedCount`）；
-- **Token 预算受限压缩 (`TokenBudgetContextManager`)**：
-  - 支持基于最大 Token 预算（`maxBudgetTokens`）严格截断，避免超出大模型上下文硬限制导致调用崩溃；
-- **滚动摘要合成引擎 (`RollingSummaryService`)**：
-  - 当会话消息超出压缩阈值时，自动提取老旧消息合成为连贯摘要（Summary），持久化于 `conversations.summary`；
-  - 下游 Prompt 自动注入 `[Previous Conversation Summary]` + 滑动窗口最新活跃消息，在保留长期记忆的同时节约 70%+ 上下文 Token 成本。
-
-### 6. 会话实时 SSE 事件总线与断点补发 (`ConversationEventBroadcaster`)
-- **全生命周期会话事件广播**：
-  - 统一推送 `MESSAGE_CREATED`, `MEMBER_JOINED`, `MEMBER_LEFT`, `LOOP_DETECTED`, `CONTEXT_TRIMMED`, `STATUS_CHANGED`, `HEARTBEAT` 等领域事件；
-- **基于 Last-Event-ID 的断点续传**：
-  - 客户端携带 `Last-Event-ID` 头部或参数重连时，系统基于 `sequence_num` 游标自动从数据库补齐重连期间缺失的所有历史消息事件后再平滑接入实时流；
-  - 内置保活心跳（Heartbeat），杜绝网关空闲断联。
-
----
-
-## 十、 工作区沙箱容器化与部署自动化体系 (Phase 7 升级)
-
-### 1. 沙箱隔离体系架构 (`SandboxProvider` SPI & Providers)
-- **统一沙箱 SPI 契约 (`SandboxProvider`)**：
-  - 抽象 `execute(SandboxExecutionRequest)`、`destroy(executionId)` 与 `isAvailable()`，解耦上层业务调用与底层沙箱运行环境；
-  - 提供 `SandboxProviderFactory`，支持按类型（`LOCAL_PROCESS`, `DOCKER`）解析提供商，并在容器不可用时安全平滑兜底；
-- **受限子进程沙箱 (`LocalProcessSandbox`)**：
-  - 严格限制 `workingDirectory` 在受控项目工作区内，禁止逃逸；
-  - 清空宿主机环境，仅注入经安全脱敏的白名单环境变量；
-  - 基于异步并发 `BoundedOutputReader` 与看门狗定时器进行全链路流式审计；
-- **容器化沙箱 (`DockerSandbox`)**：
-  - 组装非特权安全配置：非 root 用户（`--user 1000:1000`）、只读根文件系统（`--read-only`）；
-  - 限制临时写入空间（`--tmpfs /tmp:rw,noexec,nosuid,size=64m`）；
-  - 严格限制宿主机挂载：仅挂载受控工作区（`-v <workspace>:/workspace:rw`），禁止宿主机敏感目录或 Docker socket 挂载；
-  - 资源上限硬限制：`--memory <quota>m` 与 `--cpus <quota>`。
-
-### 2. 安全策略与命令防火墙 (`CommandSecurityGuard`)
-- **高危破坏性命令拦截矩阵**：
-  - 阻断破坏性文件删除：`rm -rf /`, `rm -rf ~`, `rm -rf *`, `del /s /q C:\`, `format D:`, `rmdir /s /q C:\`，支持分立参数（`-r -f`, `-f -r`, `--recursive --force`）、带单双引号路径及 PowerShell `Remove-Item -Recurse -Force`；
-  - 阻断低级磁盘破坏：`mkfs`, `dd if=...`, `fdisk`, `chmod -R 777 /`；
-  - 阻断远程管道脚本注入：`curl ... | sh`, `wget ... | bash`, `curl ... | python`；
-  - 阻断恶意命令串联与逃逸：`; rm -rf`, `&& rm -rf`, `|| rm -rf`, PowerShell `-enc/-EncodedCommand`, Fork Bomb (`:(){ :|:& };:`)，主机越权 (`> /dev/sd*`, `> /etc/`)；
-  - 深入解析合法 Shell 包裹参数（`sh -c`, `bash -c`, `cmd /c`, `powershell -c`），拦截其内部包裹的恶意命令与脚本；
-- **白名单机制 (`Executable Whitelist`)**：
-  - 严格放行标准开发工具：`node`, `npm`, `npx`, `yarn`, `pnpm`, `java`, `javac`, `mvn`, `gradle`, `python`, `git`, `echo` 等，并对可执行文件名自动剥离首尾引号及 `.exe`, `.cmd`, `.bat` 后缀；
-  - 严格拦截非白名单与黑名单程序：`sudo`, `su`, `useradd`, `nc`, `netcat`, `nmap`, `iptables`, `chroot`。
-
-### 3. 环境变量隔离与敏感凭证防护 (`EnvironmentSanitizer`)
-- **宿主机凭证继承阻断**：
-  - 自动审查并剔除包含 `KEY`, `SECRET`, `PASSWORD`, `TOKEN`, `CREDENTIAL`, `AUTH`, `DATABASE` 等关键字的宿主机变量；
-  - 防止 `OPENAI_API_KEY`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` 等敏感资产随子进程泄漏；
-- **注入攻击拦截**：
-  - 仅继承标准系统安全变量（`PATH`, `HOME`, `USER`, `LANG`, `TEMP` 等）；
-  - 拦截 `LD_PRELOAD`, `BASH_ENV` 等动态链接劫持注入攻击。
-
-### 4. 资源配额与看门狗超时监控 (`SandboxResourceQuota` & Watchdog)
-- **看门狗超时监控 (Watchdog Timeout Kill)**：
-  - 单命令执行设定硬超时阈值；
-  - 超时自动触发多平台进程树递归强平（Process Tree Kill，包括 Windows 环境 `taskkill /F /T /PID` 级联终止与 Linux 子孙进程级联终止），同步等待句柄完全释放，彻底防止临时文件锁定；进程标记退出码 137 并设置 `isTimedOut = true`；
-- **输出缓冲区截断防撑爆 (Output Buffer Truncation)**：
-  - 实时限制子进程输出捕获字节上限（默认 1MB，支持自定义）；
-  - 缓冲区线程安全并发保护与守护线程池支持；
-  - 超出配额时自动截断后续字符，并追加 `[SANDBOX WARNING: Output truncated...]` 警示，彻底消除海量日志输出导致 JVM 内存溢出 OOM 隐患。
-
-### 5. 端口分配管理与健康检查探测 (`PortAllocationService` & `HealthCheckProbeService`)
-- **原子受控端口池分配 (`PortAllocationService`)**：
-  - 管理 18000-18999 端口池；
-  - 结合内存并发原子分配与操作系统底层 TCP ServerSocket 真实绑定探测；
-  - 部署结束或失败时自动回收与释放；
-- **主动健康检查探测 (`HealthCheckProbeService`)**：
-  - 支持对 HTTP 服务进行周期性探测与重试探测；
-  - 响应 HTTP 2xx/3xx 判定为健康，探测超时或连接拒绝判定为失败。
-
-### 6. 代码一键部署生命周期与 REST 端点 (`DeploymentApplication` & `DeploymentController`)
-- **受控部署生命周期状态机模型 (`DeploymentStatus`)**：
-  - `CREATED` -> `BUILD` -> `START` -> `HEALTH_CHECK` -> `RUNNING` -> `STOP` -> `CLEANUP` -> `STOPPED` / `FAILED`；
-  - 仅当 `HealthCheckProbeService` 收到真实 HTTP `2xx/3xx` 响应后方可进入 `RUNNING`，并持久化 `lifecycleTrace`；
-- **RESTful 端点矩阵 (`/api/deployments`)**：
-  - `POST /api/deployments`：校验 `ACCEPTED` 产物并触发受控模板构建与部署；
-  - `GET /api/deployments/{id}`：查询部署详情、运行状态与 `lifecycleTrace`；
-  - `GET /api/deployments/{id}/logs`：按偏移游标（`?offset=`）获取增量日志；
-  - `POST /api/deployments/{id}/stop`：主动停止部署并释放占用端口；
-  - `GET /api/deployments?projectId={id}`：查询项目历史部署记录。
-
----
-
-## 十一、 前端 Bento 现代美学、实时看板与交互体验架构
-
-### 1. 核心设计准则：践行 `modern-aesthetic-ui`
-- **便当盒模块化网格 (Bento Grid)**：按照拓扑图 + SSE 终端、多 Agent 消息流 + Diff 审查、Provider 路由与沙箱控制台进行信息密度层级划分；
-- **微质感与环境光影 (Subtle Glassmorphism & Ambient Glow)**：
-  - 沉稳碳素黑基底：采用 `zinc-950` (`#09090b`) 底色与低饱和度径向环境微光；
-  - 磨砂玻璃容器：`bg-zinc-900/60`、`backdrop-blur-md` 结合 1px 细边线（`border border-zinc-800/80`）；
-- **显式模式标识**：顶部状态栏严格区分 **`真实产品模式`**（翠绿色徽章，禁止静默回退到 Mock 数据）与 **`离线演示/模拟模式`**（琥珀色徽章，`simulated=true`）。
-
----
-
-## 十二、 脱敏运行证据包与防篡改校验 (Phase F)
-
-- **统一导出接口**：`GET /api/executions/runs/{runId}/evidence` 与 `GET /api/executions/runs/{runId}/evidence/download`（以及别名 `/api/runs/{runId}/evidence`）；
-- **结构化证据内容 (`RunEvidenceBundleView`)**：汇总项目与工作区基线、脱敏 `workflowDslSnapshot`、Run/Step 终态、单调递增 `events`、`providerRuntime`（显式标注 `simulated` 与 `executionMode`）、JGit `StructuredDiff`、产物审查记录、测试验证摘要、人工审批记录与部署健康轨迹；
-- **全链路脱敏与防篡改校验**：所有文本载荷均经过 `SecretMasker.maskInText` / `maskUrl` 清洗，并通过 `ExecutionApplicationService.computeDeterministicChecksum` 计算确定性 SHA-256 `checksum`，任何单字节篡改均可被 `verifyEvidenceBundleChecksum` 检出。
+Run 创建后冻结 DSL、输入、Provider/Runtime 策略、工作区基线、权限和预算快照。前端的 DAG、终端、审批、Diff 和预览都是这些持久化事实的投影。
 
+## 4. 执行和事件语义
 
+`DagExecutionEngine` 是生产执行内核。Run/Step 通过数据库条件更新和租约字段领取，`PersistentExecutionRecoveryRunner` 在应用启动或租约过期后恢复未完成工作。已成功的 Step 从持久化输出恢复，不能因 JVM 重启而重复产生副作用。
 
+执行语义是 at-least-once 调度加幂等副作用：每次尝试有 attempt、租约、超时、取消和审计记录；系统不宣称分布式 exactly-once。状态迁移必须经过统一状态机，不能由多个线程直接改 Entity 字段。
+
+RunEvent 先持久化，再推送给 SSE。客户端使用 `Last-Event-ID` 或游标补回断线期间的事件。当前活跃 SSE 连接、取消令牌和审批唤醒仍有单节点内存部分，多实例广播属于后续阶段能力。
+
+## 5. 工作区、Diff 和部署
+
+Workspace API 只接受服务端 `workspaceId` 与受检相对路径。`DefaultWorkspaceResolver` 阻断绝对路径、目录穿越、符号链接逃逸和受保护目录；JGit 保存基线、快照、结构化 Diff 和回滚记录。并发写入由数据库租约、JVM 锁和 OS 文件锁共同保护。
+
+Deployment 只能绑定已接受 Artifact 和受控模板，生命周期为：
+
+```text
+CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING
+                                  |             |
+                                  v             v
+                                FAILED       STOP -> CLEANUP -> STOPPED
+```
+
+只有真实 HTTP 探针通过后才进入 `RUNNING`。Local Process 和 Docker sandbox 都属于受控团队内部预览能力；当前没有 MicroVM、Kubernetes 或公网不可信代码的内核级隔离。
+
+## 6. Agent 和上下文
+
+Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本、健康度和熔断状态选择。Provider、Runtime、工具调用和降级均必须写入 Run 证据；Mock 只能属于明确的 Demo/Test 模式。
+
+长期演进会把 Agent 收敛为版本化 `AgentDefinition` 和 `WorkflowTemplate`：包含目标、工具 allowlist、上下文来源、Token 预算、成本上限、重试、超时和停止条件。上下文来源包括项目规则、AOCI 认知、代码文件、Run 事件摘要和工具输出，均需绑定版本、范围和安全级别。
+
+## 7. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
+
+- Flyway 是唯一 Schema 演进方式；生产使用 `ddl-auto=validate`。
+- Micrometer/Prometheus 暴露 Run、Step、Provider、SSE、锁和 Deployment 指标；日志必须结构化并脱敏。
+- 证据包使用脱敏内容、模式标识和确定性 checksum；证据包只能证明对应 Run 的事实，不能替代目标环境验证。
+
+| 数据库表名 | Owner 模块 | JPA Entity / 访问组件 | 来源迁移 | 认证与归属隔离 | 幂等 / 唯一约束 | 状态 | 核心验证测试 | 删除 / 演进计划 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `users` | `identity` | `UserEntity` | `V1`, `V2` | 自身为主体 (`id`) | `PRIMARY KEY(id)`, `UNIQUE(email)` | `ACTIVE` | `RestApiSecurityAndMultiTenancyIntegrationTest` | 长期保留；`V2` 演示种子在 Phase 1 迁入 demo profile |
+| `invalidated_tokens` | `identity` | `InvalidatedTokenEntity` | `V9` | `user_id` 关联当前用户 | `PRIMARY KEY(token_id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；过期记录按 `expires_at` 清理 |
+| `auth_audit_logs` | `identity` | `AuthAuditLogEntity` | `V9` | 记录 `user_id`、`email`、`ip_address` | `PRIMARY KEY(id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；只追加审计表 |
+| `projects` | `project` | `ProjectEntity` | `V1`, `V2` | `owner_id` (`ResourceAccessGuard`) | `PRIMARY KEY(id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；`proj-default` 种子在 Phase 1 迁入 demo profile |
+| `workspaces` | `project` | `WorkspaceEntity` | `V1`, `V2` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留；`ws-default` 种子在 Phase 1 迁入 demo profile |
+| `workspace_locks` | `infrastructure` | `WorkspaceLockManager` (JDBC) | `V3`, `V12` | `owner_id` 服务端从认证上下文派生 | `PRIMARY KEY(workspace_key)` + `expires_at_epoch_ms` 条件更新 | `ACTIVE` | `PhaseEProductionOpsAndDisasterRecoveryIntegrationTest` | 长期保留；跨实例毫秒级租约互斥 |
+| `agent_definitions` | `agent` | `AgentDefinitionEntity` | `V1`, `V2`, `V6` | 系统级模板，调用需登录 | `PRIMARY KEY(id)`, `UNIQUE(def_key)` | `ACTIVE` | `ProviderDrivenAgentRuntimeIntegrationTest` | Phase 3 演进为带工具权限、上下文来源与预算的版本化定义 |
+| `agent_instances` | `agent` | `AgentInstanceEntity` | `V1` | `owner_id` + `project_id` | `PRIMARY KEY(id)` | `ACTIVE` | `FlywayMigrationAndSchemaTest` | Phase 3 与版本化 `AgentDefinition` 快照合并收敛 |
+| `providers` | `agent` | `ProviderEntity` | `V1`, `V6` | `owner_id` (`ResourceAccessGuard`) | `PRIMARY KEY(id)` | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留；`secret_ref` 脱敏存储，`V6` 默认种子 Phase 1 隔离 |
+| `token_usages` | `agent` | `TokenUsageAuditEntity` | `V6` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)` | `ACTIVE` | `TokenCostAccountingAndAuditingTest` | 长期保留；区分真实 Provider 计费与 `DEMO_SIMULATED` |
+| `teams` | `team` | `TeamEntity` | `V1`, `V7` | 经 `project_id` 校验归属 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest` | 作为协作扩展隔离维护，不阻塞研发变更交付主线 |
+| `team_members` | `team` | `TeamMemberEntity` | `V1`, `V7` | 经 `team_id -> teams` 校验 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `TeamTopologyAndCoordinationTest` | 作为协作扩展隔离维护 |
+| `conversations` | `conversation` | `ConversationEntity` | `V1`, `V7` | `owner_id` + `project_id` 校验 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `ConversationEntityRelationAndMessageSchemaTest` | Phase 1 移除 Entity 默认 `user-1`/`proj-default` 赋值 |
+| `conversation_participants` | `conversation` | `ConversationParticipantEntity` | `V1` | 经 `conversation_id` 校验 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `MessageRoutingAndVisibilityIsolationTest` | 作为协作扩展隔离维护 |
+| `messages` | `conversation` | `MessageEntity` | `V1`, `V7` | 经 `conversation_id` + `MessageVisibilityFilter` | `PRIMARY KEY(id)`, `(conversation_id, sequence_num)` 单调递增 | `ISOLATED_EXT` | `ConversationMonotonicSequenceAndConcurrencyTest` | 作为协作扩展隔离维护 |
+| `workflow_definitions` | `orchestration` | `WorkflowDefinitionEntity` | `V1`, `V5`, `V10` | 登录鉴权 + 项目关联校验 | `PRIMARY KEY(id)` + `checksum` | `ACTIVE` | `WorkflowDefinitionAndApprovalControllerIntegrationTest` | 长期保留；Phase 3 升级为 `WorkflowTemplate` |
+| `workflow_runs` | `execution` | `WorkflowRunEntity` | `V1`, `V4`, `V5`, `V10` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` + `idempotency_key` 防重 + `lease_until` 抢占 | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest` | 长期保留；执行事实唯一权威来源 |
+| `step_runs` | `execution` | `StepRunEntity` | `V1`, `V4`, `V5`, `V10` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)` + `(run_id, node_id)` + `attempt` | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest` | 长期保留；节点级状态机与租约载体 |
+| `run_events` | `execution` | `RunEventEntity` | `V1`, `V10` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)`, `UNIQUE uk_run_events_run_seq(run_id, sequence_num)` | `ACTIVE` | `ExecutionSseStreamAndReconnectionTest` | 长期保留；SSE 断点续传与证据包事件源 |
+| `artifacts` | `audit` | `ArtifactEntity` | `V1`, `V3` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)` + SHA-256 `checksum` | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留；Phase 5 扩展为完整 Artifact Lineage |
+| `approvals` | `orchestration` | `ApprovalEntity` | `V1`, `V5` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)`；单次决策状态转换 | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留；人工审批门禁权威记录 |
+| `deployments` | `sandbox` | `DeploymentEntity` | `V1`, `V8`, `V11` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` + 受控端口池原子分配 | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest` | 长期保留；绑定已验收 `artifact_id` 与健康探针轨迹 |
+
+## 8. 架构守卫和扩展规则
+
+ArchUnit（`ArchUnitArchitectureTest`）与 Phase 0 基线守卫（`Phase0BaselineAndDebtFreezeGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
+
+详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-005](adr/ADR-005-database-driven-lease-and-crash-recovery.md)。
 

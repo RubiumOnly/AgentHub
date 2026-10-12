@@ -1,6 +1,42 @@
 # 更新记录 (Changelog)
 
-所有关键架构升级、特性新增与重要缺陷修复均按版本记录于此。
+所有关键架构升级、特性新增与重要缺陷修复均按版本记录于此。本文件是历史变更记录，不是当前能力、上线状态或长期路线的权威来源；当前能力以 `docs/CURRENT_CAPABILITY_BOUNDARIES.md` 为准，长期路线以 `docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md` 为准。历史条目中的测试计数均为对应提交时间点的快照（采集命令：`mvn clean test` / `npm run build`）。
+
+## [v3.0.0-phase-0] - 2026-10-12
+
+### 🧭 Phase 0：产品边界、事实基线与瘦身冻结 (Product Brief, Baseline & Debt Freeze)
+- **唯一长期路线与文档职责收敛**：
+  - 建立唯一长期计划 `docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md`（v3.0），下线并删除历史平行路线 `docs/AGENTHUB_LONG_TERM_PLAN.md`、`docs/AGENTHUB_NEXT_LONG_TERM_PLAN.md` 与手工索引 `ARCHITECTURE_INDEX.md`；
+  - 产出 Product Brief（目标用户、首个项目模板、核心旅程、Out-of-Scope、三种运行模式 `DEMO_SIMULATED`/`LIVE_SELF_HOSTED`/`LIVE_TEAM`、数据保留与安全边界）；
+  - 在 `docs/ARCHITECTURE.md` 建立 11 项核心资源与事件词汇表及 Flyway V1～V12 共 22 张数据库表矩阵；在 `docs/API.md` 建立全部 18 个 Controller 与前端 `services/api.ts` 调用矩阵；在 `docs/CURRENT_CAPABILITY_BOUNDARIES.md` 建立 Provider/Runtime/Sandbox 能力矩阵。
+- **前端硬编码清理与代码债务冻结门禁**：
+  - 清理 `WorkflowCanvas.tsx` 对 `http://localhost:8080/api/workspace/workflow/execute` 与 Windows 宿主绝对路径 `d:/work/agenthub/data/workspaces/default` 的直连，统一收口至 `apiClient.startRun`；清理 `services/api.ts` 中 `MOCK_DEPLOYMENT` 的 `localhost:8080` 硬编码；
+  - 扩展 `ArchUnitArchitectureTest` 并新增 `Phase0BaselineAndDebtFreezeGuardTest` 与 `.github/workflows/ci.yml` 门禁，自动拦截废弃组件新增调用、前端 `localhost` 直连、非演示模式静默 Mock 回退、新增默认 ID（`user-1`/`proj-default`/`run-default`）及数据库迁移基线漂移（后端 53 个测试类、310 项测试通过）。
+
+---
+
+## [v2.0.0-stage-f] - 2026-10-12
+
+### 📦 阶段 F：脱敏运行证据包、模式隔离与 E2E 演练契约校准 (Stage F Evidence Bundle & Contract Calibration)
+- 新增 `GET /api/executions/runs/{runId}/evidence` 与 `/evidence/download`，导出含确定性 SHA-256 `checksum`、`simulated` 标识、Run/Step/Event、JGit Diff、Approval、Deployment 轨迹的脱敏证据包（`RunEvidenceBundleView`）；
+- 落地跨平台演练脚本 `scripts/run-e2e-demo.sh` 与 `scripts/run-e2e-demo.ps1` 及 `PhaseFProductQualityAndEvidenceBundleIntegrationTest`（后端 52 个测试类、301 项测试通过）。
+
+---
+
+## [v2.0.0-stage-e] - 2026-10-11
+
+### 🛡️ 阶段 E：生产环境配置校验、CI 全量门禁、Prometheus 规则与灾备演练 (Stage E Ops & DR Drill)
+- 落地 `ProductionEnvironmentValidator`、`ActuatorSecurityFilter`、`PrometheusAlertEvaluator` 与 `DisasterRecoveryBackupService`，新增 Flyway `V12` 毫秒级工作区锁过期字段 `expires_at_epoch_ms`；
+- 完善 `.github/workflows/ci.yml` 真实 MySQL 8.0 迁移门禁、`promtool` 规则校验、非 root 镜像检查（UID `10001`/`1001`）与备份篡改恢复演练（`PhaseEProductionOpsAndDisasterRecoveryIntegrationTest`）。
+
+---
+
+## [v2.0.0-stage-d] - 2026-10-10
+
+### 🚀 阶段 D：受控沙箱部署生命周期、产物门禁绑定与孤儿回收 (Stage D Sandbox Lifecycle)
+- 落地 `DeploymentLifecycleWorker` 状态机（`CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING -> STOP -> CLEANUP -> STOPPED / FAILED`），强制校验 `Artifact` 已 `ACCEPTED` 并通过真实 HTTP 探针；新增 Flyway `V11` 与 `PhaseDSandboxLifecycleAndDeliveryIntegrationTest`。
+
+---
 
 ## [v2.0.0-stage-c] - 2026-10-09
 
@@ -76,36 +112,34 @@
 
 ## [v1.9.0] - 2026-10-09
 
-### 🏆 终局里程碑：阶段 9 端到端质量门禁、全链路压测与大厂级产品化交付 (Phase 9 Final Release)
-- **生产级可观测性与业务指标系统 (Spring Boot Actuator & Micrometer Prometheus)**：
+### 🏁 阶段 9 里程碑：端到端质量门禁、并发压测与容器化编排交付 (Phase 9 Release)
+- **可观测性与业务指标系统 (Spring Boot Actuator & Micrometer Prometheus)**：
   - 引入 `spring-boot-starter-actuator` 与 `micrometer-registry-prometheus`，在 `application.yml` 与 `application-prod.yml` 中安全暴露 `/actuator/health`、`/actuator/info`、`/actuator/prometheus`；
   - 落地 `AgentHubMetricsCollector` 指标收集组件：动态注册核心 Gauge / Counter / Timer 指标（活跃 Run 计数 `agenthub.runs.active`、活跃 SSE 订阅数 `agenthub.sse.connections.active`、Step 执行延迟分布 `agenthub.steps.duration`、Token 消耗统计、工作区锁竞争耗时 `agenthub.workspace.lock.wait`、部署成功/失败计数）；
   - `RunEventBroadcaster` 联动指标收集器实时统计活跃长连接；
-- **全链路端到端黑盒冒烟与集成验收套件 (`FullLifecycleEndToEndIntegrationTest`)**：
-  - 严格覆盖长期规划第 6 节定义的【场景 A、B、C、D、E】五大核心交付场景：
-    - **场景 A**：单 Agent 试运行与产物审计（创建项目 -> 启动 Run -> 接收 SSE 真实流 -> JGit 结构化快照审计 -> 产物持久化验证）；
+- **端到端黑盒冒烟与集成验收套件 (`FullLifecycleEndToEndIntegrationTest`)**：
+  - 覆盖五大核心交付场景：
+    - **场景 A**：单 Agent 试运行与产物审计（创建项目 -> 启动 Run -> 接收 SSE 流 -> JGit 结构化快照审计 -> 产物持久化验证）；
     - **场景 B**：多 Agent 团队协作与 DAG 拓扑门禁（Backend 与 Frontend 并行开发 -> QA 汇聚 -> WAITING_APPROVAL 挂起 -> 审批人通过 -> 恢复调度至 SUCCEEDED）；
     - **场景 C**：不可信输入防御与安全边界（受控路径穿越拦截、高危命令防火墙拦截、敏感 API Key 全链路脱敏）；
     - **场景 D**：任务取消、进程回收与 SSE 断点补发（优雅取消、状态机置为 CANCELLED、基于 Last-Event-ID 游标精准重放）；
     - **场景 E**：JGit 非破坏性回滚与沙箱部署生命周期（回滚至基线快照并保留历史审计、动态端口分配与释放）；
-- **高并发、锁竞争与极限压力性能测试套件 (`HighConcurrencyStressIntegrationTest`)**：
-  - **压测 1**：工作区排他租约锁竞争（20 个并发线程争抢同一工作区锁，验证 100% 互斥安全，同一瞬间持有者 <= 1，无死锁发生）；
+- **并发与锁竞争基准测试套件 (`HighConcurrencyStressIntegrationTest`)**：
+  - **压测 1**：工作区排他租约锁竞争（20 个并发线程争抢同一工作区锁，验证互斥安全，同一瞬间持有者 <= 1，无死锁发生）；
   - **压测 2**：多智能体消息总线 128 分段锁单调定序（50 个并发线程同时争抢序号分配，87ms 内完成分配，严格 1..50 零重复、零跳号、全保序）；
-  - **压测 3**：DAG 拓扑调度批量执行吞吐（并发运行 5 个独立复杂工作流，541ms 内全部跑通，沉淀 P50: 252ms, P99: 268ms 性能基线）；
-- **生产级多容器编排与基础设施交付 (`docker-compose.prod.yml`)**：
-  - `agenthub-backend/Dockerfile`：多阶段构建（JDK 构建 -> JRE 极小镜像），非 root 用户 `agenthub:agenthub` (uid=10001)，JVM 内存自适应参数，内置 Actuator 健康探针；
-  - `agenthub-frontend/Dockerfile`：Next.js 14 Standalone 多阶段构建，非 root 用户 `nextjs:nodejs` (uid=1001)，镜像轻量敏捷；
-  - `docker/nginx/agenthub.conf`：企业级反向代理与网关，针对 `/api/.*/events` 与 `/stream` 显式配置 `proxy_buffering off`、`proxy_cache off` 与长超时，确保 SSE 零缓冲流式直推；
-  - `docker-compose.prod.yml`：整合 MySQL 8.0、Redis 7、Backend、Frontend 与 Nginx 网关全栈容器网络，配置持久化数据卷与资源限额；
-  - 提供生产环境变量模版 `.env.production.example` 与一键部署脚本（`scripts/deploy-prod.sh`、`scripts/deploy-prod.ps1`）；
-- **大厂级生产运维与灾难恢复规范**：
-  - 产出《AgentHub 生产级 Prometheus 告警规则规范》（`docs/ops/ALERTING_RULES.md`），定义 7 类核心告警与 SLA 处置响应分级；
-  - 产出《AgentHub 生产故障演练与灾难恢复手册》（`docs/ops/DISASTER_RECOVERY_RUNBOOK.md`），覆盖数据库宕机、僵尸进程排查、锁自动恢复、SSE 断流优化与数据冷备 SOP；
-- **核心架构资产与白皮书交付**：
-  - 产出《AgentHub 核心技术架构白皮书与大厂级答辩防穿指南》（`docs/TECH_WHITEPAPER_AND_DEFENSE.md`），深入拆解模块化单体、SSE+持久化、JGit 快照三大架构权衡，提供大厂面试官高频 10 问防穿打法；
-  - 产出《AgentHub 5~8 分钟全链路真实演示指南》（`docs/E2E_DEMO_GUIDE.md`）；
-  - 全面更新《当前真实能力边界最终版》（`docs/CURRENT_CAPABILITY_BOUNDARIES.md`），如实对齐全部 10 大阶段达成事实；
-  - 后端 267 项全量测试 100% 绿灯，前端 Next.js 生产构建 100% 成功，长期计划 10 大阶段 100% 圆满交付收官！
+  - **压测 3**：DAG 拓扑调度批量执行吞吐（并发运行 5 个独立工作流，沉淀 P50: 252ms, P99: 268ms 本地/CI 基准）；
+- **多容器编排与基础设施配置 (`docker-compose.prod.yml`)**：
+  - `agenthub-backend/Dockerfile`：多阶段构建（JDK 构建 -> JRE 镜像），非 root 用户 `agenthub:agenthub` (uid=10001)，JVM 内存自适应参数，内置 Actuator 健康探针；
+  - `agenthub-frontend/Dockerfile`：Next.js 14 Standalone 多阶段构建，非 root 用户 `nextjs:nodejs` (uid=1001)；
+  - `docker/nginx/agenthub.conf`：反向代理与网关，针对 `/api/.*/events` 与 `/stream` 显式配置 `proxy_buffering off`、`proxy_cache off` 与长超时，确保 SSE 零缓冲流式直推；
+  - `docker-compose.prod.yml`：整合 MySQL 8.0、Redis 7、Backend、Frontend 与 Nginx 网关容器网络，配置持久化数据卷与资源限额；
+  - 提供环境变量模版 `.env.production.example` 与部署脚本（`scripts/deploy-prod.sh`、`scripts/deploy-prod.ps1`）；
+- **运维告警与灾难恢复手册**：
+  - 产出《AgentHub Prometheus 告警规则与观测策略》（`docs/ops/ALERTING_RULES.md`），定义核心告警与 SLA 处置响应分级；
+  - 产出《AgentHub 故障演练与灾难恢复手册》（`docs/ops/DISASTER_RECOVERY_RUNBOOK.md`），覆盖数据库宕机、僵尸进程排查、锁自动恢复、SSE 断流优化与数据冷备 SOP；
+- **架构文档与能力边界同步**：
+  - 更新 `docs/TECH_WHITEPAPER_AND_DEFENSE.md`、`docs/E2E_DEMO_GUIDE.md` 与 `docs/CURRENT_CAPABILITY_BOUNDARIES.md`；
+  - 后端 267 项测试通过，前端 Next.js 构建成功，完成 v1.9 阶段 9 验收。
 
 ### 🔧 调度引擎并发加固与 GitHub Actions CI 稳定性治理 (Bugfix)
 - **并发重复分发缺陷治理**：排查并修复 `DagExecutionEngine` 在多核高速并发下因初始就绪节点动态遍历与后继节点提前递减入度产生的竞态条件（Race Condition）；

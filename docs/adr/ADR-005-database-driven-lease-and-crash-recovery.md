@@ -3,7 +3,7 @@
 * **状态 (Status)**: 已采纳 (Accepted)
 * **制定者 (Deciders)**: AgentHub 核心架构组
 * **日期 (Date)**: 2026-10-12
-* **技术背景 (Technical Story)**: `docs/AGENTHUB_NEXT_LONG_TERM_PLAN.md` 阶段 C（有状态工作流持久化恢复和并发语义）与阶段 F（关键架构权衡校准）
+* **技术背景 (Technical Story)**: AgentHub 产品化长期计划 Phase 4 的有状态工作流恢复和并发语义
 
 ---
 

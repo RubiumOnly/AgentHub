@@ -1,7 +1,7 @@
 # AgentHub 生产故障演练与灾难恢复手册 (Disaster Recovery Runbook)
 
 > 文档编号：`OPS-DR-001`  
-> 归属版本：`v2.0.0 (Phase E Hardened)`  
+> 适用基线：当前 v2.0 实现基线；每次目标环境演练后更新日期和证据。
 > 目标：提供在真实 Linux 生产环境中遇到不可预期故障时的标准化应急预案、排查命令、安全红线与恢复 SOP。
 
 ---
@@ -175,9 +175,9 @@ docker builder prune -f
 
 ---
 
-## 4. Staging 故障注入与恢复演练实测记录
+## 4. 故障注入与恢复演练实测记录
 
-以下演练由 `PhaseEProductionOpsAndDisasterRecoveryIntegrationTest`、GitHub Actions Linux Runner (`ubuntu-latest` + `mysql:8.0` + `prom/prometheus:v2.51.0`) 及本地备份脚本真实执行并采集：
+以下演练由 `PhaseEProductionOpsAndDisasterRecoveryIntegrationTest`（采集命令：`mvn test -Dtest=PhaseEProductionOpsAndDisasterRecoveryIntegrationTest`，采集日期：`2026-10-12`，环境：Windows 11 / OpenJDK 17 & GitHub Actions `ubuntu-latest` + `mysql:8.0` + `prom/prometheus:v2.51.0`）及备份恢复脚本真实执行并采集：
 
 | 演练项 | 注入故障 / 验证操作 | 观测结果与恢复证据 | 实测耗时 |
 | :--- | :--- | :--- | :--- |
