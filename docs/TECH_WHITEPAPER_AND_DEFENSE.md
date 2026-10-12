@@ -17,9 +17,9 @@ AgentHub 致力于解决多 Agent 辅助研发场景中的四大工程痛点：
 
 | 维度 | 离线确定性演示模式 (`Demo Mode`) | 真实 Provider 驱动模式 (`Live Provider Mode`) |
 | :--- | :--- | :--- |
-| **Runtime 实现类** | `MockAgentRuntime` (`simulated = true`) | `ProviderDrivenAgentRuntime` (`simulated = false`) |
+| **Runtime 与路由判定** | 含 `MockAgentRuntime` (`MOCK`)、或 `DynamicProviderRouter` 降级至 `MockLlmProvider` (`prov-mock`)、或无成功外部 Token 记录 | 全链路无 `MOCK` 节点且存在至少一条 `SUCCESS` 非 Mock 外部 Provider Token 计量记录 |
 | **外部 LLM 依赖** | 零外部 API Key 依赖，用于 CI 确定性验证与快速离线体验 | 真实调用 DeepSeek / OpenAI / Anthropic / Gemini / Ollama |
-| **Token 计费落库** | 不写入外部 Provider 账单 | 在 `token_usages` 表持久化真实 Prompt/Completion Tokens、实测延迟与估算成本 |
+| **Token 计费落库** | 不写入真实外部 Provider 账单 | 在 `token_usages` 表持久化真实 Prompt/Completion Tokens、实测延迟与估算成本 |
 | **证据包标记** | `"simulated": true`, `"executionMode": "DEMO_SIMULATED"` | `"simulated": false`, `"executionMode": "LIVE_PROVIDER"` |
 
 ---
@@ -55,21 +55,22 @@ stateDiagram-v2
     FAILED --> PENDING: retryStep()
 ```
 
-### 2.3 受控预览沙箱部署 8 阶段状态机 (`DeploymentStatus`)
+### 2.3 受控预览沙箱部署生命周期状态机 (`DeploymentStatus`)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: 校验 ACCEPTED Artifact & 分配动态端口
-    PENDING --> BUILDING: 执行受控构建模板
-    BUILDING --> STARTING: 构建退出码 == 0
-    BUILDING --> FAILED: 构建失败或超时
-    STARTING --> HEALTH_CHECKING: 子进程/容器存活
-    STARTING --> FAILED: 进程异常退出
-    HEALTH_CHECKING --> RUNNING: HealthCheckProbe 收到 HTTP 2xx/3xx
-    HEALTH_CHECKING --> FAILED: 探针超时 -> 强杀进程并释放端口
-    RUNNING --> STOPPING: stopDeployment() 或 TTL 到期
+    [*] --> CREATED: 校验 ACCEPTED Artifact & 分配动态端口
+    CREATED --> BUILD: 执行受控构建模板
+    BUILD --> START: 构建退出码 == 0
+    BUILD --> FAILED: 构建失败或超时
+    START --> HEALTH_CHECK: 子进程/容器存活
+    START --> FAILED: 进程异常退出
+    HEALTH_CHECK --> RUNNING: HealthCheckProbe 收到 HTTP 2xx/3xx
+    HEALTH_CHECK --> FAILED: 探针超时 -> 强杀进程并释放端口
+    RUNNING --> STOP: stopDeployment() 或 TTL 到期
     RUNNING --> FAILED: 进程非预期退出
-    STOPPING --> STOPPED: 销毁进程树 & 回收端口
+    STOP --> CLEANUP: 销毁进程树 & 清理沙箱上下文
+    CLEANUP --> STOPPED: 释放动态端口 & 归档日志
 ```
 
 ---

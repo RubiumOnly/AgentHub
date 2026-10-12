@@ -113,6 +113,11 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
                 String effectiveProviderType = streamResponse != null ? streamResponse.getProviderType() : "ROUTER";
                 String effectiveModel = streamResponse != null ? streamResponse.getModel() : "unknown";
 
+                if ("MOCK".equalsIgnoreCase(effectiveProviderType) || "prov-mock".equalsIgnoreCase(effectiveProviderId)) {
+                    sink.onLog(runId, stepRunId, "WARN",
+                            "[SIMULATED_FALLBACK] DynamicProviderRouter routed to MockLlmProvider (" + effectiveModel + "); execution is simulated");
+                }
+
                 // Persist token usage audit
                 tokenUsageApplication.recordUsage(
                         runId,

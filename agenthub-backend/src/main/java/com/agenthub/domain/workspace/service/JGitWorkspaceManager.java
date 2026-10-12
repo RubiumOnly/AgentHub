@@ -307,6 +307,110 @@ public class JGitWorkspaceManager {
         );
     }
 
+    public StructuredDiff computeStructuredDiffBetweenCommits(File workspaceDir, String fromCommitHash, String toCommitHash) throws Exception {
+        if (fromCommitHash == null || fromCommitHash.isBlank()
+                || toCommitHash == null || toCommitHash.isBlank()
+                || fromCommitHash.equals(toCommitHash)) {
+            return computeStructuredDiff(workspaceDir);
+        }
+        initWorkspace(workspaceDir);
+        List<FileDiffEntry> diffEntries = new ArrayList<>();
+        int totalAdded = 0;
+        int totalDeleted = 0;
+
+        try (Git git = Git.open(workspaceDir)) {
+            Repository repo = git.getRepository();
+            try (ObjectReader reader = repo.newObjectReader()) {
+                ObjectId oldTreeId = repo.resolve(fromCommitHash + "^{tree}");
+                ObjectId newTreeId = repo.resolve(toCommitHash + "^{tree}");
+                if (oldTreeId == null || newTreeId == null) {
+                    return computeStructuredDiff(workspaceDir);
+                }
+
+                CanonicalTreeParser oldTreeIter = new CanonicalTreeParser();
+                oldTreeIter.reset(reader, oldTreeId);
+                CanonicalTreeParser newTreeIter = new CanonicalTreeParser();
+                newTreeIter.reset(reader, newTreeId);
+
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try (DiffFormatter df = new DiffFormatter(out)) {
+                    df.setRepository(repo);
+                    df.setDiffComparator(RawTextComparator.DEFAULT);
+                    df.setDetectRenames(true);
+
+                    List<DiffEntry> entries = df.scan(oldTreeIter, newTreeIter);
+                    if (entries.isEmpty()) {
+                        return computeStructuredDiff(workspaceDir);
+                    }
+                    for (DiffEntry entry : entries) {
+                        out.reset();
+                        df.format(entry);
+                        String diffText = out.toString(StandardCharsets.UTF_8);
+
+                        int added = 0;
+                        int deleted = 0;
+                        for (Edit edit : df.toFileHeader(entry).toEditList()) {
+                            deleted += edit.getEndA() - edit.getBeginA();
+                            added += edit.getEndB() - edit.getBeginB();
+                        }
+
+                        FileDiffEntry.ChangeType changeType = switch (entry.getChangeType()) {
+                            case ADD -> FileDiffEntry.ChangeType.ADD;
+                            case DELETE -> FileDiffEntry.ChangeType.DELETE;
+                            case RENAME -> FileDiffEntry.ChangeType.RENAME;
+                            case COPY -> FileDiffEntry.ChangeType.COPY;
+                            default -> FileDiffEntry.ChangeType.MODIFY;
+                        };
+
+                        String targetRelPath = entry.getNewPath() != null && !"/dev/null".equals(entry.getNewPath())
+                                ? entry.getNewPath()
+                                : entry.getOldPath();
+                        byte[] committedBytes = (entry.getChangeType() != DiffEntry.ChangeType.DELETE && targetRelPath != null)
+                                ? readFileAtCommit(repo, toCommitHash, targetRelPath)
+                                : null;
+                        boolean isBinary = diffText.contains("Binary files differ");
+                        boolean hasConflict = false;
+                        String checksum = "";
+                        if (committedBytes != null) {
+                            checksum = calculateBytesChecksum(committedBytes);
+                            String text = new String(committedBytes, StandardCharsets.UTF_8);
+                            hasConflict = text.contains("<<<<<<< ") && text.contains("=======");
+                        }
+
+                        diffEntries.add(new FileDiffEntry(
+                                entry.getOldPath(),
+                                entry.getNewPath(),
+                                changeType,
+                                diffText,
+                                added,
+                                deleted,
+                                isBinary,
+                                entry.getChangeType() == DiffEntry.ChangeType.RENAME,
+                                hasConflict,
+                                FileDiffEntry.ReviewStatus.PENDING,
+                                checksum
+                        ));
+
+                        totalAdded += added;
+                        totalDeleted += deleted;
+                    }
+                }
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
+        }
+
+        return new StructuredDiff(
+                workspaceDir.getName(),
+                fromCommitHash,
+                toCommitHash,
+                diffEntries.size(),
+                totalAdded,
+                totalDeleted,
+                diffEntries
+        );
+    }
+
     public List<FileDiffEntry> computeWorkspaceDiff(File workspaceDir) throws Exception {
         return computeStructuredDiff(workspaceDir).getEntries();
     }
@@ -430,6 +534,17 @@ public class JGitWorkspaceManager {
         }
         try {
             byte[] bytes = Files.readAllBytes(path);
+            return calculateBytesChecksum(bytes);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public static String calculateBytesChecksum(byte[] bytes) {
+        if (bytes == null) {
+            return "";
+        }
+        try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] hash = md.digest(bytes);
             StringBuilder sb = new StringBuilder(hash.length * 2);
@@ -478,6 +593,9 @@ public class JGitWorkspaceManager {
             if (git != null && git.getRepository() != null && git.getRepository().getObjectDatabase() != null) {
                 git.getRepository().getObjectDatabase().close();
             }
+        } catch (Exception ignored) {}
+        try {
+            new org.eclipse.jgit.storage.file.WindowCacheConfig().install();
         } catch (Exception ignored) {}
         if (workspaceDir != null) {
             File gitDir = new File(workspaceDir, ".git");

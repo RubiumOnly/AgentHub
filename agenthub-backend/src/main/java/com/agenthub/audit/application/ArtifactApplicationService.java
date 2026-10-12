@@ -218,10 +218,51 @@ public class ArtifactApplicationService implements ArtifactApplication {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public void validateRunWorkspaceBinding(String runId, String workspaceId) {
+        if (runId == null || runId.isBlank() || workflowRunRepository == null) {
+            return;
+        }
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new com.agenthub.shared.exception.BusinessException(
+                        com.agenthub.shared.exception.ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        if (projectRepository != null) {
+            ProjectEntity project = projectRepository.findById(run.getProjectId())
+                    .orElseThrow(() -> new com.agenthub.shared.exception.BusinessException(
+                            com.agenthub.shared.exception.ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+            String currentUserId = RequestContext.get().getUserId();
+            if (accessGuard != null && currentUserId != null && !currentUserId.isBlank()) {
+                accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
+            }
+        }
+        if (workspaceId != null && !workspaceId.isBlank() && workspaceRepository != null) {
+            Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceId);
+            if (wsOpt.isEmpty()) {
+                wsOpt = workspaceRepository.findByProjectId(workspaceId);
+            }
+            if (wsOpt.isPresent()) {
+                String wsProjectId = wsOpt.get().getProjectId();
+                if (wsProjectId != null && !wsProjectId.equals(run.getProjectId())) {
+                    throw new com.agenthub.shared.exception.BusinessException(
+                            com.agenthub.shared.exception.ErrorCode.FORBIDDEN,
+                            "Access denied: run [" + runId + "] does not belong to workspace [" + workspaceId + "]");
+                }
+            } else if (projectRepository != null
+                    && projectRepository.findById(workspaceId).isPresent()
+                    && !workspaceId.equals(run.getProjectId())) {
+                throw new com.agenthub.shared.exception.BusinessException(
+                        com.agenthub.shared.exception.ErrorCode.FORBIDDEN,
+                        "Access denied: run [" + runId + "] does not belong to project workspace [" + workspaceId + "]");
+            }
+        }
+    }
+
+    @Override
     @Transactional
     public ArtifactView recordStepSnapshot(String runId, String stepRunId, String workspaceId,
                                            String commitHash, String tagName, List<String> changedFiles,
                                            Map<String, String> fileChecksums, String author) {
+        validateRunWorkspaceBinding(runId, workspaceId);
         String artifactId = "art-" + UUID.randomUUID().toString().substring(0, 8);
         StringBuilder meta = new StringBuilder("{");
         meta.append("\"commitHash\":\"").append(commitHash).append("\",");

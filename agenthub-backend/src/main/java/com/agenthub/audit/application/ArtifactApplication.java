@@ -14,4 +14,6 @@ public interface ArtifactApplication {
     ArtifactView recordStepSnapshot(String runId, String stepRunId, String workspaceId,
                                     String commitHash, String tagName, List<String> changedFiles,
                                     Map<String, String> fileChecksums, String author);
+
+    default void validateRunWorkspaceBinding(String runId, String workspaceId) {}
 }

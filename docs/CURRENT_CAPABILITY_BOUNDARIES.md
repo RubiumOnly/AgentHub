@@ -12,7 +12,7 @@
 | **认证鉴权与租户隔离 (Phase A)** | PBKDF2WithHmacSHA256 密码哈希 + HMAC-SHA256 签名令牌；`HttpOnly`/`SameSite=Lax` Cookie + `Bearer` 头；SSE 短效一次性票据（`/api/auth/stream-ticket`）；生产环境禁用 `user-1` 免密后门；基于 `ResourceAccessGuard` 的 `owner_id` 越权阻断 | `AuthController`, `TokenProvider`, `AuthFilter`, `ResourceAccessGuard` | `PhaseASecurityAndResourceBoundaryIntegrationTest` |
 | **动态 Provider 路由与容灾 (Phase B)** | OpenAI / Anthropic / Gemini / DeepSeek / Ollama 统一 HTTP 流式与非流式调用；基于优先级、权重、能力标签与成本的 `DynamicProviderRouter`；滑动窗口熔断器（`CLOSED`/`OPEN`/`HALF_OPEN`）与主备自动降级；`SecretMasker` 全链路凭据脱敏与 `token_usages` 审计 | `DynamicProviderRouter`, `CircuitBreaker`, `SecretMasker`, `ProviderDrivenAgentRuntime` | `ProviderFaultToleranceAndFallbackTest`, `SecretMaskingAndCredentialSecurityTest` |
 | **有状态 DAG 编排与崩溃恢复 (Phase C)** | Kahn 拓扑排序与环路检测；`SafeExpressionEvaluator` 无反射安全表达式求值；`workflow_runs` / `step_runs` 数据库租约（`lease_owner`, `lease_until`, `heartbeat_at`）与 `dsl_snapshot`；进程重启后 `PersistentExecutionRecoveryRunner` 自动接管过期租约并跳过已 `SUCCEEDED` 节点；JVM + OS 文件锁双层 `WorkspaceLockManager` | `DagExecutionEngine`, `PersistentExecutionRecoveryRunner`, `WorkspaceLockManager` | `PersistentExecutionRecoveryAndLeaseTest`, `HighConcurrencyStressIntegrationTest` |
-| **JGit 代码工作区与受控预览沙箱 (Phase D)** | `DefaultWorkspaceResolver` 强校验 `workspaceId` 并阻断 `../`、绝对路径与符号链接逃逸；JGit 基线提交、快照提交、Tree-to-Tree 结构化 Diff 与单文件/整包 Revert；8 态受控部署状态机（`PENDING -> BUILDING -> STARTING -> HEALTH_CHECKING -> RUNNING -> STOPPING -> STOPPED / FAILED`），基于真实 HTTP 探针就绪与增量日志游标 | `JGitWorkspaceManager`, `DeploymentLifecycleWorker`, `HealthCheckProbeService`, `CommandSecurityGuard` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest`, `WorkspaceAdversarialChallengeTest` |
+| **JGit 代码工作区与受控预览沙箱 (Phase D)** | `DefaultWorkspaceResolver` 强校验 `workspaceId` 并阻断 `../`、绝对路径与符号链接逃逸；JGit 基线提交、快照提交、Tree-to-Tree 结构化 Diff 与单文件/整包 Revert；受控部署生命周期状态机（`CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING -> STOP -> CLEANUP -> STOPPED / FAILED`），基于真实 HTTP 探针就绪与增量日志游标 | `JGitWorkspaceManager`, `DeploymentLifecycleWorker`, `HealthCheckProbeService`, `CommandSecurityGuard` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest`, `WorkspaceAdversarialChallengeTest` |
 | **单源部署编排与可观测性 (Phase E)** | 前后端同源 `/api/*` 与 SSE `proxy_buffering off` Nginx 反代；`ProductionEnvironmentValidator` 生产启动强校验；Micrometer 自定义业务指标与 `PrometheusAlertEvaluator` 阈值规则；`DisasterRecoveryBackupService` 备份/恢复清单校验 | `ProductionEnvironmentValidator`, `AgentHubMetricsCollector`, `PrometheusAlertEvaluator`, `DisasterRecoveryBackupService` | `PhaseEProductionOpsAndDisasterRecoveryIntegrationTest` |
 | **脱敏运行证据包与契约校准 (Phase F)** | 一键导出包含 DSL 快照、Run/Step 终态、单调事件序列、Provider/Runtime 审计、`simulated` 标识、JGit 结构化 Diff、审批记录、部署生命周期轨迹及确定性 SHA-256 `checksum` 的脱敏证据包（`RunEvidenceBundleView`），支持防篡改校验与跨平台脚本演练 | `ExecutionApplicationService`, `ExecutionController`, `RunEvidenceBundleView` | `PhaseFProductQualityAndEvidenceBundleIntegrationTest` |
 
@@ -23,12 +23,12 @@
 为保证在无外部 API Key 的评审环境（如面试官本地快速拉起或 GitHub Actions CI）中仍能完整体验系统闭环，同时在配置真实 API Key 时可执行真实 LLM 调用，系统对两种模式做出强制区分：
 
 1. **离线确定性演示模式 (`Demo Mode`, `simulated = true`)**
-   - **后端行为**：当工作流节点指定 `agentPlatform: "MOCK"` 时，由 `MockAgentRuntime` 执行，其 `RuntimeDescriptor.isSimulated()` 恒为 `true`，生成确定性的流式 Token、工具调用事件与示例文件写入，不产生外部网络请求。
+   - **后端行为**：当工作流节点指定 `agentPlatform: "MOCK"`（由 `MockAgentRuntime` 执行），或未配置外部 API Key 导致 `DynamicProviderRouter` 降级至 `MockLlmProvider`（`prov-mock` / `MOCK`），或运行未产生任何成功的真实外部 Provider Token 计量记录时，系统统一判定为模拟执行。
    - **前端行为**：顶部导航栏醒目展示琥珀色 **`离线演示/模拟模式`** 徽章；仅在用户显式开启该开关时允许使用离线演示数据。
    - **证据包标记**：导出的证据包强制标记 `"simulated": true` 与 `"executionMode": "DEMO_SIMULATED"`。
 
 2. **真实 Provider 驱动模式 (`Live Provider Mode`, `simulated = false`)**
-   - **后端行为**：当工作流节点指定 `agentPlatform: "PROVIDER_DRIVEN"`（或 `DEEPSEEK` / `OPENAI` 等）且已配置有效凭据时，由 `ProviderDrivenAgentRuntime` 经 `DynamicProviderRouter` 发起真实 HTTP 调用，并在 `token_usages` 表落库真实 Token 计数与实测延迟。
+   - **后端行为**：仅当工作流全链路未包含任何 `MOCK` 节点、未降级至 `MockLlmProvider`，且在 `token_usages` 表落库了至少一条状态为 `SUCCESS`、Token 数大于 0 的非 Mock 外部 Provider（OpenAI / DeepSeek / Anthropic / Gemini / Ollama）调用记录时，才判定为真实 Provider 运行。
    - **前端行为**：顶部导航栏展示翠绿色 **`真实产品模式`** 徽章；所有 API 请求严禁静默回退到伪造 Mock 数据，遇到未登录（401）、越权（403）或后端异常时原样呈现真实错误横幅。
    - **证据包标记**：导出的证据包标记 `"simulated": false` 与 `"executionMode": "LIVE_PROVIDER"`，并附带 `tokenUsageRecords` 实测账单明细。
 

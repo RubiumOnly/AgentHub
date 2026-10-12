@@ -265,13 +265,13 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         String terminalStatus = waitForRunStatus(token, runId, "SUCCEEDED");
         assertThat(terminalStatus).isEqualTo("SUCCEEDED");
 
-        // Step 8: 在受控工作区写入交付物文件（含模拟误写密钥）并提交 JGit 快照，验证结构化 Diff
+        // Step 8: 在受控工作区写入交付物文件（含模拟误写密钥与转义 JSON 密钥）并提交 JGit 快照，验证结构化 Diff
         mockMvc.perform(post("/api/workspaces/{workspaceId}/file", workspaceId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "path", "deliverables/release-summary.md",
-                                "content", "# AgentHub Release Summary\n\n- Run ID: " + runId + "\n- Verification: PASSED\n- Token Check: {\"apiKey\": \"sk-json-secret-1234567890abcdef\"}\n"
+                                "content", "# AgentHub Release Summary\n\n- Run ID: " + runId + "\n- Verification: PASSED\n- Token Check: {\"apiKey\": \"sk-json-secret-1234567890abcdef\"}\n- Escaped Check: {\\\"password\\\":\\\"MyPlaintextDbSecret2026!\\\",\\\"clientSecret\\\":\\\"oauth-secret-value-9999\\\",\\\"jwtSecret\\\":\\\"jwt-super-secret-key-2026\\\"}\n"
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
@@ -286,7 +286,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));
 
-        mockMvc.perform(post("/api/workspaces/{workspaceId}/git/snapshot", workspaceId)
+        MvcResult snapResult = mockMvc.perform(post("/api/workspaces/{workspaceId}/git/snapshot", workspaceId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -297,7 +297,11 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.commitHash").isNotEmpty());
+                .andExpect(jsonPath("$.data.commitHash").isNotEmpty())
+                .andExpect(jsonPath("$.data.artifactId").isNotEmpty())
+                .andReturn();
+        String snapArtifactId = objectMapper.readTree(snapResult.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("artifactId").asText();
 
         mockMvc.perform(get("/api/workspaces/{workspaceId}/diff", workspaceId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -315,6 +319,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         assertThat(artifactsArray.isArray()).isTrue();
         assertThat(artifactsArray.size()).isGreaterThanOrEqualTo(1);
         String firstArtifactId = artifactsArray.get(0).path("id").asText();
+        assertThat(firstArtifactId).isEqualTo(snapArtifactId);
 
         mockMvc.perform(post("/api/audit/artifacts/{artifactId}/accept", firstArtifactId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -405,10 +410,13 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         }
         assertThat(foundStepMetadata).isTrue();
 
-        // 验证敏感信息零明文残留（DSL、审批备注、JGit Diff 中的密钥均已脱敏）
+        // 验证敏感信息零明文残留（DSL、审批备注、JGit Diff 及转义 JSON 中的密钥均已脱敏）
         assertThat(rawEvidenceResponse1).doesNotContain("sk-proj-1234567890abcdefghijklmnop");
         assertThat(rawEvidenceResponse1).doesNotContain("sk-live-9876543210abcdef123456");
         assertThat(rawEvidenceResponse1).doesNotContain("sk-json-secret-1234567890abcdef");
+        assertThat(rawEvidenceResponse1).doesNotContain("MyPlaintextDbSecret2026!");
+        assertThat(rawEvidenceResponse1).doesNotContain("oauth-secret-value-9999");
+        assertThat(rawEvidenceResponse1).doesNotContain("jwt-super-secret-key-2026");
         assertThat(rawEvidenceResponse1).doesNotContain("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTYifQ.sig");
 
         // 验证 SHA-256 校验和合法且跨时间重复导出保持完全幂等
@@ -429,10 +437,96 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         );
         assertThat(bundle2.getChecksum()).isEqualTo(bundle1.getChecksum());
         assertThat(executionApplication.verifyEvidenceBundleChecksum(bundle2)).isTrue();
+
+        // Step 12: 同一项目触发后续 Run 2（修改工作区文件、提交新快照并启动新部署），验证 Run 1 的证据包与 SHA-256 指纹绝不被污染
+        MvcResult run2Res = mockMvc.perform(post("/api/executions/runs")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "projectId", projectId,
+                                "definitionId", definitionId,
+                                "idempotencyKey", "phasef-e2e-run2-" + UUID.randomUUID()
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn();
+        String run2Id = objectMapper.readTree(run2Res.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("id").asText();
+
+        String approval2Id = waitForPendingApproval(token, run2Id);
+        mockMvc.perform(post("/api/approvals/{approvalId}/approve", approval2Id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "Run 2 approved"))))
+                .andExpect(status().isOk());
+        assertThat(waitForRunStatus(token, run2Id, "SUCCEEDED")).isEqualTo("SUCCEEDED");
+
+        mockMvc.perform(post("/api/workspaces/{workspaceId}/file", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "path", "index.html",
+                                "content", "<!DOCTYPE html><html><body><h1>Modified by Run 2</h1></body></html>"
+                        ))))
+                .andExpect(status().isOk());
+
+        MvcResult snap2Res = mockMvc.perform(post("/api/workspaces/{workspaceId}/git/snapshot", workspaceId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "runId", run2Id,
+                                "stepRunId", "plan-arch",
+                                "author", email,
+                                "message", "feat(run2): modify index.html in run 2"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String run2ArtifactId = objectMapper.readTree(snap2Res.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("artifactId").asText();
+
+        mockMvc.perform(post("/api/audit/artifacts/{artifactId}/accept", run2ArtifactId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reviewer", email, "comment", "Run 2 accepted"))))
+                .andExpect(status().isOk());
+
+        MvcResult dep2Res = mockMvc.perform(post("/api/deployments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "projectId", projectId,
+                                "artifactId", run2ArtifactId,
+                                "target", "STATIC_PREVIEW",
+                                "sandboxType", "STATIC_PREVIEW",
+                                "templateType", "STATIC_WEB_TEMPLATE",
+                                "healthCheckPath", "/health"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String dep2Id = objectMapper.readTree(dep2Res.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("id").asText();
+        mockMvc.perform(post("/api/deployments/{deploymentId}/stop", dep2Id)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk());
+
+        // 再次导出 Run 1 的证据包，验证其基线、Diff、Deployments 与 SHA-256 Checksum 保持 100% 不变
+        MvcResult evidenceAfterRun2Res = mockMvc.perform(get("/api/executions/runs/{runId}/evidence", runId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+        RunEvidenceBundleView bundleAfterRun2 = objectMapper.treeToValue(
+                objectMapper.readTree(evidenceAfterRun2Res.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("data"),
+                RunEvidenceBundleView.class
+        );
+        assertThat(bundleAfterRun2.getDeployments()).hasSize(1);
+        assertThat(bundleAfterRun2.getDeployments().get(0).getId()).isEqualTo(deploymentId);
+        assertThat(bundleAfterRun2.getProject().getGitBaselineCommit()).isEqualTo(bundle1.getProject().getGitBaselineCommit());
+        assertThat(bundleAfterRun2.getGitDiff().getCurrentCommit()).isEqualTo(bundle1.getGitDiff().getCurrentCommit());
+        assertThat(bundleAfterRun2.getChecksum()).isEqualTo(bundle1.getChecksum());
     }
 
     @Test
-    @DisplayName("2. 真实 Provider 计量运行模式（simulated=false / LIVE_PROVIDER）识别与单字节防篡改校验")
+    @DisplayName("2. 真实 Provider 计量运行模式（simulated=false / LIVE_PROVIDER）识别、降级/混合运行防伪造与单字节防篡改校验")
     void shouldDistinguishSimulatedDemoFromLiveProviderExecutionAndDetectTampering() throws Exception {
         String email = "phasef_live_" + UUID.randomUUID().toString().substring(0, 8) + "@agenthub.dev";
         MvcResult regResult = mockMvc.perform(post("/api/auth/register")
@@ -542,6 +636,108 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         assertThat(liveBundle.getProviderRuntime().getTokenUsageRecords()).hasSize(1);
         assertThat(executionApplication.verifyEvidenceBundleChecksum(liveBundle)).isTrue();
 
+        // 防伪造场景 A：PROVIDER_DRIVEN 运行因未配置外部 Key 降级至 MockLlmProvider (providerType=MOCK / prov-mock) -> 必须标记为 simulated=true (DEMO_SIMULATED)
+        String fallbackRunId = "run-fb-" + UUID.randomUUID().toString().substring(0, 8);
+        String fallbackStepId = "step-fb-" + UUID.randomUUID().toString().substring(0, 8);
+        WorkflowRunEntity fallbackRun = new WorkflowRunEntity(fallbackRunId, projectId, "def-live-001", "SUCCEEDED", "idem-fb-" + fallbackRunId);
+        fallbackRun.setDslSnapshot(liveDsl);
+        workflowRunRepository.save(fallbackRun);
+
+        StepRunEntity fallbackStep = new StepRunEntity(fallbackStepId, fallbackRunId, "live-coder", "SUCCEEDED");
+        stepRunRepository.save(fallbackStep);
+
+        TokenUsageAuditEntity mockFallbackUsage = new TokenUsageAuditEntity();
+        mockFallbackUsage.setId(UUID.randomUUID().toString());
+        mockFallbackUsage.setRunId(fallbackRunId);
+        mockFallbackUsage.setStepRunId(fallbackStepId);
+        mockFallbackUsage.setProviderId("prov-mock");
+        mockFallbackUsage.setProviderType("MOCK");
+        mockFallbackUsage.setModel("mock-v1");
+        mockFallbackUsage.setPromptTokens(80);
+        mockFallbackUsage.setCompletionTokens(40);
+        mockFallbackUsage.setTotalTokens(120);
+        mockFallbackUsage.setLatencyMs(12L);
+        mockFallbackUsage.setEstimatedCost(0.0);
+        mockFallbackUsage.setStatus("SUCCESS");
+        mockFallbackUsage.setCreatedAt(now);
+        tokenUsageAuditRepository.save(mockFallbackUsage);
+
+        mockMvc.perform(get("/api/executions/runs/{runId}/evidence", fallbackRunId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.simulated").value(true))
+                .andExpect(jsonPath("$.data.executionMode").value("DEMO_SIMULATED"))
+                .andExpect(jsonPath("$.data.providerRuntime.simulated").value(true));
+
+        // 防伪造场景 B：PROVIDER_DRIVEN 运行在调用外部 LLM 前失败 (status=FAILED, providerType=ROUTER, totalTokens=0) -> 必须标记为 simulated=true
+        String failedRouterRunId = "run-fail-" + UUID.randomUUID().toString().substring(0, 8);
+        String failedRouterStepId = "step-fail-" + UUID.randomUUID().toString().substring(0, 8);
+        WorkflowRunEntity failedRouterRun = new WorkflowRunEntity(failedRouterRunId, projectId, "def-live-001", "FAILED", "idem-fail-" + failedRouterRunId);
+        failedRouterRun.setDslSnapshot(liveDsl);
+        workflowRunRepository.save(failedRouterRun);
+
+        StepRunEntity failedRouterStep = new StepRunEntity(failedRouterStepId, failedRouterRunId, "live-coder", "FAILED");
+        stepRunRepository.save(failedRouterStep);
+
+        TokenUsageAuditEntity failedRouterUsage = new TokenUsageAuditEntity();
+        failedRouterUsage.setId(UUID.randomUUID().toString());
+        failedRouterUsage.setRunId(failedRouterRunId);
+        failedRouterUsage.setStepRunId(failedRouterStepId);
+        failedRouterUsage.setProviderId(null);
+        failedRouterUsage.setProviderType("ROUTER");
+        failedRouterUsage.setModel("unknown");
+        failedRouterUsage.setPromptTokens(0);
+        failedRouterUsage.setCompletionTokens(0);
+        failedRouterUsage.setTotalTokens(0);
+        failedRouterUsage.setLatencyMs(0L);
+        failedRouterUsage.setEstimatedCost(0.0);
+        failedRouterUsage.setStatus("FAILED");
+        failedRouterUsage.setCreatedAt(now);
+        tokenUsageAuditRepository.save(failedRouterUsage);
+
+        mockMvc.perform(get("/api/executions/runs/{runId}/evidence", failedRouterRunId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.simulated").value(true))
+                .andExpect(jsonPath("$.data.executionMode").value("DEMO_SIMULATED"));
+
+        // 防伪造场景 C：混合 MOCK 与 PROVIDER_DRIVEN 节点的运行 -> 必须标记为 simulated=true
+        String mixedRunId = "run-mix-" + UUID.randomUUID().toString().substring(0, 8);
+        String mixedStepId = "step-mix-" + UUID.randomUUID().toString().substring(0, 8);
+        String mixedDsl = objectMapper.writeValueAsString(Map.of(
+                "version", "1.0",
+                "name", "Mixed Pipeline",
+                "nodes", List.of(
+                        Map.of("id", "mock-step", "type", "AGENT", "name", "Mock Step", "agentPlatform", "MOCK"),
+                        Map.of("id", "live-step", "type", "AGENT", "name", "Live Step", "agentPlatform", "PROVIDER_DRIVEN")
+                ),
+                "edges", List.of()
+        ));
+        WorkflowRunEntity mixedRun = new WorkflowRunEntity(mixedRunId, projectId, "def-mix-001", "SUCCEEDED", "idem-mix-" + mixedRunId);
+        mixedRun.setDslSnapshot(mixedDsl);
+        workflowRunRepository.save(mixedRun);
+        StepRunEntity mixedStep = new StepRunEntity(mixedStepId, mixedRunId, "live-step", "SUCCEEDED");
+        stepRunRepository.save(mixedStep);
+
+        TokenUsageAuditEntity mixedLiveUsage = new TokenUsageAuditEntity();
+        mixedLiveUsage.setId(UUID.randomUUID().toString());
+        mixedLiveUsage.setRunId(mixedRunId);
+        mixedLiveUsage.setStepRunId(mixedStepId);
+        mixedLiveUsage.setProviderType("OPENAI");
+        mixedLiveUsage.setModel("gpt-4o-mini");
+        mixedLiveUsage.setPromptTokens(100);
+        mixedLiveUsage.setCompletionTokens(50);
+        mixedLiveUsage.setTotalTokens(150);
+        mixedLiveUsage.setStatus("SUCCESS");
+        mixedLiveUsage.setCreatedAt(now);
+        tokenUsageAuditRepository.save(mixedLiveUsage);
+
+        mockMvc.perform(get("/api/executions/runs/{runId}/evidence", mixedRunId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.simulated").value(true))
+                .andExpect(jsonPath("$.data.executionMode").value("DEMO_SIMULATED"));
+
         // 防篡改测试 1：篡改 simulated 布尔标记（企图将模拟运行伪造为真实运行或反之）
         liveBundle.setSimulated(true);
         assertThat(executionApplication.verifyEvidenceBundleChecksum(liveBundle)).isFalse();
@@ -563,7 +759,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
     }
 
     @Test
-    @DisplayName("3. 证据包接口多租户隔离门禁：未认证 1001、跨租户越权 1002 与不存在运行 6002")
+    @DisplayName("3. 证据包与工作区快照接口多租户/跨项目隔离门禁：未认证 1001、越权 1002 与不存在运行 6002")
     void shouldEnforceMultiTenantSecurityBoundaryOnEvidenceEndpoints() throws Exception {
         // 注册租户 A 与租户 B
         String tokenA = registerUser("tenant_a_" + UUID.randomUUID().toString().substring(0, 6) + "@agenthub.dev");
@@ -579,8 +775,33 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andReturn();
-        String projectIdA = objectMapper.readTree(projARes.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .path("data").path("id").asText();
+        JsonNode projAData = objectMapper.readTree(projARes.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("data");
+        String projectIdA = projAData.path("id").asText();
+        String workspaceIdA = projAData.path("workspaceId").asText();
+
+        MvcResult projA2Res = mockMvc.perform(post("/api/projects")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Tenant A Second Project",
+                                "description", "Second project of Tenant A"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String workspaceIdA2 = objectMapper.readTree(projA2Res.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("workspaceId").asText();
+
+        MvcResult projBRes = mockMvc.perform(post("/api/projects")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Tenant B Own Project",
+                                "description", "Owned by Tenant B"
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String workspaceIdB = objectMapper.readTree(projBRes.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("workspaceId").asText();
 
         String runIdA = "run-sec-" + UUID.randomUUID().toString().substring(0, 8);
         LocalDateTime now = LocalDateTime.now();
@@ -613,6 +834,36 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         mockMvc.perform(get("/api/executions/runs/{runId}/evidence", "run-non-existent-99999")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA))
                 .andExpect(jsonPath("$.code").value(6002));
+
+        // 4) 租户 B 在自身工作区调用 git/snapshot 但传入租户 A 的 runIdA 企图注入伪造产物 -> 必须拦截 (1002 FORBIDDEN)
+        mockMvc.perform(post("/api/workspaces/{workspaceId}/git/snapshot", workspaceIdB)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "runId", runIdA,
+                                "message", "malicious cross-tenant artifact injection"
+                        ))))
+                .andExpect(jsonPath("$.code").value(1002));
+
+        // 5) 租户 A 在项目 2 的工作区调用 git/snapshot 但传入项目 1 的 runIdA -> 必须拦截跨项目绑定 (1002 FORBIDDEN)
+        mockMvc.perform(post("/api/workspaces/{workspaceId}/git/snapshot", workspaceIdA2)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "runId", runIdA,
+                                "message", "cross-project artifact mismatch"
+                        ))))
+                .andExpect(jsonPath("$.code").value(1002));
+
+        // 6) 传入不存在的 runId 调用 git/snapshot -> 必须拦截 (6002 RUN_NOT_FOUND)
+        mockMvc.perform(post("/api/workspaces/{workspaceId}/git/snapshot", workspaceIdA)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "runId", "run-non-existent-99999",
+                                "message", "non-existent run snapshot"
+                        ))))
+                .andExpect(jsonPath("$.code").value(6002));
     }
 
     @Test
@@ -620,7 +871,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
     void shouldVerifySampleEvidenceBundleAndDocumentationHonestyContracts() throws Exception {
         Path repoRoot = resolveRepositoryRoot();
 
-        // 1) 校验 docs/evidence/sample-run-evidence-bundle.json 存在、结构完整、无明文密钥且 SHA-256 校验和 100% 匹配
+        // 1) 校验 docs/evidence/sample-run-evidence-bundle.json 存在、结构完整、枚举值与真实后端一致、无明文密钥且 SHA-256 校验和 100% 匹配
         Path samplePath = repoRoot.resolve("docs/evidence/sample-run-evidence-bundle.json");
         assertThat(Files.exists(samplePath))
                 .as("Sample evidence bundle must exist at docs/evidence/sample-run-evidence-bundle.json")
@@ -641,7 +892,15 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         assertThat(sampleBundle.getProviderRuntime()).isNotNull();
         assertThat(sampleBundle.getGitDiff()).isNotNull();
         assertThat(sampleBundle.getTestReportSummary()).isNotNull();
+        assertThat(sampleBundle.getArtifacts()).isNotEmpty();
+        assertThat(sampleBundle.getArtifacts().get(0).getArtifactType()).isEqualTo("SNAPSHOT");
         assertThat(sampleBundle.getDeployments()).isNotEmpty();
+        assertThat(sampleBundle.getDeployments().get(0).getTarget()).isEqualTo("STATIC_PREVIEW");
+        assertThat(sampleBundle.getDeployments().get(0).getSandboxType()).isEqualTo("LOCAL_PROCESS");
+        assertThat(sampleBundle.getDeployments().get(0).getTemplateType()).isEqualTo("STATIC_WEB_TEMPLATE");
+        assertThat(sampleBundle.getDeployments().get(0).getPort()).isBetween(18000, 18999);
+        assertThat(sampleBundle.getDeployments().get(0).getLifecycleTrace())
+                .isEqualTo("CREATED->BUILD->START->HEALTH_CHECK->RUNNING->STOP->CLEANUP->STOPPED");
 
         String expectedChecksum = ExecutionApplicationService.computeDeterministicChecksum(sampleBundle);
         assertThat(sampleBundle.getChecksum())
@@ -649,7 +908,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
                 .isEqualTo(expectedChecksum);
         assertThat(executionApplication.verifyEvidenceBundleChecksum(sampleBundle)).isTrue();
 
-        // 2) 校验跨平台一键演示脚本存在且使用真实 API 路由（严禁残留废弃的 /api/v1/ 假接口）
+        // 2) 校验跨平台一键演示脚本存在且使用真实 API 路由（严禁残留废弃的 /api/v1/ 假接口或错误的 data[-1].id 索引）
         Path bashScript = repoRoot.resolve("scripts/run-e2e-demo.sh");
         Path psScript = repoRoot.resolve("scripts/run-e2e-demo.ps1");
         assertThat(Files.exists(bashScript)).isTrue();
@@ -664,13 +923,14 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
             assertThat(content).contains("/api/executions/runs");
             assertThat(content).contains("/api/approvals");
             assertThat(content).contains("/api/deployments");
-            assertThat(content).contains("/evidence");
+            assertThat(content).contains("/evidence/download");
+            assertThat(content).doesNotContain("data[-1].id");
             assertThat(content).doesNotContain("/api/v1/workflows/run");
             assertThat(content).doesNotContain("/api/v1/sandboxes/");
             assertThat(content).doesNotContain("/api/v1/workspaces/");
         }
 
-        // 3) 校验关键文档与 ADR 存在且口径诚实（无未实测的 10,000+ QPS 吹嘘、无失效 /api/v1/ 演示路由）
+        // 3) 校验关键文档与 ADR 存在且口径诚实（无未实测的 10,000+ QPS 吹嘘、无失效 /api/v1/ 演示路由、无过时状态机枚举）
         Path e2eGuide = repoRoot.resolve("docs/E2E_DEMO_GUIDE.md");
         Path capabilityDoc = repoRoot.resolve("docs/CURRENT_CAPABILITY_BOUNDARIES.md");
         Path readmeDoc = repoRoot.resolve("README.md");
@@ -684,7 +944,8 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
 
         String e2eContent = Files.readString(e2eGuide, StandardCharsets.UTF_8);
         assertThat(e2eContent).contains("/api/executions/runs");
-        assertThat(e2eContent).contains("/evidence");
+        assertThat(e2eContent).contains("/evidence/download");
+        assertThat(e2eContent).doesNotContain("data[-1].id");
         assertThat(e2eContent).doesNotContain("/api/v1/workflows/run");
         assertThat(e2eContent).doesNotContain("/api/v1/sandboxes/create");
 

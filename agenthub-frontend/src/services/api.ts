@@ -628,9 +628,104 @@ export const apiClient = {
   },
 
   async exportRunEvidenceFile(runId: string): Promise<RunEvidenceBundleView> {
-    const bundle = await this.getRunEvidence(runId);
+    if (isDemoMode() || runId === MOCK_RUN.id) {
+      const demoBundle: RunEvidenceBundleView = {
+        schemaVersion: "agenthub.evidence.v1",
+        bundleId: `evd-${runId}`,
+        exportedAt: new Date().toISOString(),
+        simulated: true,
+        executionMode: "DEMO_SIMULATED",
+        checksum: "demo-simulated-offline-preview-bundle",
+        project: {
+          id: MOCK_RUN.projectId,
+          name: "AgentHub Offline Demo Project",
+          ownerId: "user-demo",
+          workspaceId: "ws-demo",
+          gitBaselineCommit: "demo-baseline-000000",
+        },
+        workflowDslSnapshot: JSON.stringify({ version: "1.0", name: "Offline Demo Workflow", simulated: true }),
+        run: { ...MOCK_RUN, id: runId },
+        steps: MOCK_STEPS,
+        events: [],
+        providerRuntime: {
+          runtimeTypes: ["MOCK"],
+          providerTypes: ["MOCK_SIMULATOR"],
+          models: ["mock-offline-v1"],
+          simulated: true,
+          totalPromptTokens: 0,
+          totalCompletionTokens: 0,
+          totalTokens: 0,
+          totalEstimatedCost: 0,
+          tokenUsageRecords: [],
+        },
+        gitDiff: {
+          workspaceId: "ws-demo",
+          baseCommit: "demo-baseline-000000",
+          targetCommit: "demo-snapshot-111111",
+          totalFilesChanged: MOCK_DIFFS.length,
+          totalLinesAdded: MOCK_DIFFS.reduce((acc, d) => acc + d.linesAdded, 0),
+          totalLinesDeleted: MOCK_DIFFS.reduce((acc, d) => acc + d.linesDeleted, 0),
+          entries: MOCK_DIFFS,
+          clean: false,
+        },
+        artifacts: [],
+        testReportSummary: {
+          status: "SIMULATED",
+          totalSteps: MOCK_STEPS.length,
+          succeededSteps: MOCK_STEPS.filter((s) => s.status === "SUCCEEDED").length,
+          failedSteps: MOCK_STEPS.filter((s) => s.status === "FAILED").length,
+          skippedSteps: 0,
+          cancelledSteps: 0,
+          verificationSummary: `Offline Demo Mode simulated bundle (${runId})`,
+          logs: ["[DEMO_SIMULATED] Exported in frontend offline demo mode"],
+        },
+        approvals: [MOCK_APPROVAL],
+        deployments: [
+          {
+            id: MOCK_DEPLOYMENT.id,
+            projectId: MOCK_DEPLOYMENT.projectId,
+            artifactId: MOCK_DEPLOYMENT.artifactId,
+            status: MOCK_DEPLOYMENT.status,
+            target: MOCK_DEPLOYMENT.target,
+            sandboxType: MOCK_DEPLOYMENT.sandboxType,
+            templateType: MOCK_DEPLOYMENT.templateType || "STATIC_WEB_TEMPLATE",
+            url: MOCK_DEPLOYMENT.url,
+            port: MOCK_DEPLOYMENT.port,
+            startedAt: MOCK_DEPLOYMENT.startedAt,
+            finishedAt: MOCK_DEPLOYMENT.finishedAt,
+          },
+        ],
+      };
+      if (typeof window !== "undefined") {
+        const blob = new Blob([JSON.stringify(demoBundle, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `evidence-bundle-${runId}-demo-simulated.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      return demoBundle;
+    }
+
+    const token = getStoredToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const res = await fetch(`${API_BASE}/api/executions/runs/${runId}/evidence/download`, {
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) {
+      return this.getRunEvidence(runId);
+    }
+    const rawJson = await res.text();
+    const bundle = JSON.parse(rawJson) as RunEvidenceBundleView;
     if (typeof window !== "undefined") {
-      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const blob = new Blob([rawJson], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

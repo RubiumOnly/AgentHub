@@ -156,6 +156,9 @@ public class WorkspaceController {
         if (gitManager == null || workspaceResolver == null) {
             throw new IllegalStateException("JGitWorkspaceManager or WorkspaceResolver is not configured");
         }
+        if (req != null && req.runId != null && !req.runId.isBlank() && artifactApplication != null) {
+            artifactApplication.validateRunWorkspaceBinding(req.runId, workspaceId);
+        }
         Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
         String effectiveRunId = (req != null && req.runId != null && !req.runId.isBlank()) ? req.runId : "manual-" + workspaceId;
         String effectiveStepId = (req != null && req.stepRunId != null && !req.stepRunId.isBlank()) ? req.stepRunId : "step-" + System.currentTimeMillis();

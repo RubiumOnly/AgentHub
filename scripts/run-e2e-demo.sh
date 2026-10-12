@@ -171,16 +171,19 @@ curl -s -X POST "${BASE_URL}/api/workspaces/${WORKSPACE_ID}/file" \
   -H "Content-Type: application/json" \
   -d '{"path":"index.html","content":"<!DOCTYPE html><html><head><title>AgentHub Preview</title></head><body><h1>AgentHub E2E Verified</h1></body></html>"}' > /dev/null
 
-curl -s -X POST "${BASE_URL}/api/workspaces/${WORKSPACE_ID}/git/snapshot" \
+SNAP_RESP=$(curl -s -X POST "${BASE_URL}/api/workspaces/${WORKSPACE_ID}/git/snapshot" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "{\"runId\":\"${RUN_ID}\",\"author\":\"E2E-Operator\",\"message\":\"feat: E2E preview snapshot\"}" > /dev/null
+  -d "{\"runId\":\"${RUN_ID}\",\"author\":\"E2E-Operator\",\"message\":\"feat: E2E preview snapshot\"}")
 
 DIFF_FILES=$(curl -s "${BASE_URL}/api/workspaces/${WORKSPACE_ID}/diff" \
   -H "Authorization: Bearer ${TOKEN}" | jq -r '.data.totalFilesChanged')
 
-ARTIFACT_ID=$(curl -s "${BASE_URL}/api/audit/artifacts/run/${RUN_ID}" \
-  -H "Authorization: Bearer ${TOKEN}" | jq -r '.data[-1].id')
+ARTIFACT_ID=$(echo "$SNAP_RESP" | jq -r '.data.artifactId // empty')
+if [[ -z "$ARTIFACT_ID" ]]; then
+  ARTIFACT_ID=$(curl -s "${BASE_URL}/api/audit/artifacts/run/${RUN_ID}" \
+    -H "Authorization: Bearer ${TOKEN}" | jq -r '.data[0].id')
+fi
 curl -s -X POST "${BASE_URL}/api/audit/artifacts/${ARTIFACT_ID}/accept" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
@@ -212,8 +215,8 @@ echo "  -> Deployment ${DEP_ID} reached ${DEP_STATUS} and was cleanly stopped."
 echo "[9/9] Exporting Sanitized Run Evidence Bundle..."
 mkdir -p "${OUTPUT_DIR}"
 BUNDLE_PATH="${OUTPUT_DIR}/evidence-bundle-${RUN_ID}.json"
-curl -s "${BASE_URL}/api/executions/runs/${RUN_ID}/evidence" \
-  -H "Authorization: Bearer ${TOKEN}" | jq '.data' > "${BUNDLE_PATH}"
+curl -s "${BASE_URL}/api/executions/runs/${RUN_ID}/evidence/download" \
+  -H "Authorization: Bearer ${TOKEN}" -o "${BUNDLE_PATH}"
 
 SIMULATED=$(jq -r '.simulated' "${BUNDLE_PATH}")
 EXEC_MODE=$(jq -r '.executionMode' "${BUNDLE_PATH}")

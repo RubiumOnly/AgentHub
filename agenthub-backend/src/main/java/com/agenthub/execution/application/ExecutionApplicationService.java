@@ -431,7 +431,44 @@ public class ExecutionApplicationService implements ExecutionApplication {
 
         Optional<WorkspaceEntity> wsOpt = workspaceRepository.findByProjectId(project.getId());
         String wsId = wsOpt.map(WorkspaceEntity::getId).orElse(null);
-        String baselineCommit = wsOpt.map(WorkspaceEntity::getGitBaselineCommit).orElse(null);
+
+        List<ArtifactEntity> artifactEntities = new ArrayList<>(artifactRepository.findByRunId(runId));
+        artifactEntities.sort(Comparator.comparing(ArtifactEntity::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ArtifactEntity::getId));
+        String runBaselineCommit = null;
+        String runSnapshotCommit = null;
+        Set<String> runArtifactIds = new LinkedHashSet<>();
+        List<ArtifactView> sanitizedArtifacts = new ArrayList<>();
+        for (ArtifactEntity ae : artifactEntities) {
+            runArtifactIds.add(ae.getId());
+            if ("BASELINE".equalsIgnoreCase(ae.getArtifactType())
+                    && ae.getPathOrRef() != null && !ae.getPathOrRef().isBlank()
+                    && runBaselineCommit == null) {
+                runBaselineCommit = ae.getPathOrRef();
+            }
+            if ("SNAPSHOT".equalsIgnoreCase(ae.getArtifactType())
+                    && ae.getPathOrRef() != null && !ae.getPathOrRef().isBlank()) {
+                runSnapshotCommit = ae.getPathOrRef();
+            }
+            sanitizedArtifacts.add(new ArtifactView(
+                    ae.getId(),
+                    ae.getRunId(),
+                    ae.getStepRunId(),
+                    ae.getArtifactType(),
+                    ae.getPathOrRef() != null ? SecretMasker.maskInText(ae.getPathOrRef()) : null,
+                    ae.getChecksum(),
+                    ae.getMetadataJson() != null ? SecretMasker.maskInText(ae.getMetadataJson()) : null,
+                    ae.getReviewStatus(),
+                    ae.getReviewedBy(),
+                    ae.getReviewedAt(),
+                    ae.getReviewComment() != null ? SecretMasker.maskInText(ae.getReviewComment()) : null,
+                    ae.getCreatedAt()
+            ));
+        }
+
+        String baselineCommit = (runBaselineCommit != null && !runBaselineCommit.isBlank())
+                ? runBaselineCommit
+                : wsOpt.map(WorkspaceEntity::getGitBaselineCommit).orElse(null);
 
         RunEvidenceBundleView bundle = new RunEvidenceBundleView();
         bundle.setSchemaVersion("agenthub.evidence.v1");
@@ -525,7 +562,7 @@ public class ExecutionApplicationService implements ExecutionApplication {
             } catch (Exception ignored) {}
         }
 
-        Boolean eventSimulatedFlag = null;
+        Boolean anyEventSimulated = null;
         long eventPromptTokens = 0L;
         long eventCompletionTokens = 0L;
         double eventCost = 0.0;
@@ -542,7 +579,7 @@ public class ExecutionApplicationService implements ExecutionApplication {
                     }
                     if (node.hasNonNull("simulated")) {
                         boolean sim = node.get("simulated").asBoolean();
-                        eventSimulatedFlag = (eventSimulatedFlag == null) ? sim : (eventSimulatedFlag && sim);
+                        anyEventSimulated = (anyEventSimulated == null) ? sim : (anyEventSimulated || sim);
                     }
                 } catch (Exception ignored) {}
             } else if ("USAGE".equalsIgnoreCase(ev.getEventType())) {
@@ -613,24 +650,25 @@ public class ExecutionApplicationService implements ExecutionApplication {
         }
 
         boolean hasLiveTokenUsage = usageViews.stream()
-                .anyMatch(u -> u.getProviderType() != null
+                .anyMatch(u -> "SUCCESS".equalsIgnoreCase(u.getStatus())
+                        && u.getTotalTokens() > 0
+                        && u.getProviderType() != null
                         && !"MOCK".equalsIgnoreCase(u.getProviderType())
-                        && !"SIMULATED".equalsIgnoreCase(u.getProviderType()));
-        boolean hasNonMockRuntime = runtimeTypes.stream()
-                .anyMatch(rt -> rt != null && !"MOCK".equalsIgnoreCase(rt));
+                        && !"SIMULATED".equalsIgnoreCase(u.getProviderType())
+                        && !"ROUTER".equalsIgnoreCase(u.getProviderType())
+                        && (u.getProviderId() == null || !"prov-mock".equalsIgnoreCase(u.getProviderId())));
+        boolean hasSimulatedTokenUsage = usageViews.stream()
+                .anyMatch(u -> (u.getProviderType() != null
+                        && ("MOCK".equalsIgnoreCase(u.getProviderType())
+                            || "SIMULATED".equalsIgnoreCase(u.getProviderType())))
+                        || "prov-mock".equalsIgnoreCase(u.getProviderId()));
         boolean hasMockRuntime = runtimeTypes.stream()
                 .anyMatch(rt -> "MOCK".equalsIgnoreCase(rt));
 
-        boolean isSimulated;
-        if (hasLiveTokenUsage) {
-            isSimulated = false;
-        } else if (eventSimulatedFlag != null) {
-            isSimulated = eventSimulatedFlag;
-        } else if (hasNonMockRuntime && !hasMockRuntime) {
-            isSimulated = false;
-        } else {
-            isSimulated = true;
-        }
+        boolean isSimulated = !hasLiveTokenUsage
+                || hasSimulatedTokenUsage
+                || hasMockRuntime
+                || Boolean.TRUE.equals(anyEventSimulated);
 
         if (runtimeTypes.isEmpty()) {
             runtimeTypes.add(isSimulated ? "MOCK" : "PROVIDER_DRIVEN");
@@ -658,35 +696,14 @@ public class ExecutionApplicationService implements ExecutionApplication {
         bundle.setProviderRuntime(providerEvidence);
 
         // 5. Sanitized JGit Structured Diff & Artifacts
-        List<ArtifactEntity> artifactEntities = new ArrayList<>(artifactRepository.findByRunId(runId));
-        artifactEntities.sort(Comparator.comparing(ArtifactEntity::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ArtifactEntity::getId));
-        Set<String> runArtifactIds = new LinkedHashSet<>();
-        List<ArtifactView> sanitizedArtifacts = new ArrayList<>();
-        for (ArtifactEntity ae : artifactEntities) {
-            runArtifactIds.add(ae.getId());
-            sanitizedArtifacts.add(new ArtifactView(
-                    ae.getId(),
-                    ae.getRunId(),
-                    ae.getStepRunId(),
-                    ae.getArtifactType(),
-                    ae.getPathOrRef() != null ? SecretMasker.maskInText(ae.getPathOrRef()) : null,
-                    ae.getChecksum(),
-                    ae.getMetadataJson() != null ? SecretMasker.maskInText(ae.getMetadataJson()) : null,
-                    ae.getReviewStatus(),
-                    ae.getReviewedBy(),
-                    ae.getReviewedAt(),
-                    ae.getReviewComment() != null ? SecretMasker.maskInText(ae.getReviewComment()) : null,
-                    ae.getCreatedAt()
-            ));
-        }
         bundle.setArtifacts(sanitizedArtifacts);
 
         StructuredDiff sanitizedDiff = new StructuredDiff(wsId, baselineCommit, baselineCommit, 0, 0, 0, new ArrayList<>());
         if (wsOpt.isPresent()) {
             try {
                 Path wsRoot = workspaceResolver.getWorkspaceRoot(wsOpt.get().getId());
-                StructuredDiff rawDiff = gitManager.computeStructuredDiff(wsRoot.toFile());
+                StructuredDiff rawDiff = gitManager.computeStructuredDiffBetweenCommits(
+                        wsRoot.toFile(), baselineCommit, runSnapshotCommit);
                 if (rawDiff != null) {
                     List<FileDiffEntry> cleanEntries = new ArrayList<>();
                     if (rawDiff.getEntries() != null) {
@@ -794,8 +811,19 @@ public class ExecutionApplicationService implements ExecutionApplication {
         if (deploymentRepository != null) {
             List<DeploymentEntity> projectDeployments = deploymentRepository.findByProjectIdOrderByStartedAtDesc(project.getId());
             List<DeploymentEntity> matched = projectDeployments.stream()
-                    .filter(d -> (d.getArtifactId() != null && runArtifactIds.contains(d.getArtifactId()))
-                            || (run.getCreatedAt() != null && d.getCreatedAt() != null && !d.getCreatedAt().isBefore(run.getCreatedAt().minusSeconds(2))))
+                    .filter(d -> {
+                        String artId = d.getArtifactId();
+                        if (artId != null && !artId.isBlank() && !artId.startsWith("art-dep-")) {
+                            return runArtifactIds.contains(artId);
+                        }
+                        if (run.getCreatedAt() == null || d.getCreatedAt() == null) {
+                            return false;
+                        }
+                        boolean afterRunStart = !d.getCreatedAt().isBefore(run.getCreatedAt().minusSeconds(2));
+                        boolean beforeRunEnd = run.getFinishedAt() == null
+                                || !d.getCreatedAt().isAfter(run.getFinishedAt().plusSeconds(5));
+                        return afterRunStart && beforeRunEnd;
+                    })
                     .sorted(Comparator.comparing(DeploymentEntity::getStartedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                             .thenComparing(DeploymentEntity::getId))
                     .collect(Collectors.toList());

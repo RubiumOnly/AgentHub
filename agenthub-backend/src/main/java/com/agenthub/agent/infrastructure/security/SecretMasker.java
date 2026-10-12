@@ -16,8 +16,8 @@ public final class SecretMasker {
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)(Bearer\\s+)([a-zA-Z0-9._-]{8,})");
     private static final Pattern HEADER_API_KEY_PATTERN = Pattern.compile("(?i)((?:x-api-key|x-goog-api-key|api-key):\\s*)([^\\r\\n,;\"'\\s}]+)");
     private static final Pattern QUERY_PARAM_KEY_PATTERN = Pattern.compile("(?i)([?&](?:key|apiKey|token|secret)=)([^&\"'\\s}]+)");
-    private static final Pattern ENV_ASSIGNMENT_PATTERN = Pattern.compile("(?i)(\\b[A-Z0-9_]*(?:API_KEY|SECRET|PASSWORD|ACCESS_TOKEN)\\s*=\\s*['\"]?)([^\\r\\n,;\"'\\s}]+)");
-    private static final Pattern JSON_SECRET_FIELD_PATTERN = Pattern.compile("(?i)(\"(?:apiKey|api_key|secret|password|authSecret|accessToken|refreshToken)\"\\s*:\\s*\")([^\"]+)(\")");
+    private static final Pattern ENV_ASSIGNMENT_PATTERN = Pattern.compile("(?i)(\\b[A-Z0-9_]*(?:API_KEY|SECRET|PASSWORD|ACCESS_TOKEN|REFRESH_TOKEN|PRIVATE_KEY|JWT_SECRET)\\s*=\\s*['\"]?)([^\\r\\n,;\"'\\s}]+)");
+    private static final Pattern JSON_SECRET_FIELD_PATTERN = Pattern.compile("(?i)(\\\\?\"(?:apiKey|api_key|secret|password|authSecret|auth_secret|accessToken|access_token|refreshToken|refresh_token|clientSecret|client_secret|jwtSecret|jwt_secret|privateKey|private_key)\\\\?\"\\s*:\\s*\\\\?\")([^\"\\\\]+)(\\\\?\")");
 
     private SecretMasker() {}
 

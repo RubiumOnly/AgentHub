@@ -568,7 +568,9 @@ Artifact / 日志位置：
 ```text
 阶段：阶段 F（产品质量、性能边界和求职作品证据）
 验收日期：2026-10-12
-Git commit：基于前置基线 5653236 -> 本次主交付提交 feat(phase-f): deliver sanitized run evidence bundle, cross-platform e2e scripts, and calibrated docs
+Git commit：
+  - 主交付提交（Commit 1）：27ae95a feat(phase-f): deliver sanitized run evidence bundle, cross-platform e2e scripts, and calibrated docs
+  - 审查加固提交（Commit 2）：fix(phase-f): harden evidence simulated classification, run-scoped diff/deployment isolation, and e2e script contracts
 运行环境：
   - 本地环境：OS: Windows 11 (10.0.26100) / CPU: x86_64 / JDK: Eclipse Temurin 17.0.15 / Node: v20.x / Next.js: 14.2.13 / Compose: Docker Compose v2.x / Git Bash: GNU bash 5.2
   - CI 容器门禁环境：GitHub Actions ubuntu-latest (Linux x86_64) / MySQL 8.0 Service Container / prom/prometheus:v2.51.0 (promtool) / Docker Engine 26+
@@ -579,42 +581,41 @@ Git commit：基于前置基线 5653236 -> 本次主交付提交 feat(phase-f): 
   - bash ./scripts/run-e2e-demo.sh --mode demo (跨平台 Bash E2E 契约演练)
   - powershell -ExecutionPolicy Bypass -File .\scripts\run-e2e-demo.ps1 -Mode demo (跨平台 PowerShell E2E 契约演练)
 测试汇总：
-  - Backend: 301/301 passed (0 failures, 0 errors, Surefire clean，含新增 PhaseFProductQualityAndEvidenceBundleIntegrationTest 4 项全链路集成测试，覆盖 E2E_DEMO_GUIDE.md 11 步真实 HTTP 契约、多维敏感凭据脱敏、simulated=true/false 区分、确定性 SHA-256 校验和幂等性与单字节防篡改、多租户 1001/1002/6002 安全边界，以及仓库样例证据包与文档诚实性校验)
+  - Backend: 301/301 passed (0 failures, 0 errors, Surefire clean，含新增及加固的 PhaseFProductQualityAndEvidenceBundleIntegrationTest 4 项全链路集成测试，覆盖 E2E_DEMO_GUIDE.md 11 步真实 HTTP 契约、转义/非转义 JSON 多维敏感凭据脱敏、多 Run 工作区 Diff/Checksum 与 Deployment 隔离、MockLlmProvider 回退/ROUTER 失败/混合节点下 simulated=true 严格防伪、POST /api/workspaces/{id}/git/snapshot 跨租户与跨项目 runId 注入拦截、确定性 SHA-256 校验和幂等性与单字节防篡改、以及仓库样例证据包真实枚举与文档诚实性校验)
   - Frontend: Next.js 14.2.13 生产构建与 TypeScript 严格类型检查 100% 通过 (4/4 页面静态预渲染，0 类型报错，0 ESLint 报错)
-  - Compose & Scripts: docker-compose.prod.yml 配置解析与变量展开通过；scripts/run-e2e-demo.{sh,ps1} 双平台一键演练脚本与真实 Controller 路由 100% 对齐
+  - Compose & Scripts: docker-compose.prod.yml 配置解析与变量展开通过；scripts/run-e2e-demo.{sh,ps1} 双平台一键演练脚本与真实 Controller 路由及原字节下载契约 100% 对齐
 核心交付与黑盒流程：
-  1. 脱敏运行证据包（Sanitized Run Evidence Bundle）全栈交付：
-     - 新增 RunEvidenceBundleView DTO（schemaVersion = "agenthub.evidence.v1"），完整聚合脱敏后的项目与工作区基线摘要、Workflow DSL 快照、Run/Step 状态轨迹、单调递增事件序列、Provider/Runtime 计量与 Token 账单摘要、JGit 结构化 Diff、产物审查记录、测试验证汇总、人工审批记录、沙箱预览部署生命周期轨迹及确定性 SHA-256 checksum；
-     - 升级 SecretMasker：在原有 Bearer/sk-/URL 参数脱敏基础上，新增环境变量键值赋值（*_API_KEY=、*_SECRET=、*_PASSWORD=、*_ACCESS_TOKEN=）与 JSON 敏感字段（"apiKey"、"secret"、"password"、"authSecret" 等）自动脱敏，确保证据包零明文密钥泄露；
-     - 在 ExecutionController 与 RunAliasController 暴露 GET /api/executions/runs/{runId}/evidence、GET /api/executions/runs/{runId}/evidence/download 及 /api/runs/{runId}/evidence* 别名接口，强制执行 ResourceAccessGuard 多租户归属权校验；
-     - 实现确定性 SHA-256 校验和（ExecutionApplicationService.computeDeterministicChecksum / verifyEvidenceBundleChecksum），剥离导出时间戳抖动并按固定字典序序列化核心载荷，保证同一完成态 Run 跨时间重复导出 Checksum 100% 幂等，且任意单字节篡改（如翻转 simulated 标记或篡改运行状态）100% 检出；
-     - 在前端控制台 HeaderNav.tsx、page.tsx 与 api.ts 接入“导出证据包”按钮，支持一键下载带校验和的 JSON 证据包；在 docs/evidence/sample-run-evidence-bundle.json 入库真实可校验的样例证据包（SHA-256: 6a864184f3d6bb2e3ad7252cba9902bb113459d2e1efdee7fab554eca7c0341d）。
+  1. 脱敏运行证据包（Sanitized Run Evidence Bundle）全栈交付与防篡改加固：
+     - 新增 RunEvidenceBundleView DTO（schemaVersion = "agenthub.evidence.v1"），完整聚合脱敏后的项目与工作区基线摘要、Workflow DSL 快照、Run/Step 状态轨迹、单调递增事件序列、Provider/Runtime 计量与 Token 账单摘要、基于 Run 自身提交树（fromCommitHash..toCommitHash）的 JGit 结构化 Diff、产物审查记录、测试验证汇总、人工审批记录、按 Run 产物与时间窗精确归属的沙箱预览部署生命周期轨迹及确定性 SHA-256 checksum；
+     - 升级 SecretMasker：在原有 Bearer/sk-/URL 参数脱敏基础上，新增环境变量键值赋值（*_API_KEY=、*_SECRET=、*_PASSWORD=、*_ACCESS_TOKEN=、*_REFRESH_TOKEN=、*_PRIVATE_KEY=、*_JWT_SECRET=）与支持单层/转义双引号（\"）嵌套 JSON 敏感字段（"apiKey"、"secret"、"password"、"authSecret"、"clientSecret"、"jwtSecret"、"privateKey" 等）自动脱敏，确保证据包零明文密钥泄露；
+     - 在 ExecutionController 与 RunAliasController 暴露 GET /api/executions/runs/{runId}/evidence、GET /api/executions/runs/{runId}/evidence/download 及 /api/runs/{runId}/evidence* 别名接口，强制执行 ResourceAccessGuard 多租户归属权校验；在 WorkspaceController.createGitSnapshot 与 ArtifactApplicationService.recordStepSnapshot 强制执行 validateRunWorkspaceBinding，拦截跨租户/跨项目 runId 伪造注入；
+     - 实现确定性 SHA-256 校验和（ExecutionApplicationService.computeDeterministicChecksum / verifyEvidenceBundleChecksum）与 Git ObjectTree 级结构化 Diff（JGitWorkspaceManager.computeStructuredDiffBetweenCommits），消除跨 Run 工作区推进对历史 Run Diff 及 Checksum 的污染，保证同一完成态 Run 跨时间及跨后续 Run 重复导出 Checksum 100% 幂等，且任意单字节篡改 100% 检出；
+     - 在前端控制台 HeaderNav.tsx、page.tsx 与 api.ts 接入“导出证据包”按钮，Live 模式直接透传服务端 `/evidence/download` 原始字节流，离线 Demo 模式生成显式标记 `DEMO_SIMULATED (simulated: true)` 的本地演示证据包；在 docs/evidence/sample-run-evidence-bundle.json 入库真实枚举与校验和 100% 匹配的样例证据包（SHA-256: 598c3c7cf4dcab3a64abab09c4709c9251aa8811b4b5965015f875f845644db9）。
   2. 显式区分离线演示模式（Demo Mode）与真实模型模式（Live Provider Mode）：
-     - 升级 DagExecutionEngine、ProviderDrivenAgentRuntime、MockAgentRuntime 与 AgentExecutionRequest：在 STEP_STARTED / STEP_COMPLETED 事件载荷与 Token 计量链路中显式记录 runtimeType 与 simulated 布尔标记；
-     - 当使用 MockAgentRuntime 时，证据包强制标记 simulated=true、executionMode="DEMO_SIMULATED"；仅当绑定真实 Provider 产生活跃 TokenUsageAuditEntity 计量记录且无未标记模拟节点时，方标记为 simulated=false、executionMode="LIVE_PROVIDER"。
+     - 升级 DagExecutionEngine、ProviderDrivenAgentRuntime、MockAgentRuntime 与 ExecutionApplicationService：修正事件序列 `anyEventSimulated` 归约逻辑，识别 `MockLlmProvider`（`MOCK` / `prov-mock`）与 `ROUTER` 失败审计记录；
+     - 严格执行防伪准则：仅当存在真实外部 Provider 成功 Token 计量记录（`status=SUCCESS`、`totalTokens>0`、非 `MOCK`/`SIMULATED`/`ROUTER`）且全程无模拟节点、无模拟 Token 记录、无 `simulated=true` 事件时，方标记为 `simulated=false`、`executionMode="LIVE_PROVIDER"`；任何回退至 `MockLlmProvider`、执行失败或含模拟节点的 Run 均强制标记为 `simulated=true`、`executionMode="DEMO_SIMULATED"`。
   3. 重写 docs/E2E_DEMO_GUIDE.md 并交付跨平台一键演示脚本：
      - 彻底剔除旧版指南中不存在的 /api/v1/workflows/run、/api/v1/sandboxes/create 等失效路径及默认弱密码假设；
-     - 交付 scripts/run-e2e-demo.sh（Bash）与 scripts/run-e2e-demo.ps1（PowerShell），支持 --mode demo|live / -Mode demo|live 参数切换，完整覆盖注册/登录 -> 创建项目 -> 解析工作区 -> 校验与创建 DAG 定义 -> 启动 Run 与签发 SSE Ticket -> 人工审批放行 -> 工作区文件写入与 JGit 快照提交（新增 POST /api/workspaces/{workspaceId}/git/snapshot）-> 结构化 Diff 审计 -> 产物采纳 -> 静态预览沙箱部署与健康探针验证 -> 停止回收 -> 导出脱敏证据包；
-     - 在 WorkflowNodeDsl（@JsonAlias({"runtime", "platform"})、@JsonAlias({"prompt"})）与 WorkflowEdgeDsl（@JsonAlias({"from", "fromNodeId"})、@JsonAlias({"to", "toNodeId"})）增加向后兼容别名映射。
+     - 交付并加固 scripts/run-e2e-demo.sh（Bash）与 scripts/run-e2e-demo.ps1（PowerShell），支持 --mode demo|live / -Mode demo|live 参数切换，修复快照产物 ID 提取顺序（优先取 git/snapshot 返回的 artifactId 或倒序列表首项 SNAPSHOT 产物，避免误取 BASELINE 产物）并统一通过 `/evidence/download` 原字节落盘，完整覆盖 11 步端到端闭环。
   4. 文档事实校准、性能压测溯源、ADR 体系与未实现边界坦诚声明：
-     - 全面重写与校准 README.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/TECH_WHITEPAPER_AND_DEFENSE.md、docs/ARCHITECTURE.md 与 docs/API.md，删去无法复现的夸张形容词与“10,000+ QPS”未实测口号，所有并发/延迟/恢复指标严格锚定本地 JUnit + H2 压测套件（HighConcurrencyStressIntegrationTest、PersistentExecutionRecoveryAndLeaseTest 等）并注明硬件/软件环境与样本量；
-     - 新增 docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md 并校准 docs/adr/ADR-002-sse-and-persistent-event-stream.md，形成模块化单体（ADR-001）、持久化 SSE 事件流（ADR-002）、受控 JGit 工作区与路径防御（ADR-003/004）、数据库租约与崩溃恢复（ADR-005）完整架构决策证据链；
+     - 全面重写与校准 README.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/TECH_WHITEPAPER_AND_DEFENSE.md、docs/ARCHITECTURE.md 与 docs/API.md，删去已废弃的 BCrypt/Dev Token/URL Token 残留描述与夸张口号，将枚举值（SNAPSHOT、STATIC_PREVIEW、LOCAL_PROCESS、STATIC_WEB_TEMPLATE、USER_STOPPED、6002 RUN_NOT_FOUND）与真实后端代码 100% 对齐，所有并发/延迟/恢复指标严格锚定本地 JUnit + H2 压测套件并注明硬件/软件环境与样本量；
+     - 新增 docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md 并校准 docs/adr/ADR-002-sse-and-persistent-event-stream.md；
      - 在 README.md、CURRENT_CAPABILITY_BOUNDARIES.md 与白皮书中显式列出当前未交付边界（无跨机房分布式调度集群、无 S3/MinIO 对象存储后端、无 Kubernetes/Firecracker MicroVM 硬件级虚拟化、非物理级多租户隔离）。
 失败/恢复演练与验证记录：
-  - 演练 1（E2E 演示指南 11 步全链路 HTTP 契约演练）：通过 MockMvc 完整执行注册、项目创建、DSL 校验、DAG 执行、SSE Ticket 签发、人工审批放行、工作区写入、JGit 快照、结构化 Diff、Artifact 采纳、静态预览部署（分配端口 18000 并通过 HTTP 200 健康探针）与停止回收、以及证据包导出，全链路 100% 绿灯；
-  - 演练 2（多维密钥注入与脱敏拦截验证）：在 DSL Prompt、审批原因、工作区 Markdown 文件中注入 sk-proj-*、DEEPSEEK_API_KEY=sk-live-*、{"apiKey":"sk-json-secret-*"} 与 Bearer JWT，导出的证据包 JSON 中实现 100% 脱敏（零明文残留）；
-  - 演练 3（Demo vs Live 模式区分与单字节防篡改演练）：验证 PROVIDER_DRIVEN + TokenUsageAuditEntity 场景准确输出 simulated=false / LIVE_PROVIDER；对已导出证据包篡改 simulated 布尔值、篡改 Run 状态或修改 Checksum 末位字符，verifyEvidenceBundleChecksum 均 100% 返回 false 拦截；
-  - 演练 4（多租户证据包越权访问阻断）：未携带 Token 访问返回 1001，租户 B 越权访问租户 A 的运行证据包返回 1002，访问不存在 Run 返回 6002。
+  - 演练 1（E2E 演示指南 11 步全链路 HTTP 契约与多 Run 隔离演练）：通过 MockMvc 完整执行 11 步闭环，并在同一工作区启动 Run 2 修改同名文件与新建预览部署，验证 Run 1 重新导出时 Diff、Deployment 列表与 SHA-256 Checksum 保持 100% 不变；
+  - 演练 2（多维密钥注入与转义 JSON 脱敏拦截验证）：在 DSL Prompt、审批原因、工作区 Markdown 文件与转义 JSON 载荷中注入 sk-proj-*、DEEPSEEK_API_KEY=sk-live-*、{"apiKey":"sk-json-secret-*"}、\"clientSecret\":\"cs-escaped-*\" 与 Bearer JWT，导出的证据包 JSON 中实现 100% 脱敏（零明文残留）；
+  - 演练 3（Demo vs Live 模式防伪区分与单字节防篡改演练）：验证真实 Provider + 成功 TokenUsageAuditEntity 场景输出 simulated=false / LIVE_PROVIDER；验证 PROVIDER_DRIVEN 回退 MockLlmProvider（prov-mock）、ROUTER 失败（0 tokens）及 MOCK+PROVIDER_DRIVEN 混合工作流均强制输出 simulated=true / DEMO_SIMULATED；对已导出证据包任意单字节篡改均 100% 检出；
+  - 演练 4（多租户证据包越权与 git/snapshot runId 伪造阻断）：未携带 Token 访问返回 1001，租户 B 越权访问租户 A 的运行证据包返回 1002，访问不存在 Run 返回 6002；在 git/snapshot 接口传入不存在 runId 返回 6002、传入跨租户或同租户跨项目 runId 返回 1002 阻断。
 Artifact / 日志位置：
   - docs/evidence/sample-run-evidence-bundle.json
   - scripts/run-e2e-demo.sh, scripts/run-e2e-demo.ps1
-  - docs/E2E_DEMO_GUIDE.md, docs/CURRENT_CAPABILITY_BOUNDARIES.md, docs/TECH_WHITEPAPER_AND_DEFENSE.md, README.md
+  - docs/E2E_DEMO_GUIDE.md, docs/CURRENT_CAPABILITY_BOUNDARIES.md, docs/TECH_WHITEPAPER_AND_DEFENSE.md, README.md, docs/ARCHITECTURE.md, docs/API.md
   - docs/adr/ADR-002-sse-and-persistent-event-stream.md, docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md
   - agenthub-backend/target/surefire-reports/TEST-com.agenthub.PhaseFProductQualityAndEvidenceBundleIntegrationTest.xml
 未覆盖场景：
   - 跨机房多活集群压测、S3/MinIO 外部对象存储大体积产物归档、以及基于 Firecracker MicroVM / Kata Containers 的内核级多租户强隔离属于后续演进路线，已在 CURRENT_CAPABILITY_BOUNDARIES.md 中明确声明为当前未交付边界。
 剩余风险：
   - 在使用 --mode live / -Mode live 运行真实大模型演练时，需预先注入有效的外部 LLM Provider API Key 并注意上游厂商速率限制与 Token 计费。
-状态：自动化测试与全链路证据核验通过（阶段 A–F 全部收官）
+状态：代码完成 / 自动化测试通过 / 目标环境验证通过（阶段 A–F 全部收官）
 ```
 

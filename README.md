@@ -118,21 +118,22 @@ stateDiagram-v2
     TIMED_OUT --> [*]
 ```
 
-### 2.3 受控预览沙箱部署 8 阶段状态机 (`DeploymentStatus`)
+### 2.3 受控预览沙箱部署生命周期状态机 (`DeploymentStatus`)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: 校验 ACCEPTED 产物并分配端口
-    PENDING --> BUILDING: 执行受控构建模板
-    BUILDING --> STARTING: 构建成功，拉起预览子进程/容器
-    BUILDING --> FAILED: 构建非零退出或超时
-    STARTING --> HEALTH_CHECKING: 进程存活，启动 HTTP 探针轮询
-    STARTING --> FAILED: 进程启动异常退出
-    HEALTH_CHECKING --> RUNNING: 探针实测返回 HTTP 2xx/3xx
-    HEALTH_CHECKING --> FAILED: 探针超时未就绪，自动强杀进程并释放端口
-    RUNNING --> STOPPING: 收到停止指令或 TTL 到期
+    [*] --> CREATED: 校验 ACCEPTED 产物并分配动态端口
+    CREATED --> BUILD: 执行受控构建模板
+    BUILD --> START: 构建成功，拉起预览子进程/容器
+    BUILD --> FAILED: 构建非零退出或超时
+    START --> HEALTH_CHECK: 进程存活，启动 HTTP 探针轮询
+    START --> FAILED: 进程启动异常退出
+    HEALTH_CHECK --> RUNNING: 探针实测返回 HTTP 2xx/3xx
+    HEALTH_CHECK --> FAILED: 探针超时未就绪，自动强杀进程并释放端口
+    RUNNING --> STOP: 收到停止指令或 TTL 到期
     RUNNING --> FAILED: 运行期进程意外崩溃
-    STOPPING --> STOPPED: 销毁进程树并回收端口
+    STOP --> CLEANUP: 销毁进程树并清理沙箱上下文
+    CLEANUP --> STOPPED: 释放动态端口并归档日志
     STOPPED --> [*]
     FAILED --> [*]
 ```

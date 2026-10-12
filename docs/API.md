@@ -53,7 +53,8 @@
 - `5007` PROVIDER_RATE_LIMIT：大模型 Provider 命中 429 速率限制；
 - `5008` PROVIDER_AUTH_FAILED：大模型 Provider 凭证鉴权失败；
 - `5009` NO_AVAILABLE_PROVIDER：无可满足路由与能力约束的可用 Provider；
-- `6001` RUN_NOT_FOUND：执行实例不存在；
+- `6001` WORKFLOW_INVALID：工作流 DSL 拓扑非法（如存在环路、孤立节点或无效引用）；
+- `6002` RUN_NOT_FOUND：执行实例不存在；
 - `7001` DEPLOYMENT_NOT_FOUND：目标部署记录不存在；
 - `7002` SANDBOX_COMMAND_BLOCKED：命令被安全防火墙阻断（命中了高危破坏模式或非白名单程序）；
 - `7003` SANDBOX_TIMEOUT：沙箱命令执行超时（已被看门狗强平，退出码 137）；
@@ -109,11 +110,11 @@
 - `DELETE /api/workspaces/{workspaceId}/file?path={relPath}`：受控删除文件或目录；
 - `GET /api/workspaces/{workspaceId}/download?path={relPath}`：受控下载单文件二进制流或文本内容；
 - `GET /api/workspaces/{workspaceId}/archive`：将工作区受控文件归档打包为 ZIP 压缩包下载（自动排除 `.git` 元数据）；
-- `POST /api/workspaces/{workspaceId}/git/snapshot`：将当前工作区改动提交为 JGit 快照 Commit 并生成待验收 `ArtifactEntity`；
+- `POST /api/workspaces/{workspaceId}/git/snapshot`：将当前工作区改动提交为 JGit 快照 Commit 并生成待验收 `ArtifactEntity`（强制校验 `runId` 存在性、租户归属权及工作区与项目的绑定关系）；
 - `GET /api/workspaces/{workspaceId}/diff`：获取结构化 Diff 对象（`Result<StructuredDiff>`，包含变更文件数、增减行数、Unified Diff Patch、冲突与二进制状态）；
-- `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁（Body: `{"ownerId":"...","waitTimeoutMs":3000,"leaseTtlMs":60000}`，支持多节点 DB 表 `workspace_locks` 同步与超时自动回收防死锁）；
-- `POST /api/workspaces/{workspaceId}/lock/renew`：为已持有的工作区租约锁续期（Body: `{"ownerId":"...","additionalTtlMs":60000}`）；
-- `POST /api/workspaces/{workspaceId}/lock/release`：主动释放工作区锁（Body: `{"ownerId":"..."}`）；
+- `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁（Body: `{"waitTimeoutMs":3000,"leaseTtlMs":60000}`，锁持有者身份优先从认证上下文提取，支持多节点 DB 表 `workspace_locks` 同步与超时自动回收防死锁）；
+- `POST /api/workspaces/{workspaceId}/lock/renew`：为已持有的工作区租约锁续期（Body: `{"additionalTtlMs":60000}`）；
+- `POST /api/workspaces/{workspaceId}/lock/release`：主动释放工作区锁；
 - `GET /api/workspaces/{workspaceId}/lock/status`：查询工作区当前锁定状态与剩余租期。
 
 ### 4. 智能体注册表与实例 (Agent Registry & Instances)
@@ -167,12 +168,8 @@
 - `POST /api/audit/artifacts/{artifactId}/reject`：人工审查拒绝产物（Body: `{"reason":"..."}`，更新审查状态为 `REJECTED`）；
 - `POST /api/audit/artifacts/{artifactId}/revert`：安全非破坏性回滚产物（严格还原目标 Step 所影响的文件至基线 commit，杜绝 `git reset --hard` 硬重置，生成可追踪 Revert Commit 并更新状态为 `REVERTED`）。
 
-### 8. 兼容工作区接口 (Legacy Workspace Endpoints)
-- `GET /api/workspace/diff`：基于 Eclipse JGit 计算受控工作区的 Unified Diff 列表（包含文件路径、变更行数统计与完整 diff patch）；
-- `GET /api/workspace/files`：获取受控工作区的文件与目录树结构；
-- `GET /api/workspace/file/content`：读取指定工作区文件内容；
-- `POST /api/workspace/file/save`：在线编辑并保存受控工作区代码；
-- `POST /api/workspace/workflow/execute`：触发 DAG 拓扑工作流引擎按序执行各阶段节点。
+### 8. 历史非受控工作区接口退役说明 (`ADR-003`)
+- 早期接收客户端工作区路径参数的 `/api/workspace/*` 接口已在 Phase D 全量下线，所有工作区读写、Diff 与快照操作均统一收敛至基于服务端 `workspaceId` 解析的 `/api/workspaces/{workspaceId}/*`（见第 3 节）。
 
 ### 9. 模版预览与部署清单生成 (Sandbox & Deploy)
 - `GET /api/sandbox/preview/{id}`：挂载并实时预览 Agent 协同生成的 Web 静态模版页面；
@@ -215,9 +212,9 @@
 
 ### 15. 工作区沙箱与部署自动化 (Sandbox & Deployment Automation)
 - `POST /api/deployments`：创建并启动项目构建与部署
-  - Request: `{"projectId": "proj-default", "target": "STATIC_PREVIEW", "sandboxType": "LOCAL_PROCESS", "buildCommand": "npm run build", "port": 18080, "healthCheckPath": "/"}`
-  - Response: `Result<DeploymentResponse>` (`{"id": "dep-...", "status": "RUNNING", "port": 18080, "url": "http://localhost:18080/", ...}`)
-- `GET /api/deployments/{id}`：查询指定部署详情与实时运行状态 (`BUILDING`, `RUNNING`, `STOPPED`, `FAILED`)
+  - Request: `{"projectId": "proj-default", "artifactId": "art-...", "target": "STATIC_PREVIEW", "sandboxType": "LOCAL_PROCESS", "templateType": "STATIC_WEB_TEMPLATE", "healthCheckPath": "/"}`
+  - Response: `Result<DeploymentResponse>` (`{"id": "dep-...", "status": "RUNNING", "port": 18000, "url": "http://127.0.0.1:18000/", ...}`)
+- `GET /api/deployments/{id}`：查询指定部署详情与实时运行状态 (`CREATED`, `BUILD`, `START`, `HEALTH_CHECK`, `RUNNING`, `STOP`, `CLEANUP`, `STOPPED`, `FAILED`)
   - Response: `Result<DeploymentResponse>`
 - `GET /api/deployments/{id}/logs`：查询部署构建与运行完整控制台日志
   - Response: `Result<String>`

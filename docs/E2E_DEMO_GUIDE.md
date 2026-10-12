@@ -315,9 +315,9 @@ curl -s -X POST http://localhost:8080/api/workspaces/$WORKSPACE_ID/git/snapshot 
 curl -s http://localhost:8080/api/workspaces/$WORKSPACE_ID/diff \
   -H "Authorization: Bearer $TOKEN" | jq .
 
-# 3. 查询并验收快照产物 (状态流转至 ACCEPTED 后方可部署)
+# 3. 查询并验收最新快照产物 (按 createdAt DESC 排序，data[0] 为最新 SNAPSHOT 产物；状态流转至 ACCEPTED 后方可部署)
 ARTIFACT_ID=$(curl -s http://localhost:8080/api/audit/artifacts/run/$RUN_ID \
-  -H "Authorization: Bearer $TOKEN" | jq -r '.data[-1].id')
+  -H "Authorization: Bearer $TOKEN" | jq -r '.data[0].id')
 
 curl -s -X POST http://localhost:8080/api/audit/artifacts/$ARTIFACT_ID/accept \
   -H "Authorization: Bearer $TOKEN" \
@@ -332,7 +332,7 @@ Invoke-RestMethod -Uri "http://localhost:8080/api/workspaces/$WorkspaceId/file" 
     content = "<!DOCTYPE html><html><body><h1>AgentHub Preview</h1></body></html>"
 } | ConvertTo-Json)
 
-Invoke-RestMethod -Uri "http://localhost:8080/api/workspaces/$WorkspaceId/git/snapshot" -Method Post -Headers $Headers -ContentType "application/json" -Body (@{
+$SnapResp = Invoke-RestMethod -Uri "http://localhost:8080/api/workspaces/$WorkspaceId/git/snapshot" -Method Post -Headers $Headers -ContentType "application/json" -Body (@{
     runId = $RunId
     author = "E2E Operator"
     message = "feat: add preview page"
@@ -340,7 +340,7 @@ Invoke-RestMethod -Uri "http://localhost:8080/api/workspaces/$WorkspaceId/git/sn
 
 $Diff = Invoke-RestMethod -Uri "http://localhost:8080/api/workspaces/$WorkspaceId/diff" -Method Get -Headers $Headers
 $Artifacts = Invoke-RestMethod -Uri "http://localhost:8080/api/audit/artifacts/run/$RunId" -Method Get -Headers $Headers
-$ArtifactId = $Artifacts.data[-1].id
+$ArtifactId = if ($SnapResp.data.artifactId) { $SnapResp.data.artifactId } else { $Artifacts.data[0].id }
 
 Invoke-RestMethod -Uri "http://localhost:8080/api/audit/artifacts/$ArtifactId/accept" -Method Post -Headers $Headers -ContentType "application/json" -Body (@{
     reviewer = "E2E Operator"
@@ -350,7 +350,7 @@ Invoke-RestMethod -Uri "http://localhost:8080/api/audit/artifacts/$ArtifactId/ac
 
 ### 步骤 8：受控沙箱预览部署、HTTP 探针就绪与停止回收 (`DeploymentController` - `/api/deployments`)
 
-> **受控模板契约**：部署接口要求传入已验收的 `artifactId`、受控目标 `target`（`STATIC_PREVIEW` / `JAVA_SPRING_BOOT` / `NODE_NEXTJS` / `DOCKER_NGINX`）以及模板类型 `templateType`（`STATIC_WEB_TEMPLATE` / `SPRING_BOOT_JAR_TEMPLATE` / `NODE_WEB_TEMPLATE`）。状态机严格经过 `PENDING -> BUILDING -> STARTING -> HEALTH_CHECKING -> RUNNING`，仅在 `HealthCheckProbeService` 收到真实 HTTP 2xx/3xx 响应后才进入 `RUNNING`。
+> **受控模板契约**：部署接口要求传入已验收的 `artifactId`、受控目标 `target`（`STATIC_PREVIEW` / `JAVA_SPRING_BOOT` / `NODE_NEXTJS` / `DOCKER_NGINX`）以及模板类型 `templateType`（`STATIC_WEB_TEMPLATE` / `NODE_SERVICE_TEMPLATE` / `JAVA_SPRING_TEMPLATE` / `CUSTOM_SANDBOX_COMMAND`）。状态机严格经过 `CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING -> STOP -> CLEANUP -> STOPPED / FAILED`，仅在 `HealthCheckProbeService` 收到真实 HTTP 2xx/3xx 响应后才进入 `RUNNING`。
 
 **Bash**:
 ```bash
@@ -366,11 +366,11 @@ DEP_ID=$(curl -s -X POST http://localhost:8080/api/deployments \
     \"healthCheckPath\": \"/\"
   }" | jq -r '.data.id')
 
-# 查询部署状态与 lifecycleTrace (PENDING->BUILDING->STARTING->HEALTH_CHECKING->RUNNING)
+# 查询部署状态与 lifecycleTrace (CREATED->BUILD->START->HEALTH_CHECK->RUNNING)
 curl -s http://localhost:8080/api/deployments/$DEP_ID \
   -H "Authorization: Bearer $TOKEN" | jq .
 
-# 停止预览部署并释放端口
+# 停止预览部署并释放端口 (STOP->CLEANUP->STOPPED)
 curl -s -X POST http://localhost:8080/api/deployments/$DEP_ID/stop \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
@@ -391,13 +391,13 @@ $DepDetail = Invoke-RestMethod -Uri "http://localhost:8080/api/deployments/$DepI
 Invoke-RestMethod -Uri "http://localhost:8080/api/deployments/$DepId/stop" -Method Post -Headers $Headers
 ```
 
-### 步骤 9：导出脱敏运行证据包 (`GET /api/executions/runs/{runId}/evidence`)
+### 步骤 9：导出脱敏运行证据包 (`GET /api/executions/runs/{runId}/evidence` & `/evidence/download`)
 
 **Bash**:
 ```bash
-# 获取 JSON 响应或直接下载证据包文件
-curl -s http://localhost:8080/api/executions/runs/$RUN_ID/evidence \
-  -H "Authorization: Bearer $TOKEN" | jq '.data' > evidence-bundle-$RUN_ID.json
+# 直接下载服务端签名的脱敏证据包 JSON 文件（保留原始字节流以确保 SHA-256 校验和 100% 匹配）
+curl -s http://localhost:8080/api/executions/runs/$RUN_ID/evidence/download \
+  -H "Authorization: Bearer $TOKEN" -o evidence-bundle-$RUN_ID.json
 
 # 验证脱敏状态、运行模式与 SHA-256 校验和
 jq '{bundleId, simulated, executionMode, checksum, runStatus: .run.status, eventCount: (.events | length)}' evidence-bundle-$RUN_ID.json
@@ -406,7 +406,7 @@ jq '{bundleId, simulated, executionMode, checksum, runStatus: .run.status, event
 **PowerShell**:
 ```powershell
 $Evidence = Invoke-RestMethod -Uri "http://localhost:8080/api/executions/runs/$RunId/evidence" -Method Get -Headers $Headers
-$Evidence.data | ConvertTo-Json -Depth 12 | Set-Content -Path "evidence-bundle-$RunId.json" -Encoding UTF8
+Invoke-WebRequest -Uri "http://localhost:8080/api/executions/runs/$RunId/evidence/download" -Method Get -Headers $Headers -OutFile "evidence-bundle-$RunId.json" | Out-Null
 $Evidence.data | Select-Object bundleId, simulated, executionMode, checksum
 ```
 

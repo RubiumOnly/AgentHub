@@ -134,11 +134,11 @@ $FileBody = @{
 Invoke-RestMethod -Uri "$BaseUrl/api/workspaces/$WorkspaceId/file" -Method Post -Headers $Headers -ContentType "application/json" -Body $FileBody | Out-Null
 
 $SnapBody = @{ runId = $RunId; author = "E2E-Operator"; message = "feat: E2E preview snapshot" } | ConvertTo-Json
-Invoke-RestMethod -Uri "$BaseUrl/api/workspaces/$WorkspaceId/git/snapshot" -Method Post -Headers $Headers -ContentType "application/json" -Body $SnapBody | Out-Null
+$SnapResp = Invoke-RestMethod -Uri "$BaseUrl/api/workspaces/$WorkspaceId/git/snapshot" -Method Post -Headers $Headers -ContentType "application/json" -Body $SnapBody
 
 $DiffResp = Invoke-RestMethod -Uri "$BaseUrl/api/workspaces/$WorkspaceId/diff" -Method Get -Headers $Headers
 $ArtifactsResp = Invoke-RestMethod -Uri "$BaseUrl/api/audit/artifacts/run/$RunId" -Method Get -Headers $Headers
-$ArtifactId = $ArtifactsResp.data[-1].id
+$ArtifactId = if ($SnapResp.data.artifactId) { $SnapResp.data.artifactId } else { $ArtifactsResp.data[0].id }
 
 $AcceptBody = @{ reviewer = "E2E-Operator"; comment = "Diff verified and accepted" } | ConvertTo-Json
 Invoke-RestMethod -Uri "$BaseUrl/api/audit/artifacts/$ArtifactId/accept" -Method Post -Headers $Headers -ContentType "application/json" -Body $AcceptBody | Out-Null
@@ -177,7 +177,7 @@ if (-not (Test-Path $OutputDir)) {
 $BundlePath = Join-Path $OutputDir "evidence-bundle-$RunId.json"
 $EvidenceResp = Invoke-RestMethod -Uri "$BaseUrl/api/executions/runs/$RunId/evidence" -Method Get -Headers $Headers
 $BundleData = $EvidenceResp.data
-$BundleData | ConvertTo-Json -Depth 12 | Set-Content -Path $BundlePath -Encoding UTF8
+Invoke-WebRequest -Uri "$BaseUrl/api/executions/runs/$RunId/evidence/download" -Method Get -Headers $Headers -OutFile $BundlePath | Out-Null
 
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host " E2E Verification Completed!" -ForegroundColor Green

@@ -21,7 +21,7 @@ flowchart TD
 
     subgraph SecurityFilter [安全与请求链路治理]
         CorrFilter[RequestCorrelationFilter (X-Request-ID/X-Correlation-ID)]
-        AuthFilter[AuthFilter (Bearer Token / Dev Token 解析)]
+        AuthFilter[AuthFilter (Bearer Token / Cookie / Stream Ticket 鉴权)]
         Guard[ResourceAccessGuard (跨租户资源归属越权防御)]
     end
 
@@ -63,7 +63,7 @@ flowchart TD
     end
 
     subgraph Persistence [持久化与基础设施层]
-        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3-V8 Evolutions)]
+        Flyway[Flyway Migrations (V1 Schema / V2 Seed / V3-V12 Evolutions)]
         H2MySQL[H2 (MySQL Mode) / MySQL 8.0]
         GitFS[JGit Repository / Controlled Workspaces]
     end
@@ -77,13 +77,13 @@ flowchart TD
 
 ### 1. 十大核心领域模块分布 (`com.agenthub.*`)
 
-- **`identity`**：用户登录、注册、密码哈希（BCrypt）、Token 鉴权（HMAC-SHA256 与开发兼容模式）、跨租户资源归属校验（`ResourceAccessGuard`）；
+- **`identity`**：用户登录、注册、密码哈希（PBKDF2WithHmacSHA256）、Token 鉴权（HMAC-SHA256 签名令牌、HttpOnly Cookie 与 SSE 单次短效票据）、跨租户资源归属校验（`ResourceAccessGuard`）；
 - **`project`**：项目边界（`ProjectEntity`）、受控代码工作区（`WorkspaceEntity`）、受控路径解析与目录树安全提取；
 - **`agent`**：智能体平台能力定义（`AgentDefinition`）、实例配置（`AgentInstance`）、模型提供商（`Provider`）；
 - **`team`**：多智能体团队拓扑协作（`TeamEntity`、`TeamMemberEntity`），支持层级管理 (`HIERARCHICAL`)、对等协作 (`PEER_TO_PEER`) 与轮询流水线 (`ROUND_ROBIN`)，提供细粒度角色分工与委派控制；
 - **`conversation`**：即时通讯与消息总线（`ConversationEntity`、`ConversationParticipantEntity`、`MessageEntity`），具备细粒度严格单调递增序号（`sequence_num`）、点对点/广播/系统路由与可见性隔离、三层防循环震荡检测及上下文预算滑动压缩治理；
 - **`orchestration`**：任务编排引擎、版本化工作流 DSL 定义（`WorkflowDefinitionEntity`）；
-- **`execution`**：执行实例状态机（`WorkflowRunEntity`，支持幂等键防重）、节点执行（`StepRunEntity`）、可审计与可重放运行时事件（`RunEventEntity`，支持按序号游标拉取）；
+- **`execution`**：执行实例状态机（`WorkflowRunEntity`，支持幂等键防重）、节点执行（`StepRunEntity`）、可审计与可重放运行时事件（`RunEventEntity`，支持按序号游标拉取）与脱敏运行证据包导出（`RunEvidenceBundleView`）；
 - **`audit`**：版本审计基线、JGit 原生 Diff 增删行统计器、交付物实体（`ArtifactEntity`）；
 - **`sandbox`**：Web 预览沙箱、Dockerfile 构建清单生成、部署记录（`DeploymentEntity`）；
 - **`shared`**：全局统一响应结构 `Result<T>`（携带 `requestId`）、上下文链路传递 `RequestContext`（MDC 追踪）、全域业务异常错误码规范 `ErrorCode`。
@@ -108,7 +108,8 @@ flowchart TD
 - **`V4__phase3_execution_kernel_and_state_machine.sql`**：扩展 `workflow_runs` 取消原因、时间戳，扩展 `step_runs` 开始/结束时间、耗时字段与链路追踪关联；
 - **`V5__phase4_workflow_dag_and_orchestration.sql`**：扩展 `workflow_definitions` (name, description, updated_at), `workflow_runs` (context_data_json), `step_runs` (inputs_json, outputs_json, requires_approval) 及 `approvals` 索引演进；
 - **`V6__phase5_agent_providers_and_routing.sql`**：扩展 `providers`（priority, weight, capabilities, cost_per_million_input, cost_per_million_output, circuit_status, avg_latency_ms）与 `agent_definitions` 表，新增 `token_usages` 审计表与多维高效查询复合索引；
-- **`V7__phase6_multi_agent_teams_and_message_bus.sql`**：扩展 `teams` 表（topology, leader_agent_id, max_turns, config_json, status），扩展 `team_members` 表（role_type, responsibilities, system_prompt_override, can_delegate），扩展 `conversations` 表（team_id, last_sequence_num, summary, token_count, status），扩展 `messages` 表（recipient_id, message_type, protocol_type, token_count, in_reply_to_id），新增 `idx_messages_recipient`, `idx_messages_type_proto`, `idx_team_members_role`, `idx_conversations_team` 复合索引，并预置 `team-dev-swarm` 经典开发团队种子基线数据；
+- **`V7__phase6_multi_agent_teams_and_message_bus.sql`**：扩展 `teams` 表（topology, leader_agent_id, max_turns, config_json, status），扩展 `team_members` 表（role_type, responsibilities, system_prompt_override, can_delegate），扩展 `conversations` 表（team_id, last_sequence_num, summary, token_count, status），扩展 `messages` 表（recipient_id, message_type, protocol_type, token_count, in_reply_to_id），新增复合索引并预置 `team-dev-swarm` 种子基线数据；
+- **`V8__phase7_sandbox_and_deployments.sql` ~ `V12__phase_d_deployment_lifecycle_audit.sql`**：扩展 `deployments` 沙箱类型、模板类型、生命周期轨迹（`lifecycle_trace`）、终止原因（`termination_reason`），扩展 `workflow_runs` / `step_runs` 数据库租约恢复字段（`lease_owner`, `lease_until`, `heartbeat_at`, `dsl_snapshot`）以及多租户归属隔离字段；
 - **兼容性验证**：Schema DDL 经专门设计，100% 兼容 H2 (MySQL Mode) 本地快速回归测试与生产 MySQL 8.0 严苛验证；
 - **事务与查询边界**：生产与测试配置全面启用 `spring.jpa.open-in-view: false`，杜绝因延迟加载穿透导致的隐藏 N+1 查询与事务悬挂问题。
 
@@ -117,8 +118,8 @@ flowchart TD
 ## 三、 统一认证鉴权与安全防御体系
 
 1. **链路追踪 (Request Tracing)**：`RequestCorrelationFilter` 自动拦截/分配 `X-Request-ID` 与 `X-Correlation-ID`，并将追踪信息绑定至 MDC 日志与 HTTP 响应头；
-2. **身份鉴权 (Authentication)**：基于无状态 Token 令牌机制。生产与测试环境通过 Authorization Header (`Bearer <token>`) 传递，开发环境支持透明安全退化；
-3. **水平越权防御 (ResourceAccessGuard)**：执行跨用户资源拦截。任何用户试图操作或查询不属于自己的 Project / Workspace / Conversation 时，一律拦截并返回 HTTP 403 `FORBIDDEN`，杜绝多租户数据泄露。
+2. **身份鉴权 (Authentication)**：基于 HMAC-SHA256 签名令牌与 `revoked_tokens` 吊销表机制。通过 `Authorization: Bearer <token>` 或 `HttpOnly` Cookie 传递；SSE 流式连接通过 `POST /api/auth/stream-ticket` 换取 60 秒单次有效短效票据（严禁在 URL 查询参数中暴露长期 Bearer Token）；
+3. **水平越权防御 (ResourceAccessGuard)**：执行跨用户资源拦截。任何用户试图操作或查询不属于自己的 Project / Workspace / Conversation / WorkflowRun / Deployment 时，一律拦截并返回 `1002 FORBIDDEN`，杜绝多租户数据泄露。
 
 ---
 
@@ -129,7 +130,7 @@ flowchart TD
 - 控制器必须收敛于 `adapter.web` 或 `*.api` 包路径下；
 - 应用服务必须收敛于 `*.application` 包路径下；
 - 控制器严禁直接泄露 JPA 实体对象；
-- 121 项单元、领域逻辑、集成演练与边界防御测试矩阵全量绿灯执行。
+- 全量单元、领域逻辑、集成演练与边界防御测试矩阵（300+ 测试用例）100% 绿灯执行。
 
 ---
 
@@ -200,7 +201,7 @@ flowchart TD
 - **真流式事件输出**：提供专属端点 `GET /api/executions/runs/{runId}/stream` 与 `GET /api/runs/{runId}/stream`，彻底淘汰无状态长轮询假实时；
 - **严格单调递增 Sequence**：每个事件均分配唯一的单调递增 `sequenceNum`，并在 `run_events` 表持久化落库；
 - **断点补发机制**：客户端携带 `Last-Event-ID` 头部或 `?lastEventId=` 参数重连时，系统自动从数据库按序号精准补齐遗漏的历史事件后再切入实时广播，具备 `MAX_REPLAY_LIMIT (2000)` 上限防 OOM 保护；
-- **认证兼容与长连接保活心跳**：`AuthFilter` 支持标准浏览器 `EventSource` URL Token 参数鉴权；内置每 20 秒自动化发送 `:heartbeat` 注释包，防御代理与网关超时断联。
+- **安全票据鉴权与长连接保活心跳**：通过 `POST /api/auth/stream-ticket` 签发一次性短效票据供标准浏览器 `EventSource` 鉴权（禁止 URL 暴露长期 Token）；内置每 20 秒自动化发送 `:heartbeat` 注释包，防御代理与网关超时断联。
 
 ---
 
@@ -413,8 +414,8 @@ flowchart TD
   - 响应 HTTP 2xx/3xx 判定为健康，探测超时或连接拒绝判定为失败。
 
 ### 6. 代码一键部署生命周期与 REST 端点 (`DeploymentApplication` & `DeploymentController`)
-- **8 阶段受控部署状态机模型 (`DeploymentStatus`)**：
-  - `PENDING` -> `BUILDING` -> `STARTING` -> `HEALTH_CHECKING` -> `RUNNING` -> `STOPPING` -> `STOPPED` / `FAILED`；
+- **受控部署生命周期状态机模型 (`DeploymentStatus`)**：
+  - `CREATED` -> `BUILD` -> `START` -> `HEALTH_CHECK` -> `RUNNING` -> `STOP` -> `CLEANUP` -> `STOPPED` / `FAILED`；
   - 仅当 `HealthCheckProbeService` 收到真实 HTTP `2xx/3xx` 响应后方可进入 `RUNNING`，并持久化 `lifecycleTrace`；
 - **RESTful 端点矩阵 (`/api/deployments`)**：
   - `POST /api/deployments`：校验 `ACCEPTED` 产物并触发受控模板构建与部署；
