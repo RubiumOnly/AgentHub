@@ -28,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -303,6 +304,17 @@ public class DeploymentApplicationService implements DeploymentApplication {
             } catch (BusinessException be) {
                 portAllocationService.releasePort(port);
                 throw be;
+            } catch (Exception ex) {
+                transitionState(entity, DeploymentStatus.CLEANUP);
+                portAllocationService.releasePort(port);
+                transitionState(entity, DeploymentStatus.FAILED);
+                entity.setTerminationReason("BUILD_FAILED");
+                entity.setErrorMessage("Build execution error: " + ex.getMessage());
+                entity.setFinishedAt(LocalDateTime.now());
+                logAccumulator.append("=== BUILD EXCEPTION ===\n").append(ex.getMessage()).append("\n");
+                entity.setLogOutput(logAccumulator.toString());
+                deploymentRepository.save(entity);
+                return toResponse(entity);
             }
             logAccumulator.append("=== BUILD OUTPUT ===\n").append(buildResult.getCombinedOutput()).append("\n");
 
@@ -353,6 +365,8 @@ public class DeploymentApplicationService implements DeploymentApplication {
                     logAccumulator.append("=== START OUTPUT ===\n").append(procLogs).append("\n");
                     throw new IllegalStateException("Start process exited prematurely with code " + exitCode);
                 }
+            } else {
+                throw new IllegalStateException("Start command is required for non-static process deployment target [" + target + "]");
             }
 
             if (runtimeInstance != null) {
@@ -365,7 +379,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
             }
         } catch (BusinessException be) {
             transitionState(entity, DeploymentStatus.CLEANUP);
-            lifecycleWorker.stopRuntime(deployId, entity.getProcessId());
+            lifecycleWorker.stopRuntime(deployId, entity.getProcessId(), entity.getSandboxType());
             portAllocationService.releasePort(port);
             transitionState(entity, DeploymentStatus.FAILED);
             entity.setTerminationReason("START_SECURITY_OR_ISOLATION_REJECTED");
@@ -377,7 +391,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
         } catch (Exception e) {
             log.warn("Deployment start failed for [{}]: {}", deployId, e.getMessage());
             transitionState(entity, DeploymentStatus.CLEANUP);
-            lifecycleWorker.stopRuntime(deployId, entity.getProcessId());
+            lifecycleWorker.stopRuntime(deployId, entity.getProcessId(), entity.getSandboxType());
             portAllocationService.releasePort(port);
             transitionState(entity, DeploymentStatus.FAILED);
             entity.setTerminationReason("START_FAILED");
@@ -399,8 +413,10 @@ public class DeploymentApplicationService implements DeploymentApplication {
             localProbeUrl = "http://127.0.0.1:" + port + normalizedPath;
         }
 
-        boolean healthy = healthCheckProbeService.probe(localProbeUrl, 4, 200);
-        if (healthy && runtimeInstance != null && runtimeInstance.getProcessHandle() != null) {
+        boolean healthy = runtimeInstance != null
+                && lifecycleWorker.isRuntimeAlive(deployId)
+                && healthCheckProbeService.probe(localProbeUrl, 4, 200);
+        if (healthy && runtimeInstance.getProcessHandle() != null) {
             healthy = runtimeInstance.getProcessHandle().isAlive();
         }
 
@@ -414,7 +430,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
             if (liveLogs != null && !liveLogs.isBlank()) {
                 logAccumulator.append("=== RUNTIME LOGS BEFORE FAILURE ===\n").append(liveLogs).append("\n");
             }
-            lifecycleWorker.stopRuntime(deployId, entity.getProcessId());
+            lifecycleWorker.stopRuntime(deployId, entity.getProcessId(), entity.getSandboxType());
             transitionState(entity, DeploymentStatus.CLEANUP);
             portAllocationService.releasePort(port);
             transitionState(entity, DeploymentStatus.FAILED);
@@ -431,7 +447,6 @@ public class DeploymentApplicationService implements DeploymentApplication {
     }
 
     @Override
-    @Transactional
     public DeploymentResponse stopDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
@@ -441,7 +456,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
             transitionState(entity, DeploymentStatus.STOP);
 
             String liveLogs = lifecycleWorker.getLiveProcessLogs(deploymentId);
-            lifecycleWorker.stopRuntime(deploymentId, entity.getProcessId());
+            lifecycleWorker.stopRuntime(deploymentId, entity.getProcessId(), entity.getSandboxType());
 
             transitionState(entity, DeploymentStatus.CLEANUP);
             if (entity.getPort() != null) {
@@ -469,31 +484,20 @@ public class DeploymentApplicationService implements DeploymentApplication {
 
     /**
      * Reconciles orphaned deployments left in active states whose runtime process/server/container is no longer alive.
-     * Automatically invoked on application startup and available for periodic/on-demand reconciliation.
+     * Automatically invoked on application startup, periodically via @Scheduled watchdog, and on-demand.
      */
     @Override
     @EventListener(ApplicationReadyEvent.class)
-    @Transactional
+    @Scheduled(
+            initialDelayString = "${agenthub.sandbox.orphan-reconcile-initial-delay-ms:30000}",
+            fixedDelayString = "${agenthub.sandbox.orphan-reconcile-interval-ms:30000}"
+    )
     public int reconcileOrphanDeployments() {
         List<DeploymentEntity> candidates = deploymentRepository.findByStatusIn(ACTIVE_LIFECYCLE_STATUSES);
         int reconciled = 0;
         for (DeploymentEntity entity : candidates) {
             if (!lifecycleWorker.isRuntimeAlive(entity.getId())) {
-                log.warn("Reconciling orphaned deployment [{}] (previous status={})", entity.getId(), entity.getStatus());
-                transitionState(entity, DeploymentStatus.STOP);
-                lifecycleWorker.stopRuntime(entity.getId(), entity.getProcessId());
-                transitionState(entity, DeploymentStatus.CLEANUP);
-                if (entity.getPort() != null) {
-                    portAllocationService.releasePort(entity.getPort());
-                }
-                transitionState(entity, DeploymentStatus.FAILED);
-                entity.setTerminationReason("ORPHAN_RECONCILED");
-                entity.setErrorMessage("Orphaned deployment reconciled: runtime worker or child process is no longer alive");
-                entity.setFinishedAt(LocalDateTime.now());
-                String prevLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
-                entity.setLogOutput(prevLogs + "\n=== ORPHAN RECONCILIATION: Runtime not alive, port and process tree cleaned up ===\n");
-                entity.setUpdatedAt(LocalDateTime.now());
-                deploymentRepository.save(entity);
+                reconcileSingleOrphan(entity);
                 reconciled++;
             }
         }
@@ -503,21 +507,55 @@ public class DeploymentApplicationService implements DeploymentApplication {
         return reconciled;
     }
 
+    private void reconcileSingleOrphan(DeploymentEntity entity) {
+        log.warn("Reconciling orphaned deployment [{}] (previous status={})", entity.getId(), entity.getStatus());
+        String liveLogs = lifecycleWorker.getLiveProcessLogs(entity.getId());
+        transitionState(entity, DeploymentStatus.STOP);
+        lifecycleWorker.stopRuntime(entity.getId(), entity.getProcessId(), entity.getSandboxType());
+        transitionState(entity, DeploymentStatus.CLEANUP);
+        if (entity.getPort() != null) {
+            portAllocationService.releasePort(entity.getPort());
+        }
+        transitionState(entity, DeploymentStatus.FAILED);
+        entity.setTerminationReason("ORPHAN_RECONCILED");
+        entity.setErrorMessage("Orphaned deployment reconciled: runtime worker or child process is no longer alive");
+        entity.setFinishedAt(LocalDateTime.now());
+        String prevLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
+        StringBuilder sb = new StringBuilder(prevLogs);
+        if (liveLogs != null && !liveLogs.isBlank() && !prevLogs.contains(liveLogs)) {
+            sb.append("\n=== PROCESS OUTPUT BEFORE EXIT ===\n").append(liveLogs);
+        }
+        sb.append("\n=== ORPHAN RECONCILIATION: Runtime not alive, port and process tree cleaned up ===\n");
+        entity.setLogOutput(sb.toString());
+        entity.setUpdatedAt(LocalDateTime.now());
+        deploymentRepository.save(entity);
+    }
+
     @Override
-    @Transactional(readOnly = true)
     public DeploymentResponse getDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
         checkProjectAccess(entity.getProjectId());
+        if (ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())
+                && lifecycleWorker.hasTrackedRuntime(entity.getId())
+                && !lifecycleWorker.isRuntimeAlive(entity.getId())) {
+            reconcileSingleOrphan(entity);
+        }
         return toResponse(entity);
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<DeploymentResponse> listDeployments(String projectId) {
         checkProjectAccess(projectId);
-        return deploymentRepository.findByProjectIdOrderByStartedAtDesc(projectId)
-                .stream()
+        List<DeploymentEntity> list = deploymentRepository.findByProjectIdOrderByStartedAtDesc(projectId);
+        for (DeploymentEntity entity : list) {
+            if (ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())
+                    && lifecycleWorker.hasTrackedRuntime(entity.getId())
+                    && !lifecycleWorker.isRuntimeAlive(entity.getId())) {
+                reconcileSingleOrphan(entity);
+            }
+        }
+        return list.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -535,12 +573,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
         checkProjectAccess(entity.getProjectId());
 
-        String baseLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
-        String liveLogs = lifecycleWorker.getLiveProcessLogs(deploymentId);
-        String combined = baseLogs;
-        if (liveLogs != null && !liveLogs.isBlank() && !baseLogs.contains(liveLogs)) {
-            combined = baseLogs + "\n" + liveLogs;
-        }
+        String combined = buildCombinedLogs(entity);
 
         if (fromCursor != null && fromCursor > 0) {
             if (fromCursor >= combined.length()) {
@@ -549,6 +582,15 @@ public class DeploymentApplicationService implements DeploymentApplication {
             return combined.substring(fromCursor.intValue());
         }
         return combined;
+    }
+
+    private String buildCombinedLogs(DeploymentEntity entity) {
+        String baseLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
+        String liveLogs = lifecycleWorker.getLiveProcessLogs(entity.getId());
+        if (liveLogs != null && !liveLogs.isBlank() && !baseLogs.contains(liveLogs)) {
+            return baseLogs + "\n" + liveLogs;
+        }
+        return baseLogs;
     }
 
     private List<String> parseCommandTokens(String commandLine) {
@@ -581,6 +623,12 @@ public class DeploymentApplicationService implements DeploymentApplication {
     }
 
     private DeploymentResponse toResponse(DeploymentEntity entity) {
+        String combinedLogs = buildCombinedLogs(entity);
+        long effectiveCursor = Math.max(
+                entity.getLogCursor() != null ? entity.getLogCursor() : 0L,
+                combinedLogs.length()
+        );
+
         DeploymentResponse resp = new DeploymentResponse();
         resp.setId(entity.getId());
         resp.setProjectId(entity.getProjectId());
@@ -596,11 +644,11 @@ public class DeploymentApplicationService implements DeploymentApplication {
         resp.setFinishedAt(entity.getFinishedAt());
         resp.setCreatedAt(entity.getCreatedAt());
         resp.setErrorMessage(entity.getErrorMessage());
-        resp.setHasLogs(entity.getLogOutput() != null && !entity.getLogOutput().isBlank());
+        resp.setHasLogs(!combinedLogs.isBlank());
         resp.setProcessId(entity.getProcessId());
         resp.setContainerId(entity.getContainerId());
         resp.setWorkingDirectory(entity.getWorkingDirectory());
-        resp.setLogCursor(entity.getLogCursor());
+        resp.setLogCursor(effectiveCursor);
         resp.setTerminationReason(entity.getTerminationReason());
         resp.setTemplateType(entity.getTemplateType());
         resp.setLifecycleTrace(entity.getLifecycleTrace());

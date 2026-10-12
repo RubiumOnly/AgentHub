@@ -464,6 +464,11 @@ public class JGitWorkspaceManager {
     }
 
     private void closeRepositoryQuietly(Git git, File workspaceDir) {
+        try {
+            if (git != null && git.getRepository() != null && git.getRepository().getObjectDatabase() != null) {
+                git.getRepository().getObjectDatabase().close();
+            }
+        } catch (Exception ignored) {}
         if (workspaceDir != null) {
             File gitDir = new File(workspaceDir, ".git");
             if (gitDir.exists()) {

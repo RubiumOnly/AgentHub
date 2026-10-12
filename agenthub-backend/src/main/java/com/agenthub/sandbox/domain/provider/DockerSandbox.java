@@ -220,6 +220,12 @@ public class DockerSandbox implements SandboxProvider {
             cmd.add("--read-only");
             cmd.add("--tmpfs");
             cmd.add("/tmp:rw,noexec,nosuid,size=64m");
+            if (detachedService) {
+                cmd.add("--tmpfs");
+                cmd.add("/var/run:rw,noexec,nosuid,size=16m");
+                cmd.add("--tmpfs");
+                cmd.add("/var/cache:rw,noexec,nosuid,size=32m");
+            }
         }
 
         // 3. Resource quotas: memory and CPU constraints
@@ -381,6 +387,36 @@ public class DockerSandbox implements SandboxProvider {
                     .start()
                     .waitFor(2, TimeUnit.SECONDS);
         } catch (Exception ignored) {}
+    }
+
+    public List<String> buildDockerInspectArgs(String executionId) {
+        List<String> inspectCmd = new ArrayList<>();
+        inspectCmd.add("docker");
+        appendRemoteTargetFlags(inspectCmd);
+        inspectCmd.add("inspect");
+        inspectCmd.add("-f");
+        inspectCmd.add("{{.State.Running}}");
+        String containerName = executionId != null && executionId.startsWith("agenthub-")
+                ? executionId
+                : "agenthub-" + executionId;
+        inspectCmd.add(containerName);
+        return inspectCmd;
+    }
+
+    public boolean isContainerRunning(String executionId) {
+        if (executionId == null || executionId.isBlank()) {
+            return false;
+        }
+        try {
+            List<String> inspectCmd = buildDockerInspectArgs(executionId);
+            Process p = new ProcessBuilder(inspectCmd).start();
+            boolean done = p.waitFor(2, TimeUnit.SECONDS);
+            if (done && p.exitValue() == 0) {
+                String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+                return "true".equalsIgnoreCase(out);
+            }
+        } catch (Exception ignored) {}
+        return false;
     }
 
     private static class BoundedOutputReader implements Runnable {

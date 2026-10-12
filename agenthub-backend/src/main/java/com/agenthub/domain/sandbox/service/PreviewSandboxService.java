@@ -5,6 +5,9 @@ import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
 import com.agenthub.project.infrastructure.entity.ProjectEntity;
 import com.agenthub.project.infrastructure.repository.ProjectRepository;
+import com.agenthub.sandbox.api.dto.CreateDeploymentRequest;
+import com.agenthub.sandbox.api.dto.DeploymentResponse;
+import com.agenthub.sandbox.application.DeploymentApplication;
 import com.agenthub.sandbox.application.SandboxApplication;
 import com.agenthub.sandbox.infrastructure.entity.DeploymentEntity;
 import com.agenthub.sandbox.infrastructure.repository.DeploymentRepository;
@@ -12,7 +15,6 @@ import com.agenthub.shared.context.RequestContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -29,21 +31,31 @@ public class PreviewSandboxService implements SandboxApplication {
     private final DeploymentRepository deploymentRepository;
     private final ProjectRepository projectRepository;
     private final ResourceAccessGuard accessGuard;
+    private final DeploymentApplication deploymentApplication;
 
     public PreviewSandboxService(WorkspaceResolver workspaceResolver,
                                  DeploymentRepository deploymentRepository) {
-        this(workspaceResolver, deploymentRepository, null, null);
+        this(workspaceResolver, deploymentRepository, null, null, null);
+    }
+
+    public PreviewSandboxService(WorkspaceResolver workspaceResolver,
+                                 DeploymentRepository deploymentRepository,
+                                 ProjectRepository projectRepository,
+                                 ResourceAccessGuard accessGuard) {
+        this(workspaceResolver, deploymentRepository, projectRepository, accessGuard, null);
     }
 
     @Autowired
     public PreviewSandboxService(WorkspaceResolver workspaceResolver,
                                  DeploymentRepository deploymentRepository,
                                  @Autowired(required = false) ProjectRepository projectRepository,
-                                 @Autowired(required = false) ResourceAccessGuard accessGuard) {
+                                 @Autowired(required = false) ResourceAccessGuard accessGuard,
+                                 @Autowired(required = false) DeploymentApplication deploymentApplication) {
         this.workspaceResolver = workspaceResolver;
         this.deploymentRepository = deploymentRepository;
         this.projectRepository = projectRepository;
         this.accessGuard = accessGuard;
+        this.deploymentApplication = deploymentApplication;
     }
 
     private void checkProjectAccess(String projectId) {
@@ -99,24 +111,30 @@ public class PreviewSandboxService implements SandboxApplication {
     }
 
     @Override
-    @Transactional
     public DeploymentManifest deployProject(String projectId) {
         checkProjectAccess(projectId);
         workspaceResolver.getWorkspaceRoot(projectId);
-        String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
         String dockerfile = "# AgentHub Production Deployment Container\n" +
                 "FROM nginx:alpine\n" +
                 "COPY dist/ /usr/share/nginx/html/\n" +
                 "EXPOSE 80\n" +
                 "CMD [\"nginx\", \"-g\", \"daemon off;\"]\n";
 
+        if (deploymentApplication != null) {
+            CreateDeploymentRequest req = new CreateDeploymentRequest(projectId, "STATIC_PREVIEW", "LOCAL_PROCESS");
+            req.setTemplateType("STATIC_WEB_TEMPLATE");
+            DeploymentResponse liveResp = deploymentApplication.createAndDeploy(req);
+            return new DeploymentManifest(liveResp.getId(), projectId, liveResp.getUrl(), dockerfile);
+        }
+
+        String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
         String previewUrl = "http://localhost:8080/api/sandbox/preview/" + projectId;
 
         DeploymentEntity deployment = new DeploymentEntity(
                 deployId,
                 projectId,
                 "art-" + deployId,
-                "DEPLOYED",
+                "RUNNING",
                 "DOCKER_NGINX",
                 previewUrl
         );

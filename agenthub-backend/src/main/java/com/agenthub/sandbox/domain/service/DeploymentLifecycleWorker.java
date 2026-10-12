@@ -142,83 +142,156 @@ public class DeploymentLifecycleWorker {
 
     private void handleStaticFileRequest(HttpExchange exchange, Path workspaceRoot, String projectId,
                                          String deploymentId, String artifactId, int port) throws IOException {
-        String rawPath = exchange.getRequestURI().getPath();
-        if (rawPath == null || rawPath.isBlank()) {
-            rawPath = "/";
-        }
-
-        // Normalize preview prefix if accessed via /api/sandbox/preview/{projectId}
-        String previewPrefix = "/api/sandbox/preview/" + projectId;
-        String relativeReq = rawPath;
-        if (relativeReq.equals(previewPrefix) || relativeReq.equals(previewPrefix + "/")) {
-            relativeReq = "/";
-        } else if (relativeReq.startsWith(previewPrefix + "/")) {
-            relativeReq = relativeReq.substring(previewPrefix.length());
-        }
-
-        // Security check: block directory traversal and .git metadata access
-        String decoded = java.net.URLDecoder.decode(relativeReq, StandardCharsets.UTF_8);
-        if (decoded.contains("..") || decoded.toLowerCase(Locale.ROOT).contains(".git")) {
-            byte[] forbidden = "403 Forbidden: Sandbox workspace boundary violation".getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
-            exchange.sendResponseHeaders(403, forbidden.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(forbidden);
+        try {
+            String rawPath = exchange.getRequestURI().getRawPath();
+            if (rawPath == null || rawPath.isBlank()) {
+                rawPath = exchange.getRequestURI().getPath();
             }
-            return;
-        }
-
-        Path realRoot = workspaceRoot.toAbsolutePath().normalize();
-        Path targetFile = null;
-
-        if ("/".equals(decoded) || "/index.html".equalsIgnoreCase(decoded)) {
-            Path distIndex = realRoot.resolve("dist/index.html").normalize();
-            Path rootIndex = realRoot.resolve("index.html").normalize();
-            Path previewIndex = realRoot.resolve(".agenthub-preview/index.html").normalize();
-            if (Files.exists(distIndex) && !Files.isDirectory(distIndex) && distIndex.startsWith(realRoot)) {
-                targetFile = distIndex;
-            } else if (Files.exists(rootIndex) && !Files.isDirectory(rootIndex) && rootIndex.startsWith(realRoot)) {
-                targetFile = rootIndex;
-            } else if (Files.exists(previewIndex) && !Files.isDirectory(previewIndex) && previewIndex.startsWith(realRoot)) {
-                targetFile = previewIndex;
+            if (rawPath == null || rawPath.isBlank()) {
+                rawPath = "/";
             }
-        } else {
-            String stripped = decoded.startsWith("/") ? decoded.substring(1) : decoded;
-            Path candidate = realRoot.resolve(stripped).normalize();
-            if (!candidate.startsWith(realRoot)) {
-                byte[] forbidden = "403 Forbidden: Path escapes workspace root".getBytes(StandardCharsets.UTF_8);
-                exchange.sendResponseHeaders(403, forbidden.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(forbidden);
-                }
+
+            // Iteratively decode percent-encoded segments (defeats double/triple URL encoding without corrupting '+')
+            String decoded;
+            try {
+                decoded = decodePercentEncodedPath(rawPath);
+            } catch (IllegalArgumentException badEncoding) {
+                sendPlainTextResponse(exchange, 400, "400 Bad Request: Malformed URL path encoding");
                 return;
             }
-            if (Files.exists(candidate) && !Files.isDirectory(candidate)) {
-                targetFile = candidate;
+
+            // Normalize preview prefix if accessed via /api/sandbox/preview/{projectId}
+            String previewPrefix = "/api/sandbox/preview/" + projectId;
+            String relativeReq = decoded;
+            if (relativeReq.equals(previewPrefix) || relativeReq.equals(previewPrefix + "/")) {
+                relativeReq = "/";
+            } else if (relativeReq.startsWith(previewPrefix + "/")) {
+                relativeReq = relativeReq.substring(previewPrefix.length());
+            }
+
+            String lowerReq = relativeReq.toLowerCase(Locale.ROOT);
+            // Security check: block directory traversal, backslashes, null bytes, Windows drive/device chars, and sensitive metadata (.git, .env, .agenthub)
+            if (relativeReq.contains("..")
+                    || relativeReq.indexOf('\\') >= 0
+                    || relativeReq.indexOf('\0') >= 0
+                    || hasForbiddenPathCharacters(relativeReq)
+                    || lowerReq.contains(".git")
+                    || lowerReq.contains(".env")
+                    || lowerReq.contains(".agenthub")) {
+                sendPlainTextResponse(exchange, 403, "403 Forbidden: Sandbox workspace boundary violation");
+                return;
+            }
+
+            Path realRoot = Files.exists(workspaceRoot)
+                    ? workspaceRoot.toRealPath()
+                    : workspaceRoot.toAbsolutePath().normalize();
+            Path targetFile = null;
+
+            if ("/".equals(relativeReq) || "/index.html".equalsIgnoreCase(relativeReq)) {
+                Path distIndex = realRoot.resolve("dist/index.html").normalize();
+                Path rootIndex = realRoot.resolve("index.html").normalize();
+                Path previewIndex = realRoot.resolve(".agenthub-preview/index.html").normalize();
+                if ( isSafeExistingFile(distIndex, realRoot)) {
+                    targetFile = distIndex;
+                } else if (isSafeExistingFile(rootIndex, realRoot)) {
+                    targetFile = rootIndex;
+                } else if (isSafeExistingFile(previewIndex, realRoot)) {
+                    targetFile = previewIndex;
+                }
+            } else {
+                String stripped = relativeReq.startsWith("/") ? relativeReq.substring(1) : relativeReq;
+                final Path candidate;
+                try {
+                    candidate = realRoot.resolve(stripped).normalize();
+                } catch (java.nio.file.InvalidPathException ipe) {
+                    sendPlainTextResponse(exchange, 403, "403 Forbidden: Invalid path syntax");
+                    return;
+                }
+                if (!candidate.startsWith(realRoot)) {
+                    sendPlainTextResponse(exchange, 403, "403 Forbidden: Path escapes workspace root");
+                    return;
+                }
+                if (Files.exists(candidate)) {
+                    if (Files.isSymbolicLink(candidate) || !candidate.toRealPath().startsWith(realRoot)) {
+                        sendPlainTextResponse(exchange, 403, "403 Forbidden: Symlink escape outside workspace blocked");
+                        return;
+                    }
+                    if (!Files.isDirectory(candidate)) {
+                        targetFile = candidate;
+                    }
+                }
+            }
+
+            byte[] contentBytes;
+            String contentType = "text/html; charset=UTF-8";
+            int statusCode = 200;
+
+            if (targetFile != null && Files.exists(targetFile)) {
+                contentBytes = Files.readAllBytes(targetFile);
+                contentType = resolveMimeType(targetFile.getFileName().toString());
+            } else if ("/".equals(relativeReq) || "/index.html".equalsIgnoreCase(relativeReq)) {
+                contentBytes = buildDefaultDeliverableHtml(projectId, deploymentId, artifactId, port).getBytes(StandardCharsets.UTF_8);
+            } else {
+                statusCode = 404;
+                contentType = "text/plain; charset=UTF-8";
+                contentBytes = ("404 Not Found: " + relativeReq).getBytes(StandardCharsets.UTF_8);
+            }
+
+            exchange.getResponseHeaders().set("Content-Type", contentType);
+            exchange.getResponseHeaders().set("X-AgentHub-Deployment-Id", deploymentId);
+            exchange.getResponseHeaders().set("X-AgentHub-Project-Id", projectId);
+            exchange.sendResponseHeaders(statusCode, contentBytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(contentBytes);
+            }
+        } catch (Exception e) {
+            log.warn("Error handling static preview HTTP request for deployment [{}]: {}", deploymentId, e.getMessage());
+            sendPlainTextResponse(exchange, 403, "403 Forbidden: Request rejected by sandbox preview guard");
+        }
+    }
+
+    private String decodePercentEncodedPath(String rawPath) {
+        String current = rawPath;
+        for (int round = 0; round < 3 && current.indexOf('%') >= 0; round++) {
+            // Preserve literal '+' while decoding %XX sequences
+            String protectedPlus = current.replace("+", "%2B");
+            String next = java.net.URLDecoder.decode(protectedPlus, StandardCharsets.UTF_8);
+            if (next.equals(current)) {
+                break;
+            }
+            current = next;
+        }
+        return current;
+    }
+
+    private boolean hasForbiddenPathCharacters(String path) {
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c < 32 || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+                return true;
             }
         }
+        return false;
+    }
 
-        byte[] contentBytes;
-        String contentType = "text/html; charset=UTF-8";
-        int statusCode = 200;
-
-        if (targetFile != null && Files.exists(targetFile)) {
-            contentBytes = Files.readAllBytes(targetFile);
-            contentType = resolveMimeType(targetFile.getFileName().toString());
-        } else if ("/".equals(decoded) || "/index.html".equalsIgnoreCase(decoded)) {
-            contentBytes = buildDefaultDeliverableHtml(projectId, deploymentId, artifactId, port).getBytes(StandardCharsets.UTF_8);
-        } else {
-            statusCode = 404;
-            contentType = "text/plain; charset=UTF-8";
-            contentBytes = ("404 Not Found: " + decoded).getBytes(StandardCharsets.UTF_8);
+    private boolean isSafeExistingFile(Path candidate, Path realRoot) {
+        try {
+            return Files.exists(candidate)
+                    && !Files.isDirectory(candidate)
+                    && !Files.isSymbolicLink(candidate)
+                    && candidate.normalize().startsWith(realRoot)
+                    && candidate.toRealPath().startsWith(realRoot);
+        } catch (IOException e) {
+            return false;
         }
+    }
 
-        exchange.getResponseHeaders().set("Content-Type", contentType);
-        exchange.getResponseHeaders().set("X-AgentHub-Deployment-Id", deploymentId);
-        exchange.getResponseHeaders().set("X-AgentHub-Project-Id", projectId);
-        exchange.sendResponseHeaders(statusCode, contentBytes.length);
+    private void sendPlainTextResponse(HttpExchange exchange, int statusCode, String message) throws IOException {
+        byte[] body = message.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
+        exchange.sendResponseHeaders(statusCode, body.length);
         try (OutputStream os = exchange.getResponseBody()) {
-            os.write(contentBytes);
+            os.write(body);
         }
     }
 
@@ -319,6 +392,13 @@ public class DeploymentLifecycleWorker {
     }
 
     /**
+     * Returns whether this worker currently tracks a runtime entry in memory for the given deployment.
+     */
+    public boolean hasTrackedRuntime(String deploymentId) {
+        return deploymentId != null && activeRuntimes.containsKey(deploymentId);
+    }
+
+    /**
      * Checks whether the specified deployment has a genuinely alive runtime instance.
      */
     public boolean isRuntimeAlive(String deploymentId) {
@@ -342,16 +422,7 @@ public class DeploymentLifecycleWorker {
     }
 
     private boolean isDockerContainerRunning(String deploymentId) {
-        try {
-            Process p = new ProcessBuilder("docker", "inspect", "-f", "{{.State.Running}}", "agenthub-" + deploymentId)
-                    .start();
-            boolean done = p.waitFor(2, TimeUnit.SECONDS);
-            if (done && p.exitValue() == 0) {
-                String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-                return "true".equalsIgnoreCase(out);
-            }
-        } catch (Exception ignored) {}
-        return false;
+        return sandboxProviderFactory.getDockerSandbox().isContainerRunning(deploymentId);
     }
 
     /**
@@ -369,6 +440,10 @@ public class DeploymentLifecycleWorker {
      * Stops and cleans up any live HTTP server, child process tree, or Docker container for a deployment.
      */
     public void stopRuntime(String deploymentId, Long recordedPid) {
+        stopRuntime(deploymentId, recordedPid, null);
+    }
+
+    public void stopRuntime(String deploymentId, Long recordedPid, String recordedSandboxType) {
         if (deploymentId == null) {
             return;
         }
@@ -393,7 +468,10 @@ public class DeploymentLifecycleWorker {
             log.warn("Error cleaning up local process for [{}]: {}", deploymentId, e.getMessage());
         }
         try {
-            if (instance != null && "DOCKER".equalsIgnoreCase(instance.getSandboxType())) {
+            boolean isDocker = (instance != null && "DOCKER".equalsIgnoreCase(instance.getSandboxType()))
+                    || "DOCKER".equalsIgnoreCase(recordedSandboxType)
+                    || "DOCKER_CONTAINER".equalsIgnoreCase(recordedSandboxType);
+            if (isDocker) {
                 sandboxProviderFactory.getDockerSandbox().destroy(deploymentId);
             }
         } catch (Exception e) {

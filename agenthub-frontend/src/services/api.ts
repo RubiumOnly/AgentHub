@@ -711,8 +711,9 @@ export const apiClient = {
     });
   },
 
-  async getDeploymentLogs(id: string): Promise<string> {
-    return fetchJson<string>(`${API_BASE}/api/deployments/${id}/logs`);
+  async getDeploymentLogs(id: string, offset?: number): Promise<string> {
+    const query = offset !== undefined && offset > 0 ? `?offset=${offset}` : "";
+    return fetchJson<string>(`${API_BASE}/api/deployments/${id}/logs${query}`);
   },
 
   // 11. Workspace Diff Helper (routes to authoritative /api/workspaces/{workspaceId}/diff)

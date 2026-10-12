@@ -139,6 +139,8 @@ public class FullLifecycleEndToEndIntegrationTest {
         );
         assertThat(artifact.getId()).isNotNull();
         assertThat(artifact.getPathOrRef()).contains(snapshot.getCommitHash());
+        org.eclipse.jgit.lib.RepositoryCache.clear();
+        org.springframework.util.FileSystemUtils.deleteRecursively(workspaceDir);
     }
 
     @Test
@@ -197,6 +199,10 @@ public class FullLifecycleEndToEndIntegrationTest {
         List<StepRunView> stepRuns = executionApplication.listStepRuns(runId);
         assertThat(stepRuns).hasSize(5);
         assertThat(stepRuns).allMatch(s -> "SUCCEEDED".equalsIgnoreCase(s.getStatus()));
+        File mockFile = new File(workspaceDir, "MockService.java");
+        if (mockFile.exists()) {
+            mockFile.delete();
+        }
     }
 
     @Test

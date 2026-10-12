@@ -124,12 +124,14 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
                 .andReturn();
         String projectId = extractJsonField(projRes, "/data/id");
 
-        // 2. 在受控工作区写入真实构建产物 dist/index.html
+        // 2. 在受控工作区写入真实构建产物 dist/index.html 与带 '+' 的静态资源文件及敏感 .env 文件
         Path wsRoot = workspaceResolver.getWorkspaceRoot(projectId);
         Path distDir = wsRoot.resolve("dist");
         Files.createDirectories(distDir);
         String deliverableContent = "<!DOCTYPE html><html><body><h1>Phase D Verified Deliverable Content 2026</h1></body></html>";
         Files.writeString(distDir.resolve("index.html"), deliverableContent, StandardCharsets.UTF_8);
+        Files.writeString(wsRoot.resolve("app+v1.js"), "console.log('plus-file-ok');", StandardCharsets.UTF_8);
+        Files.writeString(wsRoot.resolve(".env"), "SECRET_KEY=should-never-leak", StandardCharsets.UTF_8);
 
         // 3. 创建一次 Run 并生成通过质量门禁 (APPROVED) 的 Artifact
         RequestContext.get().setSystem(true);
@@ -167,7 +169,7 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
         String liveUrl = extractJsonField(deployRes, "/data/url");
         int boundPort = Integer.parseInt(extractJsonField(deployRes, "/data/port"));
 
-        // 5. 使用独立 HttpClient 直接请求返回的 URL 与 /health 探针，验证真实服务存活且返回产物真实内容
+        // 5. 使用独立 HttpClient 直接请求返回的 URL 与带 '+' 的静态文件，验证真实服务存活且 '+' 不被篡改为空格
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
         HttpResponse<String> pageResp = client.send(
                 HttpRequest.newBuilder().uri(URI.create(liveUrl)).GET().build(),
@@ -176,14 +178,29 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
         assertThat(pageResp.statusCode()).isEqualTo(200);
         assertThat(pageResp.body()).contains("Phase D Verified Deliverable Content 2026");
 
-        // 6. 验证静态预览服务严格阻断目录穿越与 .git 敏感目录探测
-        HttpResponse<String> gitAttempt = client.send(
-                HttpRequest.newBuilder().uri(URI.create("http://127.0.0.1:" + boundPort + "/.git/config")).GET().build(),
+        HttpResponse<String> plusFileResp = client.send(
+                HttpRequest.newBuilder().uri(URI.create("http://127.0.0.1:" + boundPort + "/app+v1.js")).GET().build(),
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
         );
-        assertThat(gitAttempt.statusCode()).isEqualTo(403);
+        assertThat(plusFileResp.statusCode()).isEqualTo(200);
+        assertThat(plusFileResp.body()).contains("plus-file-ok");
 
-        // 7. 验证基于游标 (logCursor) 的增量日志拉取
+        // 6. 验证静态预览服务严格阻断 .git、.env、单重/双重 URL 编码目录穿越及 Windows 非法路径字符 (不崩溃断连)
+        for (String blockedPath : List.of(
+                "/.git/config",
+                "/.env",
+                "/%2e%2e/%2e%2e/etc/passwd",
+                "/%252e%252e/%252e%252e/etc/passwd",
+                "/C:/Windows/win.ini"
+        )) {
+            HttpResponse<String> blockedResp = client.send(
+                    HttpRequest.newBuilder().uri(URI.create("http://127.0.0.1:" + boundPort + blockedPath)).GET().build(),
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+            );
+            assertThat(blockedResp.statusCode()).as("Path should be blocked with 403: " + blockedPath).isEqualTo(403);
+        }
+
+        // 7. 验证基于游标 (cursor 与 offset 双参数兼容) 的增量日志拉取
         MvcResult fullLogRes = mockMvc.perform(get("/api/deployments/" + deploymentId + "/logs")
                         .header("Authorization", "Bearer " + tokenAlice))
                 .andExpect(status().isOk())
@@ -191,12 +208,18 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
         String fullLogs = extractJsonField(fullLogRes, "/data");
         assertThat(fullLogs).contains("DEPLOYMENT READY");
 
-        MvcResult tailLogRes = mockMvc.perform(get("/api/deployments/" + deploymentId + "/logs?cursor=" + (fullLogs.length() - 10))
+        int cursorOffset = fullLogs.length() - 10;
+        MvcResult tailByCursorRes = mockMvc.perform(get("/api/deployments/" + deploymentId + "/logs?cursor=" + cursorOffset)
                         .header("Authorization", "Bearer " + tokenAlice))
                 .andExpect(status().isOk())
                 .andReturn();
-        String tailLogs = extractJsonField(tailLogRes, "/data");
-        assertThat(tailLogs).hasSize(10);
+        assertThat(extractJsonField(tailByCursorRes, "/data")).hasSize(10);
+
+        MvcResult tailByOffsetRes = mockMvc.perform(get("/api/deployments/" + deploymentId + "/logs?offset=" + cursorOffset)
+                        .header("Authorization", "Bearer " + tokenAlice))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertThat(extractJsonField(tailByOffsetRes, "/data")).hasSize(10);
 
         // 8. 停止部署，验证状态机走完 STOP->CLEANUP->STOPPED，端口释放，且 HTTP 服务真实消亡
         mockMvc.perform(post("/api/deployments/" + deploymentId + "/stop")
@@ -306,8 +329,16 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
                 .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
                         .isEqualTo(ErrorCode.PARAM_ERROR));
 
-        // 3. 启动一个 LOCAL_PROCESS 部署但该命令不监听 HTTP 端口，导致健康检查失败，验证状态机走完 CLEANUP->FAILED 且端口被自动释放
+        // 3. 启动一个 LOCAL_PROCESS 部署但未提供 startCommand，验证在 START 阶段立即失败并释放端口
         RequestContext.get().setSystem(true);
+        CreateDeploymentRequest missingStartReq = new CreateDeploymentRequest("proj-default", "LOCAL_PROCESS", "LOCAL_PROCESS");
+        DeploymentResponse missingStartResp = deploymentApplication.createAndDeploy(missingStartReq);
+        assertThat(missingStartResp.getStatus()).isEqualTo("FAILED");
+        assertThat(missingStartResp.getTerminationReason()).isEqualTo("START_FAILED");
+        assertThat(missingStartResp.getLifecycleTrace()).contains("START->CLEANUP->FAILED");
+        assertThat(portAllocationService.isPortAllocated(missingStartResp.getPort())).isFalse();
+
+        // 4. 启动一个 LOCAL_PROCESS 部署但该命令不监听 HTTP 端口，导致健康检查失败，验证状态机走完 CLEANUP->FAILED 且端口被自动释放
         CreateDeploymentRequest failReq = new CreateDeploymentRequest("proj-default", "LOCAL_PROCESS", "LOCAL_PROCESS");
         failReq.setStartCommand("echo non-listening-command");
         failReq.setHealthCheckPath("/health");
@@ -395,7 +426,14 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
                 "--cap-drop=ALL",
                 "--pids-limit", "64",
                 "--read-only",
+                "/var/run:rw,noexec,nosuid,size=16m",
+                "/var/cache:rw,noexec,nosuid,size=32m",
                 "-p", "127.0.0.1:18088:18088"
+        );
+
+        List<String> inspectArgs = dockerSandbox.buildDockerInspectArgs("dep-docker-1");
+        assertThat(inspectArgs).containsExactly(
+                "docker", "-H", "tcp://10.0.0.50:2375", "inspect", "-f", "{{.State.Running}}", "agenthub-dep-docker-1"
         );
 
         // 4. 试图使用 root (0:0 或 root) 启动容器被严格阻断
@@ -457,6 +495,69 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
             String dockerfileContent = Files.readString(frontendDockerfile, StandardCharsets.UTF_8);
             assertThat(dockerfileContent).doesNotContain("2>/dev/null || true");
             assertThat(dockerfileContent).contains("COPY --from=builder --chown=nextjs:nodejs /app/public ./public");
+        }
+    }
+
+    // =========================================================================
+    // 7. 高并发多部署端口分配、真实 HTTP 实例并行探活与并发释放零泄漏压测
+    // =========================================================================
+
+    @Test
+    @DisplayName("阶段D测试7：12 线程高并发创建部署时端口分配无冲突、全部 HTTP 实例真实可达且并发停止后 100% 释放无泄漏")
+    void shouldHandleHighConcurrencyPortAllocationAndParallelDeploymentsWithoutCollisionOrLeak() throws Exception {
+        int concurrency = 12;
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(concurrency);
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.List< java.util.concurrent.Future<DeploymentResponse> > futures = new java.util.ArrayList<>();
+
+        for (int i = 0; i < concurrency; i++) {
+            final int idx = i;
+            futures.add(pool.submit(() -> {
+                startLatch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                RequestContext.get().setSystem(true);
+                try {
+                    CreateDeploymentRequest req = new CreateDeploymentRequest(
+                            "proj-concurrent-" + idx, "STATIC_PREVIEW", "LOCAL_PROCESS"
+                    );
+                    req.setTemplateType("STATIC_WEB_TEMPLATE");
+                    return deploymentApplication.createAndDeploy(req);
+                } finally {
+                    RequestContext.clear();
+                }
+            }));
+        }
+
+        startLatch.countDown();
+
+        java.util.Set<Integer> allocatedPorts = new java.util.HashSet<>();
+        java.util.List<DeploymentResponse> responses = new java.util.ArrayList<>();
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+
+        try {
+            for (java.util.concurrent.Future<DeploymentResponse> f : futures) {
+                DeploymentResponse resp = f.get(15, java.util.concurrent.TimeUnit.SECONDS);
+                responses.add(resp);
+                assertThat(resp.getStatus()).isEqualTo("RUNNING");
+                assertThat(resp.getPort()).isNotNull();
+                assertThat(allocatedPorts.add(resp.getPort()))
+                        .as("Port %s must be uniquely allocated across concurrent deployments", resp.getPort())
+                        .isTrue();
+
+                HttpResponse<String> healthResp = client.send(
+                        HttpRequest.newBuilder().uri(URI.create("http://127.0.0.1:" + resp.getPort() + "/health")).GET().build(),
+                        HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+                );
+                assertThat(healthResp.statusCode()).isEqualTo(200);
+                assertThat(healthResp.body()).contains(resp.getId());
+            }
+        } finally {
+            RequestContext.get().setSystem(true);
+            for (DeploymentResponse resp : responses) {
+                deploymentApplication.stopDeployment(resp.getId());
+                assertThat(portAllocationService.isPortAllocated(resp.getPort())).isFalse();
+            }
+            RequestContext.clear();
+            pool.shutdownNow();
         }
     }
 }
