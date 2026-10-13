@@ -43,7 +43,7 @@ public class IMCollaborationService implements ConversationApplication {
     // Overload for legacy signature & test compatibility
     @Transactional
     public ConversationEntity createConversation(String title, ConversationType type, List<String> agentIds) {
-        ConversationView view = createConversation(new CreateConversationCommand(title, type, agentIds, "proj-default"));
+        ConversationView view = createConversation(new CreateConversationCommand(title, type, agentIds, null));
         ConversationEntity entity = conversationRepository.findById(view.getId()).orElseThrow();
         entity.setParticipantAgentIds(agentIds != null ? String.join(",", agentIds) : "");
         return entity;

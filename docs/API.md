@@ -4,10 +4,14 @@
 
 ---
 
-## 一、 统一响应结构与链路追踪
+## 一、 统一响应结构、API 契约 v1 与链路追踪
 
-所有 RESTful 接口均返回标准统一响应体 `Result<T>`，并在响应 Header 中附带追踪标识：
-- 响应头：`X-Request-ID: <uuid>`, `X-Correlation-ID: <uuid>`
+所有 RESTful 接口均返回标准统一响应体 `Result<T>`（时区固定为 `UTC`），并在响应 Header 中附带契约版本与追踪标识：
+- 响应头：`X-API-Version: v1`, `X-Server-Timezone: UTC`, `X-Trace-Id: <uuid>`, `X-Request-ID: <uuid>`, `X-Correlation-ID: <uuid>`
+- 乐观并发与条件缓存：`GET /api/projects/{id}` 与 `GET /api/executions/runs/{runId}` 返回弱校验 `ETag: W/"v1-..."`，支持客户端携带 `If-None-Match` 返回 `304 Not Modified`；
+- 幂等键契约：`POST /api/executions/runs` 支持通过 HTTP Header `Idempotency-Key`（或请求体 `idempotencyKey`）执行幂等去重；
+- 统一分页与排序契约：`GET /api/projects/page` 与 `GET /api/executions/projects/{projectId}/runs/page` 统一接收 `page`（默认 `1`）、`size`（默认 `20`，最大 `100`）、`sortBy`（默认 `createdAt`）、`sortDir`（`ASC` / `DESC`），返回 `Result<PageResultView<T>>`；
+- 契约元数据与 OpenAPI 快照：`GET /api/system/contracts/v1`、`GET /api/v1/openapi.json`（静态快照见 [`docs/openapi-v1.json`](openapi-v1.json)）与遗留接口遥测 `GET /api/system/legacy-endpoints`。
 
 ```json
 {
@@ -283,11 +287,11 @@
 | `/api/audit/artifacts/run/{runId}`, `/api/audit/artifacts/{id}` (`/accept`, `/reject`, `/revert`) | `audit` | `ArtifactController` | `revertArtifact`（及 E2E 脚本调用 `accept`） | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | `accept`/`reject`/`revert` 状态校验，禁止重复 `revert`（错误码 `3011`） | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留（主链路） |
 | `/api/deployments*` (`POST`, `GET /{id}`, `GET /{id}/logs`, `POST /{id}/stop`, `GET ?projectId=`) | `sandbox` | `DeploymentController` | `listDeployments`, `createDeployment`, `stopDeployment`, `getDeploymentLogs` | 强制登录 + `Project.ownerId` 校验 + 强制绑定 `ACCEPTED` 状态 `Artifact` | 端口池原子分配；`stop` 幂等收敛至 `STOPPED` | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest` | 长期保留（主链路） |
 | `/api/providers*` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /route`, `POST /{id}/test`) | `agent` | `ProviderController` | `listProviders`, `evaluateRoute` | 强制登录；修改/删除校验 `Provider.ownerId` | `route` 无副作用推演；`PUT`/`DELETE` 幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
-| `/api/token-usages/runs/{runId}`, `/steps/{stepRunId}`, `/summary` | `agent` | `TokenUsageController` | `getTokenSummary` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 只读聚合查询，完全幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
-| `/api/agents`, `/api/agents/platforms`, `/api/agents/execute` | `adapter.web` -> `agent` | `AgentRegistryController` | 暂无前端直连（后端内部/管理查询） | `AuthFilter` 统一鉴权 | `GET` 幂等；`/execute` 为早期直调适配器入口 | `LEGACY_CONVERGE` | `AgentAdapterTest` | Phase 1 迁入 `com.agenthub.agent.api`，移除裸 `/execute` |
-| `/api/teams*` (`POST`, `GET`, `GET /{id}`, `/members`, `/coordinate`) | `team` | `TeamController` | `getTeam` | 强制登录 + 关联 `Project.ownerId` 校验 | 查询幂等；`coordinate` 基于当前轮次推演 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest` | 作为协作扩展隔离维护 |
-| `/api/conversations*` (`POST`, `GET`, `/{id}/messages`, `/{id}/stream`, `/{id}/context`, `/{id}/summarize`, `/{id}/coordinate`) | `conversation` | `ConversationController` | 后端标准会话路由（前端当前调 `/api/im/conversations`） | 强制登录 + `Conversation.ownerId` 与 `MessageVisibilityFilter` | 消息通过 128 分段锁 + 悲观写锁保证 `sequence_num` 单调递增 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest`, `ConversationSseStreamAndReconnectionTest` | Phase 1 与 `IMController` 合并，保留单一会话接口 |
-| `/api/im/conversations*` | `adapter.web` -> `conversation` | `IMController` | `listConversations`, `getMessages`, `sendMessage` | 同 `ConversationController` | 委托同一 `ConversationApplication` | `DEPRECATED_DUP` | `IMCollaborationTest`, `RestApiSecurityAndMultiTenancyIntegrationTest` | Phase 1 迁移前端调用至 `/api/conversations` 后下线 |
-| `/api/sandbox/preview/{projectId}`, `/api/sandbox/deploy/{projectId}` | `adapter.web` -> `sandbox` | `SandboxController` | `DEFAULT_PREVIEW_URL` (仅离线/模板静态预览) | `AuthFilter` 鉴权 + 静态 CSP 响应头 | `preview` 只读幂等；真实沙箱部署已收敛至 `/api/deployments` | `LEGACY_CONVERGE` | `SandboxAndDeployTest` | Phase 1 合并至 `DeploymentController` 受控预览路由 |
-| `/api/system/health` | `adapter.web` | `SystemHealthController` | `getHealth` | 公开探针（不暴露内部敏感配置） | 只读完全幂等 | `ACTIVE` | `SystemHealthTest`, `ActuatorAndMetricsIntegrationTest` | Phase 1 迁入 `com.agenthub.ops.api` |
-| `/api/workspace/*` (`diff`, `workflow/execute`, `files`, `file/content`, `file/save`) | `adapter.web` | `WorkflowAndDiffController` | **0 前端调用**（`WorkflowCanvas.tsx` 已于 Phase 0 移除直连） | `prod` profile 强制抛出 `1002 FORBIDDEN` 阻断；非生产记录废弃告警 | 旧版裸路径接口，已冻结 | `DEPRECATED_DISABLED_IN_PROD` | `WorkspacePathGuardTest`, `Phase0BaselineAndDebtFreezeGuardTest` | **Phase 1 删除**（生产已禁用，ArchUnit 禁止新增调用） |
+| `/api/token-usages/runs/{runId}`, `/steps/{stepRunId}`, `/summary` | `agent` | `TokenUsageController` | `workflowsApi.getTokenSummary` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 只读聚合查询，完全幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
+| `/api/agents`, `/api/agents/platforms`, `/api/agents/execute` | `agent` | `AgentRegistryController` | 后端内部/管理查询 | `AuthFilter` 统一鉴权 | `GET` 幂等 | `ACTIVE` | `AgentAdapterTest`, `Phase1ModuleConvergenceAndContractTest` | Phase 1 已迁入 `com.agenthub.agent.api` |
+| `/api/teams*` (`POST`, `GET`, `GET /{id}`, `/members`, `/coordinate`) | `team` | `TeamController` | `workflowsApi.getTeam` | 强制登录 + 关联 `Project.ownerId` 校验 | 查询幂等；`coordinate` 基于当前轮次推演 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest` | 作为协作扩展隔离维护 |
+| `/api/conversations*` (`POST`, `GET`, `/{id}/messages`, `/{id}/stream`, `/{id}/context`, `/{id}/summarize`, `/{id}/coordinate`) | `conversation` | `ConversationController` | `workflowsApi.listConversations`, `getMessages`, `sendMessage` | 强制登录 + `Conversation.ownerId` 与 `MessageVisibilityFilter` | 消息通过 128 分段锁 + 悲观写锁保证 `sequence_num` 单调递增 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest`, `ConversationSseStreamAndReconnectionTest` | 唯一正式会话接口（前端已全量切换至 `/api/conversations`） |
+| `/api/im/conversations*` | `adapter.web` | `IMController` | **0 前端调用**（已迁至 `/api/conversations`） | `@Deprecated` + `@Profile("!prod")`；`prod` 返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DEPRECATED_DISABLED_IN_PROD` | `Phase1ModuleConvergenceAndContractTest` | 生产环境已卸载并拦截 `410 Gone` |
+| `/api/sandbox/preview/{projectId}`, `/api/sandbox/deploy/{projectId}` | `adapter.web` | `SandboxController` | **0 前端调用**（已迁至 `/api/deployments`） | `@Deprecated` + `@Profile("!prod")`；`prod` 返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DEPRECATED_DISABLED_IN_PROD` | `Phase1ModuleConvergenceAndContractTest` | 生产环境已卸载并拦截 `410 Gone` |
+| `/api/system/health`, `/api/system/contracts/v1`, `/api/v1/openapi.json`, `/api/system/legacy-endpoints` | `ops` | `SystemHealthController` | `authApi.getHealth` | 公开探针与契约规范（不暴露内部敏感配置） | 只读完全幂等，附带 `X-API-Version: v1` 与 `UTC` 时区头 | `ACTIVE` | `SystemHealthTest`, `Phase1ModuleConvergenceAndContractTest` | Phase 1 已迁入 `com.agenthub.ops.api` |
+| `/api/workspace/*` (`diff`, `workflow/execute`, `files`, `file/content`, `file/save`) | `adapter.web` | `WorkflowAndDiffController` | **0 前端调用** | `@Deprecated` + `@Profile("!prod")`；`prod` 强制阻断并返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DEPRECATED_DISABLED_IN_PROD` | `WorkspacePathGuardTest`, `Phase0BaselineAndDebtFreezeGuardTest`, `Phase1ModuleConvergenceAndContractTest` | 生产环境已卸载并拦截 `410 Gone` |

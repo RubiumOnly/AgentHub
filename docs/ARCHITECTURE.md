@@ -10,17 +10,19 @@ AgentHub 当前采用 Java 17 + Spring Boot 3.3.4 的模块化单体。所有核
 
 | 模块 | 责任 | 主要事实 |
 | --- | --- | --- |
-| `identity` | 登录、令牌、资源授权、认证审计 | User、Token、AuthAudit |
-| `project` | Project、Workspace、受控路径和项目归属 | Project、Workspace |
+| `identity` | 登录、令牌、资源授权（`ResourceOwnershipVerifier`）、认证审计 | User、Token、AuthAudit |
+| `project` | Project、Workspace、单一 `/api/workspaces/{workspaceId}` 资源族和项目归属 | Project、Workspace |
 | `orchestration` | Workflow DSL、拓扑校验、审批门禁 | WorkflowDefinition、Approval |
-| `execution` | Run/Step 状态、租约、恢复、事件流 | WorkflowRun、StepRun、RunEvent |
-| `agent` / `runtime` | Provider 路由、Runtime SPI、用量和脱敏 | Provider、TokenUsage |
-| `audit` | Artifact、Diff、审查和证据引用 | Artifact、Evidence |
+| `execution` | Run/Step 状态、租约、恢复、事件流与证据包（内部拆分为 `RunCommandModule`、`RunQueryModule`、`RunEventStreamModule`、`RunEvidenceModule`） | WorkflowRun、StepRun、RunEvent |
+| `agent` / `runtime` | Agent 注册、Provider 路由、Runtime SPI、用量和脱敏 | AgentDefinition、Provider、TokenUsage |
+| `audit` | Artifact、JGit 结构化 Diff、审查和回滚 | Artifact、Evidence |
 | `sandbox` | 受控构建、启动、探针、停止和清理 | Deployment |
-| `team` / `conversation` | 多 Agent 协作和消息上下文 | Team、Conversation、Message |
-| `infrastructure` | JGit、锁、指标、备份和通用适配器 | 共享技术能力 |
+| `ops` | 系统健康、API v1 契约元数据、OpenAPI 快照、旧接口迁移遥测、指标与冷备恢复 | SystemHealth、ApiContract、BackupManifest |
+| `team` / `conversation` | 多 Agent 协作和消息上下文（隔离协作扩展） | Team、Conversation、Message |
+| `infrastructure` | JGit、跨实例锁、指标和通用技术组件 | 共享技术能力 |
 
-Controller 只负责协议转换和权限入口；Application 模块编排用例；Domain 模块承载状态和规则；Infrastructure 模块实现数据库、文件、Provider、进程和外部系统适配。Controller 不得直接注入 Repository 或返回 JPA Entity。
+Controller 只负责协议转换和权限入口；Application 模块编排用例；Domain 模块承载状态和规则；Infrastructure 模块实现数据库、文件、Provider、进程和外部系统适配。Controller 不得直接注入 Repository、不得暴露 JPA Entity，也不得直接操作 `java.nio.file.Path`、`JGitWorkspaceManager` 或 `WorkspaceLockManager`（见 [ADR-006](adr/ADR-006-context-convergence-and-api-contract-v1.md)）。
+`DagExecutionEngine` 对外保持单一执行入口，内部拆分为 `DagTopologyPlanner`、`DagLeaseExecutor`、`DagStateTransitioner`、`DagAgentInvoker`、`DagEventRecorder` 五个 seam。
 
 ## 2. 核心资源与事件词汇表 (Resource & Event Vocabulary)
 

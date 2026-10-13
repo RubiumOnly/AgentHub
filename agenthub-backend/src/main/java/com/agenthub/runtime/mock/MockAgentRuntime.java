@@ -45,7 +45,7 @@ public class MockAgentRuntime implements AgentRuntime {
         String handleId = "handle-mock-" + UUID.randomUUID().toString().substring(0, 8);
         String runId = (request.getRunId() != null && !request.getRunId().isBlank())
                 ? request.getRunId()
-                : (request.getAgentName() != null ? request.getAgentName() : "run-default");
+                : (request.getAgentName() != null ? request.getAgentName() : "run-mock-" + UUID.randomUUID().toString().substring(0, 8));
         String stepRunId = (request.getStepRunId() != null && !request.getStepRunId().isBlank())
                 ? request.getStepRunId()
                 : ("step-mock-" + UUID.randomUUID().toString().substring(0, 8));

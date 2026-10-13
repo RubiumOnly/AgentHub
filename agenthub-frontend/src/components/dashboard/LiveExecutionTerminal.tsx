@@ -230,12 +230,9 @@ export function LiveExecutionTerminal({
     const connectSSE = async () => {
       if (isCancelled) return;
       try {
-        let ticketParam = "";
+        let ticket: string | undefined;
         try {
-          const ticket = await apiClient.createStreamTicket();
-          if (ticket) {
-            ticketParam = `&ticket=${encodeURIComponent(ticket)}`;
-          }
+          ticket = await apiClient.createStreamTicket();
         } catch (ticketErr) {
           console.debug("Stream ticket generation bypassed or failed:", ticketErr);
         }
@@ -243,7 +240,7 @@ export function LiveExecutionTerminal({
         if (isCancelled) return;
 
         const currentCursor = lastEventIdRef.current || 0;
-        const sseUrl = `${API_BASE}/api/runs/${runId}/stream?lastEventId=${currentCursor}${ticketParam}`;
+        const sseUrl = apiClient.buildRunStreamUrl(runId, currentCursor, ticket);
         const es = new EventSource(sseUrl, { withCredentials: true });
         activeEs = es;
         eventSourceRef.current = es;

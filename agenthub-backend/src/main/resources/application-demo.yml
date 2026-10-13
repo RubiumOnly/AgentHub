@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: demo
+
+agenthub:
+  auth:
+    allow-superuser-bypass: false
+  demo:
+    enabled: true
+    default-user-id: "${AGENTHUB_DEMO_USER_ID:demo-user}"
+    default-project-id: "${AGENTHUB_DEMO_PROJECT_ID:demo-project}"
+    mode: "DEMO_SIMULATED"

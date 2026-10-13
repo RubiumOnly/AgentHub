@@ -1,13 +1,20 @@
 package com.agenthub.execution.dto;
 
 import com.agenthub.orchestration.domain.dsl.WorkflowDsl;
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
 
 import java.util.Map;
 
-public class StartRunCommand {
+public class StartRunCommand implements ContextCommand {
     private String projectId;
     private String definitionId;
     private String idempotencyKey;
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.EXECUTION;
+    }
     private WorkflowDsl workflowDsl;
     private Map<String, Object> inputs;
 

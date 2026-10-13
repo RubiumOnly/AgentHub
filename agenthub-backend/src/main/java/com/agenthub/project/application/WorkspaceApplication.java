@@ -6,8 +6,10 @@ import com.agenthub.domain.workspace.model.FileDiffEntry;
 import com.agenthub.domain.workspace.model.StructuredDiff;
 import com.agenthub.project.dto.WorkspaceFileDetailView;
 import com.agenthub.project.dto.WorkspaceFileNode;
+import com.agenthub.project.dto.WorkspaceLockStatusView;
 
 import java.util.List;
+import java.util.Map;
 
 public interface WorkspaceApplication {
 
@@ -38,9 +40,21 @@ public interface WorkspaceApplication {
 
     byte[] downloadFile(String workspaceIdOrPath, String relativePath) throws Exception;
 
+    String extractFilename(String relativePath);
+
     byte[] archiveWorkspace(String workspaceIdOrPath) throws Exception;
 
     void checkWorkspaceAccess(String workspaceIdOrPath);
+
+    Map<String, Object> createGitSnapshot(String workspaceId, String runId, String stepRunId, String message, String author) throws Exception;
+
+    boolean acquireLock(String workspaceId, String requestedOwnerId, long waitTimeoutMs, long leaseTtlMs);
+
+    boolean renewLock(String workspaceId, String requestedOwnerId, long additionalTtlMs);
+
+    boolean releaseLock(String workspaceId, String requestedOwnerId);
+
+    WorkspaceLockStatusView getLockStatus(String workspaceId);
 
     WorkflowExecutionResult executeWorkflow(WorkflowDefinition workflow, String workspacePath, String taskPrompt);
 }

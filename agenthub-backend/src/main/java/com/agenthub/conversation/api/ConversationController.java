@@ -54,7 +54,7 @@ public class ConversationController {
                 req.title,
                 req.type != null ? req.type : ConversationType.DIRECT_CHAT,
                 req.agentIds,
-                req.projectId != null ? req.projectId : "proj-default",
+                req.projectId,
                 req.teamId
         );
         return Result.ok(conversationApplication.createConversation(cmd));

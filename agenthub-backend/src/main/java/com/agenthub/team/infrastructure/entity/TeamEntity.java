@@ -48,7 +48,7 @@ public class TeamEntity {
     public TeamEntity(String id, String projectId, String name, String description,
                       TeamTopology topology, String leaderAgentId, Integer maxTurns, String configJson) {
         this.id = id;
-        this.projectId = projectId != null ? projectId : "proj-default";
+        this.projectId = projectId;
         this.name = name;
         this.description = description;
         this.topology = topology != null ? topology : TeamTopology.HIERARCHICAL;

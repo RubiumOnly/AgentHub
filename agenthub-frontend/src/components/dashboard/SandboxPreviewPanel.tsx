@@ -33,7 +33,7 @@ const SUPPORTED_TEMPLATES = [
 
 export function SandboxPreviewPanel({
   deployment,
-  projectId = "proj-default",
+  projectId = "",
   onRefresh,
   className = "",
 }: SandboxPreviewPanelProps) {
@@ -94,6 +94,10 @@ export function SandboxPreviewPanel({
   }, [deployment?.id, deployment?.status]);
 
   const handleDeploy = async () => {
+    if (!projectId) {
+      setActionError("请先选择或创建受控 Project 后再启动沙箱部署");
+      return;
+    }
     setIsDeploying(true);
     setActionError(null);
     try {

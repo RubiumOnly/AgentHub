@@ -7,12 +7,15 @@ import com.agenthub.conversation.domain.model.MessageType;
 import com.agenthub.conversation.dto.*;
 import com.agenthub.domain.conversation.model.ConversationType;
 import com.agenthub.domain.conversation.model.SenderType;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
+@Deprecated
+@Profile("!prod")
 @RestController
 @RequestMapping("/api/im")
 public class IMController {
@@ -54,7 +57,7 @@ public class IMController {
                 req.title,
                 req.type != null ? req.type : ConversationType.DIRECT_CHAT,
                 req.agentIds,
-                req.projectId != null ? req.projectId : "proj-default",
+                req.projectId,
                 req.teamId
         );
         ConversationView view = conversationApplication.createConversation(cmd);

@@ -52,35 +52,13 @@ class Phase0BaselineAndDebtFreezeGuardTest {
     @Autowired
     private Flyway flyway;
 
-    private static final Map<String, Integer> FROZEN_BACKEND_USER_1_MAX_COUNTS = Map.of(
-            "com/agenthub/conversation/application/ConversationApplicationService.java", 3,
-            "com/agenthub/infrastructure/repository/entity/ConversationEntity.java", 3,
-            "com/agenthub/identity/infrastructure/security/ResourceAccessGuard.java", 1,
-            "com/agenthub/agent/application/ProviderApplicationService.java", 1
-    );
+    private static final Map<String, Integer> FROZEN_BACKEND_USER_1_MAX_COUNTS = Map.of();
 
-    private static final Map<String, Integer> FROZEN_BACKEND_PROJ_DEFAULT_MAX_COUNTS = Map.of(
-            "com/agenthub/adapter/web/IMController.java", 1,
-            "com/agenthub/team/infrastructure/entity/TeamEntity.java", 1,
-            "com/agenthub/application/service/IMCollaborationService.java", 1,
-            "com/agenthub/team/application/TeamApplicationService.java", 1,
-            "com/agenthub/infrastructure/repository/entity/ConversationEntity.java", 3,
-            "com/agenthub/conversation/application/ConversationApplicationService.java", 1,
-            "com/agenthub/conversation/api/ConversationController.java", 1
-    );
+    private static final Map<String, Integer> FROZEN_BACKEND_PROJ_DEFAULT_MAX_COUNTS = Map.of();
 
-    private static final Map<String, Integer> FROZEN_BACKEND_RUN_DEFAULT_MAX_COUNTS = Map.of(
-            "com/agenthub/runtime/mock/MockAgentRuntime.java", 1,
-            "com/agenthub/runtime/provider/ProviderDrivenAgentRuntime.java", 1,
-            "com/agenthub/runtime/cli/CliAgentRuntime.java", 1,
-            "com/agenthub/runtime/openai/OpenAiCompatibleRuntime.java", 1
-    );
+    private static final Map<String, Integer> FROZEN_BACKEND_RUN_DEFAULT_MAX_COUNTS = Map.of();
 
-    private static final Map<String, Integer> FROZEN_FRONTEND_PROJ_DEFAULT_MAX_COUNTS = Map.of(
-            "services/api.ts", 3,
-            "components/dashboard/HeaderNav.tsx", 1,
-            "components/dashboard/SandboxPreviewPanel.tsx", 1
-    );
+    private static final Map<String, Integer> FROZEN_FRONTEND_PROJ_DEFAULT_MAX_COUNTS = Map.of();
 
     private static final List<String> EXPECTED_22_TABLES = List.of(
             "users",
@@ -164,7 +142,8 @@ class Phase0BaselineAndDebtFreezeGuardTest {
                 repoRoot.resolve("docs/adr/ADR-002-sse-and-persistent-event-stream.md"),
                 repoRoot.resolve("docs/adr/ADR-003-workspace-distrusts-client-paths.md"),
                 repoRoot.resolve("docs/adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md"),
-                repoRoot.resolve("docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md")
+                repoRoot.resolve("docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md"),
+                repoRoot.resolve("docs/adr/ADR-006-context-convergence-and-api-contract-v1.md")
         );
 
         for (Path doc : activeDocs) {
@@ -214,7 +193,7 @@ class Phase0BaselineAndDebtFreezeGuardTest {
                     .forEach(tsFiles::add);
         }
 
-        assertThat(tsFiles).hasSize(20);
+        assertThat(tsFiles).hasSize(34);
 
         List<String> unexpectedFrontendProjDefault = new ArrayList<>();
         List<String> unexpectedFrontendLegacyIm = new ArrayList<>();
@@ -241,7 +220,7 @@ class Phase0BaselineAndDebtFreezeGuardTest {
                 unexpectedFrontendProjDefault.add(relPath + " (count=" + projDefaultCount + ", max=" + allowedProjDefault + ")");
             }
 
-            if (content.contains("/api/im/") && !"services/api.ts".equals(relPath)) {
+            if (content.contains("/api/im/")) {
                 unexpectedFrontendLegacyIm.add(relPath);
             }
         }

@@ -1,9 +1,17 @@
 package com.agenthub.project.dto;
 
-public class CreateProjectCommand {
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
+
+public class CreateProjectCommand implements ContextCommand {
     private String name;
     private String description;
     private String relativeRoot;
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.PROJECT;
+    }
 
     public CreateProjectCommand() {}
 

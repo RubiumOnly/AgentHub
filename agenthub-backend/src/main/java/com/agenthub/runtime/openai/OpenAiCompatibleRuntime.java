@@ -71,7 +71,9 @@ public class OpenAiCompatibleRuntime implements AgentRuntime {
     @Override
     public ExecutionHandle start(AgentExecutionRequest request, RuntimeEventSink sink, CancelToken cancelToken) {
         String handleId = "handle-api-" + UUID.randomUUID().toString().substring(0, 8);
-        String runId = request.getAgentName() != null ? request.getAgentName() : "run-default";
+        String runId = (request.getRunId() != null && !request.getRunId().isBlank())
+                ? request.getRunId()
+                : (request.getAgentName() != null ? request.getAgentName() : "run-api-" + UUID.randomUUID().toString().substring(0, 8));
         String stepRunId = "step-api-" + UUID.randomUUID().toString().substring(0, 8);
         ExecutionHandle handle = new ExecutionHandle(handleId, runId, stepRunId, "OPENAI_COMPATIBLE");
 

@@ -8,14 +8,19 @@ import com.agenthub.execution.dto.StartRunCommand;
 import com.agenthub.execution.dto.StepRunView;
 import com.agenthub.execution.dto.WorkflowRunView;
 import com.agenthub.shared.context.RequestContext;
+import com.agenthub.shared.contract.ApiContractHeaders;
+import com.agenthub.shared.contract.PageRequestQuery;
+import com.agenthub.shared.contract.PageResultView;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.Comparator;
 import java.util.List;
 
 @RestController
@@ -38,25 +43,77 @@ public class ExecutionController {
     }
 
     @PostMapping("/runs")
-    public Result<WorkflowRunView> startRun(@RequestBody StartRunCommand cmd) {
+    public ResponseEntity<Result<WorkflowRunView>> startRun(
+            @RequestBody StartRunCommand cmd,
+            @RequestHeader(value = ApiContractHeaders.HEADER_IDEMPOTENCY_KEY, required = false) String idempotencyKeyHeader) {
         String currentUserId = RequestContext.get().getUserId();
         if (currentUserId == null || currentUserId.isBlank()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to start workflow run");
         }
+        if ((cmd.getIdempotencyKey() == null || cmd.getIdempotencyKey().isBlank())
+                && idempotencyKeyHeader != null && !idempotencyKeyHeader.isBlank()) {
+            cmd.setIdempotencyKey(idempotencyKeyHeader.trim());
+        }
         WorkflowRunView run = executionApplication.startRun(cmd);
-        return Result.ok(run);
+        String etag = computeRunEtag(run);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.ETAG, etag)
+                .body(Result.ok(run));
     }
 
     @GetMapping("/runs/{runId}")
-    public Result<WorkflowRunView> getRun(@PathVariable("runId") String runId) {
+    public ResponseEntity<Result<WorkflowRunView>> getRun(
+            @PathVariable("runId") String runId,
+            @RequestHeader(value = ApiContractHeaders.HEADER_IF_NONE_MATCH, required = false) String ifNoneMatch) {
         WorkflowRunView run = executionApplication.getRunById(runId);
-        return Result.ok(run);
+        String etag = computeRunEtag(run);
+        if (ifNoneMatch != null && ifNoneMatch.trim().equals(etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .header(HttpHeaders.ETAG, etag)
+                    .build();
+        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.ETAG, etag)
+                .body(Result.ok(run));
     }
 
     @GetMapping("/projects/{projectId}/runs")
     public Result<List<WorkflowRunView>> listRunsByProject(@PathVariable("projectId") String projectId) {
         List<WorkflowRunView> runs = executionApplication.listRunsByProjectId(projectId);
         return Result.ok(runs);
+    }
+
+    @GetMapping("/projects/{projectId}/runs/page")
+    public Result<PageResultView<WorkflowRunView>> listRunsByProjectPaged(
+            @PathVariable("projectId") String projectId,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "size", required = false) Integer size,
+            @RequestParam(value = "sortBy", required = false) String sortBy,
+            @RequestParam(value = "sortDir", required = false) String sortDir,
+            @RequestParam(value = "status", required = false) String status) {
+        PageRequestQuery query = PageRequestQuery.of(page, size, sortBy, sortDir);
+        List<WorkflowRunView> runs = executionApplication.listRunsByProjectId(projectId);
+        if (status != null && !status.isBlank()) {
+            runs = runs.stream()
+                    .filter(r -> status.trim().equalsIgnoreCase(r.getStatus()))
+                    .toList();
+        }
+        if ("ASC".equalsIgnoreCase(query.getSortDir())) {
+            runs = runs.stream()
+                    .sorted(Comparator.comparing(r -> r.getCreatedAt() != null ? r.getCreatedAt().toString() : ""))
+                    .toList();
+        }
+        return Result.ok(PageResultView.slice(runs, query));
+    }
+
+    private String computeRunEtag(WorkflowRunView run) {
+        if (run == null) {
+            return "W/\"run-empty\"";
+        }
+        String ts = run.getUpdatedAt() != null
+                ? run.getUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString()
+                : "";
+        return "W/\"run-" + run.getId() + "-" + run.getStatus() + "-" + Integer.toHexString(ts.hashCode()) + "\"";
     }
 
     @GetMapping("/runs/{runId}/steps")

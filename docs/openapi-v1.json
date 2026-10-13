@@ -1,0 +1,245 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AgentHub Enterprise API Contract v1",
+    "version": "1.0.0",
+    "description": "Authoritative REST/SSE contract for AgentHub 8 production bounded contexts (identity, project, orchestration, execution, agent, audit, sandbox, ops). All timestamps use UTC ISO-8601. Supports X-API-Version: v1, X-Server-Timezone: UTC, ETag/If-None-Match (304 Not Modified), Idempotency-Key, and Last-Event-ID."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Default API Gateway"
+    }
+  ],
+  "tags": [
+    { "name": "identity", "description": "User authentication, JWT rotation, and single-use SSE stream tickets (1000-1999)" },
+    { "name": "project", "description": "Managed projects and single-model /api/workspaces/{workspaceId} resources (2000-3009)" },
+    { "name": "audit", "description": "Artifact review, JGit structured diff, and non-destructive revert (3010-3999)" },
+    { "name": "agent", "description": "Agent definitions, LLM providers, routing policies, and token usage (5000-5999)" },
+    { "name": "orchestration", "description": "Versioned workflow templates, DAG topology validation, and approvals (6000-6019)" },
+    { "name": "execution", "description": "WorkflowRun, StepRun, RunEvent SSE stream, and Run Evidence Bundle (6020-6999)" },
+    { "name": "sandbox", "description": "Controlled sandbox preview deployments and lifecycle management (7000-7999)" },
+    { "name": "ops", "description": "System health, API v1 contract metadata, OpenAPI spec, and legacy endpoint telemetry (8000-8999)" }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": ["identity"],
+        "summary": "Authenticate user credentials and issue JWT",
+        "responses": { "200": { "description": "Result<AuthTokenView> in UTC" } }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["identity"],
+        "summary": "Register user account",
+        "responses": { "200": { "description": "Result<AuthTokenView> in UTC" } }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["identity"],
+        "summary": "Rotate JWT token and invalidate prior JTI",
+        "responses": { "200": { "description": "Result<AuthTokenView> in UTC" } }
+      }
+    },
+    "/api/auth/stream-ticket": {
+      "post": {
+        "tags": ["identity"],
+        "summary": "Issue 60s single-use SSE stream ticket",
+        "responses": { "200": { "description": "Result<Map<String, String>>" } }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": ["identity"],
+        "summary": "Get current authenticated principal",
+        "responses": { "200": { "description": "Result<UserView>" } }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "tags": ["project"],
+        "summary": "List projects owned by current user",
+        "responses": { "200": { "description": "Result<List<ProjectView>>" } }
+      },
+      "post": {
+        "tags": ["project"],
+        "summary": "Create project and provision managed JGit workspace",
+        "responses": { "200": { "description": "Result<ProjectView> with ETag header" } }
+      }
+    },
+    "/api/projects/page": {
+      "get": {
+        "tags": ["project"],
+        "summary": "List projects with standardized v1 pagination and sorting",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "size", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string", "default": "createdAt" } },
+          { "name": "sortDir", "in": "query", "schema": { "type": "string", "enum": ["ASC", "DESC"], "default": "DESC" } }
+        ],
+        "responses": { "200": { "description": "Result<PageResultView<ProjectView>>" } }
+      }
+    },
+    "/api/projects/{id}": {
+      "get": {
+        "tags": ["project"],
+        "summary": "Get project details with weak ETag and If-None-Match (304 Not Modified) support",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "If-None-Match", "in": "header", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Result<ProjectView> with ETag header" },
+          "304": { "description": "Not Modified (ETag matched)" }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/tree": {
+      "get": {
+        "tags": ["project"],
+        "summary": "List workspace file tree via WorkspaceApplication (zero host path leakage)",
+        "responses": { "200": { "description": "Result<List<WorkspaceFileNode>>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/file": {
+      "get": {
+        "tags": ["project"],
+        "summary": "Read workspace file detail",
+        "responses": { "200": { "description": "Result<WorkspaceFileDetailView>" } }
+      },
+      "post": {
+        "tags": ["project"],
+        "summary": "Write workspace file",
+        "responses": { "200": { "description": "Result<Void>" } }
+      },
+      "delete": {
+        "tags": ["project"],
+        "summary": "Delete workspace file",
+        "responses": { "200": { "description": "Result<Void>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/diff": {
+      "get": {
+        "tags": ["project"],
+        "summary": "Compute structured JGit diff against workspace baseline",
+        "responses": { "200": { "description": "Result<StructuredDiff>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/git/snapshot": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Create JGit commit snapshot and audit artifact",
+        "responses": { "200": { "description": "Result<Map<String, Object>>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/lock/status": {
+      "get": {
+        "tags": ["project"],
+        "summary": "Get workspace lock lease status via WorkspaceLockStatusView DTO",
+        "responses": { "200": { "description": "Result<WorkspaceLockStatusView>" } }
+      }
+    },
+    "/api/workflows/definitions": {
+      "get": {
+        "tags": ["orchestration"],
+        "summary": "List versioned workflow templates",
+        "responses": { "200": { "description": "Result<List<WorkflowDefinitionView>>" } }
+      },
+      "post": {
+        "tags": ["orchestration"],
+        "summary": "Create versioned workflow template",
+        "responses": { "200": { "description": "Result<WorkflowDefinitionView>" } }
+      }
+    },
+    "/api/executions/runs": {
+      "post": {
+        "tags": ["execution"],
+        "summary": "Start workflow run with Idempotency-Key header deduplication",
+        "parameters": [
+          { "name": "Idempotency-Key", "in": "header", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Result<WorkflowRunView> with ETag header" } }
+      }
+    },
+    "/api/executions/projects/{projectId}/runs/page": {
+      "get": {
+        "tags": ["execution"],
+        "summary": "List workflow runs for project with v1 pagination, sorting, and status filter",
+        "responses": { "200": { "description": "Result<PageResultView<WorkflowRunView>>" } }
+      }
+    },
+    "/api/executions/runs/{runId}": {
+      "get": {
+        "tags": ["execution"],
+        "summary": "Get workflow run with weak ETag and If-None-Match (304 Not Modified) support",
+        "responses": {
+          "200": { "description": "Result<WorkflowRunView> with ETag header" },
+          "304": { "description": "Not Modified" }
+        }
+      }
+    },
+    "/api/executions/runs/{runId}/stream": {
+      "get": {
+        "tags": ["execution"],
+        "summary": "Subscribe to authoritative Run SSE event stream with Last-Event-ID / afterSeq cursor",
+        "responses": { "200": { "description": "text/event-stream" } }
+      }
+    },
+    "/api/executions/runs/{runId}/evidence": {
+      "get": {
+        "tags": ["execution"],
+        "summary": "Generate deterministic, secret-masked Run Evidence Bundle",
+        "responses": { "200": { "description": "Result<RunEvidenceBundleView>" } }
+      }
+    },
+    "/api/approvals/runs/{runId}": {
+      "get": {
+        "tags": ["orchestration"],
+        "summary": "List human-in-the-loop approvals for run",
+        "responses": { "200": { "description": "Result<List<ApprovalView>>" } }
+      }
+    },
+    "/api/audit/artifacts/{artifactId}/revert": {
+      "post": {
+        "tags": ["audit"],
+        "summary": "Non-destructively revert artifact change in JGit workspace",
+        "responses": { "200": { "description": "Result<ArtifactView>" } }
+      }
+    },
+    "/api/deployments": {
+      "get": {
+        "tags": ["sandbox"],
+        "summary": "List sandbox deployments for project",
+        "responses": { "200": { "description": "Result<List<DeploymentResponse>>" } }
+      },
+      "post": {
+        "tags": ["sandbox"],
+        "summary": "Create controlled sandbox preview deployment",
+        "responses": { "200": { "description": "Result<DeploymentResponse>" } }
+      }
+    },
+    "/api/system/health": {
+      "get": {
+        "tags": ["ops"],
+        "summary": "Get system health status in UTC",
+        "responses": { "200": { "description": "Result<Map<String, Object>>" } }
+      }
+    },
+    "/api/system/contracts/v1": {
+      "get": {
+        "tags": ["ops"],
+        "summary": "Get API v1 contract metadata, bounded context registry, and legacy route telemetry",
+        "responses": { "200": { "description": "Result<Map<String, Object>>" } }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": ["ops"],
+        "summary": "Get OpenAPI 3.0.3 contract specification",
+        "responses": { "200": { "description": "OpenAPI 3.0.3 JSON document" } }
+      }
+    }
+  }
+}

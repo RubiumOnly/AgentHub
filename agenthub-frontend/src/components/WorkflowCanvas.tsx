@@ -63,10 +63,14 @@ const initialEdges: Edge[] = [
 
 export default function WorkflowCanvas({
   projectId,
-  definitionId = "wf-enterprise-auth-delivery",
+  workspaceId,
+  runId,
+  definitionId,
   onWorkflowCompleted,
 }: {
   projectId?: string;
+  workspaceId?: string;
+  runId?: string;
   definitionId?: string;
   onWorkflowCompleted?: () => void;
 }) {
@@ -105,7 +109,7 @@ export default function WorkflowCanvas({
     try {
       if (isDemoMode()) {
         setExecutionResult({
-          executionId: MOCK_RUN.id,
+          executionId: runId || MOCK_RUN.id,
           status: "DEMO_SIMULATED",
           simulated: true,
           finalOutput: `[DEMO_SIMULATED] 离线演示模式：已按目标 "${taskPrompt}" 生成模拟运行视图（未调用真实 Provider）。`,
@@ -114,15 +118,15 @@ export default function WorkflowCanvas({
         return;
       }
 
-      if (!projectId) {
-        setErrorMessage("当前处于真实运行模式，请先选择或创建受控 Project 后再触发工作流执行。");
+      if (!projectId || !definitionId) {
+        setErrorMessage("当前处于真实运行模式，请通过当前 Project/Workspace/Run 上下文注入 projectId 与 definitionId 后再触发执行。");
         return;
       }
 
       const run = await apiClient.startRun({
         projectId,
         definitionId,
-        idempotencyKey: `canvas-${Date.now()}`,
+        idempotencyKey: `canvas-${workspaceId || projectId}-${Date.now()}`,
       });
       setExecutionResult({
         executionId: run.id,

@@ -148,4 +148,28 @@ class ArchUnitArchitectureTest {
                 .because("MockLlmProvider must not gain new callers outside DynamicProviderRouter")
                 .check(importedClasses);
     }
+
+    @Test
+    @DisplayName("架构守护 9（Phase 1 控制器纯净度）：所有 RestController 严禁直接操作 java.nio.file.Path、JGit 或底层工作区锁")
+    void controllersShouldNotManipulateHostPathsOrJGitDirectly() {
+        noClasses().that().areAnnotatedWith(RestController.class)
+                .should().dependOnClassesThat().haveFullyQualifiedName("java.nio.file.Path")
+                .orShould().dependOnClassesThat().haveFullyQualifiedName("com.agenthub.domain.workspace.service.JGitWorkspaceManager")
+                .orShould().dependOnClassesThat().haveFullyQualifiedName("com.agenthub.domain.workspace.service.WorkspaceResolver")
+                .orShould().dependOnClassesThat().haveFullyQualifiedName("com.agenthub.infrastructure.concurrency.WorkspaceLockManager")
+                .because("Controllers must only exchange DTOs with Application services and never manipulate host file paths, JGit, or locks directly")
+                .check(importedClasses);
+    }
+
+    @Test
+    @DisplayName("架构守护 10（Phase 1 遗留控制器隔离）：所有旧版兼容控制器必须同时标注 @Deprecated 与 @Profile(\"!prod\")")
+    void legacyControllersMustBeDeprecatedAndExcludedFromProdProfile() {
+        classes().that().areAnnotatedWith(RestController.class)
+                .and().resideInAPackage("com.agenthub.adapter.web..")
+                .or().haveFullyQualifiedName("com.agenthub.execution.api.RunAliasController")
+                .should().beAnnotatedWith(Deprecated.class)
+                .andShould().beAnnotatedWith(org.springframework.context.annotation.Profile.class)
+                .because("Legacy compatibility controllers must be marked @Deprecated and @Profile(\"!prod\") so production profile registers zero legacy controllers")
+                .check(importedClasses);
+    }
 }

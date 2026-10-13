@@ -120,7 +120,12 @@ public class ConversationApplicationService implements ConversationApplication {
     public ConversationView createConversation(CreateConversationCommand cmd) {
         String currentUserId = RequestContext.get().getUserId();
         if (currentUserId == null || currentUserId.isBlank()) {
-            currentUserId = "user-1";
+            if (accessGuard != null && accessGuard.isAllowSuperuserBypass()
+                    && accessGuard.getDemoDefaultUserId() != null && !accessGuard.getDemoDefaultUserId().isBlank()) {
+                currentUserId = accessGuard.getDemoDefaultUserId();
+            } else {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to create conversation");
+            }
         }
         String id = "conv-" + UUID.randomUUID().toString().substring(0, 8);
         ConversationType type = cmd.getType() != null ? cmd.getType() : ConversationType.DIRECT_CHAT;
@@ -136,11 +141,14 @@ public class ConversationApplicationService implements ConversationApplication {
         }
 
         String agentIdsStr = String.join(",", agentIds);
+        String resolvedProjectId = (cmd.getProjectId() != null && !cmd.getProjectId().isBlank())
+                ? cmd.getProjectId()
+                : (accessGuard != null ? accessGuard.getDemoDefaultProjectId() : null);
 
         ConversationEntity entity = new ConversationEntity(
                 id,
                 currentUserId,
-                cmd.getProjectId() != null ? cmd.getProjectId() : "proj-default",
+                resolvedProjectId,
                 cmd.getTeamId(),
                 cmd.getTitle(),
                 type,
@@ -163,7 +171,7 @@ public class ConversationApplicationService implements ConversationApplication {
         if (currentUserId == null || currentUserId.isBlank()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to list conversations");
         }
-        if ("user-1".equals(currentUserId) || "system".equals(currentUserId)) {
+        if (accessGuard != null && accessGuard.isConfiguredSuperuser(currentUserId)) {
             return conversationRepository.findAllByOrderByUpdatedAtDesc().stream()
                     .map(this::populateAndConvertToView)
                     .collect(Collectors.toList());
@@ -203,8 +211,11 @@ public class ConversationApplicationService implements ConversationApplication {
             entities = messageRepository.findByConversationIdOrderBySequenceNumAsc(conversationId);
         }
 
-        boolean isPrivileged = "admin".equalsIgnoreCase(currentUserId) || "system".equalsIgnoreCase(currentUserId);
         String effectiveViewerId = (viewerId != null && !viewerId.isBlank()) ? viewerId : currentUserId;
+        boolean isPrivileged = "admin".equalsIgnoreCase(effectiveViewerId)
+                || "system".equalsIgnoreCase(effectiveViewerId)
+                || ((viewerId == null || viewerId.isBlank())
+                    && accessGuard != null && accessGuard.isConfiguredSuperuser(currentUserId));
 
         List<MessageView> views = entities.stream().map(this::toMessageView).collect(Collectors.toList());
         return visibilityFilter.filterVisible(views, effectiveViewerId, isPrivileged);
@@ -223,9 +234,12 @@ public class ConversationApplicationService implements ConversationApplication {
             throw new BusinessException(ErrorCode.LOOP_DETECTED, "Conversation is terminated due to loop detection or max turns");
         }
 
+        String defaultSender = (accessGuard != null && accessGuard.getDemoDefaultUserId() != null && !accessGuard.getDemoDefaultUserId().isBlank())
+                ? accessGuard.getDemoDefaultUserId()
+                : conversation.getOwnerId();
         String senderId = cmd.getSenderId() != null && !cmd.getSenderId().isBlank()
                 ? cmd.getSenderId()
-                : (currentUserId != null ? currentUserId : "user-1");
+                : (currentUserId != null && !currentUserId.isBlank() ? currentUserId : defaultSender);
 
         SenderType senderType = cmd.getSenderType() != null ? cmd.getSenderType() : SenderType.USER;
         MessageType messageType = cmd.getMessageType() != null

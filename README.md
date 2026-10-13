@@ -43,7 +43,7 @@ AgentHub 是面向软件研发团队的有状态多 Agent 变更交付平台。�
 
 “代码完成”“自动化测试通过”和“目标环境验证通过”是三种不同证据，不能互相替代。当前能力边界以 [`docs/CURRENT_CAPABILITY_BOUNDARIES.md`](docs/CURRENT_CAPABILITY_BOUNDARIES.md) 为准。
 
-- **当前验证基线（2026-10-12）**：后端 `mvn clean test` 共 53 个测试类、310 个测试用例通过（Windows 11 / OpenJDK 17 / H2 MySQL Mode，以及 GitHub Actions `ubuntu-latest` + `mysql:8.0` 容器门禁）；前端 `npx tsc --noEmit` 与 `npm run build`（Node.js 20）通过；`docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet` 通过。
+- **当前验证基线（2026-10-13，Phase 1 完成）**：后端 `mvn clean test` 共 54 个测试类、317 个测试用例通过（Windows 11 / OpenJDK 17 / H2 MySQL Mode，以及 GitHub Actions `ubuntu-latest` + `mysql:8.0` 容器门禁）；前端 `npx tsc --noEmit` 与 `npm run build`（Node.js 20）通过；`docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet` 通过。
 
 ## 本地验证
 
@@ -66,10 +66,10 @@ docker compose --env-file .env.production.example -f docker-compose.prod.yml con
 
 - [产品化长期计划](docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md)：唯一有效的长期路线，包含 Product Brief、瘦身清单、AOCI 长上下文治理和 Phase 0～8。
 - [架构说明](docs/ARCHITECTURE.md)：模块、核心资源与事件词汇表、数据库表矩阵、数据流、状态机和扩展边界。
-- [API 契约](docs/API.md)：REST、SSE、错误、幂等、资源归属约定以及 API/前端调用矩阵。
+- [API 契约](docs/API.md) 与 [OpenAPI v1 快照](docs/openapi-v1.json)：REST、SSE、错误、幂等、ETag、分页、资源归属约定以及 API/前端调用矩阵。
 - [当前能力边界](docs/CURRENT_CAPABILITY_BOUNDARIES.md)：已验证能力、模拟模式、Provider/Runtime/Sandbox 能力矩阵和未实现范围。
 - [E2E 演练指南](docs/E2E_DEMO_GUIDE.md)：Bash/PowerShell 运行和证据包导出步骤。
 - [运维告警规则](docs/ops/ALERTING_RULES.md) 与 [灾备手册](docs/ops/DISASTER_RECOVERY_RUNBOOK.md)：目标环境运维参考。
-- [ADR](docs/adr/ADR-001-modular-monolith-architecture.md)：架构决策记录索引从 ADR-001 到 ADR-005。
+- [ADR](docs/adr/ADR-001-modular-monolith-architecture.md)：架构决策记录索引从 ADR-001 到 [ADR-006](docs/adr/ADR-006-context-convergence-and-api-contract-v1.md)。
 
 技术答辩材料不再作为独立事实来源；需要解释架构权衡时，以架构说明、ADR、能力边界和实际证据为准。

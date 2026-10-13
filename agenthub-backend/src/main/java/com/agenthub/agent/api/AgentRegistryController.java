@@ -1,4 +1,4 @@
-package com.agenthub.adapter.web;
+package com.agenthub.agent.api;
 
 import com.agenthub.adapter.common.Result;
 import com.agenthub.agent.application.AgentApplication;

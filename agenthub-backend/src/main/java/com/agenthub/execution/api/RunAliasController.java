@@ -8,6 +8,7 @@ import com.agenthub.execution.dto.WorkflowRunView;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,8 +16,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Standard REST routing aliases for Workflow Runs under /api/runs.
+ * Legacy compatibility REST routing aliases for Workflow Runs under /api/runs.
+ * Use /api/executions/runs in API v1.
  */
+@Deprecated
+@Profile("!prod")
 @RestController
 @RequestMapping("/api/runs")
 public class RunAliasController {

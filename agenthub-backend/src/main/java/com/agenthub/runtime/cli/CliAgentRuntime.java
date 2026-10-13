@@ -53,7 +53,9 @@ public class CliAgentRuntime implements AgentRuntime {
     @Override
     public ExecutionHandle start(AgentExecutionRequest request, RuntimeEventSink sink, CancelToken cancelToken) {
         String handleId = "handle-cli-" + UUID.randomUUID().toString().substring(0, 8);
-        String runId = request.getAgentName() != null ? request.getAgentName() : "run-default";
+        String runId = (request.getRunId() != null && !request.getRunId().isBlank())
+                ? request.getRunId()
+                : (request.getAgentName() != null ? request.getAgentName() : "run-cli-" + UUID.randomUUID().toString().substring(0, 8));
         String stepRunId = "step-cli-" + UUID.randomUUID().toString().substring(0, 8);
         ExecutionHandle handle = new ExecutionHandle(handleId, runId, stepRunId, "CLI");
 

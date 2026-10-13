@@ -3,10 +3,13 @@ package com.agenthub.adapter.web;
 import com.agenthub.adapter.common.Result;
 import com.agenthub.domain.sandbox.model.DeploymentManifest;
 import com.agenthub.sandbox.application.SandboxApplication;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Deprecated
+@Profile("!prod")
 @RestController
 @RequestMapping("/api/sandbox")
 public class SandboxController {

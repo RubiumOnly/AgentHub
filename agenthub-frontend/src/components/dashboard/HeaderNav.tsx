@@ -39,7 +39,7 @@ interface HeaderNavProps {
 export function HeaderNav({
   backendUp,
   circuitBreakerStatus = "CLOSED",
-  activeProjectId = "proj-default",
+  activeProjectId = "",
   activeRunId,
   projects = [],
   onSelectProject,

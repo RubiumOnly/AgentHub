@@ -13,6 +13,7 @@ import com.agenthub.team.infrastructure.entity.TeamEntity;
 import com.agenthub.team.infrastructure.entity.TeamMemberEntity;
 import com.agenthub.team.infrastructure.repository.TeamMemberRepository;
 import com.agenthub.team.infrastructure.repository.TeamRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,9 @@ public class TeamApplicationService implements TeamApplication {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamTopologyStrategyFactory strategyFactory;
+
+    @Value("${agenthub.demo.default-project-id:}")
+    private String defaultProjectId = "";
 
     public TeamApplicationService(TeamRepository teamRepository,
                                   TeamMemberRepository teamMemberRepository,
@@ -45,10 +49,13 @@ public class TeamApplicationService implements TeamApplication {
 
         String teamId = "team-" + UUID.randomUUID().toString().substring(0, 8);
         TeamTopology topology = cmd.getTopology() != null ? cmd.getTopology() : TeamTopology.HIERARCHICAL;
+        String resolvedProjectId = (cmd.getProjectId() != null && !cmd.getProjectId().isBlank())
+                ? cmd.getProjectId()
+                : (defaultProjectId != null && !defaultProjectId.isBlank() ? defaultProjectId : null);
 
         TeamEntity entity = new TeamEntity(
                 teamId,
-                cmd.getProjectId() != null ? cmd.getProjectId() : "proj-default",
+                resolvedProjectId,
                 cmd.getName(),
                 cmd.getDescription(),
                 topology,

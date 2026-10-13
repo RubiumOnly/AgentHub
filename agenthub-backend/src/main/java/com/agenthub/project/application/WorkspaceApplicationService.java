@@ -2,6 +2,8 @@ package com.agenthub.project.application;
 
 import com.agenthub.adapter.common.BusinessException;
 import com.agenthub.adapter.common.ErrorCode;
+import com.agenthub.audit.application.ArtifactApplication;
+import com.agenthub.audit.dto.ArtifactView;
 import com.agenthub.domain.workflow.model.WorkflowModels.WorkflowDefinition;
 import com.agenthub.domain.workflow.model.WorkflowModels.WorkflowExecutionResult;
 import com.agenthub.domain.workflow.service.WorkflowEngineService;
@@ -9,13 +11,15 @@ import com.agenthub.domain.workspace.model.FileDiffEntry;
 import com.agenthub.domain.workspace.model.StructuredDiff;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
+import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import com.agenthub.infrastructure.concurrency.WorkspaceLockManager;
 import com.agenthub.project.dto.WorkspaceFileDetailView;
 import com.agenthub.project.dto.WorkspaceFileNode;
-import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
-import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
+import com.agenthub.project.dto.WorkspaceLockStatusView;
 import com.agenthub.project.infrastructure.entity.ProjectEntity;
+import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
 import com.agenthub.project.infrastructure.repository.ProjectRepository;
-import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
 import com.agenthub.shared.context.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,14 +29,10 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -52,26 +52,41 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     private final WorkspaceRepository workspaceRepository;
     private final ProjectRepository projectRepository;
     private final ResourceAccessGuard accessGuard;
+    private final WorkspaceLockManager lockManager;
+    private final ArtifactApplication artifactApplication;
 
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
-                                      WorkflowEngineService workflowEngineService,
-                                      WorkspaceResolver workspaceResolver) {
-        this(gitManager, workflowEngineService, workspaceResolver, null, null, null);
+                                       WorkflowEngineService workflowEngineService,
+                                       WorkspaceResolver workspaceResolver) {
+        this(gitManager, workflowEngineService, workspaceResolver, null, null, null, null, null);
+    }
+
+    public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
+                                       WorkflowEngineService workflowEngineService,
+                                       WorkspaceResolver workspaceResolver,
+                                       WorkspaceRepository workspaceRepository,
+                                       ProjectRepository projectRepository,
+                                       ResourceAccessGuard accessGuard) {
+        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, null, null);
     }
 
     @Autowired
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
-                                      WorkflowEngineService workflowEngineService,
-                                      WorkspaceResolver workspaceResolver,
-                                      @Autowired(required = false) WorkspaceRepository workspaceRepository,
-                                      @Autowired(required = false) ProjectRepository projectRepository,
-                                      @Autowired(required = false) ResourceAccessGuard accessGuard) {
+                                       WorkflowEngineService workflowEngineService,
+                                       WorkspaceResolver workspaceResolver,
+                                       @Autowired(required = false) WorkspaceRepository workspaceRepository,
+                                       @Autowired(required = false) ProjectRepository projectRepository,
+                                       @Autowired(required = false) ResourceAccessGuard accessGuard,
+                                       @Autowired(required = false) WorkspaceLockManager lockManager,
+                                       @Autowired(required = false) ArtifactApplication artifactApplication) {
         this.gitManager = gitManager;
         this.workflowEngineService = workflowEngineService;
         this.workspaceResolver = workspaceResolver;
         this.workspaceRepository = workspaceRepository;
         this.projectRepository = projectRepository;
         this.accessGuard = accessGuard;
+        this.lockManager = lockManager;
+        this.artifactApplication = artifactApplication;
     }
 
     @Override
@@ -195,7 +210,6 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
         }
 
         if (size > MAX_PREVIEW_BYTES) {
-            // Read first 2MB with truncation flag
             byte[] bytes = new byte[(int) MAX_PREVIEW_BYTES];
             try (var in = Files.newInputStream(safeFile)) {
                 int read = in.read(bytes);
@@ -284,6 +298,15 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     }
 
     @Override
+    public String extractFilename(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return "download.bin";
+        }
+        Path fileName = Path.of(relativePath).getFileName();
+        return fileName != null ? fileName.toString() : "download.bin";
+    }
+
+    @Override
     public byte[] archiveWorkspace(String workspaceIdOrPath) throws Exception {
         checkWorkspaceAccess(workspaceIdOrPath);
         Path root = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
@@ -302,6 +325,101 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
             }
         }
         return baos.toByteArray();
+    }
+
+    @Override
+    public Map<String, Object> createGitSnapshot(String workspaceId, String runId, String stepRunId, String message, String author) throws Exception {
+        checkWorkspaceAccess(workspaceId);
+        if (gitManager == null || workspaceResolver == null) {
+            throw new IllegalStateException("JGitWorkspaceManager or WorkspaceResolver is not configured");
+        }
+        if (runId != null && !runId.isBlank() && artifactApplication != null) {
+            artifactApplication.validateRunWorkspaceBinding(runId, workspaceId);
+        }
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
+        String effectiveRunId = (runId != null && !runId.isBlank()) ? runId : "manual-" + workspaceId;
+        String effectiveStepId = (stepRunId != null && !stepRunId.isBlank()) ? stepRunId : "step-" + System.currentTimeMillis();
+        String effectiveMessage = (message != null && !message.isBlank()) ? message : "Workspace snapshot commit";
+        String effectiveAuthor = (author != null && !author.isBlank()) ? author : "operator@agenthub.local";
+
+        JGitWorkspaceManager.StepSnapshotResult snap = gitManager.createStepSnapshot(
+                wsRoot.toFile(), effectiveRunId, effectiveStepId, effectiveMessage, effectiveAuthor);
+
+        ArtifactView recordedArtifact = null;
+        if (runId != null && !runId.isBlank() && artifactApplication != null) {
+            recordedArtifact = artifactApplication.recordStepSnapshot(
+                    runId, effectiveStepId, workspaceId,
+                    snap.getCommitHash(), snap.getTagName(),
+                    snap.getChangedFiles(), snap.getFileChecksums(), effectiveAuthor);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("commitHash", snap.getCommitHash());
+        result.put("tagName", snap.getTagName());
+        result.put("changedFiles", snap.getChangedFiles());
+        result.put("fileChecksums", snap.getFileChecksums());
+        if (recordedArtifact != null) {
+            result.put("artifactId", recordedArtifact.getId());
+        }
+        return result;
+    }
+
+    @Override
+    public boolean acquireLock(String workspaceId, String requestedOwnerId, long waitTimeoutMs, long leaseTtlMs) {
+        checkWorkspaceAccess(workspaceId);
+        if (lockManager == null) {
+            return false;
+        }
+        String lockOwner = resolveLockOwner(requestedOwnerId);
+        long waitTimeout = waitTimeoutMs > 0 ? waitTimeoutMs : 3000;
+        long leaseTtl = leaseTtlMs > 0 ? leaseTtlMs : 60000;
+        return lockManager.tryAcquireLock(workspaceId, lockOwner, waitTimeout, leaseTtl);
+    }
+
+    @Override
+    public boolean renewLock(String workspaceId, String requestedOwnerId, long additionalTtlMs) {
+        checkWorkspaceAccess(workspaceId);
+        if (lockManager == null) {
+            return false;
+        }
+        String lockOwner = resolveLockOwner(requestedOwnerId);
+        long additionalTtl = additionalTtlMs > 0 ? additionalTtlMs : 60000;
+        return lockManager.renewLease(workspaceId, lockOwner, additionalTtl);
+    }
+
+    @Override
+    public boolean releaseLock(String workspaceId, String requestedOwnerId) {
+        checkWorkspaceAccess(workspaceId);
+        if (lockManager == null) {
+            return false;
+        }
+        String lockOwner = resolveLockOwner(requestedOwnerId);
+        return lockManager.releaseLock(workspaceId, lockOwner);
+    }
+
+    @Override
+    public WorkspaceLockStatusView getLockStatus(String workspaceId) {
+        checkWorkspaceAccess(workspaceId);
+        if (lockManager == null) {
+            return new WorkspaceLockStatusView(workspaceId, null, false, 0, 0);
+        }
+        return lockManager.getLockInfo(workspaceId)
+                .map(info -> new WorkspaceLockStatusView(
+                        workspaceId,
+                        info.getOwnerId(),
+                        info.isLocked(),
+                        info.getAcquiredAt(),
+                        info.getAcquiredAt() + Math.max(0L, info.getRemainingTtlMs())
+                ))
+                .orElse(new WorkspaceLockStatusView(workspaceId, null, false, 0, 0));
+    }
+
+    private String resolveLockOwner(String requestedOwnerId) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (currentUserId != null && !currentUserId.isBlank()) {
+            return currentUserId;
+        }
+        return (requestedOwnerId != null && !requestedOwnerId.isBlank()) ? requestedOwnerId : "anonymous";
     }
 
     @Override

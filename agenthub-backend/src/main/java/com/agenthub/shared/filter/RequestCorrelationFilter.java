@@ -1,6 +1,7 @@
 package com.agenthub.shared.filter;
 
 import com.agenthub.shared.context.RequestContext;
+import com.agenthub.shared.contract.ApiContractHeaders;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -13,7 +14,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * Filter to establish Request-ID and Correlation-ID tracking for all incoming requests.
+ * Filter to establish Request-ID, Correlation-ID, API version (v1), and UTC timezone headers.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -47,6 +48,9 @@ public class RequestCorrelationFilter implements Filter {
 
             httpResponse.setHeader(HEADER_REQUEST_ID, requestId);
             httpResponse.setHeader(HEADER_CORRELATION_ID, correlationId);
+            httpResponse.setHeader("X-Trace-Id", correlationId);
+            httpResponse.setHeader(ApiContractHeaders.HEADER_API_VERSION, ApiContractHeaders.API_VERSION);
+            httpResponse.setHeader(ApiContractHeaders.HEADER_SERVER_TIMEZONE, ApiContractHeaders.SERVER_TIMEZONE);
 
             try {
                 chain.doFilter(request, response);

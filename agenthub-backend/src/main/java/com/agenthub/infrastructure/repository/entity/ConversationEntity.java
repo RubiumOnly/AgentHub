@@ -53,8 +53,6 @@ public class ConversationEntity {
 
     public ConversationEntity(String id, String title, ConversationType type, String participantAgentIds) {
         this.id = id;
-        this.ownerId = "user-1";
-        this.projectId = "proj-default";
         this.title = title;
         this.type = type;
         this.participantAgentIds = participantAgentIds;
@@ -67,8 +65,8 @@ public class ConversationEntity {
 
     public ConversationEntity(String id, String ownerId, String projectId, String title, ConversationType type, String participantAgentIds) {
         this.id = id;
-        this.ownerId = ownerId != null ? ownerId : "user-1";
-        this.projectId = projectId != null ? projectId : "proj-default";
+        this.ownerId = ownerId;
+        this.projectId = projectId;
         this.title = title;
         this.type = type;
         this.participantAgentIds = participantAgentIds;
@@ -81,8 +79,8 @@ public class ConversationEntity {
 
     public ConversationEntity(String id, String ownerId, String projectId, String teamId, String title, ConversationType type, String participantAgentIds) {
         this.id = id;
-        this.ownerId = ownerId != null ? ownerId : "user-1";
-        this.projectId = projectId != null ? projectId : "proj-default";
+        this.ownerId = ownerId;
+        this.projectId = projectId;
         this.teamId = teamId;
         this.title = title;
         this.type = type;

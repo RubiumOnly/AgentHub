@@ -73,7 +73,9 @@ public class ProviderApplicationService implements ProviderApplication {
             if (accessGuard != null && !accessGuard.isAllowSuperuserBypass()) {
                 throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to create provider");
             }
-            userId = "user-1";
+            userId = (accessGuard != null && accessGuard.getDemoDefaultUserId() != null && !accessGuard.getDemoDefaultUserId().isBlank())
+                    ? accessGuard.getDemoDefaultUserId()
+                    : "provider-owner";
         }
 
         String id = "prov-" + UUID.randomUUID().toString().substring(0, 8);
