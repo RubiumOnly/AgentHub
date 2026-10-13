@@ -1,11 +1,17 @@
 package com.agenthub.orchestration.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.util.List;
 
 public class ConfirmPlanCommand {
 
     private boolean confirmed = true;
+
+    @JsonAlias({"allowedHighImpactTools", "authorized_tools"})
     private List<String> authorizedTools;
+
+    @JsonAlias({"decisionNote", "reason"})
     private String comments;
 
     public ConfirmPlanCommand() {}

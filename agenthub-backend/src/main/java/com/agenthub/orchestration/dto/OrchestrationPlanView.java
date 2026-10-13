@@ -105,4 +105,34 @@ public class OrchestrationPlanView {
     public void setWorkflowDsl(WorkflowDsl workflowDsl) { this.workflowDsl = workflowDsl; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("budget")
+    public EstimatedBudget getBudget() {
+        return estimatedBudget;
+    }
+
+    public void setBudget(EstimatedBudget budget) {
+        if (this.estimatedBudget == null) {
+            this.estimatedBudget = budget;
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("taskGoal")
+    public String getTaskGoal() {
+        return requirement;
+    }
+
+    public void setTaskGoal(String taskGoal) {
+        if (this.requirement == null) {
+            this.requirement = taskGoal;
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("subtasks")
+    public List<String> getSubtasks() {
+        if (workflowDsl != null && workflowDsl.getNodes() != null && !workflowDsl.getNodes().isEmpty()) {
+            return workflowDsl.getNodes().stream().map(com.agenthub.orchestration.domain.dsl.WorkflowNodeDsl::getName).toList();
+        }
+        return List.of("需求澄清与缺陷定位", "计划生成", "缺陷修复", "防御性测试", "Diff审查", "审批门禁", "受控交付");
+    }
 }

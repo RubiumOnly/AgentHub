@@ -7,6 +7,7 @@ public class GeneratePlanCommand {
     private String projectId;
     private String workspaceId;
     private String templateType; // BUG_FIX_WITH_TESTS or NEW_FEATURE_ENDPOINT
+    @com.fasterxml.jackson.annotation.JsonAlias({"taskGoal", "task_goal"})
     private String requirement;
     private List<String> targetFiles;
 

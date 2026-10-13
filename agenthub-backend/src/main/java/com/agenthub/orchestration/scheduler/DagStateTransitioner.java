@@ -78,7 +78,11 @@ public class DagStateTransitioner {
         stateMachine.transitionStep(stepEntity.getId(), StepRunStatus.SUCCEEDED, "scheduler", "Completed successfully", null);
         try {
             StepRunEntity current = stepRunRepository.findById(stepEntity.getId()).orElse(stepEntity);
-            current.setOutputRef(output);
+            if (output != null && output.length() > 255) {
+                current.setOutputRef(output.substring(0, 252) + "...");
+            } else {
+                current.setOutputRef(output);
+            }
             current.setLeaseOwner(null);
             current.setLeaseUntil(null);
             current.setOutputsJson(objectMapper.writeValueAsString(context.getNodeState(node.getId()).getOutputs()));

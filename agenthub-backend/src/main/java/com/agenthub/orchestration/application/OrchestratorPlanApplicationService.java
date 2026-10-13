@@ -154,8 +154,14 @@ public class OrchestratorPlanApplicationService implements OrchestratorPlanAppli
         plan.setUpdatedAt(LocalDateTime.now());
 
         // Mark tool permissions authorized
+        List<String> explicitlyAuthorized = cmd != null ? cmd.getAuthorizedTools() : null;
         for (ToolPermissionRequest req : plan.getToolPermissions()) {
-            req.setAuthorized(true);
+            if (explicitlyAuthorized == null) {
+                req.setAuthorized(true);
+            } else {
+                boolean auth = !req.isHighImpact() || explicitlyAuthorized.contains(req.getToolName());
+                req.setAuthorized(auth);
+            }
         }
 
         auditService.record("PLAN_CONFIRM", userId, null, null,
@@ -213,6 +219,15 @@ public class OrchestratorPlanApplicationService implements OrchestratorPlanAppli
         if (!plan.isUserConfirmed()) {
             throw new BusinessException(ErrorCode.FORBIDDEN,
                     "High-impact tool execution [" + toolName + "] blocked: Orchestrator plan [" + planId + "] must be confirmed by user before execution");
+        }
+
+        ToolPermissionRequest perm = plan.getToolPermissions().stream()
+                .filter(p -> toolName.equals(p.getToolName()))
+                .findFirst()
+                .orElse(null);
+        if (perm == null || !perm.isAuthorized()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN,
+                    "High-impact tool execution [" + toolName + "] blocked: Tool is not authorized in Orchestrator plan [" + planId + "]");
         }
     }
 

@@ -231,6 +231,7 @@ export default function AgentHubExecutiveApp() {
         projectId: selectedProjectId,
         definitionId: activeDefinitionId || "wf-enterprise-auth-delivery",
         idempotencyKey: `idem-${selectedProjectId}-${plan.planId}-${Date.now()}`,
+        inputs: { planId: plan.planId, requirement: plan.requirement || plan.taskGoal || "", templateType: plan.templateType },
       });
       if (newRun?.id) {
         setRun(newRun);

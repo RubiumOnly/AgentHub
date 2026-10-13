@@ -37,15 +37,34 @@ import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import com.agenthub.execution.application.ExecutionApplication;
+import com.agenthub.execution.domain.model.CancelTokenRegistry;
+import com.agenthub.execution.domain.model.WorkflowRunStatus;
+import com.agenthub.execution.dto.StartRunCommand;
+import com.agenthub.execution.dto.WorkflowRunView;
+import com.agenthub.execution.infrastructure.repository.RunEventRepository;
+import com.agenthub.execution.infrastructure.repository.StepRunRepository;
+import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
+import com.agenthub.orchestration.application.ApprovalApplication;
+import com.agenthub.orchestration.dto.ApprovalDecisionCommand;
+import com.agenthub.orchestration.dto.ApprovalView;
+import com.agenthub.orchestration.infrastructure.repository.ApprovalRepository;
+import com.agenthub.orchestration.scheduler.DagExecutionEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,7 +76,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 2. 状态机与模板实例化：版本化 WorkflowTemplate（BUG_FIX_WITH_TESTS 与 NEW_FEATURE_ENDPOINT）7 阶段 Kahn 拓扑与 Agent 角色绑定；
  * 3. 错误恢复与 Provider 路由守卫：requireLive 拒绝 Mock 兜底，工具输出超出配额安全截断；
  * 4. 并发与阶段编排：Kahn 拓扑排序计算并行执行批次（executionStages）与分层 Context Assembly 预算治理；
- * 5. 安全与计划门禁：Orchestrator 结构化 Plan 生成、未确认前阻断高影响工具（FORBIDDEN）、用户确认后放行，离线评测集 5 类任务全绿。
+ * 5. 安全与计划门禁：Orchestrator 结构化 Plan 生成、未确认前阻断高影响工具（FORBIDDEN）、用户确认后放行，离线评测集 5 类任务全绿；
+ * 6. 模板实例化端到端执行：BUG_FIX_WITH_TESTS 拓扑在计划确权后完整运行，审批流转与工具门禁防御；
+ * 7. 工具输出配额、UTF-8 多字节边界防截断与 ContextAssembly 极值防御。
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -91,6 +112,30 @@ class Phase3WorkflowTemplatesAndOrchestratorPlanTest {
     private WorkspaceApplication workspaceApplication;
 
     @Autowired
+    private ExecutionApplication executionApplication;
+
+    @Autowired
+    private DagExecutionEngine dagExecutionEngine;
+
+    @Autowired
+    private ApprovalApplication approvalApplication;
+
+    @Autowired
+    private WorkflowRunRepository workflowRunRepository;
+
+    @Autowired
+    private StepRunRepository stepRunRepository;
+
+    @Autowired
+    private RunEventRepository runEventRepository;
+
+    @Autowired
+    private ApprovalRepository approvalRepository;
+
+    @Autowired
+    private CancelTokenRegistry cancelTokenRegistry;
+
+    @Autowired
     private ProjectRepository projectRepository;
 
     @Autowired
@@ -102,6 +147,7 @@ class Phase3WorkflowTemplatesAndOrchestratorPlanTest {
     private String testUserId;
     private String testProjectId;
     private String testWorkspaceId;
+    private final List<String> testRunIds = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -130,6 +176,18 @@ class Phase3WorkflowTemplatesAndOrchestratorPlanTest {
     @AfterEach
     void tearDown() {
         RequestContext.clear();
+        for (String rId : testRunIds) {
+            try {
+                cancelTokenRegistry.get(rId).ifPresent(token -> token.cancel("Test teardown cleanup"));
+            } catch (Exception ignored) {}
+            try {
+                runEventRepository.deleteAll(runEventRepository.findByRunIdOrderBySequenceNumAsc(rId));
+                stepRunRepository.deleteAll(stepRunRepository.findByRunIdOrderByCreatedAtAsc(rId));
+                approvalRepository.deleteAll(approvalRepository.findByRunId(rId));
+                workflowRunRepository.deleteById(rId);
+            } catch (Exception ignored) {}
+        }
+        testRunIds.clear();
         try {
             if (testWorkspaceId != null) {
                 workspaceRepository.deleteById(testWorkspaceId);
@@ -384,9 +442,15 @@ class Phase3WorkflowTemplatesAndOrchestratorPlanTest {
         assertThat(confirmedPlan.isUserConfirmed()).isTrue();
         assertThat(confirmedPlan.getConfirmedBy()).isEqualTo(testUserId);
 
-        // 5) 确认后：高影响工具执行顺利放行！
+        // 5) 确认后：已授权高影响工具顺利放行！
         planApplication.enforceHighImpactToolAuthorization(confirmedPlan.getPlanId(), "file_write");
         planApplication.enforceHighImpactToolAuthorization(confirmedPlan.getPlanId(), "command_exec");
+
+        // 5.1) 细粒度未授权高影响工具拦截：用户仅授权了 file_write 和 command_exec，未授权 git_operation，严格阻断（FORBIDDEN）
+        assertThatThrownBy(() -> planApplication.enforceHighImpactToolAuthorization(confirmedPlan.getPlanId(), "git_operation"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.FORBIDDEN);
 
         // 6) 离线评测集验证：5 大任务类型（新增接口、修复缺陷、重构、测试补齐、恶意 Prompt 注入防御）
         EvaluationReportView evalReport = evaluationApplication.runEvaluationSuite("gpt-4o-baseline");
@@ -401,5 +465,109 @@ class Phase3WorkflowTemplatesAndOrchestratorPlanTest {
                 .findFirst().orElseThrow();
         assertThat(promptDefenseTask.isPassed()).isTrue();
         assertThat(promptDefenseTask.isToolMisuse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("6. 模板实例化端到端执行：BUG_FIX_WITH_TESTS 拓扑在计划确权后完整运行，审批流转与工具门禁防御")
+    void shouldExecuteInstantiatedWorkflowTemplateEndToEndWithConfirmedPlan(@TempDir File baseDir) throws Exception {
+        // 1) 为缺陷修复模板生成计划并实例化
+        GeneratePlanCommand genCmd = new GeneratePlanCommand(
+                testProjectId,
+                testWorkspaceId,
+                "BUG_FIX_WITH_TESTS",
+                "修复状态机并发扣减时的空指针异常并提供测试"
+        );
+        OrchestrationPlanView plan = planApplication.generatePlan(genCmd);
+        WorkflowDefinitionView def = workflowApplication.instantiateTemplate(
+                "tpl-bug-fix-with-tests",
+                "E2E Defect Fix Run",
+                "Testing end-to-end execution of instantiated workflow template"
+        );
+
+        File wsDir = new File(baseDir, "ws-phase3-e2e");
+        wsDir.mkdirs();
+
+        // 2) 未确权场景测试：未确认计划前直接启动执行，高影响工具（file_write）拦截导致 Run 失败
+        WorkflowRunView unconfirmedRun = executionApplication.startRun(new StartRunCommand(
+                testProjectId, null, "idem-unconf-" + UUID.randomUUID()
+        ));
+        testRunIds.add(unconfirmedRun.getId());
+
+        CompletableFuture<WorkflowRunStatus> unconfFuture = dagExecutionEngine.executeDag(
+                unconfirmedRun.getId(), def.getDsl(), wsDir.getAbsolutePath(),
+                Map.of("planId", plan.getPlanId()), 30, testUserId
+        );
+        WorkflowRunStatus unconfStatus = unconfFuture.get(10, TimeUnit.SECONDS);
+        assertThat(unconfStatus).isEqualTo(WorkflowRunStatus.FAILED);
+
+        // 3) 确权放行场景测试：用户在计划中完整授权全部所需工具
+        ConfirmPlanCommand confirmCmd = new ConfirmPlanCommand(
+                true,
+                List.of("file_read", "file_tree", "file_write", "command_exec", "git_operation", "code_analyze"),
+                "Fully authorized by user for bug fix workflow"
+        );
+        OrchestrationPlanView confirmedPlan = planApplication.confirmPlan(plan.getPlanId(), confirmCmd);
+        assertThat(confirmedPlan.isUserConfirmed()).isTrue();
+
+        WorkflowRunView confirmedRun = executionApplication.startRun(new StartRunCommand(
+                testProjectId, null, "idem-conf-" + UUID.randomUUID()
+        ));
+        testRunIds.add(confirmedRun.getId());
+
+        CompletableFuture<WorkflowRunStatus> succFuture = dagExecutionEngine.executeDag(
+                confirmedRun.getId(), def.getDsl(), wsDir.getAbsolutePath(),
+                Map.of("planId", confirmedPlan.getPlanId(), "requirement", "Fix NPE"), 60, testUserId
+        );
+
+        // 4) 流程自动执行至 node-approval（APPROVAL 节点）进入挂起等待
+        long deadline = System.currentTimeMillis() + 15_000;
+        ApprovalView pending = null;
+        while (System.currentTimeMillis() < deadline) {
+            List<ApprovalView> approvals = approvalApplication.listApprovalsByRunId(confirmedRun.getId());
+            if (!approvals.isEmpty() && "PENDING".equalsIgnoreCase(approvals.get(0).getStatus())) {
+                pending = approvals.get(0);
+                break;
+            }
+            Thread.sleep(100);
+        }
+        assertThat(pending).isNotNull();
+
+        // 5) 人工审批批准，工作流继续执行后续 DELIVERY 节点并成功完结
+        approvalApplication.decide(pending.getId(), new ApprovalDecisionCommand("APPROVED", "Gate approved"));
+        WorkflowRunStatus finalStatus = succFuture.get(15, TimeUnit.SECONDS);
+        assertThat(finalStatus).isEqualTo(WorkflowRunStatus.SUCCEEDED);
+    }
+
+    @Test
+    @DisplayName("7. 工具输出配额、UTF-8 多字节边界防截断与 ContextAssembly 极值防御")
+    void shouldVerifyToolOutputLimitsUtf8BoundariesAndDefensiveContextAssembly() {
+        // 1) network_request 注册与高影响工具分类验证
+        AgentToolDefinition netTool = toolRegistry.findByName("network_request").orElseThrow();
+        assertThat(netTool.isHighImpact()).isTrue();
+        assertThat(netTool.getCategory()).isEqualTo(AgentToolCategory.NETWORK_REQUEST);
+        assertThat(netTool.getMaxOutputSizeBytes()).isEqualTo(1024 * 1024);
+
+        // 2) UTF-8 中文多字节截断边界防御：确保超长输出截断时不会将 3 字节中文字符截断成损坏序列
+        String sampleChinese = "AgentHub 智能软件变更交付平台研发防御测试用例验证".repeat(20000);
+        String guardedOutput = toolRegistry.guardOutputSize("code_analyze", sampleChinese);
+        assertThat(guardedOutput).contains("[TRUNCATED: Output exceeded max allowed size");
+        int markerIdx = guardedOutput.indexOf("\n[TRUNCATED");
+        String prefix = guardedOutput.substring(0, markerIdx);
+        assertThat(prefix).isNotEmpty();
+        byte[] prefixBytes = prefix.getBytes(StandardCharsets.UTF_8);
+        assertThat(prefixBytes.length).isLessThanOrEqualTo(512 * 1024);
+        // 验证前缀反向解码为合法的 Unicode 字符串且无乱码替代字符 \uFFFD
+        assertThat(prefix).doesNotContain("\uFFFD");
+
+        // 3) ContextAssemblyEngine 防御性入参测试：null type、null strategy、null securityLevel 均有安全缺省降级
+        List<ContextAssemblyEngine.LayerInput> nullDefensiveInputs = List.of(
+                new ContextAssemblyEngine.LayerInput(null, "Safe content text", 100, null, null, null)
+        );
+        AssembledContext ctx = agentApplication.assembleContext(nullDefensiveInputs);
+        assertThat(ctx.getLayers()).hasSize(1);
+        assertThat(ctx.getLayers().get(0).getLayerType()).isEqualTo(ContextLayerType.USER_INPUT);
+        assertThat(ctx.getLayers().get(0).getSecurityLevel()).isEqualTo(SecurityLevel.INTERNAL);
+        assertThat(ctx.getLayers().get(0).getTruncationStrategy()).isEqualTo(ContextTruncationStrategy.TRUNCATE_TAIL);
+        assertThat(ctx.isWithinBudget()).isTrue();
     }
 }

@@ -249,6 +249,27 @@
         "responses": { "200": { "description": "Result<WorkflowDefinitionView>" } }
       }
     },
+    "/api/workflows/templates": {
+      "get": {
+        "tags": ["orchestration"],
+        "summary": "List canonical workflow templates (BUG_FIX_WITH_TESTS, NEW_FEATURE_ENDPOINT)",
+        "responses": { "200": { "description": "Result<List<WorkflowTemplateView>>" } }
+      }
+    },
+    "/api/workflows/orchestrator/plans": {
+      "post": {
+        "tags": ["orchestration"],
+        "summary": "Generate structured Orchestrator plan with budget and quality gates",
+        "responses": { "200": { "description": "Result<OrchestrationPlanView>" } }
+      }
+    },
+    "/api/workflows/orchestrator/plans/{planId}/confirm": {
+      "post": {
+        "tags": ["orchestration"],
+        "summary": "Confirm Orchestrator plan and authorize high-impact tools",
+        "responses": { "200": { "description": "Result<OrchestrationPlanView>" } }
+      }
+    },
     "/api/executions/runs": {
       "post": {
         "tags": ["execution"],
@@ -309,6 +330,27 @@
         "tags": ["agent"],
         "summary": "List registered agent definitions",
         "responses": { "200": { "description": "Result<List<AgentDefinitionView>>" } }
+      }
+    },
+    "/api/agents/tools": {
+      "get": {
+        "tags": ["agent"],
+        "summary": "List registered agent tools with schemas and output limits",
+        "responses": { "200": { "description": "Result<List<AgentToolDefinition>>" } }
+      }
+    },
+    "/api/agents/context-assembly": {
+      "post": {
+        "tags": ["agent"],
+        "summary": "Assemble layered context with per-layer token budgets and truncation",
+        "responses": { "200": { "description": "Result<AssembledContext>" } }
+      }
+    },
+    "/api/agents/evaluations/run": {
+      "post": {
+        "tags": ["agent"],
+        "summary": "Execute offline evaluation benchmark suite across 5 core task categories",
+        "responses": { "200": { "description": "Result<EvaluationReportView>" } }
       }
     },
     "/api/providers": {

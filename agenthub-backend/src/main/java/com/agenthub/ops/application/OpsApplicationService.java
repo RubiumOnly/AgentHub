@@ -147,6 +147,9 @@ public class OpsApplicationService implements OpsApplication {
                 "get", endpoint("orchestration", "List versioned workflow templates"),
                 "post", endpoint("orchestration", "Create versioned workflow template")
         ));
+        paths.put("/api/workflows/templates", Map.of("get", endpoint("orchestration", "List canonical workflow templates (BUG_FIX_WITH_TESTS, NEW_FEATURE_ENDPOINT)")));
+        paths.put("/api/workflows/orchestrator/plans", Map.of("post", endpoint("orchestration", "Generate structured Orchestrator plan with budget and quality gates")));
+        paths.put("/api/workflows/orchestrator/plans/{planId}/confirm", Map.of("post", endpoint("orchestration", "Confirm Orchestrator plan and authorize high-impact tools")));
         paths.put("/api/executions/runs", Map.of("post", endpoint("execution", "Start workflow run with Idempotency-Key header deduplication")));
         paths.put("/api/executions/projects/{projectId}/runs/page", Map.of("get", endpoint("execution", "List workflow runs for project with v1 pagination, sorting, and status filter")));
         paths.put("/api/executions/runs/{runId}", Map.of("get", endpoint("execution", "Get workflow run with weak ETag and If-None-Match (304 Not Modified) support")));
@@ -155,6 +158,9 @@ public class OpsApplicationService implements OpsApplication {
         paths.put("/api/approvals/runs/{runId}", Map.of("get", endpoint("orchestration", "List human-in-the-loop approvals for run")));
         paths.put("/api/audit/artifacts/{artifactId}/revert", Map.of("post", endpoint("audit", "Non-destructively revert artifact change in JGit workspace")));
         paths.put("/api/agents", Map.of("get", endpoint("agent", "List registered agent definitions")));
+        paths.put("/api/agents/tools", Map.of("get", endpoint("agent", "List registered agent tools with schemas and output limits")));
+        paths.put("/api/agents/context-assembly", Map.of("post", endpoint("agent", "Assemble layered context with per-layer token budgets and truncation")));
+        paths.put("/api/agents/evaluations/run", Map.of("post", endpoint("agent", "Execute offline evaluation benchmark suite across 5 core task categories")));
         paths.put("/api/providers", Map.of(
                 "get", endpoint("agent", "List LLM providers"),
                 "post", endpoint("agent", "Register LLM provider")

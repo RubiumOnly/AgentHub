@@ -70,6 +70,15 @@ public class ToolRegistry {
         ));
 
         register(new AgentToolDefinition(
+                "network_request",
+                AgentToolCategory.NETWORK_REQUEST,
+                "受限外网数据拉取与外部 API 网络调用（高影响工具，需计划授权）",
+                true,
+                "{\"type\":\"object\",\"properties\":{\"url\":{\"type\":\"string\"},\"method\":{\"type\":\"string\",\"enum\":[\"GET\",\"POST\"]}},\"required\":[\"url\"]}",
+                1024 * 1024 // 1MB
+        ));
+
+        register(new AgentToolDefinition(
                 "code_analyze",
                 AgentToolCategory.CODE_ANALYSIS,
                 "执行静态代码分析、圈复杂度统计与 AST 语法审查",
@@ -108,6 +117,12 @@ public class ToolRegistry {
             return rawOutput;
         }
         int truncatedLen = (int) Math.min(bytes.length, limit);
+        while (truncatedLen > 0 && (bytes[truncatedLen - 1] & 0xC0) == 0x80) {
+            truncatedLen--;
+        }
+        if (truncatedLen > 0 && (bytes[truncatedLen - 1] & 0x80) != 0) {
+            truncatedLen--;
+        }
         String truncatedText = new String(bytes, 0, truncatedLen, java.nio.charset.StandardCharsets.UTF_8);
         return truncatedText + "\n[TRUNCATED: Output exceeded max allowed size of " + limit + " bytes for tool " + toolName + "]";
     }

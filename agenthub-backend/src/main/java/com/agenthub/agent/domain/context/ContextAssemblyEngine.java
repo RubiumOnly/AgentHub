@@ -51,8 +51,12 @@ public class ContextAssemblyEngine {
         for (LayerInput input : layerInputs) {
             if (input == null || input.content == null) continue;
 
+            ContextLayerType layerType = input.type != null ? input.type : ContextLayerType.USER_INPUT;
+            SecurityLevel secLevel = input.securityLevel != null ? input.securityLevel : SecurityLevel.INTERNAL;
+            ContextTruncationStrategy truncStrategy = input.strategy != null ? input.strategy : ContextTruncationStrategy.TRUNCATE_TAIL;
+
             String raw = input.content;
-            if (input.type == ContextLayerType.TOOL_RESULTS && input.sourceRef != null) {
+            if (layerType == ContextLayerType.TOOL_RESULTS && input.sourceRef != null) {
                 raw = toolRegistry.guardOutputSize(input.sourceRef, raw);
             }
 
@@ -64,26 +68,26 @@ public class ContextAssemblyEngine {
 
             if (estimatedTokens > input.budget && input.budget > 0) {
                 truncated = true;
-                finalContent = applyTruncation(raw, input.budget, input.strategy);
+                finalContent = applyTruncation(raw, input.budget, truncStrategy);
                 estimatedTokens = estimateTokens(finalContent);
             }
 
             totalTokens += estimatedTokens;
 
             ContextLayer layer = new ContextLayer(
-                    input.type,
+                    layerType,
                     finalContent,
                     input.budget,
                     estimatedTokens,
                     truncated,
-                    input.strategy,
-                    input.securityLevel,
+                    truncStrategy,
+                    secLevel,
                     input.sourceRef
             );
             processedLayers.add(layer);
 
-            promptBuilder.append("=== [CONTEXT: ").append(input.type.name())
-                    .append(" (Security: ").append(input.securityLevel.name())
+            promptBuilder.append("=== [CONTEXT: ").append(layerType.name())
+                    .append(" (Security: ").append(secLevel.name())
                     .append(truncated ? ", TRUNCATED" : "")
                     .append(")] ===\n")
                     .append(finalContent.trim())
@@ -101,18 +105,27 @@ public class ContextAssemblyEngine {
     }
 
     private String applyTruncation(String text, int tokenBudget, ContextTruncationStrategy strategy) {
-        int maxChars = tokenBudget * 4;
+        int maxChars = Math.max(1, tokenBudget * 4);
         if (text.length() <= maxChars) return text;
+        ContextTruncationStrategy effStrategy = strategy != null ? strategy : ContextTruncationStrategy.TRUNCATE_TAIL;
 
-        return switch (strategy) {
-            case TRUNCATE_TAIL -> text.substring(0, maxChars) + "\n... [TRUNCATED_TAIL: Exceeded token budget " + tokenBudget + "]";
-            case TRUNCATE_HEAD -> "[TRUNCATED_HEAD: Prior content omitted] ...\n" + text.substring(text.length() - maxChars);
+        return switch (effStrategy) {
+            case TRUNCATE_TAIL -> {
+                String marker = "\n... [TRUNCATED_TAIL: Exceeded token budget " + tokenBudget + "]";
+                int availableChars = Math.max(0, maxChars - marker.length());
+                yield text.substring(0, availableChars) + marker;
+            }
+            case TRUNCATE_HEAD -> {
+                String marker = "[TRUNCATED_HEAD: Prior content omitted] ...\n";
+                int availableChars = Math.max(0, maxChars - marker.length());
+                yield marker + text.substring(text.length() - availableChars);
+            }
             case SUMMARIZE -> {
-                int headChars = (int) (maxChars * 0.4);
-                int tailChars = (int) (maxChars * 0.4);
-                yield text.substring(0, headChars)
-                        + "\n... [SUMMARIZED: Content condensed to fit token budget " + tokenBudget + "] ...\n"
-                        + text.substring(text.length() - tailChars);
+                String marker = "\n... [SUMMARIZED: Content condensed to fit token budget " + tokenBudget + "] ...\n";
+                int availableChars = Math.max(0, maxChars - marker.length());
+                int headChars = availableChars / 2;
+                int tailChars = availableChars - headChars;
+                yield text.substring(0, headChars) + marker + text.substring(text.length() - tailChars);
             }
             case NONE -> text;
         };

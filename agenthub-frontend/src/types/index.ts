@@ -600,12 +600,14 @@ export interface OrchestrationPlanView {
   projectId: string;
   workspaceId: string;
   taskGoal: string;
+  requirement?: string;
   templateType: string;
   status: OrchestrationPlanStatus;
   affectedFiles: string[];
   subtasks: string[];
   toolPermissions: ToolPermissionRequest[];
   budget: EstimatedBudget;
+  estimatedBudget?: EstimatedBudget;
   qualityGates: string[];
   userConfirmed: boolean;
   confirmedBy?: string;
@@ -619,22 +621,25 @@ export interface GeneratePlanCommand {
   workspaceId: string;
   templateType: string;
   taskGoal: string;
+  requirement?: string;
 }
 
 export interface ConfirmPlanCommand {
   confirmed: boolean;
+  authorizedTools?: string[];
   allowedHighImpactTools?: string[];
+  comments?: string;
   decisionNote?: string;
 }
 
 export type AgentToolCategory =
-  | "FILE_READ"
   | "FILE_WRITE"
-  | "SHELL_EXEC"
-  | "CODE_SEARCH"
-  | "GIT_OPERATIONS"
-  | "TEST_RUNNER"
-  | "CUSTOM";
+  | "COMMAND_EXEC"
+  | "GIT_OPERATION"
+  | "DEPLOYMENT"
+  | "NETWORK_REQUEST"
+  | "FILE_READ"
+  | "CODE_ANALYSIS";
 
 export interface AgentToolDefinition {
   name: string;

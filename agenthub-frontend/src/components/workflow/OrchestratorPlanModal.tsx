@@ -119,7 +119,9 @@ export function OrchestratorPlanModal({
 
       const confirmedPlan = await workflowsApi.confirmPlan(plan.planId, {
         confirmed: true,
+        authorizedTools: confirmedTools,
         allowedHighImpactTools: confirmedTools,
+        comments: "Plan confirmed via UI modal with authorized tools",
         decisionNote: "Plan confirmed via UI modal with authorized tools",
       });
 
@@ -330,10 +332,10 @@ export function OrchestratorPlanModal({
                     <div className="p-3.5 rounded-xl bg-zinc-800/30 border border-zinc-800 space-y-2">
                       <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
                         <FileCode2 className="w-4 h-4 text-indigo-400" />
-                        <span>预测受影响文件 ({plan.affectedFiles.length})</span>
+                        <span>预测受影响文件 ({(plan.affectedFiles || []).length})</span>
                       </div>
                       <ul className="space-y-1.5">
-                        {plan.affectedFiles.map((file, idx) => (
+                        {(plan.affectedFiles || []).map((file, idx) => (
                           <li
                             key={idx}
                             className="text-xs font-mono text-zinc-300 bg-zinc-900/60 px-2.5 py-1 rounded border border-zinc-800/60 truncate"
@@ -348,10 +350,10 @@ export function OrchestratorPlanModal({
                     <div className="p-3.5 rounded-xl bg-zinc-800/30 border border-zinc-800 space-y-2">
                       <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
                         <ListTodo className="w-4 h-4 text-indigo-400" />
-                        <span>执行子任务编排 ({plan.subtasks.length})</span>
+                        <span>执行子任务编排 ({(plan.subtasks || []).length})</span>
                       </div>
                       <ul className="space-y-1.5">
-                        {plan.subtasks.map((task, idx) => (
+                        {(plan.subtasks || []).map((task, idx) => (
                           <li
                             key={idx}
                             className="text-xs text-zinc-300 flex items-center gap-2 bg-zinc-900/60 px-2.5 py-1 rounded border border-zinc-800/60"
@@ -371,7 +373,7 @@ export function OrchestratorPlanModal({
                       <div>
                         <span className="text-[10px] text-zinc-400">Token 预算配额</span>
                         <p className="text-xs font-semibold text-white">
-                          {plan.budget?.maxTokens?.toLocaleString() || 32000} Tokens
+                          {(plan.budget || plan.estimatedBudget)?.maxTokens?.toLocaleString() || 32000} Tokens
                         </p>
                       </div>
                     </div>
@@ -381,7 +383,7 @@ export function OrchestratorPlanModal({
                       <div>
                         <span className="text-[10px] text-zinc-400">超时看门狗上限</span>
                         <p className="text-xs font-semibold text-white">
-                          {plan.budget?.timeoutSeconds || 600} 秒
+                          {(plan.budget || plan.estimatedBudget)?.timeoutSeconds || 600} 秒
                         </p>
                       </div>
                     </div>
@@ -391,7 +393,7 @@ export function OrchestratorPlanModal({
                       <div>
                         <span className="text-[10px] text-zinc-400">成本约束上限</span>
                         <p className="text-xs font-semibold text-white">
-                          ${plan.budget?.costUsdUpperLimit?.toFixed(2) || "0.48"} USD
+                          ${(plan.budget || plan.estimatedBudget)?.costUsdUpperLimit?.toFixed(2) || "0.48"} USD
                         </p>
                       </div>
                     </div>
