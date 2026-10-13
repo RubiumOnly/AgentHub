@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 
@@ -67,7 +68,7 @@ public class ExecutionController {
             @RequestHeader(value = ApiContractHeaders.HEADER_IF_NONE_MATCH, required = false) String ifNoneMatch) {
         WorkflowRunView run = executionApplication.getRunById(runId);
         String etag = computeRunEtag(run);
-        if (ifNoneMatch != null && ifNoneMatch.trim().equals(etag)) {
+        if (ApiContractHeaders.matchesEtag(ifNoneMatch, etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
                     .header(HttpHeaders.ETAG, etag)
                     .build();
@@ -98,11 +99,18 @@ public class ExecutionController {
                     .filter(r -> status.trim().equalsIgnoreCase(r.getStatus()))
                     .toList();
         }
-        if ("ASC".equalsIgnoreCase(query.getSortDir())) {
-            runs = runs.stream()
-                    .sorted(Comparator.comparing(r -> r.getCreatedAt() != null ? r.getCreatedAt().toString() : ""))
-                    .toList();
+        Comparator<WorkflowRunView> cmp;
+        if ("status".equalsIgnoreCase(query.getSortBy())) {
+            cmp = Comparator.comparing(r -> r.getStatus() != null ? r.getStatus().toLowerCase() : "");
+        } else if ("updatedAt".equalsIgnoreCase(query.getSortBy())) {
+            cmp = Comparator.comparing(r -> r.getUpdatedAt() != null ? r.getUpdatedAt().toString() : "");
+        } else {
+            cmp = Comparator.comparing(r -> r.getCreatedAt() != null ? r.getCreatedAt().toString() : "");
         }
+        if ("DESC".equalsIgnoreCase(query.getSortDir())) {
+            cmp = cmp.reversed();
+        }
+        runs = runs.stream().sorted(cmp).toList();
         return Result.ok(PageResultView.slice(runs, query));
     }
 
@@ -110,10 +118,19 @@ public class ExecutionController {
         if (run == null) {
             return "W/\"run-empty\"";
         }
-        String ts = run.getUpdatedAt() != null
-                ? run.getUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString()
-                : "";
-        return "W/\"run-" + run.getId() + "-" + run.getStatus() + "-" + Integer.toHexString(ts.hashCode()) + "\"";
+        String ts = run.getUpdatedAt() != null ? run.getUpdatedAt().truncatedTo(ChronoUnit.SECONDS).toString()
+                : (run.getCreatedAt() != null ? run.getCreatedAt().truncatedTo(ChronoUnit.SECONDS).toString() : "");
+        int fingerprint = java.util.Objects.hash(
+                ts,
+                run.getStatus(),
+                run.getCancelReason(),
+                run.getStartedAt() != null ? run.getStartedAt().truncatedTo(ChronoUnit.SECONDS).toString() : "",
+                run.getFinishedAt() != null ? run.getFinishedAt().truncatedTo(ChronoUnit.SECONDS).toString() : "",
+                run.getCancelledAt() != null ? run.getCancelledAt().truncatedTo(ChronoUnit.SECONDS).toString() : "",
+                run.getCorrelationId(),
+                run.getDefinitionId()
+        );
+        return "W/\"run-" + run.getId() + "-" + run.getStatus() + "-" + Integer.toHexString(fingerprint) + "\"";
     }
 
     @GetMapping("/runs/{runId}/steps")

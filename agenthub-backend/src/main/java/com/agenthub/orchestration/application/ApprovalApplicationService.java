@@ -36,6 +36,7 @@ public class ApprovalApplicationService implements ApprovalApplication {
     private final ProjectRepository projectRepository;
     private final ResourceAccessGuard accessGuard;
     private final RunEventBroadcaster broadcaster;
+    private final com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier;
 
     public ApprovalApplicationService(ApprovalRepository approvalRepository,
                                       ApprovalSignalRegistry approvalSignalRegistry,
@@ -43,12 +44,25 @@ public class ApprovalApplicationService implements ApprovalApplication {
                                       ProjectRepository projectRepository,
                                       ResourceAccessGuard accessGuard,
                                       RunEventBroadcaster broadcaster) {
+        this(approvalRepository, approvalSignalRegistry, workflowRunRepository, projectRepository, accessGuard, broadcaster, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ApprovalApplicationService(ApprovalRepository approvalRepository,
+                                      ApprovalSignalRegistry approvalSignalRegistry,
+                                      WorkflowRunRepository workflowRunRepository,
+                                      ProjectRepository projectRepository,
+                                      ResourceAccessGuard accessGuard,
+                                      RunEventBroadcaster broadcaster,
+                                      @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier) {
         this.approvalRepository = approvalRepository;
         this.approvalSignalRegistry = approvalSignalRegistry;
         this.workflowRunRepository = workflowRunRepository;
         this.projectRepository = projectRepository;
         this.accessGuard = accessGuard;
         this.broadcaster = broadcaster;
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : (accessGuard != null ? new com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier(accessGuard, projectRepository, null, null, workflowRunRepository, null, null) : null);
     }
 
     @Override
@@ -88,7 +102,13 @@ public class ApprovalApplicationService implements ApprovalApplication {
         ApprovalDecision decision = ApprovalDecision.fromString(cmd.getDecision());
         String reviewer = RequestContext.get().getUserId();
         if (reviewer == null || reviewer.isBlank()) {
-            reviewer = "system";
+            if (RequestContext.get().isSystem()) {
+                reviewer = "system";
+            } else if (accessGuard != null && accessGuard.isAllowSuperuserBypass() && accessGuard.getDemoDefaultUserId() != null) {
+                reviewer = accessGuard.getDemoDefaultUserId();
+            } else {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to decide approval");
+            }
         }
         String reason = cmd.getReason() != null ? cmd.getReason() : (cmd.getComments() != null ? cmd.getComments() : "");
 
@@ -127,6 +147,10 @@ public class ApprovalApplicationService implements ApprovalApplication {
     }
 
     private void checkRunAccess(String runId) {
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyRunAccess(runId);
+            return;
+        }
         WorkflowRunEntity run = workflowRunRepository.findById(runId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
         ProjectEntity project = projectRepository.findById(run.getProjectId())

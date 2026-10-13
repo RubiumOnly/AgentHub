@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 
@@ -49,14 +50,18 @@ public class ProjectController {
             @RequestParam(value = "sortDir", required = false) String sortDir) {
         PageRequestQuery query = PageRequestQuery.of(page, size, sortBy, sortDir);
         List<ProjectView> list = projectApplication.listCurrentUserProjects();
+        Comparator<ProjectView> cmp;
         if ("name".equalsIgnoreCase(query.getSortBy())) {
-            Comparator<ProjectView> cmp = Comparator.comparing(
-                    p -> p.getName() != null ? p.getName().toLowerCase() : "");
-            if ("DESC".equalsIgnoreCase(query.getSortDir())) {
-                cmp = cmp.reversed();
-            }
-            list = list.stream().sorted(cmp).toList();
+            cmp = Comparator.comparing(p -> p.getName() != null ? p.getName().toLowerCase() : "");
+        } else if ("updatedAt".equalsIgnoreCase(query.getSortBy())) {
+            cmp = Comparator.comparing(p -> p.getUpdatedAt() != null ? p.getUpdatedAt().toString() : "");
+        } else {
+            cmp = Comparator.comparing(p -> p.getCreatedAt() != null ? p.getCreatedAt().toString() : "");
         }
+        if ("DESC".equalsIgnoreCase(query.getSortDir())) {
+            cmp = cmp.reversed();
+        }
+        list = list.stream().sorted(cmp).toList();
         return Result.ok(PageResultView.slice(list, query));
     }
 
@@ -66,7 +71,7 @@ public class ProjectController {
             @RequestHeader(value = ApiContractHeaders.HEADER_IF_NONE_MATCH, required = false) String ifNoneMatch) {
         ProjectView view = projectApplication.getProjectById(projectId);
         String etag = computeProjectEtag(view);
-        if (ifNoneMatch != null && ifNoneMatch.trim().equals(etag)) {
+        if (ApiContractHeaders.matchesEtag(ifNoneMatch, etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
                     .header(HttpHeaders.ETAG, etag)
                     .build();
@@ -92,9 +97,8 @@ public class ProjectController {
         if (view == null) {
             return "W/\"proj-empty\"";
         }
-        String ts = view.getUpdatedAt() != null
-                ? view.getUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString()
-                : "";
+        String ts = view.getUpdatedAt() != null ? view.getUpdatedAt().truncatedTo(ChronoUnit.SECONDS).toString()
+                : (view.getCreatedAt() != null ? view.getCreatedAt().truncatedTo(ChronoUnit.SECONDS).toString() : "");
         int fingerprint = java.util.Objects.hash(ts, view.getName(), view.getDescription(), view.getStatus(), view.getWorkspaceId());
         return "W/\"proj-" + view.getId() + "-" + view.getStatus() + "-" + Integer.toHexString(fingerprint) + "\"";
     }

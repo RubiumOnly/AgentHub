@@ -12,6 +12,7 @@ import com.agenthub.domain.workspace.model.StructuredDiff;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier;
 import com.agenthub.infrastructure.concurrency.WorkspaceLockManager;
 import com.agenthub.project.dto.WorkspaceFileDetailView;
 import com.agenthub.project.dto.WorkspaceFileNode;
@@ -54,11 +55,12 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     private final ResourceAccessGuard accessGuard;
     private final WorkspaceLockManager lockManager;
     private final ArtifactApplication artifactApplication;
+    private final ResourceOwnershipVerifier ownershipVerifier;
 
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
                                        WorkflowEngineService workflowEngineService,
                                        WorkspaceResolver workspaceResolver) {
-        this(gitManager, workflowEngineService, workspaceResolver, null, null, null, null, null);
+        this(gitManager, workflowEngineService, workspaceResolver, null, null, null, null, null, null);
     }
 
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
@@ -67,7 +69,18 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                                        WorkspaceRepository workspaceRepository,
                                        ProjectRepository projectRepository,
                                        ResourceAccessGuard accessGuard) {
-        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, null, null);
+        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, null, null, null);
+    }
+
+    public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
+                                       WorkflowEngineService workflowEngineService,
+                                       WorkspaceResolver workspaceResolver,
+                                       WorkspaceRepository workspaceRepository,
+                                       ProjectRepository projectRepository,
+                                       ResourceAccessGuard accessGuard,
+                                       WorkspaceLockManager lockManager,
+                                       ArtifactApplication artifactApplication) {
+        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, lockManager, artifactApplication, null);
     }
 
     @Autowired
@@ -78,7 +91,8 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                                        @Autowired(required = false) ProjectRepository projectRepository,
                                        @Autowired(required = false) ResourceAccessGuard accessGuard,
                                        @Autowired(required = false) WorkspaceLockManager lockManager,
-                                       @Autowired(required = false) ArtifactApplication artifactApplication) {
+                                       @Autowired(required = false) ArtifactApplication artifactApplication,
+                                       @Autowired(required = false) ResourceOwnershipVerifier ownershipVerifier) {
         this.gitManager = gitManager;
         this.workflowEngineService = workflowEngineService;
         this.workspaceResolver = workspaceResolver;
@@ -87,6 +101,8 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
         this.accessGuard = accessGuard;
         this.lockManager = lockManager;
         this.artifactApplication = artifactApplication;
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : (accessGuard != null ? new ResourceOwnershipVerifier(accessGuard, projectRepository, workspaceRepository, null, null, null, null) : null);
     }
 
     @Override
@@ -101,6 +117,10 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                 wsOpt = workspaceRepository.findByProjectId(workspaceIdOrPath);
             }
             if (wsOpt.isPresent()) {
+                if (ownershipVerifier != null) {
+                    ownershipVerifier.verifyWorkspaceAccess(wsOpt.get().getId(), currentUserId);
+                    return;
+                }
                 ProjectEntity project = projectRepository.findById(wsOpt.get().getProjectId()).orElse(null);
                 if (project != null) {
                     accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
@@ -109,6 +129,10 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
             }
             Optional<ProjectEntity> projOpt = projectRepository.findById(workspaceIdOrPath);
             if (projOpt.isPresent()) {
+                if (ownershipVerifier != null) {
+                    ownershipVerifier.verifyProjectAccess(projOpt.get().getId(), currentUserId);
+                    return;
+                }
                 accessGuard.checkOwnership(projOpt.get().getOwnerId(), currentUserId);
                 return;
             }
@@ -401,17 +425,19 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     public WorkspaceLockStatusView getLockStatus(String workspaceId) {
         checkWorkspaceAccess(workspaceId);
         if (lockManager == null) {
-            return new WorkspaceLockStatusView(workspaceId, null, false, 0, 0);
+            return new WorkspaceLockStatusView(workspaceId, workspaceId, null, false, 0, 0, 0);
         }
         return lockManager.getLockInfo(workspaceId)
                 .map(info -> new WorkspaceLockStatusView(
                         workspaceId,
+                        info.getWorkspaceKey(),
                         info.getOwnerId(),
                         info.isLocked(),
                         info.getAcquiredAt(),
-                        info.getAcquiredAt() + Math.max(0L, info.getRemainingTtlMs())
+                        info.getExpiresAt(),
+                        info.getRemainingTtlMs()
                 ))
-                .orElse(new WorkspaceLockStatusView(workspaceId, null, false, 0, 0));
+                .orElse(new WorkspaceLockStatusView(workspaceId, workspaceId, null, false, 0, 0, 0));
     }
 
     private String resolveLockOwner(String requestedOwnerId) {

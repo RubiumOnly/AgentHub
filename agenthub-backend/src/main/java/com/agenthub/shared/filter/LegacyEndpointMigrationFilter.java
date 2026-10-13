@@ -65,6 +65,7 @@ public class LegacyEndpointMigrationFilter implements Filter {
         httpResponse.setHeader(ApiContractHeaders.HEADER_DEPRECATED_ENDPOINT, legacyPrefix);
         httpResponse.setHeader(ApiContractHeaders.HEADER_MIGRATION_TARGET, migrationTarget);
         httpResponse.setHeader(ApiContractHeaders.HEADER_SUNSET, "Phase-2");
+        httpResponse.setHeader(ApiContractHeaders.HEADER_LINK, "<" + migrationTarget + ">; rel=\"successor-version\"");
 
         boolean enforceHeader = "true".equalsIgnoreCase(httpRequest.getHeader(ApiContractHeaders.HEADER_ENFORCE_LEGACY_GONE));
         boolean shouldReturn410 = enforceGoneOverride
@@ -79,16 +80,28 @@ public class LegacyEndpointMigrationFilter implements Filter {
             long ts = Instant.now().toEpochMilli();
             httpResponse.setStatus(HttpServletResponse.SC_GONE);
             httpResponse.setContentType("application/json;charset=UTF-8");
+            String safeUri = escapeJson(uri);
+            String safeTarget = escapeJson(migrationTarget);
+            String safePrefix = escapeJson(legacyPrefix);
+            String safeReqId = escapeJson(reqId != null ? reqId : "");
             String body = String.format(
                     "{\"code\":410,\"message\":\"Legacy endpoint [%s] is retired (410 Gone). Migrate to [%s].\","
                             + "\"data\":{\"deprecatedPrefix\":\"%s\",\"migrationTarget\":\"%s\",\"status\":410},"
                             + "\"timestamp\":%d,\"requestId\":\"%s\"}",
-                    uri, migrationTarget, legacyPrefix, migrationTarget, ts, reqId != null ? reqId : ""
+                    safeUri, safeTarget, safePrefix, safeTarget, ts, safeReqId
             );
             httpResponse.getWriter().write(body);
             return;
         }
 
         chain.doFilter(request, response);
+    }
+
+    private static String escapeJson(String raw) {
+        if (raw == null) return "";
+        return raw.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n");
     }
 }

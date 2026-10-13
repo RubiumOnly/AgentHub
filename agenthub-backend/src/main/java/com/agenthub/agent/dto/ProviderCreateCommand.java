@@ -1,6 +1,9 @@
 package com.agenthub.agent.dto;
 
-public class ProviderCreateCommand {
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
+
+public class ProviderCreateCommand implements ContextCommand {
     private String providerType;
     private String baseUrl;
     private String secretRef;
@@ -12,6 +15,11 @@ public class ProviderCreateCommand {
     private Double costPerMillionOutput = 0.0;
 
     public ProviderCreateCommand() {}
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.AGENT;
+    }
 
     public String getProviderType() { return providerType; }
     public void setProviderType(String providerType) { this.providerType = providerType; }

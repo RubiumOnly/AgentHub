@@ -27,6 +27,7 @@ public final class ApiContractHeaders {
     public static final String HEADER_MIGRATION_TARGET = "X-Deprecated-Migration-Target";
     public static final String HEADER_DEPRECATED_MIGRATION_TARGET = HEADER_MIGRATION_TARGET;
     public static final String HEADER_SUNSET = "Sunset";
+    public static final String HEADER_LINK = "Link";
     public static final String HEADER_ENFORCE_LEGACY_GONE = "X-Enforce-Legacy-Gone";
 
     private ApiContractHeaders() {
@@ -45,10 +46,19 @@ public final class ApiContractHeaders {
     }
 
     public static boolean matchesEtag(String ifNoneMatchHeader, String currentEtag) {
-        if (ifNoneMatchHeader == null || ifNoneMatchHeader.isBlank() || currentEtag == null) {
+        if (ifNoneMatchHeader == null || ifNoneMatchHeader.isBlank() || currentEtag == null || currentEtag.isBlank()) {
             return false;
         }
         String candidate = ifNoneMatchHeader.trim();
-        return "*".equals(candidate) || candidate.equals(currentEtag);
+        if ("*".equals(candidate) || candidate.equals(currentEtag)) {
+            return true;
+        }
+        for (String token : candidate.split(",")) {
+            String trimmed = token.trim();
+            if ("*".equals(trimmed) || trimmed.equals(currentEtag)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

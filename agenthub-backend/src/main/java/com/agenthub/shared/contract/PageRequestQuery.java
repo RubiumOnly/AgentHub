@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * Standardized pagination, sorting, and cursor query contract for API v1 endpoints.
  */
-public final class PageRequestQuery {
+public final class PageRequestQuery implements ContextQuery {
 
     public static final int DEFAULT_PAGE = 1;
     public static final int DEFAULT_SIZE = 20;
@@ -22,12 +22,22 @@ public final class PageRequestQuery {
     private final String sortBy;
     private final String sortDirection;
     private final String cursor;
+    private final BoundedContext context;
 
     public PageRequestQuery(Integer page,
                             Integer size,
                             String sortBy,
                             String sortDirection,
                             String cursor) {
+        this(page, size, sortBy, sortDirection, cursor, BoundedContext.OPS);
+    }
+
+    public PageRequestQuery(Integer page,
+                            Integer size,
+                            String sortBy,
+                            String sortDirection,
+                            String cursor,
+                            BoundedContext context) {
         this.page = (page == null || page < 1) ? DEFAULT_PAGE : page;
         int requestedSize = (size == null || size < 1) ? DEFAULT_SIZE : size;
         this.size = Math.min(requestedSize, MAX_SIZE);
@@ -37,6 +47,12 @@ public final class PageRequestQuery {
                 : sortDirection.trim().toUpperCase();
         this.sortDirection = ALLOWED_SORT_DIRECTIONS.contains(normalizedDir) ? normalizedDir : DEFAULT_SORT_DIR;
         this.cursor = (cursor == null || cursor.isBlank()) ? null : cursor.trim();
+        this.context = context != null ? context : BoundedContext.OPS;
+    }
+
+    @Override
+    public BoundedContext boundedContext() {
+        return context;
     }
 
     public static PageRequestQuery of(Integer page, Integer size) {

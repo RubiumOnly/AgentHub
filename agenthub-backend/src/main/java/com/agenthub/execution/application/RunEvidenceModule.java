@@ -89,6 +89,7 @@ public class RunEvidenceModule {
     private final JGitWorkspaceManager gitManager;
     private final ArtifactRepository artifactRepository;
     private final ResourceAccessGuard accessGuard;
+    private final com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier;
 
     @Autowired(required = false)
     private WorkflowDefinitionRepository workflowDefinitionRepository;
@@ -114,6 +115,21 @@ public class RunEvidenceModule {
                              JGitWorkspaceManager gitManager,
                              ArtifactRepository artifactRepository,
                              ResourceAccessGuard accessGuard) {
+        this(workflowRunRepository, stepRunRepository, runEventRepository, projectRepository,
+                workspaceRepository, workspaceResolver, gitManager, artifactRepository, accessGuard, null);
+    }
+
+    @Autowired
+    public RunEvidenceModule(WorkflowRunRepository workflowRunRepository,
+                             StepRunRepository stepRunRepository,
+                             RunEventRepository runEventRepository,
+                             ProjectRepository projectRepository,
+                             WorkspaceRepository workspaceRepository,
+                             WorkspaceResolver workspaceResolver,
+                             JGitWorkspaceManager gitManager,
+                             ArtifactRepository artifactRepository,
+                             ResourceAccessGuard accessGuard,
+                             @Autowired(required = false) com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier) {
         this.workflowRunRepository = workflowRunRepository;
         this.stepRunRepository = stepRunRepository;
         this.runEventRepository = runEventRepository;
@@ -123,6 +139,8 @@ public class RunEvidenceModule {
         this.gitManager = gitManager;
         this.artifactRepository = artifactRepository;
         this.accessGuard = accessGuard;
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : (accessGuard != null ? new com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier(accessGuard, projectRepository, workspaceRepository, null, workflowRunRepository, artifactRepository, null) : null);
     }
 
     @Transactional(readOnly = true)
@@ -135,11 +153,9 @@ public class RunEvidenceModule {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to export run evidence bundle");
         }
 
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId, currentUserId) : verifyRunAccessFallback(runId, currentUserId);
         ProjectEntity project = projectRepository.findById(run.getProjectId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
 
         Optional<WorkspaceEntity> wsOpt = workspaceRepository.findByProjectId(project.getId());
         String wsId = wsOpt.map(WorkspaceEntity::getId).orElse(null);
@@ -598,5 +614,14 @@ public class RunEvidenceModule {
         } catch (Exception e) {
             throw new IllegalStateException("Failed to compute deterministic SHA-256 checksum for RunEvidenceBundleView", e);
         }
+    }
+
+    private WorkflowRunEntity verifyRunAccessFallback(String runId, String currentUserId) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
+        return run;
     }
 }

@@ -1,8 +1,13 @@
 package com.agenthub.execution.dto;
 
-import java.time.LocalDateTime;
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextDomainEvent;
 
-public class RunEventView {
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+
+public class RunEventView implements ContextDomainEvent {
     private String id;
     private String runId;
     private Long sequenceNum;
@@ -19,6 +24,21 @@ public class RunEventView {
         this.eventType = eventType;
         this.payload = payload;
         this.createdAt = createdAt;
+    }
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.EXECUTION;
+    }
+
+    @Override
+    public String eventType() {
+        return eventType != null ? eventType : "RUN_EVENT";
+    }
+
+    @Override
+    public Instant occurredAt() {
+        return createdAt != null ? createdAt.toInstant(ZoneOffset.UTC) : Instant.now();
     }
 
     public String getId() { return id; }

@@ -208,6 +208,25 @@
         "responses": { "200": { "description": "Result<ArtifactView>" } }
       }
     },
+    "/api/agents": {
+      "get": {
+        "tags": ["agent"],
+        "summary": "List registered agent definitions",
+        "responses": { "200": { "description": "Result<List<AgentDefinitionView>>" } }
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "tags": ["agent"],
+        "summary": "List LLM providers",
+        "responses": { "200": { "description": "Result<List<ProviderView>>" } }
+      },
+      "post": {
+        "tags": ["agent"],
+        "summary": "Register LLM provider",
+        "responses": { "200": { "description": "Result<ProviderView>" } }
+      }
+    },
     "/api/deployments": {
       "get": {
         "tags": ["sandbox"],
@@ -232,6 +251,13 @@
         "tags": ["ops"],
         "summary": "Get API v1 contract metadata, bounded context registry, and legacy route telemetry",
         "responses": { "200": { "description": "Result<Map<String, Object>>" } }
+      }
+    },
+    "/api/system/legacy-endpoints": {
+      "get": {
+        "tags": ["ops"],
+        "summary": "Get deprecated legacy endpoint invocation counts",
+        "responses": { "200": { "description": "Result<Map<String, Long>>" } }
       }
     },
     "/api/v1/openapi.json": {

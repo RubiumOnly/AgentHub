@@ -66,14 +66,16 @@ public class ResourceOwnershipVerifier {
     }
 
     public WorkspaceEntity verifyWorkspaceAccess(String workspaceId, String userId) {
-        Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceId);
-        if (wsOpt.isEmpty()) {
+        Optional<WorkspaceEntity> wsOpt = workspaceRepository != null ? workspaceRepository.findById(workspaceId) : Optional.empty();
+        if (wsOpt.isEmpty() && workspaceRepository != null) {
             wsOpt = workspaceRepository.findByProjectId(workspaceId);
         }
         WorkspaceEntity ws = wsOpt.orElseThrow(
                 () -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
         if (ws.getProjectId() != null && !ws.getProjectId().isBlank()) {
             verifyProjectAccess(ws.getProjectId(), userId);
+        } else {
+            accessGuard.checkOwnership(null, userId);
         }
         return ws;
     }
@@ -99,8 +101,16 @@ public class ResourceOwnershipVerifier {
         WorkflowRunEntity run = workflowRunRepository.findById(runId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Workflow run not found: " + runId));
         if (run.getProjectId() != null && !run.getProjectId().isBlank()) {
-            projectRepository.findById(run.getProjectId())
-                    .ifPresent(project -> accessGuard.checkOwnership(project.getOwnerId(), userId));
+            if (projectRepository != null) {
+                ProjectEntity project = projectRepository.findById(run.getProjectId())
+                        .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND,
+                                "Project not found for run: " + run.getProjectId()));
+                accessGuard.checkOwnership(project.getOwnerId(), userId);
+            } else {
+                accessGuard.checkOwnership(null, userId);
+            }
+        } else if (accessGuard != null) {
+            accessGuard.checkOwnership(null, userId);
         }
         return run;
     }

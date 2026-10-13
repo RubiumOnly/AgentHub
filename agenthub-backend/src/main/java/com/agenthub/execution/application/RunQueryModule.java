@@ -33,34 +33,47 @@ public class RunQueryModule {
     private final RunEventRepository runEventRepository;
     private final ProjectRepository projectRepository;
     private final ResourceAccessGuard accessGuard;
+    private final com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier;
 
     public RunQueryModule(WorkflowRunRepository workflowRunRepository,
                           StepRunRepository stepRunRepository,
                           RunEventRepository runEventRepository,
                           ProjectRepository projectRepository,
                           ResourceAccessGuard accessGuard) {
+        this(workflowRunRepository, stepRunRepository, runEventRepository, projectRepository, accessGuard, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RunQueryModule(WorkflowRunRepository workflowRunRepository,
+                          StepRunRepository stepRunRepository,
+                          RunEventRepository runEventRepository,
+                          ProjectRepository projectRepository,
+                          ResourceAccessGuard accessGuard,
+                          @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier) {
         this.workflowRunRepository = workflowRunRepository;
         this.stepRunRepository = stepRunRepository;
         this.runEventRepository = runEventRepository;
         this.projectRepository = projectRepository;
         this.accessGuard = accessGuard;
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : (accessGuard != null ? new com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier(accessGuard, projectRepository, null, null, workflowRunRepository, null, null) : null);
     }
 
     @Transactional(readOnly = true)
     public WorkflowRunView getRunById(String runId) {
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
         return toRunView(run);
     }
 
     @Transactional(readOnly = true)
     public List<WorkflowRunView> listRunsByProjectId(String projectId) {
-        ProjectEntity project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyProjectAccess(projectId);
+        } else {
+            ProjectEntity project = projectRepository.findById(projectId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId));
+            accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        }
         return workflowRunRepository.findByProjectIdOrderByCreatedAtDesc(projectId).stream()
                 .map(RunQueryModule::toRunView)
                 .collect(Collectors.toList());
@@ -68,11 +81,11 @@ public class RunQueryModule {
 
     @Transactional(readOnly = true)
     public List<StepRunView> listStepRuns(String runId) {
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyRunAccess(runId);
+        } else {
+            verifyRunAccessFallback(runId);
+        }
         return stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId).stream()
                 .map(RunQueryModule::toStepView)
                 .collect(Collectors.toList());
@@ -80,11 +93,11 @@ public class RunQueryModule {
 
     @Transactional(readOnly = true)
     public List<RunEventView> listEvents(String runId, Long afterSeq) {
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyRunAccess(runId);
+        } else {
+            verifyRunAccessFallback(runId);
+        }
 
         List<RunEventEntity> events;
         if (afterSeq != null && afterSeq > 0) {
@@ -93,6 +106,15 @@ public class RunQueryModule {
             events = runEventRepository.findByRunIdOrderBySequenceNumAsc(runId);
         }
         return events.stream().map(RunQueryModule::toEventView).collect(Collectors.toList());
+    }
+
+    private WorkflowRunEntity verifyRunAccessFallback(String runId) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        return run;
     }
 
     public static WorkflowRunView toRunView(WorkflowRunEntity entity) {

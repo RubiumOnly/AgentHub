@@ -61,13 +61,19 @@ public class WorkspaceLockManager {
         private final boolean locked;
         private final long remainingTtlMs;
         private final long acquiredAt;
+        private final long expiresAt;
 
         public LockInfo(String workspaceKey, String ownerId, boolean locked, long remainingTtlMs, long acquiredAt) {
+            this(workspaceKey, ownerId, locked, remainingTtlMs, acquiredAt, acquiredAt + Math.max(0L, remainingTtlMs));
+        }
+
+        public LockInfo(String workspaceKey, String ownerId, boolean locked, long remainingTtlMs, long acquiredAt, long expiresAt) {
             this.workspaceKey = workspaceKey;
             this.ownerId = ownerId;
             this.locked = locked;
             this.remainingTtlMs = remainingTtlMs;
             this.acquiredAt = acquiredAt;
+            this.expiresAt = expiresAt;
         }
 
         public String getWorkspaceKey() { return workspaceKey; }
@@ -75,6 +81,7 @@ public class WorkspaceLockManager {
         public boolean isLocked() { return locked; }
         public long getRemainingTtlMs() { return remainingTtlMs; }
         public long getAcquiredAt() { return acquiredAt; }
+        public long getExpiresAt() { return expiresAt; }
     }
 
     private final ConcurrentHashMap<String, LockEntry> lockMap = new ConcurrentHashMap<>();
@@ -425,7 +432,7 @@ public class WorkspaceLockManager {
             long now = System.currentTimeMillis();
             boolean isLocked = entry.ownerId != null && now <= entry.expiresAt;
             long remaining = isLocked ? (entry.expiresAt - now) : 0;
-            return Optional.of(new LockInfo(key, entry.ownerId, isLocked, remaining, entry.acquiredAt));
+            return Optional.of(new LockInfo(key, entry.ownerId, isLocked, remaining, entry.acquiredAt, entry.expiresAt));
         } finally {
             entry.internalLock.unlock();
         }

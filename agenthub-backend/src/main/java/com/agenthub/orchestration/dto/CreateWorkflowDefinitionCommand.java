@@ -1,8 +1,10 @@
 package com.agenthub.orchestration.dto;
 
 import com.agenthub.orchestration.domain.dsl.WorkflowDsl;
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
 
-public class CreateWorkflowDefinitionCommand {
+public class CreateWorkflowDefinitionCommand implements ContextCommand {
     private String name;
     private String description;
     private String version = "1.0.0";
@@ -15,6 +17,11 @@ public class CreateWorkflowDefinitionCommand {
         this.name = name;
         this.description = description;
         this.dsl = dsl;
+    }
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.ORCHESTRATION;
     }
 
     public String getName() { return name; }

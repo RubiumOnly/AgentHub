@@ -12,7 +12,6 @@ import com.agenthub.execution.dto.WorkflowRunView;
 import com.agenthub.execution.infrastructure.repository.RunEventRepository;
 import com.agenthub.execution.infrastructure.repository.StepRunRepository;
 import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
-import com.agenthub.execution.scheduler.ExecutionScheduler;
 import com.agenthub.execution.service.ExecutionStateMachine;
 import com.agenthub.execution.service.RunEventBroadcaster;
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
@@ -60,8 +59,7 @@ public class ExecutionApplicationService implements ExecutionApplication {
                                        ResourceAccessGuard accessGuard,
                                        ExecutionStateMachine stateMachine,
                                        CancelTokenRegistry cancelTokenRegistry,
-                                       RunEventBroadcaster broadcaster,
-                                       ExecutionScheduler executionScheduler) {
+                                       RunEventBroadcaster broadcaster) {
         this.runCommandModule = new RunCommandModule(
                 workflowRunRepository, stepRunRepository, projectRepository, workspaceRepository,
                 workspaceResolver, gitManager, artifactRepository, accessGuard, stateMachine,

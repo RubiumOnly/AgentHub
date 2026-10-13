@@ -75,13 +75,16 @@ public class DeploymentApplicationService implements DeploymentApplication {
     @Value("${agenthub.sandbox.external-base-url:}")
     private String externalBaseUrl = "";
 
+    @Autowired(required = false)
+    private com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier;
+
     public DeploymentApplicationService(DeploymentRepository deploymentRepository,
                                         WorkspaceResolver workspaceResolver,
                                         PortAllocationService portAllocationService,
                                         HealthCheckProbeService healthCheckProbeService,
                                         SandboxProviderFactory sandboxProviderFactory) {
         this(deploymentRepository, workspaceResolver, portAllocationService, healthCheckProbeService,
-                sandboxProviderFactory, null, null, null, null, null);
+                sandboxProviderFactory, null, null, null, null, null, null);
     }
 
     public DeploymentApplicationService(DeploymentRepository deploymentRepository,
@@ -92,7 +95,21 @@ public class DeploymentApplicationService implements DeploymentApplication {
                                         ProjectRepository projectRepository,
                                         ResourceAccessGuard accessGuard) {
         this(deploymentRepository, workspaceResolver, portAllocationService, healthCheckProbeService,
-                sandboxProviderFactory, projectRepository, accessGuard, null, null, null);
+                sandboxProviderFactory, projectRepository, accessGuard, null, null, null, null);
+    }
+
+    public DeploymentApplicationService(DeploymentRepository deploymentRepository,
+                                        WorkspaceResolver workspaceResolver,
+                                        PortAllocationService portAllocationService,
+                                        HealthCheckProbeService healthCheckProbeService,
+                                        SandboxProviderFactory sandboxProviderFactory,
+                                        ProjectRepository projectRepository,
+                                        ResourceAccessGuard accessGuard,
+                                        DeploymentLifecycleWorker lifecycleWorker,
+                                        ArtifactRepository artifactRepository,
+                                        WorkflowRunRepository workflowRunRepository) {
+        this(deploymentRepository, workspaceResolver, portAllocationService, healthCheckProbeService,
+                sandboxProviderFactory, projectRepository, accessGuard, lifecycleWorker, artifactRepository, workflowRunRepository, null);
     }
 
     @Autowired
@@ -105,7 +122,8 @@ public class DeploymentApplicationService implements DeploymentApplication {
                                         @Autowired(required = false) ResourceAccessGuard accessGuard,
                                         @Autowired(required = false) DeploymentLifecycleWorker lifecycleWorker,
                                         @Autowired(required = false) ArtifactRepository artifactRepository,
-                                        @Autowired(required = false) WorkflowRunRepository workflowRunRepository) {
+                                        @Autowired(required = false) WorkflowRunRepository workflowRunRepository,
+                                        @Autowired(required = false) com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier) {
         this.deploymentRepository = deploymentRepository;
         this.workspaceResolver = workspaceResolver;
         this.portAllocationService = portAllocationService;
@@ -116,6 +134,8 @@ public class DeploymentApplicationService implements DeploymentApplication {
         this.lifecycleWorker = lifecycleWorker != null ? lifecycleWorker : new DeploymentLifecycleWorker(sandboxProviderFactory);
         this.artifactRepository = artifactRepository;
         this.workflowRunRepository = workflowRunRepository;
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : (accessGuard != null ? new com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier(accessGuard, projectRepository, null, null, workflowRunRepository, artifactRepository, deploymentRepository) : null);
     }
 
     private void checkProjectAccess(String projectId) {
@@ -123,13 +143,22 @@ public class DeploymentApplicationService implements DeploymentApplication {
             return;
         }
         if (projectRepository != null && accessGuard != null && projectId != null) {
-            String currentUserId = RequestContext.get().getUserId();
             ProjectEntity project = projectRepository.findById(projectId).orElse(null);
             if (project != null) {
-                accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
-            } else if (currentUserId == null || currentUserId.isBlank()) {
-                accessGuard.checkOwnership("unauthenticated-resource", null);
+                if (ownershipVerifier != null) {
+                    ownershipVerifier.verifyProjectAccess(projectId);
+                } else {
+                    accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+                }
+            } else if (accessGuard.isAllowSuperuserBypass()) {
+                return;
+            } else if (ownershipVerifier != null) {
+                ownershipVerifier.verifyProjectAccess(projectId);
+            } else {
+                throw new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId);
             }
+        } else if (ownershipVerifier != null && projectId != null) {
+            ownershipVerifier.verifyProjectAccess(projectId);
         }
     }
 

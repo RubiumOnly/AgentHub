@@ -172,6 +172,7 @@ export default function AgentHubExecutiveApp() {
         provsData,
         depsData,
         diffData,
+        teamsData,
       ] = await Promise.allSettled([
         workflowsApi.listDefinitions().catch(() => []),
         currentRunId ? runsApi.getRun(currentRunId) : Promise.resolve(null),
@@ -181,6 +182,7 @@ export default function AgentHubExecutiveApp() {
         workflowsApi.listProviders().catch(() => []),
         deploymentsApi.listDeployments(currentProjId).catch(() => []),
         currentWorkspaceId ? workspacesApi.getStructuredDiff(currentWorkspaceId).catch(() => null) : Promise.resolve(null),
+        currentProjId ? workflowsApi.listTeams(currentProjId).catch(() => []) : Promise.resolve([]),
       ]);
 
       if (defsData.status === "fulfilled" && defsData.value.length > 0 && !activeDefinitionId) {
@@ -193,6 +195,7 @@ export default function AgentHubExecutiveApp() {
       } else {
         setApproval(null);
       }
+      setTeam(teamsData.status === "fulfilled" && teamsData.value.length > 0 ? teamsData.value[0] : null);
       if (tokensData.status === "fulfilled") setTokenSummary(tokensData.value);
       if (provsData.status === "fulfilled") setProviders(provsData.value);
       setDeployment(
@@ -215,6 +218,7 @@ export default function AgentHubExecutiveApp() {
     const nextMode = !isDemo;
     setDemoMode(nextMode);
     setIsDemo(nextMode);
+    if (!nextMode) setTeam(null);
   };
 
   const handleRunWorkflow = async () => {

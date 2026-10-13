@@ -1,6 +1,7 @@
 package com.agenthub.project.application;
 
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
+import com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier;
 import com.agenthub.project.dto.CreateProjectCommand;
 import com.agenthub.project.dto.ProjectView;
 import com.agenthub.project.dto.WorkspaceView;
@@ -11,6 +12,7 @@ import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +26,24 @@ public class ProjectApplicationService implements ProjectApplication {
     private final ProjectRepository projectRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ResourceAccessGuard accessGuard;
+    private final ResourceOwnershipVerifier ownershipVerifier;
 
     public ProjectApplicationService(ProjectRepository projectRepository,
                                      WorkspaceRepository workspaceRepository,
                                      ResourceAccessGuard accessGuard) {
+        this(projectRepository, workspaceRepository, accessGuard, null);
+    }
+
+    @Autowired
+    public ProjectApplicationService(ProjectRepository projectRepository,
+                                     WorkspaceRepository workspaceRepository,
+                                     ResourceAccessGuard accessGuard,
+                                     @Autowired(required = false) ResourceOwnershipVerifier ownershipVerifier) {
         this.projectRepository = projectRepository;
         this.workspaceRepository = workspaceRepository;
         this.accessGuard = accessGuard;
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : new ResourceOwnershipVerifier(accessGuard, projectRepository, workspaceRepository, null, null, null, null);
     }
 
     @Override
@@ -92,19 +105,14 @@ public class ProjectApplicationService implements ProjectApplication {
     @Override
     @Transactional(readOnly = true)
     public ProjectView getProjectById(String projectId) {
-        ProjectEntity project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        ProjectEntity project = ownershipVerifier.verifyProjectAccess(projectId);
         return toView(project);
     }
 
     @Override
     @Transactional(readOnly = true)
     public WorkspaceView getWorkspaceByProjectId(String projectId) {
-        ProjectEntity project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
-
+        ownershipVerifier.verifyProjectAccess(projectId);
         WorkspaceEntity workspace = workspaceRepository.findByProjectId(projectId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found for project: " + projectId));
         return toView(workspace);

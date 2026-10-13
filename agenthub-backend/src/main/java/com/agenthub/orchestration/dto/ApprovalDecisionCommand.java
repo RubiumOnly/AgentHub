@@ -1,6 +1,9 @@
 package com.agenthub.orchestration.dto;
 
-public class ApprovalDecisionCommand {
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
+
+public class ApprovalDecisionCommand implements ContextCommand {
     private String decision; // APPROVED or REJECTED
     private String reason;
     private String comments;
@@ -11,6 +14,11 @@ public class ApprovalDecisionCommand {
         this.decision = decision;
         this.reason = reason;
         this.comments = reason;
+    }
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.ORCHESTRATION;
     }
 
     public String getDecision() { return decision; }

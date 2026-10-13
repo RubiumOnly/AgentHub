@@ -41,6 +41,7 @@ public class ArtifactApplicationService implements ArtifactApplication {
     private final RunEventRepository runEventRepository;
     private final ResourceAccessGuard accessGuard;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.agenthub.execution.service.RunEventBroadcaster broadcaster;
@@ -54,7 +55,20 @@ public class ArtifactApplicationService implements ArtifactApplication {
                                     RunEventRepository runEventRepository,
                                     ResourceAccessGuard accessGuard) {
         this(artifactRepository, workflowRunRepository, projectRepository, workspaceRepository,
-                workspaceResolver, gitManager, runEventRepository, accessGuard, new com.fasterxml.jackson.databind.ObjectMapper());
+                workspaceResolver, gitManager, runEventRepository, accessGuard, new com.fasterxml.jackson.databind.ObjectMapper(), null);
+    }
+
+    public ArtifactApplicationService(ArtifactRepository artifactRepository,
+                                    WorkflowRunRepository workflowRunRepository,
+                                    ProjectRepository projectRepository,
+                                    WorkspaceRepository workspaceRepository,
+                                    WorkspaceResolver workspaceResolver,
+                                    JGitWorkspaceManager gitManager,
+                                    RunEventRepository runEventRepository,
+                                    ResourceAccessGuard accessGuard,
+                                    com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+        this(artifactRepository, workflowRunRepository, projectRepository, workspaceRepository,
+                workspaceResolver, gitManager, runEventRepository, accessGuard, objectMapper, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -66,7 +80,8 @@ public class ArtifactApplicationService implements ArtifactApplication {
                                     JGitWorkspaceManager gitManager,
                                     RunEventRepository runEventRepository,
                                     ResourceAccessGuard accessGuard,
-                                    @org.springframework.beans.factory.annotation.Autowired(required = false) com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+                                    @org.springframework.beans.factory.annotation.Autowired(required = false) com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+                                    @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier) {
         this.artifactRepository = artifactRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.projectRepository = projectRepository;
@@ -76,16 +91,22 @@ public class ArtifactApplicationService implements ArtifactApplication {
         this.runEventRepository = runEventRepository;
         this.accessGuard = accessGuard;
         this.objectMapper = (objectMapper != null) ? objectMapper : new com.fasterxml.jackson.databind.ObjectMapper();
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : (accessGuard != null ? new com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier(accessGuard, projectRepository, workspaceRepository, null, workflowRunRepository, artifactRepository, null) : null);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ArtifactView> listArtifactsByRunId(String runId) {
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + runId));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyRunAccess(runId);
+        } else {
+            WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + runId));
+            ProjectEntity project = projectRepository.findById(run.getProjectId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
+            accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        }
 
         return artifactRepository.findByRunIdOrderByCreatedAtDesc(runId).stream()
                 .map(this::toView)
@@ -95,13 +116,9 @@ public class ArtifactApplicationService implements ArtifactApplication {
     @Override
     @Transactional(readOnly = true)
     public ArtifactView getArtifactById(String artifactId) {
-        ArtifactEntity entity = artifactRepository.findById(artifactId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ARTIFACT_NOT_FOUND, "Artifact not found: " + artifactId));
-        WorkflowRunEntity run = workflowRunRepository.findById(entity.getRunId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + entity.getRunId()));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        ArtifactEntity entity = ownershipVerifier != null
+                ? ownershipVerifier.verifyArtifactAccess(artifactId)
+                : getArtifactByIdFallback(artifactId);
 
         return toView(entity);
     }
@@ -109,14 +126,10 @@ public class ArtifactApplicationService implements ArtifactApplication {
     @Override
     @Transactional
     public ArtifactView acceptArtifact(String artifactId, String reviewerId) {
-        ArtifactEntity entity = artifactRepository.findById(artifactId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ARTIFACT_NOT_FOUND, "Artifact not found: " + artifactId));
-        WorkflowRunEntity run = workflowRunRepository.findById(entity.getRunId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + entity.getRunId()));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
         String actor = (reviewerId != null && !reviewerId.isBlank()) ? reviewerId : RequestContext.get().getUserId();
-        accessGuard.checkOwnership(project.getOwnerId(), actor);
+        ArtifactEntity entity = ownershipVerifier != null
+                ? ownershipVerifier.verifyArtifactAccess(artifactId, actor)
+                : getArtifactByIdWithActorFallback(artifactId, actor);
 
         entity.setReviewStatus("ACCEPTED");
         entity.setReviewedBy(actor);
@@ -131,14 +144,10 @@ public class ArtifactApplicationService implements ArtifactApplication {
     @Override
     @Transactional
     public ArtifactView rejectArtifact(String artifactId, String reviewerId, String reason) {
-        ArtifactEntity entity = artifactRepository.findById(artifactId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ARTIFACT_NOT_FOUND, "Artifact not found: " + artifactId));
-        WorkflowRunEntity run = workflowRunRepository.findById(entity.getRunId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + entity.getRunId()));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
         String actor = (reviewerId != null && !reviewerId.isBlank()) ? reviewerId : RequestContext.get().getUserId();
-        accessGuard.checkOwnership(project.getOwnerId(), actor);
+        ArtifactEntity entity = ownershipVerifier != null
+                ? ownershipVerifier.verifyArtifactAccess(artifactId, actor)
+                : getArtifactByIdWithActorFallback(artifactId, actor);
 
         entity.setReviewStatus("REJECTED");
         entity.setReviewedBy(actor);
@@ -343,5 +352,20 @@ public class ArtifactApplicationService implements ArtifactApplication {
                 entity.getReviewComment(),
                 entity.getCreatedAt()
         );
+    }
+
+    private ArtifactEntity getArtifactByIdFallback(String artifactId) {
+        return getArtifactByIdWithActorFallback(artifactId, RequestContext.get().getUserId());
+    }
+
+    private ArtifactEntity getArtifactByIdWithActorFallback(String artifactId, String actor) {
+        ArtifactEntity entity = artifactRepository.findById(artifactId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ARTIFACT_NOT_FOUND, "Artifact not found: " + artifactId));
+        WorkflowRunEntity run = workflowRunRepository.findById(entity.getRunId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + entity.getRunId()));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), actor);
+        return entity;
     }
 }

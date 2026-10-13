@@ -65,6 +65,7 @@ public class RunCommandModule {
     private final ExecutionStateMachine stateMachine;
     private final CancelTokenRegistry cancelTokenRegistry;
     private final RunEventBroadcaster broadcaster;
+    private final com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier;
 
     @Autowired(required = false)
     private WorkflowDefinitionRepository workflowDefinitionRepository;
@@ -86,6 +87,24 @@ public class RunCommandModule {
                             ExecutionStateMachine stateMachine,
                             CancelTokenRegistry cancelTokenRegistry,
                             RunEventBroadcaster broadcaster) {
+        this(workflowRunRepository, stepRunRepository, projectRepository, workspaceRepository,
+                workspaceResolver, gitManager, artifactRepository, accessGuard, stateMachine,
+                cancelTokenRegistry, broadcaster, null);
+    }
+
+    @Autowired
+    public RunCommandModule(WorkflowRunRepository workflowRunRepository,
+                            StepRunRepository stepRunRepository,
+                            ProjectRepository projectRepository,
+                            WorkspaceRepository workspaceRepository,
+                            WorkspaceResolver workspaceResolver,
+                            JGitWorkspaceManager gitManager,
+                            ArtifactRepository artifactRepository,
+                            ResourceAccessGuard accessGuard,
+                            ExecutionStateMachine stateMachine,
+                            CancelTokenRegistry cancelTokenRegistry,
+                            RunEventBroadcaster broadcaster,
+                            @Autowired(required = false) com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier) {
         this.workflowRunRepository = workflowRunRepository;
         this.stepRunRepository = stepRunRepository;
         this.projectRepository = projectRepository;
@@ -97,6 +116,8 @@ public class RunCommandModule {
         this.stateMachine = stateMachine;
         this.cancelTokenRegistry = cancelTokenRegistry;
         this.broadcaster = broadcaster;
+        this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
+                : (accessGuard != null ? new com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier(accessGuard, projectRepository, workspaceRepository, null, workflowRunRepository, artifactRepository, null) : null);
     }
 
     @Transactional
@@ -105,9 +126,13 @@ public class RunCommandModule {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "Project ID must not be null");
         }
 
-        ProjectEntity project = projectRepository.findById(cmd.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + cmd.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyProjectAccess(cmd.getProjectId());
+        } else {
+            ProjectEntity project = projectRepository.findById(cmd.getProjectId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + cmd.getProjectId()));
+            accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        }
 
         if (cmd.getIdempotencyKey() != null && !cmd.getIdempotencyKey().isBlank()) {
             Optional<WorkflowRunEntity> existing = workflowRunRepository.findByIdempotencyKey(cmd.getIdempotencyKey());
@@ -210,11 +235,7 @@ public class RunCommandModule {
 
     @Transactional
     public WorkflowRunView cancelRun(String runId, String reason) {
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
 
         String cancelReason = reason != null && !reason.isBlank() ? reason : "User cancelled execution";
 
@@ -236,11 +257,7 @@ public class RunCommandModule {
 
     @Transactional
     public WorkflowRunView pauseRun(String runId) {
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
 
         WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.PAUSED, "Paused by user");
         broadcaster.publishEvent(runId, "RUN_PAUSED", "{\"reason\":\"Paused by user\"}");
@@ -249,11 +266,7 @@ public class RunCommandModule {
 
     @Transactional
     public WorkflowRunView resumeRun(String runId) {
-        WorkflowRunEntity run = workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
 
         WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "Resumed by user");
         broadcaster.publishEvent(runId, "RUN_RESUMED", "{\"reason\":\"Resumed by user\"}");
@@ -264,14 +277,19 @@ public class RunCommandModule {
     public StepRunView retryStep(String stepRunId) {
         StepRunEntity step = stepRunRepository.findById(stepRunId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STEP_RUN_NOT_FOUND, "Step run not found: " + stepRunId));
-        WorkflowRunEntity run = workflowRunRepository.findById(step.getRunId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + step.getRunId()));
-        ProjectEntity project = projectRepository.findById(run.getProjectId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
-        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(step.getRunId()) : verifyRunAccessFallback(step.getRunId());
 
         StepRunEntity updated = stateMachine.transitionStep(stepRunId, StepRunStatus.PENDING, "Retry requested by user");
         broadcaster.publishEvent(run.getId(), "STEP_RETRY_INITIATED", "{\"stepRunId\":\"" + stepRunId + "\"}");
         return RunQueryModule.toStepView(updated);
+    }
+
+    private WorkflowRunEntity verifyRunAccessFallback(String runId) {
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));
+        ProjectEntity project = projectRepository.findById(run.getProjectId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + run.getProjectId()));
+        accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+        return run;
     }
 }

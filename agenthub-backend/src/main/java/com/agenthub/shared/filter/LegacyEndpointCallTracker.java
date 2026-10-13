@@ -1,5 +1,8 @@
 package com.agenthub.shared.filter;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -17,6 +20,8 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class LegacyEndpointCallTracker {
 
+    public static final String METRIC_LEGACY_ENDPOINT_CALLS_TOTAL = "agenthub_legacy_endpoint_calls_total";
+
     public static final Map<String, String> LEGACY_ROUTE_MIGRATION_MAP;
     static {
         Map<String, String> map = new LinkedHashMap<>();
@@ -31,8 +36,15 @@ public class LegacyEndpointCallTracker {
     private final ConcurrentMap<String, AtomicLong> blockedInProdCounts = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> lastAccessedAt = new ConcurrentHashMap<>();
     private final AtomicLong totalCalls = new AtomicLong(0);
+    private final MeterRegistry meterRegistry;
 
     public LegacyEndpointCallTracker() {
+        this(null);
+    }
+
+    @Autowired
+    public LegacyEndpointCallTracker(@Autowired(required = false) MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
         for (String prefix : LEGACY_ROUTE_MIGRATION_MAP.keySet()) {
             callCounts.put(prefix, new AtomicLong(0));
             blockedInProdCounts.put(prefix, new AtomicLong(0));
@@ -43,16 +55,17 @@ public class LegacyEndpointCallTracker {
         if (requestUri == null || requestUri.isBlank()) {
             return null;
         }
-        if (requestUri.equals("/api/workspace") || requestUri.startsWith("/api/workspace/")) {
+        String normalized = requestUri.trim().replaceAll("/{2,}", "/");
+        if (normalized.equals("/api/workspace") || normalized.startsWith("/api/workspace/")) {
             return "/api/workspace";
         }
-        if (requestUri.equals("/api/im") || requestUri.startsWith("/api/im/")) {
+        if (normalized.equals("/api/im") || normalized.startsWith("/api/im/")) {
             return "/api/im";
         }
-        if (requestUri.equals("/api/sandbox") || requestUri.startsWith("/api/sandbox/")) {
+        if (normalized.equals("/api/sandbox") || normalized.startsWith("/api/sandbox/")) {
             return "/api/sandbox";
         }
-        if (requestUri.equals("/api/runs") || requestUri.startsWith("/api/runs/")) {
+        if (normalized.equals("/api/runs") || normalized.startsWith("/api/runs/")) {
             return "/api/runs";
         }
         return null;
@@ -72,6 +85,14 @@ public class LegacyEndpointCallTracker {
         }
         lastAccessedAt.put(legacyPrefix, Instant.now().toString());
         totalCalls.incrementAndGet();
+        if (meterRegistry != null) {
+            Counter.builder(METRIC_LEGACY_ENDPOINT_CALLS_TOTAL)
+                    .description("Total invocations of deprecated legacy REST endpoints")
+                    .tag("prefix", legacyPrefix)
+                    .tag("blocked", String.valueOf(blockedWith410))
+                    .register(meterRegistry)
+                    .increment();
+        }
     }
 
     public long getCallCount(String legacyPrefix) {

@@ -13,9 +13,26 @@ import com.agenthub.project.dto.CreateProjectCommand;
 import com.agenthub.project.dto.ProjectView;
 import com.agenthub.sandbox.infrastructure.entity.DeploymentEntity;
 import com.agenthub.sandbox.infrastructure.repository.DeploymentRepository;
+import com.agenthub.agent.dto.ProviderCreateCommand;
+import com.agenthub.execution.dto.RunEventView;
+import com.agenthub.execution.infrastructure.entity.WorkflowRunEntity;
+import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
+import com.agenthub.identity.dto.LoginCommand;
+import com.agenthub.identity.dto.RegisterCommand;
+import com.agenthub.orchestration.application.ApprovalApplication;
+import com.agenthub.orchestration.dto.ApprovalDecisionCommand;
+import com.agenthub.orchestration.dto.CreateWorkflowDefinitionCommand;
+import com.agenthub.orchestration.infrastructure.entity.ApprovalEntity;
+import com.agenthub.orchestration.infrastructure.repository.ApprovalRepository;
+import com.agenthub.project.application.WorkspaceApplication;
+import com.agenthub.project.dto.WorkspaceLockStatusView;
+import com.agenthub.sandbox.api.dto.CreateDeploymentRequest;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.contract.ApiContractHeaders;
 import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
+import com.agenthub.shared.contract.ContextDomainEvent;
+import com.agenthub.shared.contract.ContextQuery;
 import com.agenthub.shared.contract.PageRequestQuery;
 import com.agenthub.shared.contract.PageResultView;
 import com.agenthub.shared.exception.BusinessException;
@@ -23,6 +40,8 @@ import com.agenthub.shared.exception.ErrorCode;
 import com.agenthub.shared.filter.LegacyEndpointCallTracker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -97,6 +116,21 @@ class Phase1ModuleConvergenceAndContractTest {
 
     @Autowired
     private DeploymentRepository deploymentRepository;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
+
+    @Autowired
+    private WorkflowRunRepository workflowRunRepository;
+
+    @Autowired
+    private WorkspaceApplication workspaceApplication;
+
+    @Autowired
+    private ApprovalApplication approvalApplication;
+
+    @Autowired
+    private ApprovalRepository approvalRepository;
 
     @BeforeEach
     void setUp() {
@@ -173,6 +207,7 @@ class Phase1ModuleConvergenceAndContractTest {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.apiVersion").value("v1"))
                 .andExpect(jsonPath("$.data.timezone").value("UTC"))
+                .andExpect(jsonPath("$.data.pagination.maxSize").value(100))
                 .andExpect(jsonPath("$.data.productionContexts.length()").value(8));
 
         mockMvc.perform(get("/api/v1/openapi.json").accept(MediaType.APPLICATION_JSON))
@@ -207,6 +242,18 @@ class Phase1ModuleConvergenceAndContractTest {
                         .header(ApiContractHeaders.HEADER_IF_NONE_MATCH, initialEtag))
                 .andExpect(status().isNotModified())
                 .andExpect(header().string(ApiContractHeaders.HEADER_ETAG, initialEtag));
+
+        // 携带 If-None-Match: * 通配头应返回 304 Not Modified
+        mockMvc.perform(get("/api/projects/" + projectId)
+                        .header("Authorization", "Bearer " + token)
+                        .header(ApiContractHeaders.HEADER_IF_NONE_MATCH, "*"))
+                .andExpect(status().isNotModified());
+
+        // 携带包含匹配 ETag 的逗号分隔列表应返回 304 Not Modified
+        mockMvc.perform(get("/api/projects/" + projectId)
+                        .header("Authorization", "Bearer " + token)
+                        .header(ApiContractHeaders.HEADER_IF_NONE_MATCH, "W/\"v1-stale\", " + initialEtag))
+                .andExpect(status().isNotModified());
 
         // 携带不匹配的 If-None-Match 请求头应返回 200 OK
         mockMvc.perform(get("/api/projects/" + projectId)
@@ -263,6 +310,13 @@ class Phase1ModuleConvergenceAndContractTest {
                 .andExpect(jsonPath("$.data.sortDirection").value("ASC"))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
+        mockMvc.perform(get("/api/projects/page?page=1&size=10&sortBy=createdAt&sortDir=ASC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.sortBy").value("createdAt"))
+                .andExpect(jsonPath("$.data.sortDirection").value("ASC"));
+
         mockMvc.perform(get("/api/executions/projects/" + projectId + "/runs/page?page=1&size=5&sortDir=DESC")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
@@ -292,18 +346,33 @@ class Phase1ModuleConvergenceAndContractTest {
                     .andExpect(status().isGone())
                     .andExpect(header().string(ApiContractHeaders.HEADER_DEPRECATION, "true"))
                     .andExpect(header().string(ApiContractHeaders.HEADER_MIGRATION_TARGET, entry.getValue()))
+                    .andExpect(header().string(ApiContractHeaders.HEADER_LINK, "<" + entry.getValue() + ">; rel=\"successor-version\""))
                     .andExpect(jsonPath("$.code").value(410))
                     .andExpect(jsonPath("$.data.migrationTarget").value(entry.getValue()));
         }
 
-        // 2) 验证 /api/system/legacy-endpoints 精确记录了上述 4 次被拦截调用
+        // 验证多重斜杠路径（如 /api//workspace/diff）同样被规范化拦截且不绕过安全规则
+        mockMvc.perform(get("/api//workspace/diff")
+                        .header(ApiContractHeaders.HEADER_ENFORCE_LEGACY_GONE, "true"))
+                .andExpect(status().isGone())
+                .andExpect(header().string(ApiContractHeaders.HEADER_MIGRATION_TARGET, "/api/workspaces/{workspaceId}"));
+
+        // 2) 验证 /api/system/legacy-endpoints 精确记录了上述拦截调用
         mockMvc.perform(get("/api/system/legacy-endpoints"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data['/api/workspace']").value(1))
+                .andExpect(jsonPath("$.data['/api/workspace']").value(2))
                 .andExpect(jsonPath("$.data['/api/im']").value(1))
                 .andExpect(jsonPath("$.data['/api/sandbox']").value(1))
                 .andExpect(jsonPath("$.data['/api/runs']").value(1));
+
+        // 3) 验证 Micrometer 业务指标 agenthub_legacy_endpoint_calls_total 真实记录
+        Counter workspaceCounter = meterRegistry.find("agenthub_legacy_endpoint_calls_total")
+                .tag("prefix", "/api/workspace")
+                .tag("blocked", "true")
+                .counter();
+        assertThat(workspaceCounter).isNotNull();
+        assertThat(workspaceCounter.count()).isGreaterThanOrEqualTo(2.0);
     }
 
     @Test
@@ -392,6 +461,42 @@ class Phase1ModuleConvergenceAndContractTest {
                         .extracting(ex -> ((BusinessException) ex).getErrorCode())
                         .isEqualTo(ErrorCode.FORBIDDEN);
             }
+
+            // 4) 验证 WorkspaceLockStatusView 正确保留 workspaceId, workspaceKey, remainingTtlMs 与绝对 leaseExpiresAt
+            WorkspaceLockStatusView runLockStatus = workspaceApplication.getLockStatus(workspaceId);
+            assertThat(runLockStatus.isLocked()).isTrue();
+            assertThat(runLockStatus.getOwnerId()).isEqualTo(run.getId());
+            assertThat(runLockStatus.getWorkspaceId()).isEqualTo(workspaceId);
+            assertThat(runLockStatus.getWorkspaceKey()).contains(projectId);
+            assertThat(runLockStatus.getRemainingTtlMs()).isGreaterThan(0L);
+            assertThat(runLockStatus.getLeaseExpiresAt()).isGreaterThan(0L);
+
+            // 5) 验证孤儿 Run（projectId 不在 projectRepository）被统一拦截为 PROJECT_NOT_FOUND
+            WorkflowRunEntity orphanRun = new WorkflowRunEntity();
+            orphanRun.setId("run-orphan-" + UUID.randomUUID());
+            orphanRun.setProjectId("proj-missing-" + UUID.randomUUID());
+            orphanRun.setStatus("RUNNING");
+            orphanRun.setCreatedAt(LocalDateTime.now());
+            orphanRun.setUpdatedAt(LocalDateTime.now());
+            workflowRunRepository.save(orphanRun);
+
+            assertThatThrownBy(() -> ownershipVerifier.verifyRunAccess(orphanRun.getId(), ownerId))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                    .isEqualTo(ErrorCode.PROJECT_NOT_FOUND);
+
+            // 6) 验证 ApprovalApplicationService 拒绝未认证/非所有者审查（禁止隐式回退到 system）
+            ApprovalEntity testApproval = new ApprovalEntity(
+                    "appr-" + UUID.randomUUID(), run.getId(), "step-own-1", "PENDING", ownerId
+            );
+            approvalRepository.save(testApproval);
+
+            ApprovalDecisionCommand decisionCmd = new ApprovalDecisionCommand("APPROVED", "LGTM");
+            RequestContext.clear();
+            assertThatThrownBy(() -> approvalApplication.decide(testApproval.getId(), decisionCmd))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                    .isEqualTo(ErrorCode.UNAUTHORIZED);
         } finally {
             accessGuard.setAllowSuperuserBypass(originalBypass);
         }
@@ -412,7 +517,15 @@ class Phase1ModuleConvergenceAndContractTest {
         assertThat(openApiJson.path("paths").has("/api/executions/runs")).isTrue();
         assertThat(openApiJson.path("paths").has("/api/v1/openapi.json")).isTrue();
 
-        // 2) 验证前端 services/api.ts 已拆分为 10 个子模块，且主入口文件收敛在 120 行以内
+        // 2) 运行时 OpenAPI 规范必须包含完整 8 个 tag 且路径集合与快照完全一致
+        MvcResult runtimeOpenApiRes = mockMvc.perform(get("/api/v1/openapi.json").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode runtimeOpenApiJson = objectMapper.readTree(runtimeOpenApiRes.getResponse().getContentAsString());
+        assertThat(runtimeOpenApiJson.path("tags").size()).isEqualTo(8);
+        assertThat(runtimeOpenApiJson.path("paths").size()).isEqualTo(openApiJson.path("paths").size());
+
+        // 3) 验证前端 services/api.ts 已拆分为 10 个子模块，且主入口文件收敛在 120 行以内
         Path frontendSrc = repoRoot.resolve("agenthub-frontend/src");
         Path apiBarrel = frontendSrc.resolve("services/api.ts");
         assertThat(Files.readAllLines(apiBarrel, StandardCharsets.UTF_8).size()).isLessThan(120);
@@ -428,7 +541,7 @@ class Phase1ModuleConvergenceAndContractTest {
                     .isTrue();
         }
 
-        // 3) 验证前端 app/page.tsx 已拆分为 ProjectShell、RunWorkspacePanel、ReviewSidebar、DeploymentPanel 四个组件
+        // 4) 验证前端 app/page.tsx 已拆分为 ProjectShell、RunWorkspacePanel、ReviewSidebar、DeploymentPanel 四个组件
         Path pageTsx = frontendSrc.resolve("app/page.tsx");
         assertThat(Files.readAllLines(pageTsx, StandardCharsets.UTF_8).size()).isLessThan(420);
         for (String shellComp : List.of(
@@ -439,6 +552,24 @@ class Phase1ModuleConvergenceAndContractTest {
                     .as("Frontend dashboard shell component must exist: components/dashboard/%s", shellComp)
                     .isTrue();
         }
+    }
+
+    @Test
+    @DisplayName("6. 限界上下文通用 Marker 契约（ContextCommand / ContextQuery / ContextDomainEvent）实现验证")
+    void shouldEnforceMarkerContractsForCommandsQueriesAndEvents() {
+        // 验证各限界上下文的核心 Command 显式实现 ContextCommand 契约
+        assertThat(ContextCommand.class.isAssignableFrom(CreateProjectCommand.class)).isTrue();
+        assertThat(ContextCommand.class.isAssignableFrom(StartRunCommand.class)).isTrue();
+        assertThat(ContextCommand.class.isAssignableFrom(LoginCommand.class)).isTrue();
+        assertThat(ContextCommand.class.isAssignableFrom(RegisterCommand.class)).isTrue();
+        assertThat(ContextCommand.class.isAssignableFrom(CreateWorkflowDefinitionCommand.class)).isTrue();
+        assertThat(ContextCommand.class.isAssignableFrom(ApprovalDecisionCommand.class)).isTrue();
+        assertThat(ContextCommand.class.isAssignableFrom(ProviderCreateCommand.class)).isTrue();
+        assertThat(ContextCommand.class.isAssignableFrom(CreateDeploymentRequest.class)).isTrue();
+
+        // 验证 Query 与 DomainEvent 契约实现
+        assertThat(ContextQuery.class.isAssignableFrom(PageRequestQuery.class)).isTrue();
+        assertThat(ContextDomainEvent.class.isAssignableFrom(RunEventView.class)).isTrue();
     }
 
     private String registerUserAndGetToken(String email) throws Exception {

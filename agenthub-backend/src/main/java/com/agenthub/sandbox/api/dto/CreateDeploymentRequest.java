@@ -1,12 +1,15 @@
 package com.agenthub.sandbox.api.dto;
 
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
+
 import java.io.Serializable;
 import java.util.Map;
 
 /**
  * Request payload for creating and launching a deployment.
  */
-public class CreateDeploymentRequest implements Serializable {
+public class CreateDeploymentRequest implements Serializable, ContextCommand {
     private static final long serialVersionUID = 1L;
 
     private String projectId;
@@ -27,6 +30,11 @@ public class CreateDeploymentRequest implements Serializable {
         this.projectId = projectId;
         this.target = target;
         this.sandboxType = sandboxType;
+    }
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.SANDBOX;
     }
 
     public String getProjectId() { return projectId; }

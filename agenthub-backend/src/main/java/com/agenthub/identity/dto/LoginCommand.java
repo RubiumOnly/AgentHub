@@ -1,6 +1,9 @@
 package com.agenthub.identity.dto;
 
-public class LoginCommand {
+import com.agenthub.shared.contract.BoundedContext;
+import com.agenthub.shared.contract.ContextCommand;
+
+public class LoginCommand implements ContextCommand {
     private String email;
     private String password;
 
@@ -9,6 +12,11 @@ public class LoginCommand {
     public LoginCommand(String email, String password) {
         this.email = email;
         this.password = password;
+    }
+
+    @Override
+    public BoundedContext boundedContext() {
+        return BoundedContext.IDENTITY;
     }
 
     public String getEmail() { return email; }

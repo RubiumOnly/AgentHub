@@ -50,6 +50,11 @@ export const workflowsApi = {
     return fetchJson<TeamView>(`${API_BASE}/api/teams/${encodeURIComponent(teamId)}`);
   },
 
+  async listTeams(projectId?: string): Promise<TeamView[]> {
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+    return fetchJson<TeamView[]>(`${API_BASE}/api/teams${query}`);
+  },
+
   async listConversations(projectId?: string): Promise<ConversationView[]> {
     const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
     return fetchJson<ConversationView[]>(`${API_BASE}/api/conversations${query}`);

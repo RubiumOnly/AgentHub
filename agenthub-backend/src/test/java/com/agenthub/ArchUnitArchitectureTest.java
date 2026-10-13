@@ -82,9 +82,8 @@ class ArchUnitArchitectureTest {
                 .check(importedClasses);
 
         noClasses().that().haveNameNotMatching("com\\.agenthub\\.execution\\.scheduler\\.ExecutionScheduler(\\$.*)?")
-                .and().doNotHaveFullyQualifiedName("com.agenthub.execution.application.ExecutionApplicationService")
                 .should().dependOnClassesThat().haveNameMatching("com\\.agenthub\\.execution\\.scheduler\\.ExecutionScheduler(\\$.*)?")
-                .because("Deprecated linear ExecutionScheduler is frozen in favor of DagExecutionEngine")
+                .because("Deprecated linear ExecutionScheduler is frozen in favor of DagExecutionEngine and must have zero external callers")
                 .check(importedClasses);
 
         noClasses().that().haveNameNotMatching("com\\.agenthub\\.application\\.service\\.IMCollaborationService(\\$.*)?")
