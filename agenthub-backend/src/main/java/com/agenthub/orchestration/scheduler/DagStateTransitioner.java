@@ -164,7 +164,7 @@ public class DagStateTransitioner {
         CompletableFuture<ApprovalDecisionResult> signal = approvalSignalRegistry.register(approvalId);
 
         try {
-            while (!signal.isDone()) {
+            while (true) {
                 if (cancelToken.isCancelled()) {
                     approvalSignalRegistry.remove(approvalId);
                     return false;
@@ -184,10 +184,19 @@ public class DagStateTransitioner {
                 } catch (TimeoutException ignored) {
                     ApprovalEntity current = approvalRepository.findById(approvalId).orElse(null);
                     if (current != null && !"PENDING".equalsIgnoreCase(current.getStatus())) {
-                        if ("APPROVED".equalsIgnoreCase(current.getStatus())) {
-                            signal.complete(new ApprovalDecisionResult(ApprovalDecision.APPROVED, current.getDecisionReason(), current.getReviewedBy()));
+                        approvalSignalRegistry.remove(approvalId);
+                        boolean isApproved = "APPROVED".equalsIgnoreCase(current.getStatus());
+                        ApprovalDecision decision = isApproved ? ApprovalDecision.APPROVED : ApprovalDecision.REJECTED;
+                        ApprovalDecisionResult fallbackResult = new ApprovalDecisionResult(decision, current.getDecisionReason(), current.getReviewedBy());
+                        signal.complete(fallbackResult);
+                        if (isApproved) {
+                            stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "scheduler", "Approval approved by " + fallbackResult.getReviewer(), null);
+                            stateMachine.transitionStep(stepEntity.getId(), StepRunStatus.RUNNING, "scheduler", "Approval approved by " + fallbackResult.getReviewer(), null);
+                            return true;
                         } else {
-                            signal.complete(new ApprovalDecisionResult(ApprovalDecision.REJECTED, current.getDecisionReason(), current.getReviewedBy()));
+                            stateMachine.transitionStep(stepEntity.getId(), StepRunStatus.FAILED, "scheduler", "Approval rejected: " + fallbackResult.getReason(), null);
+                            stateMachine.transitionRun(runId, WorkflowRunStatus.FAILED, "scheduler", "Approval rejected: " + fallbackResult.getReason(), null);
+                            return false;
                         }
                     }
                 }
@@ -197,6 +206,5 @@ public class DagStateTransitioner {
             approvalSignalRegistry.remove(approvalId);
             return false;
         }
-        return false;
     }
 }
