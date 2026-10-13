@@ -141,6 +141,95 @@
         "responses": { "200": { "description": "Result<WorkspaceLockStatusView>" } }
       }
     },
+    "/api/projects/onboarding/start": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Start 7-step project onboarding wizard and verify source",
+        "responses": { "200": { "description": "Result<OnboardingSessionView>" } }
+      }
+    },
+    "/api/projects/onboarding/{sessionId}/step": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Execute onboarding wizard step",
+        "responses": { "200": { "description": "Result<OnboardingSessionView>" } }
+      }
+    },
+    "/api/projects/onboarding/{sessionId}/retry": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Retry failed onboarding wizard step",
+        "responses": { "200": { "description": "Result<OnboardingSessionView>" } }
+      }
+    },
+    "/api/projects/onboarding/{sessionId}": {
+      "get": {
+        "tags": ["project"],
+        "summary": "Get onboarding wizard session details and audit steps",
+        "responses": { "200": { "description": "Result<OnboardingSessionView>" } }
+      }
+    },
+    "/api/projects/onboarding/{sessionId}/abort": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Abort onboarding and clean up temporary resources",
+        "responses": { "200": { "description": "Result<OnboardingSessionView>" } }
+      }
+    },
+    "/api/projects/onboarding/{sessionId}/complete": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Complete onboarding and finalize project baseline",
+        "responses": { "200": { "description": "Result<ProjectView>" } }
+      }
+    },
+    "/api/projects/{projectId}/context-sources": {
+      "get": {
+        "tags": ["project"],
+        "summary": "List versioned context sources for project",
+        "responses": { "200": { "description": "Result<List<ContextSourceView>>" } }
+      },
+      "post": {
+        "tags": ["project"],
+        "summary": "Register versioned context source with SHA-256 fingerprint",
+        "responses": { "200": { "description": "Result<ContextSourceView>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/resync": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Resync controlled workspace to baseline commit",
+        "responses": { "200": { "description": "Result<WorkspaceView>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/change-baseline": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Change workspace git baseline with user confirmation",
+        "responses": { "200": { "description": "Result<WorkspaceView>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/discard": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Discard uncommitted workspace changes with user confirmation",
+        "responses": { "200": { "description": "Result<WorkspaceView>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/restore-snapshot": {
+      "post": {
+        "tags": ["project"],
+        "summary": "Restore workspace to snapshot commit with user confirmation",
+        "responses": { "200": { "description": "Result<WorkspaceView>" } }
+      }
+    },
+    "/api/workspaces/{workspaceId}/quota": {
+      "get": {
+        "tags": ["project"],
+        "summary": "Get workspace quota capacity, file count, and policy usage",
+        "responses": { "200": { "description": "Result<WorkspaceQuotaUsage>" } }
+      }
+    },
     "/api/workflows/definitions": {
       "get": {
         "tags": ["orchestration"],

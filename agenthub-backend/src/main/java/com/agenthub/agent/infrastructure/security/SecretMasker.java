@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  */
 public final class SecretMasker {
 
-    private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)(sk-[a-zA-Z0-9_-]{8,}|key-[a-zA-Z0-9_-]{8,}|AIza[0-9A-Za-z-_]{35})");
+    private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)(sk-[a-zA-Z0-9_-]{8,}|key-[a-zA-Z0-9_-]{8,}|AIza[0-9A-Za-z-_]{35}|ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{20,})");
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)(Bearer\\s+)([a-zA-Z0-9._-]{8,})");
     private static final Pattern HEADER_API_KEY_PATTERN = Pattern.compile("(?i)((?:x-api-key|x-goog-api-key|api-key):\\s*)([^\\r\\n,;\"'\\s}]+)");
     private static final Pattern QUERY_PARAM_KEY_PATTERN = Pattern.compile("(?i)([?&](?:key|apiKey|token|secret)=)([^&\"'\\s}]+)");

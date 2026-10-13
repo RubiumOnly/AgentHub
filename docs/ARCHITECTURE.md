@@ -71,26 +71,26 @@ Run 创建后冻结 DSL、输入、Provider/Runtime 策略、工作区基线、�
 
 RunEvent 先持久化，再推送给 SSE。客户端使用 `Last-Event-ID` 或游标补回断线期间的事件。当前活跃 SSE 连接、取消令牌和审批唤醒仍有单节点内存部分，多实例广播属于后续阶段能力。
 
-## 5. 工作区、Diff 和部署
+## 5. 受控工作区、安全配额与生命周期运维
 
-Workspace API 只接受服务端 `workspaceId` 与受检相对路径。`DefaultWorkspaceResolver` 阻断绝对路径、目录穿越、符号链接逃逸和受保护目录；JGit 保存基线、快照、结构化 Diff 和回滚记录。并发写入由数据库租约、JVM 锁和 OS 文件锁共同保护。
+Workspace API 只接受服务端 `workspaceId` 与受检相对路径。`DefaultWorkspaceResolver` 与 `GitSourceConfig` 统一阻断绝对路径（盘符、`/etc` 等）、目录穿越、符号链接逃逸和受保护目录；JGit 保存基线、快照、结构化 Diff 和回滚记录。并发写入由数据库租约、JVM 锁和 OS 文件锁共同保护。
 
-Deployment 只能绑定已接受 Artifact 和受控模板，生命周期为：
+在 Phase 2 中，受控工作区实现了完整产品化生命周期与安全策略：
+1. **7 步受控接入向导（Onboarding Wizard）**：不可跳过地依序执行代码源连接、凭据脱敏校验（严禁明文 Token）、默认分支选择、工作区分配与隔离分支、技术栈环境扫描、工程防御规约生成（`PROJECT_RULES.md`）、以及初始 Git 基线确权；支持步骤失败重试与中止回滚；
+2. **工作区安全配额（`WorkspaceQuotaGuard`）**：严格实行单文件写入 10MB、文本预览 2MB、工作区总容量 500MB、文件总数 5000 个、执行超时 3600 秒以及网络访问控制策略，超配额统一触发 `BLOCKED_POLICY (3012)`；
+3. **受控工作区生命周期运维**：提供 `resyncWorkspace`（重同步至基线）、`changeBaseline`（变更基线）、`discardWorkspace`（放弃未提交变更）、`restoreSnapshot`（恢复指定快照）、以及 `getWorkspaceQuota`（实时配额监视）；危险操作强制用户显式确认（`confirmed=true`）并由 `AuthAuditService` 记入审计日志。
 
-```text
-CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING
-                                  |             |
-                                  v             v
-                                FAILED       STOP -> CLEANUP -> STOPPED
-```
-
-只有真实 HTTP 探针通过后才进入 `RUNNING`。Local Process 和 Docker sandbox 都属于受控团队内部预览能力；当前没有 MicroVM、Kubernetes 或公网不可信代码的内核级隔离。
-
-## 6. Agent 和上下文
+## 6. Agent 与版本化上下文源 (Versioned Context Sources)
 
 Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本、健康度和熔断状态选择。Provider、Runtime、工具调用和降级均必须写入 Run 证据；Mock 只能属于明确的 Demo/Test 模式。
 
-长期演进会把 Agent 收敛为版本化 `AgentDefinition` 和 `WorkflowTemplate`：包含目标、工具 allowlist、上下文来源、Token 预算、成本上限、重试、超时和停止条件。上下文来源包括项目规则、AOCI 认知、代码文件、Run 事件摘要和工具输出，均需绑定版本、范围和安全级别。
+在 Phase 2 中，系统建立了不可篡改的版本化上下文源矩阵（`ContextSourceView`），存储于持久化体系中：
+1. `AOCI_COGNITION`：AOCI 软件工程认知基线；
+2. `PROJECT_RULES`：项目工程规约与 DDD 架构分层守卫；
+3. `BUILD_CONFIG`：构建与依赖配置（`pom.xml`, `package.json` 等）；
+4. `TEST_CONVENTIONS`：测试防御矩阵与验证标准。
+
+每个上下文源均计算确定性 SHA-256 内容指纹（`contentFingerprint`），并与创建时的 Git Baseline Commit 强绑定，为后续 Phase 3 Orchestrator 计划生成提供不可篡改的代码与架构事实输入。
 
 ## 7. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
 

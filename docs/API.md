@@ -37,11 +37,23 @@
 - `3003` WORKSPACE_PATH_INVALID：工作区路径格式非法、包含空字节或命中系统保留设备名；
 - `3004` DIRECTORY_TRAVERSAL_FORBIDDEN：工作区路径穿越违规（含符号链接越权）；
 - `3005` GIT_DIRECTORY_MODIFICATION_FORBIDDEN：禁止直接读写 `.git` 内部文件；
+- `2001` PROJECT_NOT_FOUND：目标研发项目不存在；
+- `2002` PROJECT_ACCESS_DENIED：非项目所有者，拒绝越权访问；
+- `2003` ONBOARDING_FAILED：项目接入向导步骤执行失败；
+- `2004` ONBOARDING_SESSION_NOT_FOUND：项目接入会话记录不存在；
+- `2005` CONTEXT_SOURCE_NOT_FOUND：版本化上下文源记录不存在；
+- `3001` WORKSPACE_NOT_FOUND：目标受控代码工作区不存在；
+- `3002` WORKSPACE_LOCKED：工作区当前正处于锁占用状态；
+- `3003` WORKSPACE_PATH_INVALID：非法的工作区相对路径格式或特殊字符；
+- `3004` WORKSPACE_TRAVERSAL_DENIED：尝试进行跨工作区目录穿越或访问宿主绝对路径；
+- `3005` WORKSPACE_GIT_ACCESS_DENIED：禁止直接读写受控工作区内部 `.git` 元数据；
+- `3006` WORKSPACE_GIT_ERROR：JGit 底层操作执行异常；
 - `3007` WORKSPACE_FILE_TOO_LARGE：文件体积超过单文件上限（10MB 写入 / 2MB 预览）；
 - `3008` WORKSPACE_BINARY_PREVIEW_DENIED：二进制文件无法作为纯文本预览；
 - `3009` WORKSPACE_RESERVED_DEVICE_DENIED：命中了系统保留设备名；
 - `3010` ARTIFACT_NOT_FOUND：目标产物记录不存在；
 - `3011` ARTIFACT_REVIEW_INVALID：非法的产物审查或重复回滚操作；
+- `3012` BLOCKED_POLICY：触发受控工作区安全配额或网络策略熔断阻断；
 - `4001` CONVERSATION_NOT_FOUND：协同会话不存在；
 - `4003` CONVERSATION_PERMISSION_DENIED：非当前会话参与者；
 - `4004` MESSAGE_NOT_FOUND：指定消息记录不存在；
@@ -106,18 +118,48 @@
 - `GET /api/projects/{id}/workspace`：获取项目主工作区详情
   - Response: `Result<WorkspaceView>`
 
-### 3. 受控工作区统一文件与租约 API (Controlled Workspace & Lock API)
+#### 2.1 7 步受控项目接入向导 (Project Onboarding Wizard)
+- `POST /api/projects/onboarding/start`：启动受控项目接入向导（Step 1：验证并连接代码源）
+  - Request: `{"projectName": "...", "description": "...", "sourceConfig": {"sourceType": "LOCAL_DIR"|"REMOTE_GIT", "localPath": "...", "remoteUrl": "...", "secretRef": "...", "defaultBranch": "main"}}`
+  - Response: `Result<OnboardingSessionView>`
+- `POST /api/projects/onboarding/{sessionId}/step`：执行向导指定步骤（Step 2~7）
+  - Request: `{"step": "CONNECT_SOURCE"|"VERIFY_PERMISSIONS"|"SELECT_DEFAULT_BRANCH"|"CREATE_WORKSPACE"|"SCAN_ENVIRONMENT"|"GENERATE_PROJECT_RULES"|"CREATE_INITIAL_BASELINE", "selectedBranch": "...", "customRules": "..."}`
+  - Response: `Result<OnboardingSessionView>`
+- `POST /api/projects/onboarding/{sessionId}/retry`：重试失败的向导步骤（`?step=...` 可选）
+  - Response: `Result<OnboardingSessionView>`
+- `GET /api/projects/onboarding/{sessionId}`：查询向导会话状态与各步骤审计执行记录
+  - Response: `Result<OnboardingSessionView>`
+- `POST /api/projects/onboarding/{sessionId}/abort`：中止向导并级联清理受控临时现场与文件目录
+  - Response: `Result<OnboardingSessionView>`
+- `POST /api/projects/onboarding/{sessionId}/complete`：完成向导接入，固化项目与初始基线并返回已就绪的 Project 视图
+  - Response: `Result<ProjectView>`
+
+#### 2.2 版本化上下文源 API (Versioned Context Sources)
+- `GET /api/projects/{projectId}/context-sources`：查询项目绑定的所有版本化上下文源清单（AOCI 认知、项目规约、构建配置、测试规约）
+  - Response: `Result<List<ContextSourceView>>`
+- `POST /api/projects/{projectId}/context-sources`：注册新的版本化上下文源（自动计算 SHA-256 内容指纹并绑定 Git Commit）
+  - Request: `{"sourceType": "TEST_CONVENTIONS", "name": "...", "relativePath": "...", "content": "...", "commitHash": "...", "securityLevel": "INTERNAL"}`
+  - Response: `Result<ContextSourceView>`
+- `GET /api/projects/{projectId}/context-sources/{sourceId}`：获取指定上下文源内容与元数据
+  - Response: `Result<ContextSourceView>`
+
+### 3. 受控工作区统一文件、租约与生命周期 API (Controlled Workspace API)
 - `GET /api/workspaces/{workspaceId}/tree`：递归获取受控工作区文件树（支持相对子目录过滤 `?path=...`，严格忽略 `.git` 内部元数据）；
 - `GET /api/workspaces/{workspaceId}/file?path={relPath}`：读取文件详情（返回 `WorkspaceFileDetailView`，严格限制单文件 2MB 预览上限，提供二进制自动识别与截断标识）；
-- `POST /api/workspaces/{workspaceId}/file`：写入或更新工作区文件（Body: `{"path":"...","content":"..."}`，严格限制单文件 10MB 写入上限，拦截系统保留设备名、NTFS 8.3短名与路径穿越）；
+- `POST /api/workspaces/{workspaceId}/file`：写入或更新工作区文件（Body: `{"path":"...","content":"..."}`，严格限制单文件 10MB 写入上限，执行 WorkspaceQuotaGuard 容量与文件数配额校验）；
 - `POST /api/workspaces/{workspaceId}/file/rename`：安全重命名文件或目录（Body: `{"oldPath":"...","newPath":"..."}`）；
 - `DELETE /api/workspaces/{workspaceId}/file?path={relPath}`：受控删除文件或目录；
 - `GET /api/workspaces/{workspaceId}/download?path={relPath}`：受控下载单文件二进制流或文本内容；
 - `GET /api/workspaces/{workspaceId}/archive`：将工作区受控文件归档打包为 ZIP 压缩包下载（自动排除 `.git` 元数据）；
-- `POST /api/workspaces/{workspaceId}/git/snapshot`：将当前工作区改动提交为 JGit 快照 Commit 并生成待验收 `ArtifactEntity`（强制校验 `runId` 存在性、租户归属权及工作区与项目的绑定关系）；
-- `GET /api/workspaces/{workspaceId}/diff`：获取结构化 Diff 对象（`Result<StructuredDiff>`，包含变更文件数、增减行数、Unified Diff Patch、冲突与二进制状态）；
-- `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁（Body: `{"waitTimeoutMs":3000,"leaseTtlMs":60000}`，锁持有者身份优先从认证上下文提取，支持多节点 DB 表 `workspace_locks` 同步与超时自动回收防死锁）；
-- `POST /api/workspaces/{workspaceId}/lock/renew`：为已持有的工作区租约锁续期（Body: `{"additionalTtlMs":60000}`）；
+- `POST /api/workspaces/{workspaceId}/git/snapshot`：将当前工作区改动提交为 JGit 快照 Commit 并生成待验收 `ArtifactEntity`；
+- `GET /api/workspaces/{workspaceId}/diff`：获取结构化 Diff 对象（`Result<StructuredDiff>`）；
+- `POST /api/workspaces/{workspaceId}/resync`：重新同步工作区至当前基线 Commit，清理脏现场；
+- `POST /api/workspaces/{workspaceId}/change-baseline`：推进或重置受控工作区基线 Commit（Body: `{"targetCommitHash":"...","confirmed":true}`）；
+- `POST /api/workspaces/{workspaceId}/discard`：放弃工作区所有未提交的本地修改并回滚至基线（Body: `{"confirmed":true,"reason":"..."}`）；
+- `POST /api/workspaces/{workspaceId}/restore-snapshot`：恢复至指定的历史快照 Commit 或 Tag（Body: `{"snapshotCommitOrTag":"...","confirmed":true}`）；
+- `GET /api/workspaces/{workspaceId}/quota`：查询工作区配额使用度（已用容量/上限、文件数/上限、执行时间、网络访问策略、当前并发执行数）；
+- `POST /api/workspaces/{workspaceId}/lock/acquire`：申请工作区 Keyed 租约锁；
+- `POST /api/workspaces/{workspaceId}/lock/renew`：为已持有的工作区租约锁续期；
 - `POST /api/workspaces/{workspaceId}/lock/release`：主动释放工作区锁；
 - `GET /api/workspaces/{workspaceId}/lock/status`：查询工作区当前锁定状态与剩余租期。
 

@@ -425,4 +425,101 @@ export interface RunEvidenceBundleView {
   checksum: string;
 }
 
+// ============================================================================
+// Phase 2: Project Onboarding, Controlled Workspace, & Versioned Context Sources
+// ============================================================================
 
+export type GitSourceType = "LOCAL_DIR" | "REMOTE_GIT";
+
+export interface GitSourceConfig {
+  sourceType: GitSourceType;
+  localPath?: string;
+  remoteUrl?: string;
+  secretRef?: string;
+  defaultBranch?: string;
+}
+
+export type OnboardingStep =
+  | "CONNECT_SOURCE"
+  | "VERIFY_PERMISSIONS"
+  | "SELECT_DEFAULT_BRANCH"
+  | "CREATE_WORKSPACE"
+  | "SCAN_ENVIRONMENT"
+  | "GENERATE_PROJECT_RULES"
+  | "CREATE_INITIAL_BASELINE";
+
+export type OnboardingSessionStatus = "IN_PROGRESS" | "COMPLETED" | "FAILED" | "ABORTED";
+
+export type OnboardingStepStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "SKIPPED";
+
+export interface EnvironmentScanResultView {
+  language: string;
+  framework: string;
+  buildTool: string;
+  testFramework?: string;
+  suggestedBuildCommand?: string;
+  suggestedTestCommand?: string;
+  detectedConfigFiles: string[];
+  securityNotice?: string;
+}
+
+export interface OnboardingStepRecordView {
+  step: OnboardingStep;
+  status: OnboardingStepStatus;
+  startedAt?: string;
+  finishedAt?: string;
+  summary?: string;
+  detail?: string;
+  errorMessage?: string;
+}
+
+export interface OnboardingSessionView {
+  sessionId: string;
+  projectId?: string;
+  projectName: string;
+  description?: string;
+  ownerId: string;
+  status: OnboardingSessionStatus;
+  currentStep: OnboardingStep;
+  isolatedBranch?: string;
+  workspaceId?: string;
+  baselineCommit?: string;
+  sourceConfig: GitSourceConfig;
+  scanResult?: EnvironmentScanResultView;
+  generatedRules?: string;
+  steps: OnboardingStepRecordView[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceQuotaUsage {
+  workspaceId: string;
+  currentCapacityBytes: number;
+  maxCapacityBytes: number;
+  currentFilesCount: number;
+  maxFilesCount: number;
+  maxSingleFileSizeBytes: number;
+  currentExecutionDurationSeconds: number;
+  maxExecutionDurationSeconds: number;
+  allowNetworkAccess: boolean;
+  activeConcurrentRuns: number;
+  maxConcurrentRuns: number;
+}
+
+export type ContextSourceType = "AOCI_COGNITION" | "PROJECT_RULES" | "BUILD_CONFIG" | "TEST_CONVENTIONS";
+
+export type ContextSourceSecurityLevel = "PUBLIC" | "INTERNAL" | "RESTRICTED" | "CONFIDENTIAL";
+
+export interface ContextSourceView {
+  id: string;
+  projectId: string;
+  sourceType: ContextSourceType;
+  name: string;
+  relativePath?: string;
+  content: string;
+  contentFingerprint: string;
+  commitHash: string;
+  securityLevel: ContextSourceSecurityLevel;
+  metadata?: Record<string, string>;
+  createdAt: string;
+}

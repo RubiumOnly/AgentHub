@@ -11,12 +11,16 @@ import com.agenthub.domain.workspace.model.FileDiffEntry;
 import com.agenthub.domain.workspace.model.StructuredDiff;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
+import com.agenthub.identity.infrastructure.security.AuthAuditService;
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
 import com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier;
 import com.agenthub.infrastructure.concurrency.WorkspaceLockManager;
+import com.agenthub.project.domain.quota.WorkspaceQuotaPolicy;
+import com.agenthub.project.domain.quota.WorkspaceQuotaUsage;
 import com.agenthub.project.dto.WorkspaceFileDetailView;
 import com.agenthub.project.dto.WorkspaceFileNode;
 import com.agenthub.project.dto.WorkspaceLockStatusView;
+import com.agenthub.project.dto.WorkspaceView;
 import com.agenthub.project.infrastructure.entity.ProjectEntity;
 import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
 import com.agenthub.project.infrastructure.repository.ProjectRepository;
@@ -56,11 +60,13 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     private final WorkspaceLockManager lockManager;
     private final ArtifactApplication artifactApplication;
     private final ResourceOwnershipVerifier ownershipVerifier;
+    private final WorkspaceQuotaGuard quotaGuard;
+    private final AuthAuditService auditService;
 
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
                                        WorkflowEngineService workflowEngineService,
                                        WorkspaceResolver workspaceResolver) {
-        this(gitManager, workflowEngineService, workspaceResolver, null, null, null, null, null, null);
+        this(gitManager, workflowEngineService, workspaceResolver, null, null, null, null, null, null, null, null);
     }
 
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
@@ -69,7 +75,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                                        WorkspaceRepository workspaceRepository,
                                        ProjectRepository projectRepository,
                                        ResourceAccessGuard accessGuard) {
-        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, null, null, null);
+        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, null, null, null, null, null);
     }
 
     public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
@@ -80,7 +86,19 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                                        ResourceAccessGuard accessGuard,
                                        WorkspaceLockManager lockManager,
                                        ArtifactApplication artifactApplication) {
-        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, lockManager, artifactApplication, null);
+        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, lockManager, artifactApplication, null, null, null);
+    }
+
+    public WorkspaceApplicationService(JGitWorkspaceManager gitManager,
+                                       WorkflowEngineService workflowEngineService,
+                                       WorkspaceResolver workspaceResolver,
+                                       WorkspaceRepository workspaceRepository,
+                                       ProjectRepository projectRepository,
+                                       ResourceAccessGuard accessGuard,
+                                       WorkspaceLockManager lockManager,
+                                       ArtifactApplication artifactApplication,
+                                       ResourceOwnershipVerifier ownershipVerifier) {
+        this(gitManager, workflowEngineService, workspaceResolver, workspaceRepository, projectRepository, accessGuard, lockManager, artifactApplication, ownershipVerifier, null, null);
     }
 
     @Autowired
@@ -92,7 +110,9 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                                        @Autowired(required = false) ResourceAccessGuard accessGuard,
                                        @Autowired(required = false) WorkspaceLockManager lockManager,
                                        @Autowired(required = false) ArtifactApplication artifactApplication,
-                                       @Autowired(required = false) ResourceOwnershipVerifier ownershipVerifier) {
+                                       @Autowired(required = false) ResourceOwnershipVerifier ownershipVerifier,
+                                       @Autowired(required = false) WorkspaceQuotaGuard quotaGuard,
+                                       @Autowired(required = false) AuthAuditService auditService) {
         this.gitManager = gitManager;
         this.workflowEngineService = workflowEngineService;
         this.workspaceResolver = workspaceResolver;
@@ -103,6 +123,8 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
         this.artifactApplication = artifactApplication;
         this.ownershipVerifier = ownershipVerifier != null ? ownershipVerifier
                 : (accessGuard != null ? new ResourceOwnershipVerifier(accessGuard, projectRepository, workspaceRepository, null, null, null, null) : null);
+        this.quotaGuard = quotaGuard != null ? quotaGuard : new WorkspaceQuotaGuard();
+        this.auditService = auditService;
     }
 
     @Override
@@ -261,6 +283,13 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
         checkWorkspaceAccess(workspaceIdOrPath);
         validateWriteSize(content);
         Path safeFile = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, relativePath);
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
+
+        byte[] bytes = (content != null) ? content.getBytes(StandardCharsets.UTF_8) : new byte[0];
+        if (quotaGuard != null) {
+            quotaGuard.validateFileWrite(wsRoot, safeFile, bytes, WorkspaceQuotaPolicy.defaultPolicy());
+        }
+
         if (safeFile.getParent() != null && !Files.exists(safeFile.getParent())) {
             Files.createDirectories(safeFile.getParent());
         }
@@ -479,5 +508,108 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                 scanFiles(f, root, nodes);
             }
         }
+    }
+
+    @Override
+    public WorkspaceView resyncWorkspace(String workspaceId) throws Exception {
+        checkWorkspaceAccess(workspaceId);
+        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
+        gitManager.resyncWorkspace(wsRoot.toFile(), entity.getGitBaselineCommit());
+        if (auditService != null) {
+            auditService.record("WORKSPACE_RESYNC", RequestContext.get().getUserId(), null, null,
+                    "Resynced workspace [" + workspaceId + "] to baseline commit [" + entity.getGitBaselineCommit() + "]");
+        }
+        return toWorkspaceView(entity);
+    }
+
+    @Override
+    public WorkspaceView changeBaseline(String workspaceId, String targetCommitHash, boolean confirmed) throws Exception {
+        checkWorkspaceAccess(workspaceId);
+        if (!confirmed) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Baseline change requires explicit user confirmation (confirmed=true)");
+        }
+        if (targetCommitHash == null || targetCommitHash.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Target commit hash must not be blank");
+        }
+        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
+        String committedHash = gitManager.changeBaseline(wsRoot.toFile(), targetCommitHash.trim());
+        entity.setGitBaselineCommit(committedHash);
+        entity.setUpdatedAt(java.time.LocalDateTime.now());
+        workspaceRepository.save(entity);
+        if (auditService != null) {
+            auditService.record("WORKSPACE_CHANGE_BASELINE", RequestContext.get().getUserId(), null, null,
+                    "Changed baseline for workspace [" + workspaceId + "] to commit [" + committedHash + "]");
+        }
+        return toWorkspaceView(entity);
+    }
+
+    @Override
+    public WorkspaceView discardWorkspace(String workspaceId, boolean confirmed, String reason) throws Exception {
+        checkWorkspaceAccess(workspaceId);
+        if (!confirmed) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Discard workspace changes requires explicit user confirmation (confirmed=true)");
+        }
+        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
+        gitManager.discardWorkspaceChanges(wsRoot.toFile(), entity.getGitBaselineCommit());
+        if (auditService != null) {
+            auditService.record("WORKSPACE_DISCARD", RequestContext.get().getUserId(), null, null,
+                    "Discarded changes in workspace [" + workspaceId + "], reason: " + (reason != null ? reason : "user initiated"));
+        }
+        return toWorkspaceView(entity);
+    }
+
+    @Override
+    public WorkspaceView restoreSnapshot(String workspaceId, String snapshotCommitOrTag, boolean confirmed) throws Exception {
+        checkWorkspaceAccess(workspaceId);
+        if (!confirmed) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Restoring snapshot requires explicit user confirmation (confirmed=true)");
+        }
+        if (snapshotCommitOrTag == null || snapshotCommitOrTag.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Snapshot commit hash or tag must not be blank");
+        }
+        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
+        String restoredCommit = gitManager.restoreSnapshot(wsRoot.toFile(), snapshotCommitOrTag.trim());
+        if (auditService != null) {
+            auditService.record("WORKSPACE_RESTORE_SNAPSHOT", RequestContext.get().getUserId(), null, null,
+                    "Restored snapshot in workspace [" + workspaceId + "] to [" + restoredCommit + "]");
+        }
+        return toWorkspaceView(entity);
+    }
+
+    @Override
+    public WorkspaceQuotaUsage getWorkspaceQuota(String workspaceId) {
+        checkWorkspaceAccess(workspaceId);
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
+        int concurrentLocks = (lockManager != null ? lockManager.getLockInfo(workspaceId).map(info -> info.isLocked() ? 1 : 0).orElse(0) : 0);
+        if (quotaGuard != null) {
+            return quotaGuard.computeUsage(workspaceId, wsRoot, WorkspaceQuotaPolicy.defaultPolicy(), concurrentLocks);
+        }
+        return new WorkspaceQuotaUsage(
+                workspaceId, 0L, WorkspaceQuotaPolicy.DEFAULT_MAX_CAPACITY_BYTES,
+                0, WorkspaceQuotaPolicy.DEFAULT_MAX_FILES_COUNT,
+                WorkspaceQuotaPolicy.DEFAULT_MAX_SINGLE_FILE_SIZE_BYTES,
+                0L, WorkspaceQuotaPolicy.DEFAULT_MAX_EXECUTION_DURATION_SECONDS,
+                WorkspaceQuotaPolicy.DEFAULT_ALLOW_NETWORK_ACCESS,
+                concurrentLocks, WorkspaceQuotaPolicy.DEFAULT_MAX_CONCURRENT_LOCKS
+        );
+    }
+
+    private WorkspaceView toWorkspaceView(WorkspaceEntity entity) {
+        return new WorkspaceView(
+                entity.getId(),
+                entity.getProjectId(),
+                entity.getRelativeRoot(),
+                entity.getGitBaselineCommit(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
     }
 }

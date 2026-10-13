@@ -175,10 +175,69 @@ public class WorkspaceController {
         return Result.ok(released);
     }
 
+    public static class ChangeBaselineRequest {
+        public String targetCommitHash;
+        public boolean confirmed = false;
+    }
+
+    public static class DiscardWorkspaceRequest {
+        public boolean confirmed = false;
+        public String reason;
+    }
+
+    public static class RestoreSnapshotRequest {
+        public String snapshotCommitOrTag;
+        public boolean confirmed = false;
+    }
+
     @GetMapping("/{workspaceId}/lock/status")
     public Result<WorkspaceLockStatusView> getLockStatus(
             @PathVariable("workspaceId") String workspaceId) {
         WorkspaceLockStatusView info = workspaceApplication.getLockStatus(workspaceId);
         return Result.ok(info);
+    }
+
+    @PostMapping("/{workspaceId}/resync")
+    public Result<com.agenthub.project.dto.WorkspaceView> resyncWorkspace(
+            @PathVariable("workspaceId") String workspaceId) throws Exception {
+        com.agenthub.project.dto.WorkspaceView view = workspaceApplication.resyncWorkspace(workspaceId);
+        return Result.ok(view);
+    }
+
+    @PostMapping("/{workspaceId}/change-baseline")
+    public Result<com.agenthub.project.dto.WorkspaceView> changeBaseline(
+            @PathVariable("workspaceId") String workspaceId,
+            @RequestBody(required = false) ChangeBaselineRequest req) throws Exception {
+        String target = req != null ? req.targetCommitHash : null;
+        boolean confirmed = req != null && req.confirmed;
+        com.agenthub.project.dto.WorkspaceView view = workspaceApplication.changeBaseline(workspaceId, target, confirmed);
+        return Result.ok(view);
+    }
+
+    @PostMapping("/{workspaceId}/discard")
+    public Result<com.agenthub.project.dto.WorkspaceView> discardWorkspace(
+            @PathVariable("workspaceId") String workspaceId,
+            @RequestBody(required = false) DiscardWorkspaceRequest req) throws Exception {
+        boolean confirmed = req != null && req.confirmed;
+        String reason = req != null ? req.reason : null;
+        com.agenthub.project.dto.WorkspaceView view = workspaceApplication.discardWorkspace(workspaceId, confirmed, reason);
+        return Result.ok(view);
+    }
+
+    @PostMapping("/{workspaceId}/restore-snapshot")
+    public Result<com.agenthub.project.dto.WorkspaceView> restoreSnapshot(
+            @PathVariable("workspaceId") String workspaceId,
+            @RequestBody(required = false) RestoreSnapshotRequest req) throws Exception {
+        String snapshot = req != null ? req.snapshotCommitOrTag : null;
+        boolean confirmed = req != null && req.confirmed;
+        com.agenthub.project.dto.WorkspaceView view = workspaceApplication.restoreSnapshot(workspaceId, snapshot, confirmed);
+        return Result.ok(view);
+    }
+
+    @GetMapping("/{workspaceId}/quota")
+    public Result<com.agenthub.project.domain.quota.WorkspaceQuotaUsage> getWorkspaceQuota(
+            @PathVariable("workspaceId") String workspaceId) {
+        com.agenthub.project.domain.quota.WorkspaceQuotaUsage usage = workspaceApplication.getWorkspaceQuota(workspaceId);
+        return Result.ok(usage);
     }
 }

@@ -57,4 +57,14 @@ public interface WorkspaceApplication {
     WorkspaceLockStatusView getLockStatus(String workspaceId);
 
     WorkflowExecutionResult executeWorkflow(WorkflowDefinition workflow, String workspacePath, String taskPrompt);
+
+    com.agenthub.project.dto.WorkspaceView resyncWorkspace(String workspaceId) throws Exception;
+
+    com.agenthub.project.dto.WorkspaceView changeBaseline(String workspaceId, String targetCommitHash, boolean confirmed) throws Exception;
+
+    com.agenthub.project.dto.WorkspaceView discardWorkspace(String workspaceId, boolean confirmed, String reason) throws Exception;
+
+    com.agenthub.project.dto.WorkspaceView restoreSnapshot(String workspaceId, String snapshotCommitOrTag, boolean confirmed) throws Exception;
+
+    com.agenthub.project.domain.quota.WorkspaceQuotaUsage getWorkspaceQuota(String workspaceId);
 }

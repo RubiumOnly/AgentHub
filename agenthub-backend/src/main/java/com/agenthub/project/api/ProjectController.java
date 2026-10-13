@@ -22,9 +22,20 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectApplication projectApplication;
+    private final com.agenthub.project.application.ProjectOnboardingApplication onboardingApplication;
+    private final com.agenthub.project.application.ContextSourceApplication contextSourceApplication;
 
     public ProjectController(ProjectApplication projectApplication) {
+        this(projectApplication, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ProjectController(ProjectApplication projectApplication,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.project.application.ProjectOnboardingApplication onboardingApplication,
+                             @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.project.application.ContextSourceApplication contextSourceApplication) {
         this.projectApplication = projectApplication;
+        this.onboardingApplication = onboardingApplication;
+        this.contextSourceApplication = contextSourceApplication;
     }
 
     @PostMapping
@@ -91,6 +102,93 @@ public class ProjectController {
     public Result<List<WorkspaceView>> getWorkspaces(@PathVariable("projectId") String projectId) {
         WorkspaceView view = projectApplication.getWorkspaceByProjectId(projectId);
         return Result.ok(List.of(view));
+    }
+
+    // Onboarding Wizard Endpoints
+    @PostMapping("/onboarding/start")
+    public Result<com.agenthub.project.dto.onboarding.OnboardingSessionView> startOnboarding(
+            @RequestBody com.agenthub.project.dto.onboarding.StartOnboardingCommand cmd) {
+        if (onboardingApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Onboarding service unavailable");
+        }
+        return Result.ok(onboardingApplication.startOnboarding(cmd));
+    }
+
+    @PostMapping("/onboarding/{sessionId}/step")
+    public Result<com.agenthub.project.dto.onboarding.OnboardingSessionView> executeOnboardingStep(
+            @PathVariable("sessionId") String sessionId,
+            @RequestBody(required = false) com.agenthub.project.dto.onboarding.ExecuteStepCommand cmd) {
+        if (onboardingApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Onboarding service unavailable");
+        }
+        return Result.ok(onboardingApplication.executeStep(sessionId, cmd));
+    }
+
+    @PostMapping("/onboarding/{sessionId}/retry")
+    public Result<com.agenthub.project.dto.onboarding.OnboardingSessionView> retryOnboardingStep(
+            @PathVariable("sessionId") String sessionId,
+            @RequestParam(value = "step", required = false) com.agenthub.project.domain.onboarding.OnboardingStep step) {
+        if (onboardingApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Onboarding service unavailable");
+        }
+        return Result.ok(onboardingApplication.retryStep(sessionId, step));
+    }
+
+    @GetMapping("/onboarding/{sessionId}")
+    public Result<com.agenthub.project.dto.onboarding.OnboardingSessionView> getOnboardingSession(
+            @PathVariable("sessionId") String sessionId) {
+        if (onboardingApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Onboarding service unavailable");
+        }
+        return Result.ok(onboardingApplication.getSession(sessionId));
+    }
+
+    @PostMapping("/onboarding/{sessionId}/abort")
+    public Result<com.agenthub.project.dto.onboarding.OnboardingSessionView> abortOnboarding(
+            @PathVariable("sessionId") String sessionId) {
+        if (onboardingApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Onboarding service unavailable");
+        }
+        return Result.ok(onboardingApplication.abortOnboarding(sessionId));
+    }
+
+    @PostMapping("/onboarding/{sessionId}/complete")
+    public Result<ProjectView> completeOnboarding(
+            @PathVariable("sessionId") String sessionId) {
+        if (onboardingApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Onboarding service unavailable");
+        }
+        return Result.ok(onboardingApplication.completeOnboarding(sessionId));
+    }
+
+    // Versioned Context Source Endpoints
+    @GetMapping("/{projectId}/context-sources")
+    public Result<List<com.agenthub.project.dto.context.ContextSourceView>> listContextSources(
+            @PathVariable("projectId") String projectId) {
+        if (contextSourceApplication == null) {
+            return Result.ok(List.of());
+        }
+        return Result.ok(contextSourceApplication.listContextSources(projectId));
+    }
+
+    @PostMapping("/{projectId}/context-sources")
+    public Result<com.agenthub.project.dto.context.ContextSourceView> registerContextSource(
+            @PathVariable("projectId") String projectId,
+            @RequestBody com.agenthub.project.dto.context.RegisterContextSourceCommand cmd) {
+        if (contextSourceApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Context source service unavailable");
+        }
+        return Result.ok(contextSourceApplication.registerContextSource(projectId, cmd));
+    }
+
+    @GetMapping("/{projectId}/context-sources/{sourceId}")
+    public Result<com.agenthub.project.dto.context.ContextSourceView> getContextSource(
+            @PathVariable("projectId") String projectId,
+            @PathVariable("sourceId") String sourceId) {
+        if (contextSourceApplication == null) {
+            throw new com.agenthub.shared.exception.BusinessException(com.agenthub.shared.exception.ErrorCode.INTERNAL_SERVER_ERROR, "Context source service unavailable");
+        }
+        return Result.ok(contextSourceApplication.getContextSource(projectId, sourceId));
     }
 
     private String computeProjectEtag(ProjectView view) {

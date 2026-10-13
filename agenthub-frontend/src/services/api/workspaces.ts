@@ -8,6 +8,7 @@ import {
   StructuredDiff,
   WorkspaceFileNode,
   WorkspaceView,
+  WorkspaceQuotaUsage,
 } from "@/types";
 import { API_BASE, fetchJson } from "./errors";
 
@@ -63,5 +64,36 @@ export const workspacesApi = {
     } catch {
       return [];
     }
+  },
+
+  async resyncWorkspace(workspaceId: string): Promise<WorkspaceView> {
+    return fetchJson<WorkspaceView>(`${API_BASE}/api/workspaces/${encodeURIComponent(workspaceId)}/resync`, {
+      method: "POST",
+    });
+  },
+
+  async changeBaseline(workspaceId: string, targetCommitHash: string, confirmed = true): Promise<WorkspaceView> {
+    return fetchJson<WorkspaceView>(`${API_BASE}/api/workspaces/${encodeURIComponent(workspaceId)}/change-baseline`, {
+      method: "POST",
+      body: JSON.stringify({ targetCommitHash, confirmed }),
+    });
+  },
+
+  async discardWorkspace(workspaceId: string, confirmed = true, reason?: string): Promise<WorkspaceView> {
+    return fetchJson<WorkspaceView>(`${API_BASE}/api/workspaces/${encodeURIComponent(workspaceId)}/discard`, {
+      method: "POST",
+      body: JSON.stringify({ confirmed, reason }),
+    });
+  },
+
+  async restoreSnapshot(workspaceId: string, snapshotCommitOrTag: string, confirmed = true): Promise<WorkspaceView> {
+    return fetchJson<WorkspaceView>(`${API_BASE}/api/workspaces/${encodeURIComponent(workspaceId)}/restore-snapshot`, {
+      method: "POST",
+      body: JSON.stringify({ snapshotCommitOrTag, confirmed }),
+    });
+  },
+
+  async getWorkspaceQuota(workspaceId: string): Promise<WorkspaceQuotaUsage> {
+    return fetchJson<WorkspaceQuotaUsage>(`${API_BASE}/api/workspaces/${encodeURIComponent(workspaceId)}/quota`);
   },
 };

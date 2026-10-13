@@ -1,8 +1,15 @@
 package com.agenthub.domain.workspace.service;
 
+import com.agenthub.agent.infrastructure.security.SecretMasker;
 import com.agenthub.domain.workspace.model.FileDiffEntry;
 import com.agenthub.domain.workspace.model.StructuredDiff;
+import com.agenthub.project.domain.source.GitSourceConfig;
+import com.agenthub.project.domain.source.GitSourceType;
+import com.agenthub.project.dto.onboarding.EnvironmentScanResultView;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
@@ -14,6 +21,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -528,6 +536,279 @@ public class JGitWorkspaceManager {
         return null;
     }
 
+    public String cloneOrInitFromSource(File workspaceDir, GitSourceConfig sourceConfig, String branchName, String authorEmail) throws Exception {
+        if (sourceConfig == null) {
+            sourceConfig = new GitSourceConfig();
+        }
+        sourceConfig.validate();
+
+        String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
+        String effectiveBranch = (branchName != null && !branchName.isBlank()) ? branchName : "main";
+
+        if (sourceConfig.getSourceType() == GitSourceType.REMOTE_GIT) {
+            String repoUrl = sourceConfig.getRepoUrl();
+            log.info("Cloning remote Git repository from [{}] into [{}]", SecretMasker.maskUrl(repoUrl), workspaceDir.getAbsolutePath());
+            try {
+                var cloneCmd = Git.cloneRepository()
+                        .setURI(repoUrl)
+                        .setDirectory(workspaceDir)
+                        .setBranch(sourceConfig.getDefaultBranch());
+
+                String secret = SecretMasker.resolveSecret(sourceConfig.getSecretRef(), null, "GITHUB_TOKEN");
+                if (secret != null && !secret.isBlank()) {
+                    cloneCmd.setCredentialsProvider(new UsernamePasswordCredentialsProvider(secret, ""));
+                }
+
+                try (Git git = cloneCmd.call()) {
+                    try {
+                        if (!effectiveBranch.equals(sourceConfig.getDefaultBranch())) {
+                            git.checkout().setCreateBranch(true).setName(effectiveBranch).call();
+                        }
+                        ObjectId head = git.getRepository().resolve("HEAD");
+                        return head != null ? head.getName() : "";
+                    } finally {
+                        closeRepositoryQuietly(git, workspaceDir);
+                    }
+                }
+            } catch (Exception e) {
+                String maskedErr = SecretMasker.maskInText(e.getMessage());
+                log.error("Failed to clone remote repository [{}]: {}", SecretMasker.maskUrl(repoUrl), maskedErr);
+                throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Remote Git clone failed: " + maskedErr);
+            }
+        } else {
+            // LOCAL_DIR
+            initWorkspace(workspaceDir);
+            try (Git git = Git.open(workspaceDir)) {
+                try {
+                    String location = sourceConfig.getLocation();
+                    if (location != null && !location.isBlank()) {
+                        File srcDir = new File(location);
+                        if (!srcDir.isAbsolute()) {
+                            File controlledDir = new File("./data/controlled-sources", location);
+                            if (controlledDir.exists() && controlledDir.isDirectory()) {
+                                copyDirectoryContents(controlledDir, workspaceDir);
+                            }
+                        }
+                    }
+
+                    git.add().addFilepattern(".").call();
+                    Status status = git.status().call();
+                    RevCommit commit;
+                    if (!status.isClean()) {
+                        commit = git.commit()
+                                .setMessage("Initial onboarded baseline from " + sourceConfig.getMaskedIdentifier())
+                                .setAuthor(DEFAULT_AUTHOR, author)
+                                .call();
+                    } else {
+                        ObjectId head = git.getRepository().resolve("HEAD");
+                        try (RevWalk rw = new RevWalk(git.getRepository())) {
+                            commit = rw.parseCommit(head);
+                        }
+                    }
+
+                    if (!"main".equals(effectiveBranch) && !"master".equals(effectiveBranch)) {
+                        try {
+                            git.checkout().setCreateBranch(true).setName(effectiveBranch).call();
+                        } catch (Exception ignored) {}
+                    }
+
+                    String tagName = "tag-onboard-baseline-" + commit.getName().substring(0, Math.min(8, commit.getName().length()));
+                    try {
+                        git.tag().setName(tagName).setObjectId(commit).call();
+                    } catch (Exception ignored) {}
+
+                    return commit.getName();
+                } finally {
+                    closeRepositoryQuietly(git, workspaceDir);
+                }
+            }
+        }
+    }
+
+    public EnvironmentScanResultView scanEnvironment(File workspaceDir) {
+        if (workspaceDir == null || !workspaceDir.exists()) {
+            return new EnvironmentScanResultView("Unknown", "Generic", "None", "None", "", "", List.of());
+        }
+
+        List<String> detectedFiles = new ArrayList<>();
+        File pomFile = new File(workspaceDir, "pom.xml");
+        File gradleFile = new File(workspaceDir, "build.gradle");
+        File pkgFile = new File(workspaceDir, "package.json");
+        File reqFile = new File(workspaceDir, "requirements.txt");
+        File goFile = new File(workspaceDir, "go.mod");
+
+        if (pomFile.exists()) detectedFiles.add("pom.xml");
+        if (gradleFile.exists()) detectedFiles.add("build.gradle");
+        if (pkgFile.exists()) detectedFiles.add("package.json");
+        if (reqFile.exists()) detectedFiles.add("requirements.txt");
+        if (goFile.exists()) detectedFiles.add("go.mod");
+
+        if (pomFile.exists()) {
+            boolean isSpring = false;
+            try {
+                String pomContent = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
+                isSpring = pomContent.contains("spring-boot");
+            } catch (Exception ignored) {}
+            return new EnvironmentScanResultView(
+                    "Java 17+",
+                    isSpring ? "Spring Boot 3.x" : "Java Maven Project",
+                    "Maven",
+                    "JUnit 5",
+                    "mvn clean package -DskipTests",
+                    "mvn test",
+                    detectedFiles
+            );
+        } else if (gradleFile.exists()) {
+            return new EnvironmentScanResultView(
+                    "Java/Kotlin",
+                    "Gradle Project",
+                    "Gradle",
+                    "JUnit",
+                    "./gradlew build -x test",
+                    "./gradlew test",
+                    detectedFiles
+            );
+        } else if (pkgFile.exists()) {
+            boolean isNext = false;
+            try {
+                String pkgContent = Files.readString(pkgFile.toPath(), StandardCharsets.UTF_8);
+                isNext = pkgContent.contains("next");
+            } catch (Exception ignored) {}
+            return new EnvironmentScanResultView(
+                    "TypeScript / JavaScript",
+                    isNext ? "Next.js 14+" : "Node.js Application",
+                    "npm",
+                    "Jest / Vitest",
+                    "npm run build",
+                    "npm test",
+                    detectedFiles
+            );
+        } else if (reqFile.exists()) {
+            return new EnvironmentScanResultView(
+                    "Python 3.x",
+                    "Python Application",
+                    "pip",
+                    "pytest",
+                    "pip install -r requirements.txt",
+                    "pytest",
+                    detectedFiles
+            );
+        } else if (goFile.exists()) {
+            return new EnvironmentScanResultView(
+                    "Go",
+                    "Go Module",
+                    "go build",
+                    "go test",
+                    "go build ./...",
+                    "go test ./...",
+                    detectedFiles
+            );
+        }
+
+        return new EnvironmentScanResultView(
+                "General Software",
+                "Standard Repository",
+                "Custom",
+                "Custom",
+                "",
+                "",
+                detectedFiles
+        );
+    }
+
+    public void resyncWorkspace(File workspaceDir, String baselineCommit) throws Exception {
+        initWorkspace(workspaceDir);
+        try (Git git = Git.open(workspaceDir)) {
+            try {
+                Repository repo = git.getRepository();
+                String target = (baselineCommit != null && !baselineCommit.isBlank()) ? baselineCommit : "HEAD";
+                ObjectId commitId = repo.resolve(target);
+                if (commitId == null) {
+                    throw new BusinessException(ErrorCode.WORKSPACE_GIT_ERROR, "Baseline commit not found: " + target);
+                }
+                git.reset().setMode(ResetType.HARD).setRef(target).call();
+                git.clean().setCleanDirectories(true).setForce(true).call();
+                log.info("Resynced workspace [{}] to commit [{}]", workspaceDir.getAbsolutePath(), target);
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
+        }
+    }
+
+    public String changeBaseline(File workspaceDir, String targetCommitHash) throws Exception {
+        initWorkspace(workspaceDir);
+        try (Git git = Git.open(workspaceDir)) {
+            try {
+                Repository repo = git.getRepository();
+                ObjectId commitId = repo.resolve(targetCommitHash);
+                if (commitId == null || !repo.hasObject(commitId)) {
+                    throw new BusinessException(ErrorCode.WORKSPACE_GIT_ERROR, "Target baseline commit not found: " + targetCommitHash);
+                }
+                RevCommit commit;
+                try (RevWalk rw = new RevWalk(repo)) {
+                    commit = rw.parseCommit(commitId);
+                }
+                git.reset().setMode(ResetType.HARD).setRef(targetCommitHash).call();
+                git.clean().setCleanDirectories(true).setForce(true).call();
+
+                String tagName = "tag-baseline-" + targetCommitHash.substring(0, Math.min(8, targetCommitHash.length()));
+                try {
+                    git.tag().setName(tagName).setObjectId(commit).setForceUpdate(true).call();
+                } catch (Exception ignored) {}
+                log.info("Changed baseline in workspace [{}] to commit [{}]", workspaceDir.getAbsolutePath(), targetCommitHash);
+                return commit.getName();
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
+        }
+    }
+
+    public void discardWorkspaceChanges(File workspaceDir, String baselineCommit) throws Exception {
+        resyncWorkspace(workspaceDir, baselineCommit);
+    }
+
+    public String restoreSnapshot(File workspaceDir, String snapshotCommitOrTag) throws Exception {
+        initWorkspace(workspaceDir);
+        try (Git git = Git.open(workspaceDir)) {
+            try {
+                Repository repo = git.getRepository();
+                ObjectId commitId = repo.resolve(snapshotCommitOrTag);
+                if (commitId == null || !repo.hasObject(commitId)) {
+                    throw new BusinessException(ErrorCode.WORKSPACE_GIT_ERROR, "Snapshot commit or tag not found: " + snapshotCommitOrTag);
+                }
+                RevCommit commit;
+                try (RevWalk rw = new RevWalk(repo)) {
+                    commit = rw.parseCommit(commitId);
+                }
+                git.reset().setMode(ResetType.HARD).setRef(snapshotCommitOrTag).call();
+                git.clean().setCleanDirectories(true).setForce(true).call();
+                log.info("Restored snapshot in workspace [{}] to [{}]", workspaceDir.getAbsolutePath(), snapshotCommitOrTag);
+                return commit.getName();
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
+        }
+    }
+
+    private void copyDirectoryContents(File sourceDir, File targetDir) {
+        if (!sourceDir.exists() || !sourceDir.isDirectory()) return;
+        if (!targetDir.exists()) targetDir.mkdirs();
+
+        File[] files = sourceDir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.getName().equalsIgnoreCase(".git")) continue;
+            File dest = new File(targetDir, f.getName());
+            if (f.isDirectory()) {
+                copyDirectoryContents(f, dest);
+            } else {
+                try {
+                    Files.copy(f.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
     public static String calculateFileChecksum(Path path) {
         if (!Files.exists(path) || Files.isDirectory(path)) {
             return "";
@@ -590,9 +871,18 @@ public class JGitWorkspaceManager {
 
     private void closeRepositoryQuietly(Git git, File workspaceDir) {
         try {
-            if (git != null && git.getRepository() != null && git.getRepository().getObjectDatabase() != null) {
-                git.getRepository().getObjectDatabase().close();
+            if (git != null) {
+                if (git.getRepository() != null) {
+                    if (git.getRepository().getObjectDatabase() != null) {
+                        git.getRepository().getObjectDatabase().close();
+                    }
+                    git.getRepository().close();
+                }
+                git.close();
             }
+        } catch (Exception ignored) {}
+        try {
+            org.eclipse.jgit.lib.RepositoryCache.clear();
         } catch (Exception ignored) {}
         try {
             new org.eclipse.jgit.storage.file.WindowCacheConfig().install();

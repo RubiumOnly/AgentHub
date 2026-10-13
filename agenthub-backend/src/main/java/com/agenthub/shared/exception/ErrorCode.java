@@ -22,6 +22,9 @@ public enum ErrorCode {
     // Project & Workspace
     PROJECT_NOT_FOUND(2001, "Project not found"),
     PROJECT_ACCESS_DENIED(2002, "Access to project denied"),
+    ONBOARDING_FAILED(2003, "Project onboarding step failed"),
+    ONBOARDING_SESSION_NOT_FOUND(2004, "Project onboarding session not found"),
+    CONTEXT_SOURCE_NOT_FOUND(2005, "Context source not found"),
     WORKSPACE_NOT_FOUND(3001, "Workspace not found"),
     WORKSPACE_LOCKED(3002, "Workspace is Currently Locked by Another Task"),
     WORKSPACE_PATH_INVALID(3003, "Invalid workspace path format or illegal characters"),
@@ -31,6 +34,7 @@ public enum ErrorCode {
     WORKSPACE_FILE_TOO_LARGE(3007, "File size exceeds allowed limit"),
     WORKSPACE_BINARY_PREVIEW_DENIED(3008, "Binary file cannot be previewed as text"),
     WORKSPACE_RESERVED_DEVICE_DENIED(3009, "Device file name is not allowed"),
+    BLOCKED_POLICY(3012, "Operation blocked by workspace security quota or execution policy"),
 
     // Audit & Artifacts
     ARTIFACT_NOT_FOUND(3010, "Artifact not found"),
