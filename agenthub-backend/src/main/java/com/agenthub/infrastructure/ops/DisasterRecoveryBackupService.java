@@ -417,11 +417,13 @@ public class DisasterRecoveryBackupService {
         boolean schemaVersionVerified = Objects.equals(manifest.flywaySchemaVersion, currentFlywayVersion);
 
         boolean sampledRunsVerified = true;
+        String mismatchDetails = null;
         for (Map.Entry<String, String> sample : manifest.sampledRunFingerprints.entrySet()) {
             String runId = sample.getKey();
             WorkflowRunEntity restoredRun = workflowRunRepository.findById(runId).orElse(null);
             if (restoredRun == null) {
                 sampledRunsVerified = false;
+                mismatchDetails = "Run not found in database: " + runId;
                 break;
             }
             long stepCount = stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId).size();
@@ -432,12 +434,15 @@ public class DisasterRecoveryBackupService {
                     .getBytes(StandardCharsets.UTF_8));
             if (!actualFingerprint.equalsIgnoreCase(sample.getValue())) {
                 sampledRunsVerified = false;
+                mismatchDetails = String.format("Fingerprint mismatch for run [%s]: expected [%s], actual [%s] (status=%s, steps=%d, events=%d, artifacts=%d)",
+                        runId, sample.getValue(), actualFingerprint, restoredRun.getStatus(), stepCount, eventCount, artifactCount);
+                log.warn(mismatchDetails);
                 break;
             }
         }
 
         if (!sampledRunsVerified) {
-            throw new IllegalStateException("Post-restore sampled Run verification failed!");
+            throw new IllegalStateException("Post-restore sampled Run verification failed! " + (mismatchDetails != null ? mismatchDetails : ""));
         }
 
         long restoreDurationMs = Math.max(1L, (System.nanoTime() - startNs) / 1_000_000L);

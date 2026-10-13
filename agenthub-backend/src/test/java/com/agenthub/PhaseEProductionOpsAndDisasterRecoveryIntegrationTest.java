@@ -507,6 +507,14 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
         Path restoredWorkspaceRoot = tempDir.resolve("restored-workspaces");
         String passphrase = "ProdBackupPassphrase#2026_AES256GCM!";
 
+        // 0. 确保灾备演练开始前数据库与运行时处于干净已知基线，避免跨测试异步残余数据干扰
+        approvalRepository.deleteAll();
+        deploymentRepository.deleteAll();
+        artifactRepository.deleteAll();
+        runEventRepository.deleteAll();
+        stepRunRepository.deleteAll();
+        workflowRunRepository.deleteAll();
+
         // 1. 创建真实项目、工作区文件、JGit 快照、Run、Step、Event、Artifact 与 Deployment
         ProjectView project = projectApplication.createProject(
                 new CreateProjectCommand("PhaseE-DR-Project", "灾备备份还原验证项目", null));
@@ -599,6 +607,16 @@ public class PhaseEProductionOpsAndDisasterRecoveryIntegrationTest {
         Path restoredSourceFile = restoredWorkspaceRoot.resolve(workspaceId).resolve("src/DeliveryApp.java");
         assertThat(Files.exists(restoredSourceFile)).isTrue();
         assertThat(Files.readString(restoredSourceFile, StandardCharsets.UTF_8)).isEqualTo(expectedSourceCode);
+
+        // 6. 清理还原后的演练记录，保持测试环境整洁
+        try {
+            artifactRepository.deleteById(artifact.getId());
+            runEventRepository.deleteAll(runEventRepository.findByRunIdOrderBySequenceNumAsc(runId));
+            stepRunRepository.deleteAll(stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId));
+            workflowRunRepository.deleteById(runId);
+            workspaceRepository.deleteById(workspaceId);
+            projectRepository.deleteById(projectId);
+        } catch (Exception ignored) {}
     }
 
     // =========================================================================

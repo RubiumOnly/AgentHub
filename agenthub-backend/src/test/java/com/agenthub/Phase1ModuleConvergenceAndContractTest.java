@@ -16,6 +16,8 @@ import com.agenthub.sandbox.infrastructure.repository.DeploymentRepository;
 import com.agenthub.agent.dto.ProviderCreateCommand;
 import com.agenthub.execution.dto.RunEventView;
 import com.agenthub.execution.infrastructure.entity.WorkflowRunEntity;
+import com.agenthub.execution.infrastructure.repository.RunEventRepository;
+import com.agenthub.execution.infrastructure.repository.StepRunRepository;
 import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
 import com.agenthub.identity.dto.LoginCommand;
 import com.agenthub.identity.dto.RegisterCommand;
@@ -26,7 +28,10 @@ import com.agenthub.orchestration.infrastructure.entity.ApprovalEntity;
 import com.agenthub.orchestration.infrastructure.repository.ApprovalRepository;
 import com.agenthub.project.application.WorkspaceApplication;
 import com.agenthub.project.dto.WorkspaceLockStatusView;
+import com.agenthub.project.infrastructure.repository.ProjectRepository;
+import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
 import com.agenthub.sandbox.api.dto.CreateDeploymentRequest;
+import java.util.ArrayList;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.contract.ApiContractHeaders;
 import com.agenthub.shared.contract.BoundedContext;
@@ -132,6 +137,21 @@ class Phase1ModuleConvergenceAndContractTest {
     @Autowired
     private ApprovalRepository approvalRepository;
 
+    @Autowired
+    private ProjectRepository projectRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private StepRunRepository stepRunRepository;
+
+    @Autowired
+    private RunEventRepository runEventRepository;
+
+    private final List<String> createdRunIds = new ArrayList<>();
+    private final List<String> createdProjectIds = new ArrayList<>();
+
     @BeforeEach
     void setUp() {
         RequestContext.clear();
@@ -141,6 +161,27 @@ class Phase1ModuleConvergenceAndContractTest {
     @AfterEach
     void tearDown() {
         RequestContext.clear();
+        for (String runId : createdRunIds) {
+            try {
+                executionApplication.cancelRun(runId, "test tearDown");
+            } catch (Exception ignored) {}
+            try {
+                runEventRepository.deleteAll(runEventRepository.findByRunIdOrderBySequenceNumAsc(runId));
+                stepRunRepository.deleteAll(stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId));
+                artifactRepository.deleteAll(artifactRepository.findByRunId(runId));
+                workflowRunRepository.deleteById(runId);
+            } catch (Exception ignored) {}
+        }
+        createdRunIds.clear();
+
+        for (String projId : createdProjectIds) {
+            try {
+                deploymentRepository.deleteAll(deploymentRepository.findByProjectIdOrderByStartedAtDesc(projId));
+                workspaceRepository.findByProjectId(projId).ifPresent(workspaceRepository::delete);
+                projectRepository.deleteById(projId);
+            } catch (Exception ignored) {}
+        }
+        createdProjectIds.clear();
     }
 
     @Test
@@ -233,6 +274,7 @@ class Phase1ModuleConvergenceAndContractTest {
 
         JsonNode projNode = objectMapper.readTree(createProjRes.getResponse().getContentAsString()).path("data");
         String projectId = projNode.path("id").asText();
+        createdProjectIds.add(projectId);
         String initialEtag = createProjRes.getResponse().getHeader(ApiContractHeaders.HEADER_ETAG);
         assertThat(initialEtag).startsWith("W/\"proj-");
 
@@ -286,6 +328,7 @@ class Phase1ModuleConvergenceAndContractTest {
                 .andReturn();
 
         String runId1 = objectMapper.readTree(runRes1.getResponse().getContentAsString()).path("data").path("id").asText();
+        createdRunIds.add(runId1);
         String runId2 = objectMapper.readTree(runRes2.getResponse().getContentAsString()).path("data").path("id").asText();
         assertThat(runId1).isNotBlank().isEqualTo(runId2);
 
@@ -388,6 +431,7 @@ class Phase1ModuleConvergenceAndContractTest {
         createCmd.setDescription("Unified ownership verifier test");
         ProjectView project = projectApplication.createProject(createCmd);
         String projectId = project.getId();
+        createdProjectIds.add(projectId);
         String workspaceId = project.getWorkspaceId();
 
         StartRunCommand runCmd = new StartRunCommand();
@@ -395,6 +439,7 @@ class Phase1ModuleConvergenceAndContractTest {
         runCmd.setDefinitionId("wf-enterprise-auth-delivery");
         runCmd.setIdempotencyKey("own-idem-" + UUID.randomUUID());
         WorkflowRunView run = executionApplication.startRun(runCmd);
+        createdRunIds.add(run.getId());
 
         ArtifactEntity artifact = new ArtifactEntity();
         artifact.setId("art-" + UUID.randomUUID());
@@ -418,6 +463,19 @@ class Phase1ModuleConvergenceAndContractTest {
         deployment.setCreatedAt(LocalDateTime.now());
         deployment.setUpdatedAt(LocalDateTime.now());
         deploymentRepository.save(deployment);
+
+        ApprovalEntity testApproval = new ApprovalEntity(
+                "appr-" + UUID.randomUUID(), run.getId(), "step-own-1", "PENDING", ownerId
+        );
+        approvalRepository.save(testApproval);
+
+        WorkflowRunEntity orphanRun = new WorkflowRunEntity();
+        orphanRun.setId("run-orphan-" + UUID.randomUUID());
+        orphanRun.setProjectId("proj-missing-" + UUID.randomUUID());
+        orphanRun.setStatus("RUNNING");
+        orphanRun.setCreatedAt(LocalDateTime.now());
+        orphanRun.setUpdatedAt(LocalDateTime.now());
+        workflowRunRepository.save(orphanRun);
 
         boolean originalBypass = accessGuard.isAllowSuperuserBypass();
         accessGuard.setAllowSuperuserBypass(false);
@@ -472,25 +530,12 @@ class Phase1ModuleConvergenceAndContractTest {
             assertThat(runLockStatus.getLeaseExpiresAt()).isGreaterThan(0L);
 
             // 5) 验证孤儿 Run（projectId 不在 projectRepository）被统一拦截为 PROJECT_NOT_FOUND
-            WorkflowRunEntity orphanRun = new WorkflowRunEntity();
-            orphanRun.setId("run-orphan-" + UUID.randomUUID());
-            orphanRun.setProjectId("proj-missing-" + UUID.randomUUID());
-            orphanRun.setStatus("RUNNING");
-            orphanRun.setCreatedAt(LocalDateTime.now());
-            orphanRun.setUpdatedAt(LocalDateTime.now());
-            workflowRunRepository.save(orphanRun);
-
             assertThatThrownBy(() -> ownershipVerifier.verifyRunAccess(orphanRun.getId(), ownerId))
                     .isInstanceOf(BusinessException.class)
                     .extracting(ex -> ((BusinessException) ex).getErrorCode())
                     .isEqualTo(ErrorCode.PROJECT_NOT_FOUND);
 
             // 6) 验证 ApprovalApplicationService 拒绝未认证/非所有者审查（禁止隐式回退到 system）
-            ApprovalEntity testApproval = new ApprovalEntity(
-                    "appr-" + UUID.randomUUID(), run.getId(), "step-own-1", "PENDING", ownerId
-            );
-            approvalRepository.save(testApproval);
-
             ApprovalDecisionCommand decisionCmd = new ApprovalDecisionCommand("APPROVED", "LGTM");
             RequestContext.clear();
             assertThatThrownBy(() -> approvalApplication.decide(testApproval.getId(), decisionCmd))
@@ -499,6 +544,12 @@ class Phase1ModuleConvergenceAndContractTest {
                     .isEqualTo(ErrorCode.UNAUTHORIZED);
         } finally {
             accessGuard.setAllowSuperuserBypass(originalBypass);
+            try {
+                workflowRunRepository.deleteById(orphanRun.getId());
+                approvalRepository.deleteById(testApproval.getId());
+                deploymentRepository.deleteById(deployment.getId());
+                artifactRepository.deleteById(artifact.getId());
+            } catch (Exception ignored) {}
         }
     }
 
