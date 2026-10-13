@@ -58,7 +58,7 @@ public class ContextSourceApplicationService implements ContextSourceApplication
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ContextSourceView> listContextSources(String projectId) {
         ownershipVerifier.verifyProjectAccess(projectId);
         List<ContextSourceView> results = new ArrayList<>();
@@ -127,11 +127,13 @@ public class ContextSourceApplicationService implements ContextSourceApplication
 
         String content = cmd.getContent() != null ? cmd.getContent() : "";
         String fingerprint = JGitWorkspaceManager.calculateBytesChecksum(content.getBytes(StandardCharsets.UTF_8));
-        String sourceId = "ctx-" + UUID.randomUUID().toString().substring(0, 8);
+        String targetPathOrRef = cmd.getFilePath() != null && !cmd.getFilePath().isBlank()
+                ? cmd.getFilePath() : cmd.getSourceType().name();
 
         Map<String, String> meta = new LinkedHashMap<>();
         meta.put("name", cmd.getName());
-        meta.put("filePath", cmd.getFilePath() != null ? cmd.getFilePath() : "");
+        meta.put("filePath", targetPathOrRef);
+        meta.put("workspaceId", workspaceId);
         meta.put("sourceType", cmd.getSourceType().name());
         meta.put("securityLevel", cmd.getSecurityLevel().name());
         meta.put("content", content);
@@ -146,18 +148,37 @@ public class ContextSourceApplicationService implements ContextSourceApplication
             metaJson = "{}";
         }
 
+        String sourceId = "ctx-" + UUID.randomUUID().toString().substring(0, 8);
         if (artifactRepository != null) {
-            ArtifactEntity entity = new ArtifactEntity(
-                    sourceId,
-                    projectId,
-                    commitHash,
-                    "CONTEXT_SOURCE",
-                    cmd.getFilePath() != null ? cmd.getFilePath() : cmd.getSourceType().name(),
-                    fingerprint,
-                    metaJson
-            );
-            entity.setReviewStatus("ACCEPTED");
-            artifactRepository.save(entity);
+            List<ArtifactEntity> existingList = artifactRepository.findByRunIdAndArtifactType(projectId, "CONTEXT_SOURCE");
+            ArtifactEntity existingEntity = null;
+            for (ArtifactEntity e : existingList) {
+                if (targetPathOrRef.equalsIgnoreCase(e.getPathOrRef())) {
+                    existingEntity = e;
+                    break;
+                }
+            }
+
+            if (existingEntity != null) {
+                sourceId = existingEntity.getId();
+                existingEntity.setChecksum(fingerprint);
+                existingEntity.setStepRunId(commitHash);
+                existingEntity.setMetadataJson(metaJson);
+                existingEntity.setReviewedAt(LocalDateTime.now());
+                artifactRepository.save(existingEntity);
+            } else {
+                ArtifactEntity entity = new ArtifactEntity(
+                        sourceId,
+                        projectId,
+                        commitHash,
+                        "CONTEXT_SOURCE",
+                        targetPathOrRef,
+                        fingerprint,
+                        metaJson
+                );
+                entity.setReviewStatus("ACCEPTED");
+                artifactRepository.save(entity);
+            }
         }
 
         ContextSourceView view = new ContextSourceView(
@@ -176,7 +197,10 @@ public class ContextSourceApplicationService implements ContextSourceApplication
                 meta
         );
 
-        memoryCache.computeIfAbsent(projectId, k -> new ArrayList<>()).add(view);
+        List<ContextSourceView> cachedList = memoryCache.computeIfAbsent(projectId, k -> new ArrayList<>());
+        cachedList.removeIf(v -> v.getId().equals(view.getId()) || (view.getFilePath() != null && view.getFilePath().equalsIgnoreCase(v.getFilePath())));
+        cachedList.add(view);
+
         log.info("Registered versioned ContextSource [{}] type=[{}] for project [{}] commit=[{}] fingerprint=[{}]",
                 sourceId, cmd.getSourceType(), projectId, commitHash, fingerprint);
         return view;
@@ -195,18 +219,24 @@ public class ContextSourceApplicationService implements ContextSourceApplication
                 return list;
             }
 
-            // 1. Discover Project Rules (PROJECT_RULES.md or AGENTS.md)
+            // 1. Discover Project Rules (PROJECT_RULES.md or fallback to AGENTS.md)
             Path rulesFile = wsRoot.resolve("PROJECT_RULES.md");
+            String rulesFileName = "PROJECT_RULES.md";
+            if (!Files.exists(rulesFile)) {
+                rulesFile = wsRoot.resolve("AGENTS.md");
+                rulesFileName = "AGENTS.md";
+            }
+
             if (Files.exists(rulesFile)) {
                 String content = Files.readString(rulesFile, StandardCharsets.UTF_8);
                 RegisterContextSourceCommand cmd = new RegisterContextSourceCommand(
                         ContextSourceType.PROJECT_RULES,
-                        "Project Engineering Rules",
-                        "PROJECT_RULES.md",
+                        "Project Engineering Rules (" + rulesFileName + ")",
+                        rulesFileName,
                         content,
                         commitHash,
                         SecurityLevel.INTERNAL,
-                        Map.of("category", "engineering_rules")
+                        Map.of("category", "engineering_rules", "manifest", rulesFileName)
                 );
                 list.add(registerContextSource(projectId, cmd));
             }
@@ -283,10 +313,17 @@ public class ContextSourceApplicationService implements ContextSourceApplication
             } catch (Exception ignored) {}
         }
 
+        String workspaceId = meta.getOrDefault("workspaceId", "");
+        if (workspaceId.isBlank() && workspaceRepository != null) {
+            workspaceId = workspaceRepository.findByProjectId(projectId)
+                    .map(WorkspaceEntity::getId)
+                    .orElse("");
+        }
+
         return new ContextSourceView(
                 entity.getId(),
                 projectId,
-                "",
+                workspaceId,
                 type,
                 name,
                 filePath,

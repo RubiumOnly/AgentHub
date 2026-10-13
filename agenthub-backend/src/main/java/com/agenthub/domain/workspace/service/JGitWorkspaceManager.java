@@ -636,20 +636,46 @@ public class JGitWorkspaceManager {
         File pkgFile = new File(workspaceDir, "package.json");
         File reqFile = new File(workspaceDir, "requirements.txt");
         File goFile = new File(workspaceDir, "go.mod");
+        File submodulesFile = new File(workspaceDir, ".gitmodules");
 
         if (pomFile.exists()) detectedFiles.add("pom.xml");
         if (gradleFile.exists()) detectedFiles.add("build.gradle");
         if (pkgFile.exists()) detectedFiles.add("package.json");
         if (reqFile.exists()) detectedFiles.add("requirements.txt");
         if (goFile.exists()) detectedFiles.add("go.mod");
+        if (submodulesFile.exists()) detectedFiles.add(".gitmodules");
 
-        if (pomFile.exists()) {
+        // Subdirectory check for multi-module/monorepo structures if root has no primary manifest
+        if (!pomFile.exists() && !gradleFile.exists() && !pkgFile.exists() && !reqFile.exists() && !goFile.exists()) {
+            File[] subDirs = workspaceDir.listFiles(f -> f.isDirectory() && !f.getName().startsWith(".") && !Files.isSymbolicLink(f.toPath()));
+            if (subDirs != null) {
+                for (File sub : subDirs) {
+                    if (sub.getName().equalsIgnoreCase("target") || sub.getName().equalsIgnoreCase("node_modules")) continue;
+                    File sPom = new File(sub, "pom.xml");
+                    File sPkg = new File(sub, "package.json");
+                    File sGradle = new File(sub, "build.gradle");
+                    if (sPom.exists()) detectedFiles.add(sub.getName() + "/pom.xml");
+                    if (sPkg.exists()) detectedFiles.add(sub.getName() + "/package.json");
+                    if (sGradle.exists()) detectedFiles.add(sub.getName() + "/build.gradle");
+                }
+            }
+        }
+
+        String securityNotice = "安全须知：扫描结果仅供参考，系统严禁自动执行未知构建命令，需用户审查确认。";
+        if (submodulesFile.exists()) {
+            securityNotice += " 检测到 Git 子模块 (.gitmodules)，受控工作区默认禁用自动递归克隆以防 SSRF 攻击。";
+        }
+
+        EnvironmentScanResultView view;
+        if (pomFile.exists() || detectedFiles.stream().anyMatch(f -> f.endsWith("/pom.xml"))) {
             boolean isSpring = false;
             try {
-                String pomContent = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
-                isSpring = pomContent.contains("spring-boot");
+                if (pomFile.exists()) {
+                    String pomContent = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
+                    isSpring = pomContent.contains("spring-boot");
+                }
             } catch (Exception ignored) {}
-            return new EnvironmentScanResultView(
+            view = new EnvironmentScanResultView(
                     "Java 17+",
                     isSpring ? "Spring Boot 3.x" : "Java Maven Project",
                     "Maven",
@@ -658,8 +684,8 @@ public class JGitWorkspaceManager {
                     "mvn test",
                     detectedFiles
             );
-        } else if (gradleFile.exists()) {
-            return new EnvironmentScanResultView(
+        } else if (gradleFile.exists() || detectedFiles.stream().anyMatch(f -> f.endsWith("/build.gradle"))) {
+            view = new EnvironmentScanResultView(
                     "Java/Kotlin",
                     "Gradle Project",
                     "Gradle",
@@ -668,13 +694,15 @@ public class JGitWorkspaceManager {
                     "./gradlew test",
                     detectedFiles
             );
-        } else if (pkgFile.exists()) {
+        } else if (pkgFile.exists() || detectedFiles.stream().anyMatch(f -> f.endsWith("/package.json"))) {
             boolean isNext = false;
             try {
-                String pkgContent = Files.readString(pkgFile.toPath(), StandardCharsets.UTF_8);
-                isNext = pkgContent.contains("next");
+                if (pkgFile.exists()) {
+                    String pkgContent = Files.readString(pkgFile.toPath(), StandardCharsets.UTF_8);
+                    isNext = pkgContent.contains("next");
+                }
             } catch (Exception ignored) {}
-            return new EnvironmentScanResultView(
+            view = new EnvironmentScanResultView(
                     "TypeScript / JavaScript",
                     isNext ? "Next.js 14+" : "Node.js Application",
                     "npm",
@@ -684,7 +712,7 @@ public class JGitWorkspaceManager {
                     detectedFiles
             );
         } else if (reqFile.exists()) {
-            return new EnvironmentScanResultView(
+            view = new EnvironmentScanResultView(
                     "Python 3.x",
                     "Python Application",
                     "pip",
@@ -694,7 +722,7 @@ public class JGitWorkspaceManager {
                     detectedFiles
             );
         } else if (goFile.exists()) {
-            return new EnvironmentScanResultView(
+            view = new EnvironmentScanResultView(
                     "Go",
                     "Go Module",
                     "go build",
@@ -703,17 +731,20 @@ public class JGitWorkspaceManager {
                     "go test ./...",
                     detectedFiles
             );
+        } else {
+            view = new EnvironmentScanResultView(
+                    "General Software",
+                    "Standard Repository",
+                    "Custom",
+                    "Custom",
+                    "",
+                    "",
+                    detectedFiles
+            );
         }
 
-        return new EnvironmentScanResultView(
-                "General Software",
-                "Standard Repository",
-                "Custom",
-                "Custom",
-                "",
-                "",
-                detectedFiles
-        );
+        view.setSecurityNotice(securityNotice);
+        return view;
     }
 
     public void resyncWorkspace(File workspaceDir, String baselineCommit) throws Exception {
@@ -872,12 +903,6 @@ public class JGitWorkspaceManager {
     private void closeRepositoryQuietly(Git git, File workspaceDir) {
         try {
             if (git != null) {
-                if (git.getRepository() != null) {
-                    if (git.getRepository().getObjectDatabase() != null) {
-                        git.getRepository().getObjectDatabase().close();
-                    }
-                    git.getRepository().close();
-                }
                 git.close();
             }
         } catch (Exception ignored) {}

@@ -1,5 +1,6 @@
 package com.agenthub.project.dto.onboarding;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import java.util.List;
 
 /**
@@ -10,10 +11,16 @@ public class EnvironmentScanResultView {
     private String language;
     private String framework;
     private String buildTool;
+
+    @JsonAlias({"testFramework"})
     private String testRunner;
+
     private String suggestedBuildCommand;
     private String suggestedTestCommand;
+
+    @JsonAlias({"detectedConfigFiles"})
     private List<String> detectedFiles;
+
     private String securityNotice;
 
     public EnvironmentScanResultView() {
@@ -45,6 +52,13 @@ public class EnvironmentScanResultView {
     public String getTestRunner() { return testRunner; }
     public void setTestRunner(String testRunner) { this.testRunner = testRunner; }
 
+    public String getTestFramework() { return testRunner; }
+    public void setTestFramework(String testFramework) {
+        if (this.testRunner == null || this.testRunner.isBlank()) {
+            this.testRunner = testFramework;
+        }
+    }
+
     public String getSuggestedBuildCommand() { return suggestedBuildCommand; }
     public void setSuggestedBuildCommand(String suggestedBuildCommand) { this.suggestedBuildCommand = suggestedBuildCommand; }
 
@@ -53,6 +67,13 @@ public class EnvironmentScanResultView {
 
     public List<String> getDetectedFiles() { return detectedFiles; }
     public void setDetectedFiles(List<String> detectedFiles) { this.detectedFiles = detectedFiles; }
+
+    public List<String> getDetectedConfigFiles() { return detectedFiles; }
+    public void setDetectedConfigFiles(List<String> detectedConfigFiles) {
+        if (this.detectedFiles == null || this.detectedFiles.isEmpty()) {
+            this.detectedFiles = detectedConfigFiles;
+        }
+    }
 
     public String getSecurityNotice() { return securityNotice; }
     public void setSecurityNotice(String securityNotice) { this.securityNotice = securityNotice; }

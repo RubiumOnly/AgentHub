@@ -3,16 +3,27 @@ package com.agenthub.project.domain.source;
 import com.agenthub.agent.infrastructure.security.SecretMasker;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * Git Source Configuration with credential masking and path sanitization.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GitSourceConfig {
 
+    @JsonAlias({"type"})
     private GitSourceType sourceType = GitSourceType.LOCAL_DIR;
+
+    @JsonAlias({"localPath"})
     private String location;
+
+    @JsonAlias({"remoteUrl"})
     private String repoUrl;
+
     private String secretRef;
+
+    @JsonAlias({"branch"})
     private String defaultBranch = "main";
 
     public GitSourceConfig() {}
@@ -62,15 +73,43 @@ public class GitSourceConfig {
     public GitSourceType getSourceType() { return sourceType; }
     public void setSourceType(GitSourceType sourceType) { this.sourceType = sourceType; }
 
+    public GitSourceType getType() { return sourceType; }
+    public void setType(GitSourceType type) {
+        if (type != null) {
+            this.sourceType = type;
+        }
+    }
+
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
 
+    public String getLocalPath() { return location; }
+    public void setLocalPath(String localPath) {
+        if (this.location == null || this.location.isBlank()) {
+            this.location = localPath;
+        }
+    }
+
     public String getRepoUrl() { return repoUrl; }
     public void setRepoUrl(String repoUrl) { this.repoUrl = repoUrl; }
+
+    public String getRemoteUrl() { return repoUrl; }
+    public void setRemoteUrl(String remoteUrl) {
+        if (this.repoUrl == null || this.repoUrl.isBlank()) {
+            this.repoUrl = remoteUrl;
+        }
+    }
 
     public String getSecretRef() { return secretRef; }
     public void setSecretRef(String secretRef) { this.secretRef = secretRef; }
 
     public String getDefaultBranch() { return defaultBranch; }
     public void setDefaultBranch(String defaultBranch) { this.defaultBranch = defaultBranch; }
+
+    public String getBranch() { return defaultBranch; }
+    public void setBranch(String branch) {
+        if (branch != null && !branch.isBlank()) {
+            this.defaultBranch = branch.trim();
+        }
+    }
 }

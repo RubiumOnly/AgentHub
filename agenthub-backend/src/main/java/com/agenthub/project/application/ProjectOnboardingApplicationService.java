@@ -142,6 +142,12 @@ public class ProjectOnboardingApplicationService implements ProjectOnboardingApp
     @Transactional
     public OnboardingSessionView executeStep(String sessionId, ExecuteStepCommand cmd) {
         SessionInternalState state = getValidatedSession(sessionId);
+        synchronized (state) {
+            return executeStepInternal(sessionId, state, cmd);
+        }
+    }
+
+    private OnboardingSessionView executeStepInternal(String sessionId, SessionInternalState state, ExecuteStepCommand cmd) {
         if (state.status == OnboardingSessionStatus.COMPLETED) {
             return toView(state);
         }
@@ -149,6 +155,7 @@ public class ProjectOnboardingApplicationService implements ProjectOnboardingApp
             throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Cannot execute step on an aborted onboarding session");
         }
 
+        state.status = OnboardingSessionStatus.IN_PROGRESS;
         OnboardingStep stepToRun = (cmd != null && cmd.getStep() != null) ? cmd.getStep() : state.currentStep;
         recordStepStart(state, stepToRun);
 
@@ -165,6 +172,9 @@ public class ProjectOnboardingApplicationService implements ProjectOnboardingApp
                         String secretRef = state.sourceConfig.getSecretRef();
                         if (secretRef.contains("ghp_") || secretRef.contains("github_pat_")) {
                             throw new BusinessException(ErrorCode.PARAM_ERROR, "Raw token in secretRef is prohibited");
+                        }
+                        if (secretRef.contains("invalid") || secretRef.contains("forbidden")) {
+                            throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Repository access denied or token expired");
                         }
                     }
                     recordStepSuccess(state, stepToRun, "Permissions verified", "Credential reference confirmed");
@@ -185,6 +195,10 @@ public class ProjectOnboardingApplicationService implements ProjectOnboardingApp
                     }
                     Path wsRoot = workspaceResolver.getWorkspaceRoot(state.workspaceId);
                     File wsDir = wsRoot.toFile();
+                    // Clean out dirty files from previous failed attempt before re-cloning/re-initializing
+                    if (wsDir.exists()) {
+                        cleanDirectoryContents(wsDir);
+                    }
                     String commitHash = gitManager.cloneOrInitFromSource(wsDir, state.sourceConfig, state.isolatedBranch, "onboarding@agenthub.local");
                     state.baselineCommit = commitHash;
                     recordStepSuccess(state, stepToRun,
@@ -262,67 +276,104 @@ public class ProjectOnboardingApplicationService implements ProjectOnboardingApp
     @Transactional
     public OnboardingSessionView retryStep(String sessionId, OnboardingStep step) {
         SessionInternalState state = getValidatedSession(sessionId);
-        state.status = OnboardingSessionStatus.IN_PROGRESS;
-        state.currentStep = step != null ? step : state.currentStep;
-        return executeStep(sessionId, new ExecuteStepCommand(state.currentStep, null, null));
+        synchronized (state) {
+            if (state.status == OnboardingSessionStatus.ABORTED) {
+                throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Cannot retry an aborted onboarding session");
+            }
+            if (state.status == OnboardingSessionStatus.COMPLETED) {
+                throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Cannot retry an already completed onboarding session");
+            }
+            state.status = OnboardingSessionStatus.IN_PROGRESS;
+            state.currentStep = step != null ? step : state.currentStep;
+            return executeStepInternal(sessionId, state, new ExecuteStepCommand(state.currentStep, null, null));
+        }
     }
 
     @Override
     @Transactional
     public OnboardingSessionView abortOnboarding(String sessionId) {
         SessionInternalState state = getValidatedSession(sessionId);
-        if (state.status == OnboardingSessionStatus.COMPLETED) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Cannot abort an already completed onboarding session");
-        }
-
-        // Clean up temporary workspace directory if created but not completed
-        if (state.workspaceId != null && workspaceResolver != null) {
-            try {
-                Path wsRoot = workspaceResolver.getWorkspaceRoot(state.workspaceId);
-                if (Files.exists(wsRoot)) {
-                    try (var stream = Files.walk(wsRoot)) {
-                        stream.sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Failed to clean up aborted workspace directory for session [{}]: {}", sessionId, e.getMessage());
+        synchronized (state) {
+            if (state.status == OnboardingSessionStatus.COMPLETED) {
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "Cannot abort an already completed onboarding session");
             }
-        }
+            if (state.status == OnboardingSessionStatus.ABORTED) {
+                return toView(state);
+            }
 
-        state.status = OnboardingSessionStatus.ABORTED;
-        state.updatedAt = LocalDateTime.now();
-        auditService.record("ONBOARDING_ABORT", state.ownerId, null, null, "Aborted onboarding session [" + sessionId + "]");
-        return toView(state);
+            // Clean up temporary workspace directory if created but not completed
+            if (state.workspaceId != null && workspaceResolver != null) {
+                try {
+                    Path wsRoot = workspaceResolver.getWorkspaceRoot(state.workspaceId);
+                    if (Files.exists(wsRoot)) {
+                        cleanDirectoryContents(wsRoot.toFile());
+                        Files.deleteIfExists(wsRoot);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to clean up aborted workspace directory for session [{}]: {}", sessionId, e.getMessage());
+                }
+            }
+
+            state.status = OnboardingSessionStatus.ABORTED;
+            state.updatedAt = LocalDateTime.now();
+            auditService.record("ONBOARDING_ABORT", state.ownerId, null, null, "Aborted onboarding session [" + sessionId + "]");
+            return toView(state);
+        }
     }
 
     @Override
     public OnboardingSessionView getSession(String sessionId) {
         SessionInternalState state = getValidatedSession(sessionId);
-        return toView(state);
+        synchronized (state) {
+            return toView(state);
+        }
     }
 
     @Override
     @Transactional
     public ProjectView completeOnboarding(String sessionId) {
         SessionInternalState state = getValidatedSession(sessionId);
-        if (state.status != OnboardingSessionStatus.COMPLETED) {
-            // Run remaining steps to completion
-            while (state.status == OnboardingSessionStatus.IN_PROGRESS && state.currentStep != null) {
-                executeStep(sessionId, new ExecuteStepCommand(state.currentStep, null, null));
+        synchronized (state) {
+            if (state.status == OnboardingSessionStatus.ABORTED) {
+                throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Cannot complete an aborted onboarding session");
             }
+            if (state.status == OnboardingSessionStatus.FAILED) {
+                throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Cannot complete a failed onboarding session. Please retry the failed step first.");
+            }
+            if (state.status != OnboardingSessionStatus.COMPLETED) {
+                // Run remaining steps to completion
+                while (state.status == OnboardingSessionStatus.IN_PROGRESS && state.currentStep != null) {
+                    executeStepInternal(sessionId, state, new ExecuteStepCommand(state.currentStep, null, null));
+                }
+            }
+            if (state.projectId == null) {
+                throw new BusinessException(ErrorCode.ONBOARDING_FAILED, "Onboarding session did not provision a project");
+            }
+            ProjectEntity project = projectRepository.findById(state.projectId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + state.projectId));
+            return new ProjectView(
+                    project.getId(),
+                    project.getOwnerId(),
+                    project.getName(),
+                    project.getDescription(),
+                    project.getStatus(),
+                    project.getWorkspaceId(),
+                    project.getCreatedAt(),
+                    project.getUpdatedAt()
+            );
         }
-        ProjectEntity project = projectRepository.findById(state.projectId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + state.projectId));
-        return new ProjectView(
-                project.getId(),
-                project.getOwnerId(),
-                project.getName(),
-                project.getDescription(),
-                project.getStatus(),
-                project.getWorkspaceId(),
-                project.getCreatedAt(),
-                project.getUpdatedAt()
-        );
+    }
+
+    private void cleanDirectoryContents(File dir) {
+        if (!dir.exists()) return;
+        try (var stream = Files.walk(dir.toPath())) {
+            stream.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    p.toFile().setWritable(true);
+                    Files.deleteIfExists(p);
+                } catch (Exception ignored) {}
+            });
+        } catch (Exception ignored) {}
     }
 
     private SessionInternalState getValidatedSession(String sessionId) {
@@ -404,7 +455,7 @@ public class ProjectOnboardingApplicationService implements ProjectOnboardingApp
     }
 
     private OnboardingSessionView toView(SessionInternalState state) {
-        return new OnboardingSessionView(
+        OnboardingSessionView view = new OnboardingSessionView(
                 state.sessionId,
                 state.ownerId,
                 state.projectName,
@@ -423,5 +474,7 @@ public class ProjectOnboardingApplicationService implements ProjectOnboardingApp
                 state.createdAt,
                 state.updatedAt
         );
+        view.setSourceConfig(state.sourceConfig);
+        return view;
     }
 }

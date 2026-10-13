@@ -434,7 +434,9 @@ export type GitSourceType = "LOCAL_DIR" | "REMOTE_GIT";
 export interface GitSourceConfig {
   sourceType: GitSourceType;
   localPath?: string;
+  location?: string;
   remoteUrl?: string;
+  repoUrl?: string;
   secretRef?: string;
   defaultBranch?: string;
 }
@@ -457,9 +459,11 @@ export interface EnvironmentScanResultView {
   framework: string;
   buildTool: string;
   testFramework?: string;
+  testRunner?: string;
   suggestedBuildCommand?: string;
   suggestedTestCommand?: string;
   detectedConfigFiles: string[];
+  detectedFiles?: string[];
   securityNotice?: string;
 }
 

@@ -432,12 +432,12 @@ AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；
 阶段：Phase 2
 范围：受控项目接入向导（7 步 Wizard：CONNECT_SOURCE、VERIFY_PERMISSIONS、SELECT_DEFAULT_BRANCH、CREATE_WORKSPACE、SCAN_ENVIRONMENT、GENERATE_PROJECT_RULES、CREATE_INITIAL_BASELINE）、代码源与凭据安全策略（GitSourceConfig 宿主绝对路径与路径穿越拦截、secretRef 禁用明文 Token、SecretMasker PAT 脱敏）、受控工作区安全配额守卫（WorkspaceQuotaGuard：单文件写 10MB/预览 2MB、总容量 500MB、文件数 5000、执行 3600s、网络策略熔断 BLOCKED_POLICY）、版本化上下文源（ContextSourceView：AOCI_COGNITION、PROJECT_RULES、BUILD_CONFIG、TEST_CONVENTIONS 带 SHA-256 指纹与 Commit 强绑定）、受控工作区生命周期运维（resyncWorkspace、changeBaseline、discardWorkspace、restoreSnapshot、getWorkspaceQuota 强制确认与审计）、前端 7 步交互式接入向导（ProjectOnboardingModal）、CreateProjectModal 向导引流、WorkspaceExplorer 工作区生命周期与配额监控
 代码完成：是，变更包含 GitSourceConfig、GitSourceType、WorkspaceQuotaPolicy、WorkspaceQuotaUsage、WorkspaceQuotaGuard、ContextSourceType、SecurityLevel、ContextSourceView、RegisterContextSourceCommand、ContextSourceApplication/ContextSourceApplicationService、OnboardingStep/OnboardingSessionStatus/OnboardingStepStatus、StartOnboardingCommand/ExecuteStepCommand/EnvironmentScanResultView/OnboardingStepRecordView/OnboardingSessionView、ProjectOnboardingApplication/ProjectOnboardingApplicationService、JGitWorkspaceManager 扩展、WorkspaceApplication/WorkspaceApplicationService 扩展、ProjectController/WorkspaceController 扩展、Phase2ControlledWorkspaceAndOnboardingTest、前端 ProjectOnboardingModal.tsx、CreateProjectModal.tsx、WorkspaceExplorer.tsx、types/index.ts、services/api/projects.ts、services/api/workspaces.ts、docs/adr/ADR-007、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/openapi-v1.json
-自动化测试：后端 55 test classes / 324 tests 通过（mvn clean test，含 Phase2ControlledWorkspaceAndOnboardingTest 6 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过
+自动化测试：后端 55 test classes / 325 tests 通过（mvn clean test，含 Phase2ControlledWorkspaceAndOnboardingTest 7 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过
 目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
 AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase2ControlledWorkspaceAndOnboardingTest 锁定受管范围与版本化 Context Source 指纹基线）
 删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
 未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实远程 GitHub 私有仓库在生产网络环境下的 Webhook 自动触发演练
 已知风险与回滚方式：若后续需要回退 Phase 2 功能，可通过 git revert 对应 Phase 2 提交恢复；底层表结构零变更，回滚零数据丢失风险
 普通提交 Subject：feat(phase-2): productize project onboarding wizard, controlled workspace policies, and versioned context sources
-加固提交 Subject（如有）：无
+加固提交 Subject（如有）：fix(phase-2): harden onboarding error recovery, context source idempotency, workspaceId mapping, and Jackson contract compatibility
 ```

@@ -32,8 +32,11 @@ import com.agenthub.project.infrastructure.entity.ProjectEntity;
 import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
 import com.agenthub.project.infrastructure.repository.ProjectRepository;
 import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
+import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
+import com.agenthub.project.dto.onboarding.EnvironmentScanResultView;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.agenthub.shared.exception.ErrorCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -311,7 +314,13 @@ class Phase2ControlledWorkspaceAndOnboardingTest {
         ProjectView projView = onboardingApplication.completeOnboarding(session.getSessionId());
         assertThat(projView.getId()).isEqualTo(session.getProjectId());
 
-        // 10) 验证向导中止（Abort）能力
+        // 已完成会话严禁再次 retryStep
+        final String completedSessionId = session.getSessionId();
+        assertThatThrownBy(() -> onboardingApplication.retryStep(completedSessionId, OnboardingStep.CREATE_INITIAL_BASELINE))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("already completed");
+
+        // 10) 验证向导中止（Abort）能力与防护
         StartOnboardingCommand abortCmd = new StartOnboardingCommand(
                 "to-abort-service",
                 "Will be aborted",
@@ -322,10 +331,54 @@ class Phase2ControlledWorkspaceAndOnboardingTest {
         OnboardingSessionView aborted = onboardingApplication.abortOnboarding(toAbort.getSessionId());
         assertThat(aborted.getStatus()).isEqualTo(OnboardingSessionStatus.ABORTED);
 
-        // 中止后严禁继续执行步骤
+        // 中止幂等性校验
+        OnboardingSessionView abortedAgain = onboardingApplication.abortOnboarding(toAbort.getSessionId());
+        assertThat(abortedAgain.getStatus()).isEqualTo(OnboardingSessionStatus.ABORTED);
+
+        // 中止后严禁继续执行步骤或重试
         assertThatThrownBy(() -> onboardingApplication.executeStep(toAbort.getSessionId(), new ExecuteStepCommand(OnboardingStep.VERIFY_PERMISSIONS, null, null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("aborted");
+
+        assertThatThrownBy(() -> onboardingApplication.retryStep(toAbort.getSessionId(), OnboardingStep.VERIFY_PERMISSIONS))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("aborted");
+
+        // 中止后严禁完成会话
+        assertThatThrownBy(() -> onboardingApplication.completeOnboarding(toAbort.getSessionId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("aborted");
+
+        // 11) 验证真实步骤失败与 retryStep 恢复流
+        StartOnboardingCommand failCmd = new StartOnboardingCommand(
+                "fail-recovery-service",
+                "Will fail and recover",
+                new GitSourceConfig(GitSourceType.REMOTE_GIT, null, "https://github.com/myorg/repo.git", "env:invalid_repo_token", "main")
+        );
+        OnboardingSessionView failSession = onboardingApplication.startOnboarding(failCmd);
+        createdSessionIds.add(failSession.getSessionId());
+
+        // Step 2 校验权限时因无效凭据阻断失败
+        assertThatThrownBy(() -> onboardingApplication.executeStep(failSession.getSessionId(), new ExecuteStepCommand(OnboardingStep.VERIFY_PERMISSIONS, null, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("access denied or token expired");
+
+        OnboardingSessionView failedState = onboardingApplication.getSession(failSession.getSessionId());
+        assertThat(failedState.getStatus()).isEqualTo(OnboardingSessionStatus.FAILED);
+
+        // 失败状态下禁止调用 completeOnboarding
+        assertThatThrownBy(() -> onboardingApplication.completeOnboarding(failSession.getSessionId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("failed");
+
+        // 修复凭据后调用 retryStep 重试并恢复为 IN_PROGRESS
+        failSession.getSourceConfig().setSecretRef("env:CLEAN_GITHUB_TOKEN");
+        OnboardingSessionView recovered = onboardingApplication.retryStep(failSession.getSessionId(), OnboardingStep.VERIFY_PERMISSIONS);
+        assertThat(recovered.getStatus()).isEqualTo(OnboardingSessionStatus.IN_PROGRESS);
+        assertThat(recovered.getCurrentStep()).isEqualTo(OnboardingStep.SELECT_DEFAULT_BRANCH);
+
+        // 清理失败测试会话
+        onboardingApplication.abortOnboarding(failSession.getSessionId());
     }
 
     @Test
@@ -426,6 +479,7 @@ class Phase2ControlledWorkspaceAndOnboardingTest {
             assertThat(s.getContentFingerprint()).isNotBlank();
             assertThat(s.getCommitHash()).isNotBlank();
             assertThat(s.getSecurityLevel()).isNotNull();
+            assertThat(s.getWorkspaceId()).isEqualTo(session.getWorkspaceId());
         }
 
         // 2) 手动注册新的 Context Source（TEST_CONVENTIONS）
@@ -443,11 +497,29 @@ class Phase2ControlledWorkspaceAndOnboardingTest {
         assertThat(registered.getId()).startsWith("ctx-");
         assertThat(registered.getSourceType()).isEqualTo(ContextSourceType.TEST_CONVENTIONS);
         assertThat(registered.getContentFingerprint()).isNotBlank();
+        assertThat(registered.getWorkspaceId()).isEqualTo(session.getWorkspaceId());
+
+        // 校验幂等性：重复注册相同路径时复用 ID 并更新内容与指纹
+        String updatedContent = testConventionsContent + "\nUpdated rule.";
+        RegisterContextSourceCommand updateCmd = new RegisterContextSourceCommand(
+                ContextSourceType.TEST_CONVENTIONS,
+                "Boundary Test Guard Matrix v2",
+                "docs/TEST_CONVENTIONS.md",
+                updatedContent,
+                session.getBaselineCommit(),
+                SecurityLevel.INTERNAL,
+                Map.of("coverage", "extreme_boundaries,updated")
+        );
+        ContextSourceView updated = contextSourceApplication.registerContextSource(projId, updateCmd);
+        assertThat(updated.getId()).isEqualTo(registered.getId());
+        assertThat(updated.getName()).isEqualTo("Boundary Test Guard Matrix v2");
+        assertThat(updated.getContentFingerprint()).isNotEqualTo(registered.getContentFingerprint());
 
         // 3) 根据 sourceId 单独查询
         ContextSourceView queried = contextSourceApplication.getContextSource(projId, registered.getId());
-        assertThat(queried.getName()).isEqualTo("Boundary Test Guard Matrix");
-        assertThat(queried.getContent()).isEqualTo(testConventionsContent);
+        assertThat(queried.getName()).isEqualTo("Boundary Test Guard Matrix v2");
+        assertThat(queried.getContent()).isEqualTo(updatedContent);
+        assertThat(queried.getWorkspaceId()).isEqualTo(session.getWorkspaceId());
     }
 
     @Test
@@ -529,5 +601,80 @@ class Phase2ControlledWorkspaceAndOnboardingTest {
         assertThat(sanitizedText).doesNotContain(rawGithubToken);
         assertThat(sanitizedText).doesNotContain(rawPatToken);
         assertThat(sanitizedText).contains("***");
+    }
+
+    @Test
+    @DisplayName("7. GitSourceConfig 序列化与反序列化兼容性、AGENTS.md降级探测与子模块/Monorepo环境扫描校验")
+    void shouldEnsureGitSourceConfigSerializationAndEnvironmentScan() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+
+        // 1) 前端发送 localPath 格式的反序列化兼容性
+        String frontendLocalJson = "{\"type\":\"LOCAL_DIR\",\"localPath\":\"demo-folder\",\"branch\":\"main\"}";
+        GitSourceConfig fromLocal = mapper.readValue(frontendLocalJson, GitSourceConfig.class);
+        assertThat(fromLocal.getType()).isEqualTo(GitSourceType.LOCAL_DIR);
+        assertThat(fromLocal.getLocation()).isEqualTo("demo-folder");
+        assertThat(fromLocal.getLocalPath()).isEqualTo("demo-folder");
+
+        // 2) 前端发送 remoteUrl 格式的反序列化兼容性
+        String frontendRemoteJson = "{\"type\":\"REMOTE_GIT\",\"remoteUrl\":\"https://github.com/myorg/demo.git\",\"branch\":\"master\"}";
+        GitSourceConfig fromRemote = mapper.readValue(frontendRemoteJson, GitSourceConfig.class);
+        assertThat(fromRemote.getType()).isEqualTo(GitSourceType.REMOTE_GIT);
+        assertThat(fromRemote.getRepoUrl()).isEqualTo("https://github.com/myorg/demo.git");
+        assertThat(fromRemote.getRemoteUrl()).isEqualTo("https://github.com/myorg/demo.git");
+
+        // 3) 后端序列化同时包含 localPath / remoteUrl
+        String serialized = mapper.writeValueAsString(fromRemote);
+        assertThat(serialized).contains("remoteUrl");
+        assertThat(serialized).contains("repoUrl");
+
+        // 4) 探测降级逻辑：无 PROJECT_RULES.md 时降级识别 AGENTS.md
+        StartOnboardingCommand agentsCmd = new StartOnboardingCommand(
+                "agents-fallback-service",
+                "Fallback to AGENTS.md",
+                new GitSourceConfig(GitSourceType.LOCAL_DIR, "src-agents-fallback", null, null, "main")
+        );
+        OnboardingSessionView agentsSession = onboardingApplication.startOnboarding(agentsCmd);
+        createdSessionIds.add(agentsSession.getSessionId());
+        for (OnboardingStep step : List.of(OnboardingStep.CONNECT_SOURCE, OnboardingStep.VERIFY_PERMISSIONS, OnboardingStep.SELECT_DEFAULT_BRANCH, OnboardingStep.CREATE_WORKSPACE)) {
+            agentsSession = onboardingApplication.executeStep(agentsSession.getSessionId(), new ExecuteStepCommand(step, null, null));
+        }
+        String agentsWsId = agentsSession.getWorkspaceId();
+        String agentsProjId = agentsSession.getProjectId();
+        createdWorkspaceIds.add(agentsWsId);
+        createdProjectIds.add(agentsProjId);
+        ProjectEntity projectEntity = new ProjectEntity(agentsProjId, USER_ALICE, "agents-fallback-service", "desc", "ACTIVE", agentsWsId);
+        projectRepository.save(projectEntity);
+        WorkspaceEntity workspaceEntity = new WorkspaceEntity(agentsWsId, agentsProjId, agentsWsId, "init-commit");
+        workspaceRepository.save(workspaceEntity);
+
+        workspaceApplication.saveFile(agentsWsId, "AGENTS.md", "# AgentHub Engineering Rules via AGENTS.md");
+        List<ContextSourceView> discoveredAgents = contextSourceApplication.autoDiscoverContextSources(
+                agentsProjId, agentsWsId, "agents-commit"
+        );
+        assertThat(discoveredAgents.stream().anyMatch(s -> "AGENTS.md".equals(s.getFilePath()) && s.getSourceType() == ContextSourceType.PROJECT_RULES)).isTrue();
+        onboardingApplication.abortOnboarding(agentsSession.getSessionId());
+
+        // 5) 环境扫描校验：检测 .gitmodules 与多模块/Monorepo 目录探测
+        Path tempWsDir = Files.createTempDirectory("scan-test-ws");
+        try {
+            Files.writeString(tempWsDir.resolve(".gitmodules"), "[submodule \"lib\"]\n\tpath = lib\n\turl = https://example.com/lib.git\n");
+            Path subDir = Files.createDirectory(tempWsDir.resolve("agenthub-backend"));
+            Files.writeString(subDir.resolve("pom.xml"), "<project><groupId>com.agenthub</groupId></project>");
+
+            JGitWorkspaceManager manager = new JGitWorkspaceManager();
+            EnvironmentScanResultView scanResult = manager.scanEnvironment(tempWsDir.toFile());
+
+            assertThat(scanResult.getDetectedFiles()).contains(".gitmodules");
+            assertThat(scanResult.getDetectedFiles()).contains("agenthub-backend/pom.xml");
+            assertThat(scanResult.getLanguage()).isEqualTo("Java 17+");
+            assertThat(scanResult.getBuildTool()).isEqualTo("Maven");
+            assertThat(scanResult.getSecurityNotice()).contains(".gitmodules");
+        } finally {
+            try (var stream = Files.walk(tempWsDir)) {
+                stream.sorted(Comparator.reverseOrder()).forEach(p -> {
+                    try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+                });
+            }
+        }
     }
 }

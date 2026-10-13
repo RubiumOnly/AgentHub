@@ -18,6 +18,7 @@ public class OnboardingSessionView {
     private String description;
     private GitSourceType sourceType;
     private String repoLocationOrUrlMasked;
+    private com.agenthub.project.domain.source.GitSourceConfig sourceConfig;
     private OnboardingStep currentStep;
     private OnboardingSessionStatus status;
     private String projectId;
@@ -108,4 +109,7 @@ public class OnboardingSessionView {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public com.agenthub.project.domain.source.GitSourceConfig getSourceConfig() { return sourceConfig; }
+    public void setSourceConfig(com.agenthub.project.domain.source.GitSourceConfig sourceConfig) { this.sourceConfig = sourceConfig; }
 }

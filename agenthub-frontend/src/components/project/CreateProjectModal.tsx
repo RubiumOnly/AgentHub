@@ -102,7 +102,9 @@ export function ProjectOnboardingModal({
     const sourceConfig: GitSourceConfig = {
       sourceType,
       localPath: sourceType === "LOCAL_DIR" ? sourcePath.trim() : undefined,
+      location: sourceType === "LOCAL_DIR" ? sourcePath.trim() : undefined,
       remoteUrl: sourceType === "REMOTE_GIT" ? sourcePath.trim() : undefined,
+      repoUrl: sourceType === "REMOTE_GIT" ? sourcePath.trim() : undefined,
       secretRef: secretRef.trim() || undefined,
       defaultBranch: defaultBranch.trim() || "main",
     };
@@ -478,7 +480,7 @@ export function ProjectOnboardingModal({
                     <div className="bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
                       <span className="text-[10px] text-zinc-500 block">构建工具 / 测试</span>
                       <span className="font-medium text-zinc-200">
-                        {session.scanResult.buildTool} · {session.scanResult.testFramework || "N/A"}
+                        {session.scanResult.buildTool} · {session.scanResult.testFramework || session.scanResult.testRunner || "N/A"}
                       </span>
                     </div>
                     <div className="bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
