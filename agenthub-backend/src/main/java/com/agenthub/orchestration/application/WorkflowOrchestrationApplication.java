@@ -13,4 +13,7 @@ public interface WorkflowOrchestrationApplication {
     List<WorkflowDefinitionView> listDefinitions();
     ValidateDslResultView validateDsl(WorkflowDsl dsl);
     WorkflowDsl parseAndValidateDslJson(String dslJson);
+    List<com.agenthub.orchestration.domain.template.WorkflowTemplateView> listTemplates();
+    com.agenthub.orchestration.domain.template.WorkflowTemplateView getTemplate(String templateId);
+    WorkflowDefinitionView instantiateTemplate(String templateId, String customName, String description);
 }

@@ -2,43 +2,20 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  WorkflowRunView,
-  StepRunView,
-  ApprovalView,
-  TeamView,
-  TokenSummaryView,
-  ProviderView,
-  DeploymentResponse,
-  FileDiffEntry,
-  ProjectView,
-  UserView,
+  WorkflowRunView, StepRunView, ApprovalView, TeamView, TokenSummaryView,
+  ProviderView, DeploymentResponse, FileDiffEntry, ProjectView, UserView, OrchestrationPlanView,
 } from "@/types";
 import {
-  authApi,
-  projectsApi,
-  workspacesApi,
-  workflowsApi,
-  runsApi,
-  approvalsApi,
-  deploymentsApi,
-  getStoredUser,
-  setStoredUser,
-  setStoredToken,
-  isDemoMode,
-  setDemoMode,
-  MOCK_RUN,
-  MOCK_STEPS,
-  MOCK_APPROVAL,
-  MOCK_TEAM,
-  MOCK_PROVIDERS,
-  MOCK_TOKEN_SUMMARY,
-  MOCK_DEPLOYMENT,
-  MOCK_DIFFS,
+  authApi, projectsApi, workspacesApi, workflowsApi, runsApi, approvalsApi,
+  deploymentsApi, getStoredUser, setStoredUser, setStoredToken, isDemoMode,
+  setDemoMode, MOCK_RUN, MOCK_STEPS, MOCK_APPROVAL, MOCK_TEAM, MOCK_PROVIDERS,
+  MOCK_TOKEN_SUMMARY, MOCK_DEPLOYMENT, MOCK_DIFFS,
 } from "@/services/api";
 import { DashboardTabId, ProjectShell } from "@/components/dashboard/ProjectShell";
 import { RunWorkspacePanel } from "@/components/dashboard/RunWorkspacePanel";
 import { ReviewSidebar } from "@/components/dashboard/ReviewSidebar";
 import { DeploymentPanel } from "@/components/dashboard/DeploymentPanel";
+import { OrchestratorPlanModal } from "@/components/workflow/OrchestratorPlanModal";
 
 export default function AgentHubExecutiveApp() {
   const [backendUp, setBackendUp] = useState(false);
@@ -46,6 +23,7 @@ export default function AgentHubExecutiveApp() {
   const [currentUser, setCurrentUser] = useState<UserView | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
 
   const [projects, setProjects] = useState<ProjectView[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -222,10 +200,10 @@ export default function AgentHubExecutiveApp() {
   };
 
   const handleRunWorkflow = async () => {
-    setIsRunningWorkflow(true);
     setSyncErrorMessage(null);
 
     if (isDemo) {
+      setIsRunningWorkflow(true);
       setApproval(MOCK_APPROVAL);
       setSteps(MOCK_STEPS);
       setTimeout(() => {
@@ -237,16 +215,22 @@ export default function AgentHubExecutiveApp() {
 
     if (!selectedProjectId) {
       setIsCreateProjectModalOpen(true);
-      setIsRunningWorkflow(false);
       setSyncErrorMessage("请先创建或选择受控研发项目后再启动执行");
       return;
     }
 
+    // Phase 3: 打开 Orchestrator 结构化 Plan 规划与工具确权门禁模态框
+    setIsPlanModalOpen(true);
+  };
+
+  const handlePlanConfirmedAndLaunch = async (plan: OrchestrationPlanView) => {
+    setIsRunningWorkflow(true);
+    setSyncErrorMessage(null);
     try {
       const newRun = await runsApi.startRun({
         projectId: selectedProjectId,
         definitionId: activeDefinitionId || "wf-enterprise-auth-delivery",
-        idempotencyKey: `idem-${selectedProjectId}-${Date.now()}`,
+        idempotencyKey: `idem-${selectedProjectId}-${plan.planId}-${Date.now()}`,
       });
       if (newRun?.id) {
         setRun(newRun);
@@ -401,6 +385,14 @@ export default function AgentHubExecutiveApp() {
           onRefresh={syncDashboardData}
         />
       )}
+
+      <OrchestratorPlanModal
+        isOpen={isPlanModalOpen}
+        onClose={() => setIsPlanModalOpen(false)}
+        projectId={selectedProjectId}
+        workspaceId={activeWorkspaceId}
+        onPlanConfirmedAndLaunch={handlePlanConfirmedAndLaunch}
+      />
     </ProjectShell>
   );
 }

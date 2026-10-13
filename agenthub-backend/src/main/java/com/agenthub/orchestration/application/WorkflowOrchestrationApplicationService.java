@@ -31,11 +31,14 @@ public class WorkflowOrchestrationApplicationService implements WorkflowOrchestr
 
     private final WorkflowDefinitionRepository workflowDefinitionRepository;
     private final ObjectMapper objectMapper;
+    private final com.agenthub.orchestration.domain.template.WorkflowTemplateRegistry templateRegistry;
 
     public WorkflowOrchestrationApplicationService(WorkflowDefinitionRepository workflowDefinitionRepository,
-                                                   ObjectMapper objectMapper) {
+                                                   ObjectMapper objectMapper,
+                                                   com.agenthub.orchestration.domain.template.WorkflowTemplateRegistry templateRegistry) {
         this.workflowDefinitionRepository = workflowDefinitionRepository;
         this.objectMapper = objectMapper;
+        this.templateRegistry = templateRegistry;
     }
 
     @Override
@@ -139,7 +142,8 @@ public class WorkflowOrchestrationApplicationService implements WorkflowOrchestr
                 true,
                 "Workflow DSL is valid. Kahn topological sort succeeded.",
                 result.getSortedNodeIds(),
-                dsl.getNodes().size()
+                dsl.getNodes().size(),
+                result.getExecutionStages()
         );
     }
 
@@ -156,6 +160,47 @@ public class WorkflowOrchestrationApplicationService implements WorkflowOrchestr
         }
         WorkflowDslValidator.validate(dsl);
         return dsl;
+    }
+
+    @Override
+    public List<com.agenthub.orchestration.domain.template.WorkflowTemplateView> listTemplates() {
+        return templateRegistry.listTemplates();
+    }
+
+    @Override
+    public com.agenthub.orchestration.domain.template.WorkflowTemplateView getTemplate(String templateId) {
+        return templateRegistry.getTemplate(templateId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKFLOW_INVALID, "Workflow template not found: " + templateId));
+    }
+
+    @Override
+    @Transactional
+    public WorkflowDefinitionView instantiateTemplate(String templateId, String customName, String description) {
+        com.agenthub.orchestration.domain.template.WorkflowTemplateView tpl = getTemplate(templateId);
+        WorkflowDsl clonedDsl;
+        try {
+            String json = objectMapper.writeValueAsString(tpl.getDsl());
+            clonedDsl = objectMapper.readValue(json, WorkflowDsl.class);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Failed to clone template DSL: " + e.getMessage());
+        }
+
+        String defId = "wf-inst-" + UUID.randomUUID().toString().substring(0, 8);
+        clonedDsl.setId(defId);
+        if (customName != null && !customName.isBlank()) {
+            clonedDsl.setName(customName.trim());
+        }
+        if (description != null && !description.isBlank()) {
+            clonedDsl.setDescription(description.trim());
+        }
+
+        CreateWorkflowDefinitionCommand cmd = new CreateWorkflowDefinitionCommand(
+                clonedDsl.getName(),
+                clonedDsl.getDescription(),
+                clonedDsl.getVersion(),
+                clonedDsl
+        );
+        return createDefinition(cmd);
     }
 
     private WorkflowDefinitionView toView(WorkflowDefinitionEntity entity, WorkflowDsl dsl) {

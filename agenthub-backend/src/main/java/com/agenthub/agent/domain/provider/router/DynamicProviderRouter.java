@@ -240,7 +240,14 @@ public class DynamicProviderRouter implements ProviderRouter {
             eligible.add(provider);
         }
 
+        if (request != null && request.isRequireLive()) {
+            eligible.removeIf(p -> p.isSimulated() || "MOCK".equalsIgnoreCase(p.getProviderType()) || "prov-mock".equalsIgnoreCase(p.getId()));
+        }
+
         if (eligible.isEmpty()) {
+            if (request != null && request.isRequireLive()) {
+                throw new NoAvailableProviderException("No live provider available matching capabilities and constraints (requireLive=true)");
+            }
             // If all preferred providers are circuit-broken or missing, fall back to mock
             LlmProvider mock = providerRegistry.get("prov-mock");
             if (mock != null) {

@@ -527,3 +527,149 @@ export interface ContextSourceView {
   metadata?: Record<string, string>;
   createdAt: string;
 }
+
+// ============================================================================
+// Phase 3: Versioned Workflow Templates, Kahn DAG & Orchestrator Plan Types
+// ============================================================================
+
+export type WorkflowTemplateType = "BUG_FIX_WITH_TESTS" | "NEW_FEATURE_ENDPOINT";
+
+export interface WorkflowEdgeDsl {
+  fromNodeId: string;
+  toNodeId: string;
+}
+
+export interface WorkflowNodeDsl {
+  id: string;
+  name: string;
+  type: string;
+  agentPlatform?: string;
+  promptTemplate?: string;
+  agentRole?: string;
+  requiresApproval?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface WorkflowDsl {
+  id: string;
+  name: string;
+  version?: number;
+  description?: string;
+  nodes: WorkflowNodeDsl[];
+  edges: WorkflowEdgeDsl[];
+}
+
+export interface WorkflowTemplateView {
+  id: string;
+  name: string;
+  templateType: WorkflowTemplateType;
+  description: string;
+  version: string;
+  stages: string[];
+  requiredAgentRoles: string[];
+  dsl: WorkflowDsl;
+}
+
+export interface ValidateDslResultView {
+  valid: boolean;
+  errorMessage?: string;
+  topologicalOrder: string[];
+  executionStages: string[][];
+  approvalNodeIds: string[];
+}
+
+export interface ToolPermissionRequest {
+  toolName: string;
+  category: string;
+  highImpact: boolean;
+  purpose: string;
+  parametersHint: string;
+  authorized: boolean;
+}
+
+export interface EstimatedBudget {
+  maxTokens: number;
+  costUsdUpperLimit: number;
+  timeoutSeconds: number;
+}
+
+export type OrchestrationPlanStatus = "GENERATED" | "CONFIRMED" | "REJECTED";
+
+export interface OrchestrationPlanView {
+  planId: string;
+  projectId: string;
+  workspaceId: string;
+  taskGoal: string;
+  templateType: string;
+  status: OrchestrationPlanStatus;
+  affectedFiles: string[];
+  subtasks: string[];
+  toolPermissions: ToolPermissionRequest[];
+  budget: EstimatedBudget;
+  qualityGates: string[];
+  userConfirmed: boolean;
+  confirmedBy?: string;
+  confirmedAt?: string;
+  userDecisionNote?: string;
+  createdAt: string;
+}
+
+export interface GeneratePlanCommand {
+  projectId: string;
+  workspaceId: string;
+  templateType: string;
+  taskGoal: string;
+}
+
+export interface ConfirmPlanCommand {
+  confirmed: boolean;
+  allowedHighImpactTools?: string[];
+  decisionNote?: string;
+}
+
+export type AgentToolCategory =
+  | "FILE_READ"
+  | "FILE_WRITE"
+  | "SHELL_EXEC"
+  | "CODE_SEARCH"
+  | "GIT_OPERATIONS"
+  | "TEST_RUNNER"
+  | "CUSTOM";
+
+export interface AgentToolDefinition {
+  name: string;
+  category: AgentToolCategory;
+  description: string;
+  highImpact: boolean;
+  parametersSchema: string;
+  maxOutputSizeBytes: number;
+}
+
+export type EvaluationTaskCategory =
+  | "NEW_ENDPOINT"
+  | "BUG_FIX"
+  | "REFACTOR"
+  | "TEST_COMPLETION"
+  | "PROMPT_INJECTION_DEFENSE";
+
+export interface EvaluationTaskResult {
+  taskId: string;
+  category: EvaluationTaskCategory;
+  name: string;
+  passed: boolean;
+  score: number;
+  toolMisuse: boolean;
+  diffAcceptable: boolean;
+  errorDetail?: string;
+  outputSummary?: string;
+}
+
+export interface EvaluationReportView {
+  reportId: string;
+  modelIdentifier: string;
+  evaluatedAt: string;
+  passRate: number;
+  toolMisuseRate: number;
+  diffAcceptanceRate: number;
+  taskResults: EvaluationTaskResult[];
+}

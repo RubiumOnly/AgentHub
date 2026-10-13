@@ -19,6 +19,13 @@ public class CreateWorkflowDefinitionCommand implements ContextCommand {
         this.dsl = dsl;
     }
 
+    public CreateWorkflowDefinitionCommand(String name, String description, String version, WorkflowDsl dsl) {
+        this.name = name;
+        this.description = description;
+        this.version = version;
+        this.dsl = dsl;
+    }
+
     @Override
     public BoundedContext boundedContext() {
         return BoundedContext.ORCHESTRATION;

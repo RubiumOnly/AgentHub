@@ -4,13 +4,19 @@
 // ============================================================================
 
 import {
+  ConfirmPlanCommand,
   ConversationView,
+  GeneratePlanCommand,
   MessageView,
+  OrchestrationPlanView,
   ProviderView,
   RouteDecisionView,
   TeamView,
   TokenSummaryView,
+  ValidateDslResultView,
   WorkflowDefinitionView,
+  WorkflowDsl,
+  WorkflowTemplateView,
 } from "@/types";
 import { API_BASE, fetchJson } from "./errors";
 
@@ -19,8 +25,72 @@ export const workflowsApi = {
     return fetchJson<WorkflowDefinitionView[]>(`${API_BASE}/api/workflows/definitions`);
   },
 
-  async validateDsl(dsl: unknown): Promise<{ valid: boolean; errors?: string[] }> {
-    return fetchJson(`${API_BASE}/api/workflows/definitions/validate`, {
+  async listTemplates(): Promise<WorkflowTemplateView[]> {
+    return fetchJson<WorkflowTemplateView[]>(`${API_BASE}/api/workflows/templates`);
+  },
+
+  async getTemplate(id: string): Promise<WorkflowTemplateView> {
+    return fetchJson<WorkflowTemplateView>(`${API_BASE}/api/workflows/templates/${encodeURIComponent(id)}`);
+  },
+
+  async instantiateTemplate(
+    id: string,
+    name?: string,
+    description?: string
+  ): Promise<WorkflowDefinitionView> {
+    return fetchJson<WorkflowDefinitionView>(
+      `${API_BASE}/api/workflows/templates/${encodeURIComponent(id)}/instantiate`,
+      {
+        method: "POST",
+        body: JSON.stringify({ name, description }),
+      }
+    );
+  },
+
+  async generatePlan(cmd: GeneratePlanCommand): Promise<OrchestrationPlanView> {
+    return fetchJson<OrchestrationPlanView>(`${API_BASE}/api/workflows/orchestrator/plans`, {
+      method: "POST",
+      body: JSON.stringify(cmd),
+    });
+  },
+
+  async getPlan(planId: string): Promise<OrchestrationPlanView> {
+    return fetchJson<OrchestrationPlanView>(
+      `${API_BASE}/api/workflows/orchestrator/plans/${encodeURIComponent(planId)}`
+    );
+  },
+
+  async confirmPlan(
+    planId: string,
+    cmd?: ConfirmPlanCommand
+  ): Promise<OrchestrationPlanView> {
+    return fetchJson<OrchestrationPlanView>(
+      `${API_BASE}/api/workflows/orchestrator/plans/${encodeURIComponent(planId)}/confirm`,
+      {
+        method: "POST",
+        body: JSON.stringify(cmd || { confirmed: true }),
+      }
+    );
+  },
+
+  async rejectPlan(planId: string, reason?: string): Promise<OrchestrationPlanView> {
+    return fetchJson<OrchestrationPlanView>(
+      `${API_BASE}/api/workflows/orchestrator/plans/${encodeURIComponent(planId)}/reject`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }
+    );
+  },
+
+  async listPlansByProject(projectId: string): Promise<OrchestrationPlanView[]> {
+    return fetchJson<OrchestrationPlanView[]>(
+      `${API_BASE}/api/workflows/projects/${encodeURIComponent(projectId)}/plans`
+    );
+  },
+
+  async validateDsl(dsl: WorkflowDsl | unknown): Promise<ValidateDslResultView> {
+    return fetchJson<ValidateDslResultView>(`${API_BASE}/api/workflows/definitions/validate`, {
       method: "POST",
       body: JSON.stringify(dsl),
     });

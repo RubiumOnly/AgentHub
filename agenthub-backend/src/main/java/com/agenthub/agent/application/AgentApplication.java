@@ -18,4 +18,6 @@ public interface AgentApplication {
     List<ProviderView> listCurrentUserProviders();
     List<Map<String, Object>> getSupportedPlatforms();
     AgentExecutionResult execute(AgentExecutionRequest request);
+    List<com.agenthub.agent.domain.definition.AgentToolDefinition> listTools();
+    com.agenthub.agent.domain.context.AssembledContext assembleContext(List<com.agenthub.agent.domain.context.ContextAssemblyEngine.LayerInput> layerInputs);
 }

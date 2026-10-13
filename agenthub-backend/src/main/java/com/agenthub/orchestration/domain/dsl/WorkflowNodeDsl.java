@@ -23,6 +23,9 @@ public class WorkflowNodeDsl implements Serializable {
     private Long timeoutSeconds;
     private RetryPolicyDsl retryPolicy = new RetryPolicyDsl(0, 500L);
     private List<String> nextNodeIds = new ArrayList<>();
+    private String agentDefinitionKey;
+    private String stage;
+    private List<String> requiredTools = new ArrayList<>();
 
     public WorkflowNodeDsl() {}
 
@@ -64,4 +67,10 @@ public class WorkflowNodeDsl implements Serializable {
     public void setRetryPolicy(RetryPolicyDsl retryPolicy) { this.retryPolicy = retryPolicy; }
     public List<String> getNextNodeIds() { return nextNodeIds; }
     public void setNextNodeIds(List<String> nextNodeIds) { this.nextNodeIds = nextNodeIds != null ? nextNodeIds : new ArrayList<>(); }
+    public String getAgentDefinitionKey() { return agentDefinitionKey; }
+    public void setAgentDefinitionKey(String agentDefinitionKey) { this.agentDefinitionKey = agentDefinitionKey; }
+    public String getStage() { return stage; }
+    public void setStage(String stage) { this.stage = stage; }
+    public List<String> getRequiredTools() { return requiredTools; }
+    public void setRequiredTools(List<String> requiredTools) { this.requiredTools = requiredTools != null ? requiredTools : new ArrayList<>(); }
 }

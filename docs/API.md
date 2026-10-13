@@ -174,10 +174,18 @@
 - `POST /api/im/conversations/{id}/messages`：发送消息与触发智能体路由（入参 `SendMessageCommand`）；
 - `GET /api/im/conversations/{id}/stream`：**SSE 实时事件流通道**。
 
-### 6. 工作流定义、执行引擎、事件回放与脱敏证据包 (Workflow Execution & Evidence Bundle)
-- `POST /api/workflows/definitions/validate`：校验 DAG 工作流 DSL 拓扑合法性（Kahn 环路检测与节点契约验证）
-- `POST /api/workflows/definitions`：创建并持久化版本化工作流定义
-- `GET /api/workflows/definitions`：查询工作流定义列表（支持 `?projectId=...`）
+### 6. 工作流定义、模板、Orchestrator 计划、执行引擎与脱敏证据包 (Workflow Execution & Evidence Bundle)
+- `GET /api/workflows/templates`：获取版本化工作流模板列表（`BUG_FIX_WITH_TESTS`, `NEW_FEATURE_ENDPOINT`，内置 7 阶段 Kahn DAG 与 4 大 Agent 角色）；
+- `GET /api/workflows/templates/{id}`：获取模板详情与 Kahn 阶段拓扑规范；
+- `POST /api/workflows/templates/{id}/instantiate`：根据模板动态实例化生成版本化 `WorkflowDefinition`；
+- `POST /api/workflows/definitions/validate`：校验 DAG 工作流 DSL 拓扑合法性（Kahn 环路检测、自环拦截、孤岛节点拦截，计算阶段级并行执行批次 `executionStages` 与审批节点校验）；
+- `POST /api/workflows/definitions`：创建并持久化版本化工作流定义；
+- `GET /api/workflows/definitions`：查询工作流定义列表（支持 `?projectId=...`）；
+- `POST /api/workflows/orchestrator/plans`：Orchestrator 生成结构化执行计划（入参 `GeneratePlanCommand`：projectId, workspaceId, templateType, taskGoal；包含预测受影响文件、子任务拆解、Token/成本/超时预算上限、质量门禁与工具权限清单）；
+- `GET /api/workflows/orchestrator/plans/{planId}`：获取 Orchestrator 计划详情；
+- `POST /api/workflows/orchestrator/plans/{planId}/confirm`：用户审查并确认计划（入参 `ConfirmPlanCommand`：confirmed, allowedHighImpactTools, decisionNote；确认后解锁高影响工具执行权限）；
+- `POST /api/workflows/orchestrator/plans/{planId}/reject`：用户驳回计划（入参 `RejectPlanRequest`：reason）；
+- `GET /api/workflows/projects/{projectId}/plans`：按项目查询历史规划列表；
 - `POST /api/executions/runs`（或 `POST /api/runs`）：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
   - Request: `{"projectId": "<project-id>", "definitionId": "<definition-id>", "idempotencyKey": "idemp-uuid"}`
   - Response: `Result<WorkflowRunView>`
@@ -272,6 +280,16 @@
   - Response: `text/html`
 - `POST /api/sandbox/deploy/{projectId}`：一键部署并生成容器镜像交付清单与 Dockerfile
   - Response: `Result<DeploymentManifest>`
+
+### 16. Agent 注册表、工具体系、上下文装配与离线评测 (Agent Registry, Tools, Context & Evaluation)
+- `GET /api/agents`：查询系统注册的 Agent 定义列表（含 4 大内置规范角色：`backend-architect`, `backend-developer`, `qa-tester`, `security-reviewer`）；
+- `GET /api/agents/{defKey}`：查询指定 Agent 定义详情（含工具白名单、Provider 策略、Token 预算、安全级别与停止条件）；
+- `GET /api/agents/tools`：查询系统 7 大核心内置工具定义清单（含参数 JSON Schema、高影响标识与输出配额上限）；
+- `POST /api/agents/context-assembly`：6 层分层上下文组装引擎（按层级 Token 预算分配、截断策略、来源追溯与安全级别标记，防爆防泄漏）；
+- `POST /api/agents/evaluations/run`：触发运行离线自动化评测套件（入参可选指定模型 `model`；覆盖 5 大任务类型：新端点、缺陷修复、代码重构、测试补齐、对抗注入防御）；
+- `GET /api/agents/evaluations/latest`：获取最新离线评测报告（包含综合通过率 `passRate`、工具误用率 `toolMisuseRate`、Diff 采纳率与单任务明细）；
+- `GET /api/agents/platforms`：查询受支持的 Agent 执行平台与沙箱形态；
+- `POST /api/agents/execute`：单次受控 Agent 任务直接执行。
 
 ---
 

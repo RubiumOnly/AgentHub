@@ -193,7 +193,7 @@ class Phase0BaselineAndDebtFreezeGuardTest {
                     .forEach(tsFiles::add);
         }
 
-        assertThat(tsFiles).hasSize(34);
+        assertThat(tsFiles).hasSize(35);
 
         List<String> unexpectedFrontendProjDefault = new ArrayList<>();
         List<String> unexpectedFrontendLegacyIm = new ArrayList<>();

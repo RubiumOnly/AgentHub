@@ -108,14 +108,14 @@ public class WorkflowDslValidator {
             }
         }
 
-        // Cycle Detection via Kahn's Topological Sort Algorithm
+        // Cycle Detection & Stage Leveling via Kahn's Topological Sort Algorithm
         Map<String, Integer> inDegrees = new LinkedHashMap<>();
-        Queue<String> queue = new ArrayDeque<>();
+        List<String> zeroInDegreeRoots = new ArrayList<>();
         for (String id : nodeIds) {
             int deg = incoming.get(id).size();
             inDegrees.put(id, deg);
             if (deg == 0) {
-                queue.add(id);
+                zeroInDegreeRoots.add(id);
             }
         }
 
@@ -123,16 +123,24 @@ public class WorkflowDslValidator {
         Map<String, Integer> initialInDegrees = new LinkedHashMap<>(inDegrees);
 
         List<String> sortedOrder = new ArrayList<>();
-        while (!queue.isEmpty()) {
-            String current = queue.poll();
-            sortedOrder.add(current);
-            for (String neighbor : outgoing.get(current)) {
-                int newDeg = inDegrees.get(neighbor) - 1;
-                inDegrees.put(neighbor, newDeg);
-                if (newDeg == 0) {
-                    queue.add(neighbor);
+        List<List<String>> executionStages = new ArrayList<>();
+        List<String> currentLevel = new ArrayList<>(zeroInDegreeRoots);
+
+        while (!currentLevel.isEmpty()) {
+            executionStages.add(new ArrayList<>(currentLevel));
+            List<String> nextLevel = new ArrayList<>();
+
+            for (String current : currentLevel) {
+                sortedOrder.add(current);
+                for (String neighbor : outgoing.get(current)) {
+                    int newDeg = inDegrees.get(neighbor) - 1;
+                    inDegrees.put(neighbor, newDeg);
+                    if (newDeg == 0) {
+                        nextLevel.add(neighbor);
+                    }
                 }
             }
+            currentLevel = nextLevel;
         }
 
         if (sortedOrder.size() < nodeIds.size()) {
@@ -146,6 +154,13 @@ public class WorkflowDslValidator {
                     "Cycle detected in workflow graph involving nodes: " + cycleNodes);
         }
 
-        return new TopologicalSortResult(sortedOrder, initialInDegrees, outgoing, incoming);
+        // Validate APPROVAL nodes
+        for (WorkflowNodeDsl node : dsl.getNodes()) {
+            if ("APPROVAL".equalsIgnoreCase(node.getType())) {
+                node.setRequiresApproval(true);
+            }
+        }
+
+        return new TopologicalSortResult(sortedOrder, initialInDegrees, outgoing, incoming, executionStages);
     }
 }

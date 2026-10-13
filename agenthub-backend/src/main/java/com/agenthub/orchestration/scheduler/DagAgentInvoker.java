@@ -32,16 +32,27 @@ public class DagAgentInvoker {
     private final DagLeaseExecutor leaseExecutor;
     private final DagStateTransitioner stateTransitioner;
     private final DagEventRecorder eventRecorder;
+    private final com.agenthub.orchestration.application.OrchestratorPlanApplication planApplication;
     private final SafeExpressionEvaluator evaluator = new SafeExpressionEvaluator();
 
     public DagAgentInvoker(AgentRuntimeRegistry runtimeRegistry,
                            DagLeaseExecutor leaseExecutor,
                            DagStateTransitioner stateTransitioner,
                            DagEventRecorder eventRecorder) {
+        this(runtimeRegistry, leaseExecutor, stateTransitioner, eventRecorder, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DagAgentInvoker(AgentRuntimeRegistry runtimeRegistry,
+                           DagLeaseExecutor leaseExecutor,
+                           DagStateTransitioner stateTransitioner,
+                           DagEventRecorder eventRecorder,
+                           com.agenthub.orchestration.application.OrchestratorPlanApplication planApplication) {
         this.runtimeRegistry = runtimeRegistry;
         this.leaseExecutor = leaseExecutor;
         this.stateTransitioner = stateTransitioner;
         this.eventRecorder = eventRecorder;
+        this.planApplication = planApplication;
     }
 
     public boolean executeAgentNodeWithRetry(String runId,
@@ -58,6 +69,17 @@ public class DagAgentInvoker {
 
         Map<String, Object> resolvedInputs = evaluator.resolveInputs(node.getInputs(), context);
         context.recordNodeStarted(node.getId(), resolvedInputs);
+
+        // Guard: Enforce high-impact tool authorization against confirmed Orchestrator plan
+        if (node.getRequiredTools() != null && !node.getRequiredTools().isEmpty() && planApplication != null) {
+            String planId = resolvedInputs != null && resolvedInputs.get("planId") != null
+                    ? String.valueOf(resolvedInputs.get("planId"))
+                    : (context.getInputs() != null && context.getInputs().get("planId") != null
+                            ? String.valueOf(context.getInputs().get("planId")) : null);
+            for (String toolName : node.getRequiredTools()) {
+                planApplication.enforceHighImpactToolAuthorization(planId, toolName);
+            }
+        }
 
         Object promptObj = evaluator.resolveTemplate(node.getPromptTemplate(), context);
         String prompt = promptObj != null ? String.valueOf(promptObj) : "";

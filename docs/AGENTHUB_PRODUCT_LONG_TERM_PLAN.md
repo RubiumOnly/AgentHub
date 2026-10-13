@@ -441,3 +441,19 @@ AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；
 普通提交 Subject：feat(phase-2): productize project onboarding wizard, controlled workspace policies, and versioned context sources
 加固提交 Subject（如有）：fix(phase-2): harden onboarding error recovery, context source idempotency, workspaceId mapping, and Jackson contract compatibility
 ```
+
+### 9.7 Phase 3 阶段验收记录
+
+```text
+阶段：Phase 3
+范围：版本化 AgentDefinition 产品化（4 大规范研发角色 backend-architect、backend-developer、qa-tester、security-reviewer，工具白名单、JSON Schema 参数校验、ProviderPolicy、AgentBudget 预算上限、安全级别与停止条件）；7 核心 Agent 工具定义（ToolRegistry）与输出防爆配额保护（guardOutputSize）；Kahn DAG 增强校验（WorkflowDslValidator：自环、环路、孤岛节点拦截，阶段级并行执行批次 executionStages 计算，审批节点 requiresApproval 校验）；版本化 WorkflowTemplate 产品化（BUG_FIX_WITH_TESTS 7 阶段含审批门禁，NEW_FEATURE_ENDPOINT 7 阶段 DDD 端点交付）与动态实例化（instantiateTemplate）；Orchestrator 结构化 Plan 生成（OrchestrationPlanApplication：影响文件、子任务拆解、预算配额、质量门禁、工具权限清单）与高影响工具门禁（enforceHighImpactToolAuthorization 未确认前阻断 4003 FORBIDDEN，确认后放行）；6 层分层上下文组装引擎（ContextAssemblyEngine：系统规约、AOCI 认知、受影响文件、对话历史、工具输出、用户输入，按 Token 预算截断与来源追溯）；真实活体 Provider 路由保护（ChatRequest.requireLive=true 拒绝 Mock 兜底，抛出 NoAvailableProviderException）；离线自动化评测基准（OfflineEvaluationApplication 覆盖新端点、缺陷修复、重构、测试补齐、对抗注入防御 5 大任务）；前端 OrchestratorPlanModal 模板选择、计划审查、预算监视与高影响工具确权门禁模态框；ADR-008 与文档契约对齐
+代码完成：是，变更包含 AgentToolCategory、AgentToolDefinition、ToolRegistry、ProviderPolicy、AgentBudget、AgentDefinitionManifest、ContextLayerType、ContextTruncationStrategy、ContextLayer、AssembledContext、ContextAssemblyEngine、WorkflowTemplateType、WorkflowTemplateView、WorkflowTemplateRegistry、TopologicalSortResult、WorkflowDslValidator 扩展、ToolPermissionRequest、EstimatedBudget、OrchestrationPlanStatus、OrchestrationPlan、OrchestratorPlanApplication/OrchestratorPlanApplicationService、DagAgentInvoker 门禁接入、EvaluationTaskCategory、EvaluationTaskResult、EvaluationReportView、OfflineEvaluationApplication/OfflineEvaluationApplicationService、ChatRequest.requireLive、DynamicProviderRouter 路由守卫、WorkflowDefinitionController 扩展、AgentRegistryController 扩展、Phase3WorkflowTemplatesAndOrchestratorPlanTest、前端 OrchestratorPlanModal.tsx、app/page.tsx、types/index.ts、services/api/workflows.ts、docs/adr/ADR-008、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/openapi-v1.json
+自动化测试：后端 56 test classes / 330 tests 通过（mvn clean test，含 Phase3WorkflowTemplatesAndOrchestratorPlanTest 5 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过
+目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
+AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase3WorkflowTemplatesAndOrchestratorPlanTest 锁定受管范围、OpenAPI v1 契约与 Flyway V1-V12 SHA-256 指纹基线）
+删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
+未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实生产多并发负载下的大规模 LLM 流式 Token 压测
+已知风险与回滚方式：若后续需要回退 Phase 3 功能，可通过 git revert 对应 Phase 3 提交恢复；底层表结构零变更，回滚零数据丢失风险
+普通提交 Subject：feat(phase-3): productize workflow templates, kahn dag parallel stages, orchestrator plan, and tool authorization guards
+加固提交 Subject（如有）：无
+```

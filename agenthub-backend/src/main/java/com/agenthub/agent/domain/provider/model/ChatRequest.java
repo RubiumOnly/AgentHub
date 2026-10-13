@@ -15,6 +15,7 @@ public class ChatRequest {
     private Set<String> requiredCapabilities = new HashSet<>();
     private String preferredProvider;
     private int timeoutSeconds = 60;
+    private boolean requireLive = false;
     private Map<String, Object> metadata = new HashMap<>();
 
     public ChatRequest() {}
@@ -69,4 +70,6 @@ public class ChatRequest {
     public void setMetadata(Map<String, Object> metadata) {
         this.metadata = metadata != null ? new HashMap<>(metadata) : new HashMap<>();
     }
+    public boolean isRequireLive() { return requireLive; }
+    public void setRequireLive(boolean requireLive) { this.requireLive = requireLive; }
 }

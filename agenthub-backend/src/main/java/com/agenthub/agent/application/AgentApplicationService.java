@@ -18,6 +18,14 @@ import com.agenthub.domain.agent.spi.UnifiedAgentAdapter;
 import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import com.agenthub.agent.domain.context.AssembledContext;
+import com.agenthub.agent.domain.context.ContextAssemblyEngine;
+import com.agenthub.agent.domain.definition.*;
+import com.agenthub.project.domain.context.SecurityLevel;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,19 +37,84 @@ import java.util.stream.Collectors;
 @Service
 public class AgentApplicationService implements AgentApplication {
 
+    private static final Logger log = LoggerFactory.getLogger(AgentApplicationService.class);
+
     private final AgentDefinitionRepository definitionRepository;
     private final AgentInstanceRepository instanceRepository;
     private final ProviderRepository providerRepository;
     private final AgentAdapterFactory adapterFactory;
+    private final ToolRegistry toolRegistry;
+    private final ContextAssemblyEngine contextAssemblyEngine;
+    private final ObjectMapper objectMapper;
 
     public AgentApplicationService(AgentDefinitionRepository definitionRepository,
                                    AgentInstanceRepository instanceRepository,
                                    ProviderRepository providerRepository,
-                                   AgentAdapterFactory adapterFactory) {
+                                   AgentAdapterFactory adapterFactory,
+                                   ToolRegistry toolRegistry,
+                                   ContextAssemblyEngine contextAssemblyEngine,
+                                   ObjectMapper objectMapper) {
         this.definitionRepository = definitionRepository;
         this.instanceRepository = instanceRepository;
         this.providerRepository = providerRepository;
         this.adapterFactory = adapterFactory;
+        this.toolRegistry = toolRegistry;
+        this.contextAssemblyEngine = contextAssemblyEngine;
+        this.objectMapper = objectMapper;
+    }
+
+    @PostConstruct
+    public void initCanonicalDefinitions() {
+        seedIfMissing("backend-architect", "后端架构师 (Backend Architect)", "ARCHITECT",
+                "需求分析、Kahn DAG 计划生成与架构防御守卫",
+                "你是一名具备深厚 DDD 与 Spring Boot 架构功底的系统架构师，负责变更范围界定与结构化计划编排。",
+                List.of("file_read", "file_tree", "code_analyze"),
+                SecurityLevel.INTERNAL);
+
+        seedIfMissing("backend-developer", "后端研发工程师 (Backend Developer)", "DEVELOPER",
+                "代码实现、接口编写与缺陷修复",
+                "你是一名资深 Java 后端开发工程师，遵循 Clean Code 与守卫从句规范，实现精确的代码变更。",
+                List.of("file_read", "file_write"),
+                SecurityLevel.INTERNAL);
+
+        seedIfMissing("qa-tester", "测试防御专家 (QA Tester)", "TESTER",
+                "五维测试矩阵防御编写与真实回归验证",
+                "你是一名严苛的 QA 测试防御专家，负责编写覆盖边界极值、并发竞态与空指针防御的自动化测试用例。",
+                List.of("file_read", "file_write", "command_exec"),
+                SecurityLevel.RESTRICTED);
+
+        seedIfMissing("security-reviewer", "安全审查专员 (Security Reviewer)", "REVIEWER",
+                "JGit Diff 审查、质量门禁审计与越权拦截",
+                "你是一名软件安全审查专员，负责对 Git diff 进行逐行安全审计，阻断越权与高危依赖引入。",
+                List.of("file_read", "git_operation", "code_analyze"),
+                SecurityLevel.INTERNAL);
+    }
+
+    private void seedIfMissing(String defKey, String name, String role, String objective, String prompt, List<String> tools, SecurityLevel securityLevel) {
+        try {
+            if (definitionRepository.findByDefKey(defKey).isEmpty()) {
+                AgentDefinitionManifest manifest = new AgentDefinitionManifest();
+                manifest.setRole(role);
+                manifest.setObjective(objective);
+                manifest.setSystemPrompt(prompt);
+                manifest.setTools(tools);
+                manifest.setSecurityLevel(securityLevel);
+                String manifestJson = objectMapper.writeValueAsString(manifest);
+
+                AgentDefinitionEntity entity = new AgentDefinitionEntity(
+                        "def-" + defKey,
+                        defKey,
+                        name,
+                        role,
+                        manifestJson,
+                        "1.0.0"
+                );
+                definitionRepository.save(entity);
+                log.info("Seeded canonical AgentDefinition [{}]", defKey);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to seed agent definition [{}]: {}", defKey, e.getMessage());
+        }
     }
 
     @Override
@@ -58,6 +131,16 @@ public class AgentApplicationService implements AgentApplication {
         AgentDefinitionEntity def = definitionRepository.findByDefKey(defKey)
                 .orElseThrow(() -> new BusinessException(ErrorCode.AGENT_NOT_FOUND, "Agent definition not found: " + defKey));
         return toView(def);
+    }
+
+    @Override
+    public List<AgentToolDefinition> listTools() {
+        return toolRegistry.listAllTools();
+    }
+
+    @Override
+    public AssembledContext assembleContext(List<ContextAssemblyEngine.LayerInput> layerInputs) {
+        return contextAssemblyEngine.assemble(layerInputs);
     }
 
     @Override

@@ -80,17 +80,32 @@ Workspace API 只接受服务端 `workspaceId` 与受检相对路径。`DefaultW
 2. **工作区安全配额（`WorkspaceQuotaGuard`）**：严格实行单文件写入 10MB、文本预览 2MB、工作区总容量 500MB、文件总数 5000 个、执行超时 3600 秒以及网络访问控制策略，超配额统一触发 `BLOCKED_POLICY (3012)`；
 3. **受控工作区生命周期运维**：提供 `resyncWorkspace`（重同步至基线）、`changeBaseline`（变更基线）、`discardWorkspace`（放弃未提交变更）、`restoreSnapshot`（恢复指定快照）、以及 `getWorkspaceQuota`（实时配额监视）；危险操作强制用户显式确认（`confirmed=true`）并由 `AuthAuditService` 记入审计日志。
 
-## 6. Agent 与版本化上下文源 (Versioned Context Sources)
+## 6. Agent 工作单元、工作流模板与 Orchestrator 计划 (Phase 3 产品化事实)
 
-Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本、健康度和熔断状态选择。Provider、Runtime、工具调用和降级均必须写入 Run 证据；Mock 只能属于明确的 Demo/Test 模式。
+Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本、健康度和熔断状态选择。在 Phase 3 中，系统实现了 Agent 治理、工作流模板与计划门禁的全面产品化：
 
-在 Phase 2 中，系统建立了不可篡改的版本化上下文源矩阵（`ContextSourceView`），存储于持久化体系中：
-1. `AOCI_COGNITION`：AOCI 软件工程认知基线；
-2. `PROJECT_RULES`：项目工程规约与 DDD 架构分层守卫；
-3. `BUILD_CONFIG`：构建与依赖配置（`pom.xml`, `package.json` 等）；
-4. `TEST_CONVENTIONS`：测试防御矩阵与验证标准。
-
-每个上下文源均计算确定性 SHA-256 内容指纹（`contentFingerprint`），并与创建时的 Git Baseline Commit 强绑定，为后续 Phase 3 Orchestrator 计划生成提供不可篡改的代码与架构事实输入。
+1. **版本化 `AgentDefinition` 与内置规范角色**：
+   - 固化 `AgentDefinitionManifest`（工具白名单、参数 JSON Schema、ProviderPolicy、AgentBudget 预算上限、安全级别与停止条件）；
+   - 系统启动确权 4 大规范研发角色：`backend-architect`、`backend-developer`、`qa-tester`、`security-reviewer`。
+2. **7 大内置 Agent 工具体系与防爆配额**：
+   - 固化 `file_read`、`file_write`、`command_exec`、`code_search`、`git_operations`、`test_runner`、`context_inspect` 规范与参数 Schema；
+   - `guardOutputSize` 为工具输出提供最大 512KB～2MB 的字节配额保护，超限自动安全截断并记录标记。
+3. **Kahn DAG 校验与并行批次编排**：
+   - `WorkflowDslValidator` 严格执行自环、环路与孤岛节点多重拓扑防御；
+   - 计算阶段级并行执行批次（`executionStages`），并强制审批意图节点标注 `requiresApproval=true`。
+4. **版本化 `WorkflowTemplate` 矩阵**：
+   - 预置 `BUG_FIX_WITH_TESTS`（7 阶段含审批门禁）与 `NEW_FEATURE_ENDPOINT`（7 阶段 DDD 端点交付）两大核心工业级模板；
+   - 支持动态实例化生成带时间戳与版本的 `WorkflowDefinition`。
+5. **Orchestrator 计划生成与高影响工具门禁**：
+   - 执行前生成结构化 `OrchestrationPlan`（预测受影响文件、子任务拆解、预算配额、质量门禁、工具权限清单）；
+   - `enforceHighImpactToolAuthorization` 双重门禁：未经用户确认前阻断 `file_write` / `command_exec` 等高影响写操作与执行命令（`4003 FORBIDDEN`）；用户审查确认后方放行执行。
+6. **6 层上下文分层组装引擎（`ContextAssemblyEngine`）**：
+   - 依序组装：`SYSTEM_AND_PROJECT_RULES` -> `AOCI_COGNITION` -> `AFFECTED_FILES` -> `CONVERSATION_HISTORY` -> `TOOL_RESULTS` -> `USER_INPUT`；
+   - 每层独立分配 Token 预算、截断策略与安全级别标记。
+7. **真实活体 Provider 路由保护（`requireLive`）**：
+   - `ChatRequest.requireLive=true` 严禁静默回退至 Mock；无活跃可用真实 Provider 时显式抛出 `NoAvailableProviderException`。
+8. **离线自动化评测基准（`OfflineEvaluationApplication`）**：
+   - 内置覆盖 5 大典型任务的 Benchmark 套件（新端点、缺陷修复、重构、测试补齐、对抗注入防御），量化通过率、工具误用率与 Diff 采纳率。
 
 ## 7. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
 
@@ -127,5 +142,5 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 
 ArchUnit（`ArchUnitArchitectureTest`）与 Phase 0 基线守卫（`Phase0BaselineAndDebtFreezeGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
 
-详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-005](adr/ADR-005-database-driven-lease-and-crash-recovery.md)。
+详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-008](adr/ADR-008-workflow-templates-kahn-dag-and-orchestrator-plan.md)。
 
