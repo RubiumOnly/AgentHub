@@ -21,21 +21,23 @@ public class UnifiedExecutionStateGraph {
 
     // Legal transitions for WorkflowRunStatus
     private static final Map<WorkflowRunStatus, Set<WorkflowRunStatus>> LEGAL_RUN_TRANSITIONS = Map.of(
-            WorkflowRunStatus.PENDING, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.CANCELLED),
+            WorkflowRunStatus.PENDING, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.CANCELLED, WorkflowRunStatus.REJECTED),
             WorkflowRunStatus.RUNNING, Set.of(
                     WorkflowRunStatus.PAUSED,
                     WorkflowRunStatus.WAITING_APPROVAL,
                     WorkflowRunStatus.SUCCEEDED,
                     WorkflowRunStatus.FAILED,
                     WorkflowRunStatus.CANCELLED,
-                    WorkflowRunStatus.TIMED_OUT
+                    WorkflowRunStatus.TIMED_OUT,
+                    WorkflowRunStatus.REJECTED
             ),
-            WorkflowRunStatus.PAUSED, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.CANCELLED),
-            WorkflowRunStatus.WAITING_APPROVAL, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.FAILED, WorkflowRunStatus.CANCELLED),
-            WorkflowRunStatus.SUCCEEDED, Set.of(),
-            WorkflowRunStatus.FAILED, Set.of(WorkflowRunStatus.RUNNING),
+            WorkflowRunStatus.PAUSED, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.CANCELLED, WorkflowRunStatus.REJECTED),
+            WorkflowRunStatus.WAITING_APPROVAL, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.FAILED, WorkflowRunStatus.CANCELLED, WorkflowRunStatus.REJECTED),
+            WorkflowRunStatus.SUCCEEDED, Set.of(WorkflowRunStatus.REJECTED),
+            WorkflowRunStatus.FAILED, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.REJECTED),
             WorkflowRunStatus.CANCELLED, Set.of(),
-            WorkflowRunStatus.TIMED_OUT, Set.of(WorkflowRunStatus.RUNNING)
+            WorkflowRunStatus.TIMED_OUT, Set.of(WorkflowRunStatus.RUNNING, WorkflowRunStatus.REJECTED),
+            WorkflowRunStatus.REJECTED, Set.of()
     );
 
     // Legal transitions for StepRunStatus

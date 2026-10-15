@@ -147,10 +147,10 @@ export function SandboxPreviewPanel({
     setActionError(null);
     const start = performance.now();
     try {
-      await apiClient.probeDeployment(deployment.id);
-      const elapsed = Math.round(performance.now() - start);
+      const res = await apiClient.probeDeployment(deployment.id);
+      const elapsed = res.probeLatencyMs ?? Math.round(performance.now() - start);
       setProbeLatency(elapsed);
-      setProbeStatus("HEALTHY");
+      setProbeStatus(res.healthy !== false ? "HEALTHY" : "UNHEALTHY");
       onRefresh?.();
       await fetchLogs(false);
     } catch (e: any) {

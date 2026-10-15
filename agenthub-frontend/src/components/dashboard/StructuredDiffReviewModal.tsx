@@ -158,7 +158,17 @@ export const StructuredDiffReviewModal: React.FC<StructuredDiffReviewModalProps>
 
   const handleCopyPrMarkdown = () => {
     if (!prDraft) return;
-    const md = `# ${prDraft.title}\n\n## 关联目标\n- 目标分支: \`${prDraft.targetBranch}\`\n- 关联 Run: \`${prDraft.runId}\`\n- 质量门禁: **${prDraft.qualityGateStatus}** (${prDraft.qualityGateScore}分)\n\n## 变更摘要\n${prDraft.summary}\n\n## 风险评估\n${prDraft.riskAssessment}\n\n## 变更文件 (${prDraft.changedFiles.length})\n${prDraft.changedFiles.map((f) => `- ${f}`).join("\n")}\n\n代码统计: +${prDraft.totalLinesAdded} / -${prDraft.totalLinesDeleted}`;
+    const changedFiles = prDraft.changedFiles || [];
+    const filesCount = changedFiles.length || prDraft.changedFilesCount || 0;
+    const gateStatus = prDraft.qualityGateStatus || prDraft.qualityGateReport?.overallStatus || "PASSED";
+    const gateScore = prDraft.qualityGateScore ?? prDraft.qualityGateReport?.compositeScore ?? 100;
+    const added = prDraft.totalLinesAdded ?? prDraft.addedLines ?? 0;
+    const deleted = prDraft.totalLinesDeleted ?? prDraft.deletedLines ?? 0;
+    const summary = prDraft.summary || prDraft.summaryMarkdown || "";
+    const risk = prDraft.riskAssessment || (prDraft.canMergeSafely ? "LOW_RISK: 质量门禁全部通过" : "MEDIUM_RISK: 建议人工审查");
+    const fileListText = changedFiles.length > 0 ? changedFiles.map((f) => `- ${f}`).join("\n") : `共 ${filesCount} 个文件`;
+
+    const md = `# ${prDraft.title}\n\n## 关联目标\n- 目标分支: \`${prDraft.targetBranch}\`\n- 关联 Run: \`${prDraft.runId}\`\n- 质量门禁: **${gateStatus}** (${gateScore}分)\n\n## 变更摘要\n${summary}\n\n## 风险评估\n${risk}\n\n## 变更文件 (${filesCount})\n${fileListText}\n\n代码统计: +${added} / -${deleted}`;
     navigator.clipboard.writeText(md);
     setPrCopied(true);
     setTimeout(() => setPrCopied(false), 2000);
@@ -459,13 +469,13 @@ export const StructuredDiffReviewModal: React.FC<StructuredDiffReviewModalProps>
                   <div>
                     <label className="text-slate-400 block mb-1">变更动机与摘要</label>
                     <div className="p-2.5 rounded bg-slate-900 border border-slate-800 text-slate-300 leading-relaxed whitespace-pre-wrap">
-                      {prDraft.summary}
+                      {prDraft.summary || prDraft.summaryMarkdown || "自动化质量门禁与受控交付流水线生成"}
                     </div>
                   </div>
                   <div>
                     <label className="text-slate-400 block mb-1">风险评估</label>
                     <div className="p-2.5 rounded bg-slate-900 border border-slate-800 text-emerald-400 font-mono">
-                      {prDraft.riskAssessment}
+                      {prDraft.riskAssessment || (prDraft.canMergeSafely ? "LOW_RISK: 质量门禁全部通过" : "RISK: 存在未通过门禁项")}
                     </div>
                   </div>
                 </div>

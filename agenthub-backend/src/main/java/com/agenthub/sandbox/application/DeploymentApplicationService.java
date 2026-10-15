@@ -714,9 +714,15 @@ public class DeploymentApplicationService implements DeploymentApplication {
         entity.setLogOutput(currentLogs + logAppend);
         if (healthy && !DeploymentStatus.RUNNING.name().equals(entity.getStatus())) {
             transitionState(entity, DeploymentStatus.RUNNING);
+        } else if (!healthy && DeploymentStatus.RUNNING.name().equals(entity.getStatus())) {
+            entity.setErrorMessage("Health check probe failed: " + localProbeUrl + " is unresponsive (latency: " + elapsed + "ms)");
         }
         entity.setUpdatedAt(LocalDateTime.now());
         deploymentRepository.save(entity);
-        return toResponse(entity);
+
+        DeploymentResponse resp = toResponse(entity);
+        resp.setProbeLatencyMs(elapsed);
+        resp.setHealthy(healthy);
+        return resp;
     }
 }

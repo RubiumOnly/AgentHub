@@ -315,11 +315,11 @@ public class RunCommandModule {
             try {
                 if (ws.getGitBaselineCommit() != null) {
                     Path root = workspaceResolver.getWorkspaceRoot(ws.getId());
-                    gitManager.revertStepFiles(root.toFile(), ws.getGitBaselineCommit(), null, RequestContext.get().getUserId());
-                    log.info("Reverted workspace [{}] to baseline commit [{}] on run rejection", ws.getId(), ws.getGitBaselineCommit());
+                    gitManager.resetWorkspaceToBaseline(root.toFile(), ws.getGitBaselineCommit());
+                    log.info("Reset workspace [{}] hard to baseline commit [{}] on run rejection", ws.getId(), ws.getGitBaselineCommit());
                 }
             } catch (Exception e) {
-                log.warn("Failed to revert workspace on run rejection: {}", e.getMessage());
+                log.warn("Failed to reset workspace on run rejection: {}", e.getMessage());
             }
         });
 
@@ -331,7 +331,7 @@ public class RunCommandModule {
             }
         }
 
-        WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.CANCELLED, "Rejected: " + rejectReason);
+        WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.REJECTED, "Rejected: " + rejectReason);
         broadcaster.publishEvent(runId, "RUN_REJECTED", "{\"reason\":\"" + rejectReason.replace("\"", "\\\"") + "\"}");
         return RunQueryModule.toRunView(updated);
     }

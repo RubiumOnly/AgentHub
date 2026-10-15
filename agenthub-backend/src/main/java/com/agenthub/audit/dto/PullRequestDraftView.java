@@ -4,6 +4,7 @@ import com.agenthub.audit.domain.quality.QualityGateReport;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Standardized Pull Request draft specification for controlled Git delivery.
@@ -16,14 +17,22 @@ public class PullRequestDraftView implements Serializable {
     private String artifactId;
     private String sourceBranch;
     private String targetBranch;
+    private String summary;
     private String summaryMarkdown;
+    private String riskAssessment;
+    private String qualityGateStatus;
+    private int qualityGateScore;
     private QualityGateReport qualityGateReport;
     private int changedFilesCount;
+    private List<String> changedFiles = new java.util.ArrayList<>();
     private int addedLines;
     private int deletedLines;
+    private int totalLinesAdded;
+    private int totalLinesDeleted;
     private String auditChecksum;
     private boolean canMergeSafely;
     private LocalDateTime createdAt;
+    private LocalDateTime generatedAt;
 
     public PullRequestDraftView() {
     }
@@ -138,5 +147,69 @@ public class PullRequestDraftView implements Serializable {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getSummary() {
+        return summary;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public String getRiskAssessment() {
+        return riskAssessment;
+    }
+
+    public void setRiskAssessment(String riskAssessment) {
+        this.riskAssessment = riskAssessment;
+    }
+
+    public String getQualityGateStatus() {
+        return qualityGateStatus;
+    }
+
+    public void setQualityGateStatus(String qualityGateStatus) {
+        this.qualityGateStatus = qualityGateStatus;
+    }
+
+    public int getQualityGateScore() {
+        return qualityGateScore;
+    }
+
+    public void setQualityGateScore(int qualityGateScore) {
+        this.qualityGateScore = qualityGateScore;
+    }
+
+    public List<String> getChangedFiles() {
+        return changedFiles;
+    }
+
+    public void setChangedFiles(List<String> changedFiles) {
+        this.changedFiles = changedFiles != null ? changedFiles : new java.util.ArrayList<>();
+    }
+
+    public int getTotalLinesAdded() {
+        return totalLinesAdded;
+    }
+
+    public void setTotalLinesAdded(int totalLinesAdded) {
+        this.totalLinesAdded = totalLinesAdded;
+    }
+
+    public int getTotalLinesDeleted() {
+        return totalLinesDeleted;
+    }
+
+    public void setTotalLinesDeleted(int totalLinesDeleted) {
+        this.totalLinesDeleted = totalLinesDeleted;
+    }
+
+    public LocalDateTime getGeneratedAt() {
+        return generatedAt;
+    }
+
+    public void setGeneratedAt(LocalDateTime generatedAt) {
+        this.generatedAt = generatedAt;
     }
 }

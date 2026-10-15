@@ -215,16 +215,25 @@ export interface PullRequestDraftView {
   draftId: string;
   artifactId: string;
   runId: string;
+  sourceBranch?: string;
   targetBranch: string;
   title: string;
-  summary: string;
-  riskAssessment: string;
-  qualityGateStatus: string;
-  qualityGateScore: number;
-  changedFiles: string[];
-  totalLinesAdded: number;
-  totalLinesDeleted: number;
-  generatedAt: string;
+  summary?: string;
+  summaryMarkdown?: string;
+  riskAssessment?: string;
+  qualityGateStatus?: string;
+  qualityGateScore?: number;
+  qualityGateReport?: QualityGateReport;
+  changedFiles?: string[];
+  changedFilesCount?: number;
+  addedLines?: number;
+  deletedLines?: number;
+  totalLinesAdded?: number;
+  totalLinesDeleted?: number;
+  auditChecksum?: string;
+  canMergeSafely?: boolean;
+  createdAt?: string;
+  generatedAt?: string;
 }
 
 export interface DeploymentProbeResult {
@@ -369,6 +378,8 @@ export interface DeploymentResponse {
   terminationReason?: string;
   templateType?: string;
   lifecycleTrace?: string;
+  probeLatencyMs?: number;
+  healthy?: boolean;
 }
 
 export interface CreateDeploymentRequest {

@@ -12,6 +12,7 @@ import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.execution.application.ExecutionApplication;
 import com.agenthub.execution.domain.model.StepRunStatus;
+import com.agenthub.execution.domain.model.WorkflowRunStatus;
 import com.agenthub.execution.dto.RunEvidenceBundleView;
 import com.agenthub.execution.dto.StepRunView;
 import com.agenthub.execution.dto.WorkflowRunView;
@@ -491,5 +492,216 @@ public class Phase5QualityGateAndDeliveryTest {
         assertThat(bundle.getProject().getId()).isEqualTo(testProjectId);
         assertThat(bundle.getChecksum()).isNotBlank().hasSize(64);
         assertThat(executionApplication.verifyEvidenceBundleChecksum(bundle)).isTrue();
+    }
+
+    @Test
+    @DisplayName("测试 9：全盘驳回（rejectRun）工作区硬重置至基线快照且 Run 状态收敛为 REJECTED")
+    void testRejectRunHardResetsWorkspaceToBaselineAndTransitionsToRejected() throws Exception {
+        String runId = "run-reject-" + UUID.randomUUID().toString().substring(0, 8);
+        createdRunIds.add(runId);
+
+        WorkflowRunEntity run = new WorkflowRunEntity(runId, testProjectId, "def-1", "RUNNING", "key-rej");
+        workflowRunRepository.save(run);
+
+        // Step 1: Establish baseline with BaseA.java
+        Path baseFile = testWorkspacePath.resolve("BaseA.java");
+        Files.writeString(baseFile, "public class BaseA { int v = 1; }\n");
+        String baselineHash = gitManager.createBaseline(testWorkspacePath.toFile(), runId, testUserId);
+
+        WorkspaceEntity ws = workspaceRepository.findById(testWorkspaceId).orElseThrow();
+        ws.setGitBaselineCommit(baselineHash);
+        workspaceRepository.save(ws);
+
+        // Step 2: Agent execution creates step run, modifies BaseA.java, and adds NewClass.java
+        String stepId = "step-rej-1";
+        StepRunEntity step = new StepRunEntity(stepId, runId, "node-code", "RUNNING");
+        stepRunRepository.save(step);
+
+        Files.writeString(baseFile, "public class BaseA { int v = 999; /* modified by agent */ }\n");
+        Path addedFile = testWorkspacePath.resolve("NewClass.java");
+        Files.writeString(addedFile, "public class NewClass {}\n");
+        gitManager.createStepSnapshot(testWorkspacePath.toFile(), runId, stepId, "Agent modified and added files", testUserId);
+
+        // Step 3: Reject the run
+        WorkflowRunView rejectedView = executionApplication.rejectRun(runId, "Rejected due to unacceptable changes");
+
+        // Verify Run status is explicitly REJECTED
+        assertThat(rejectedView).isNotNull();
+        assertThat(rejectedView.getStatus()).isEqualTo(WorkflowRunStatus.REJECTED.name());
+
+        WorkflowRunEntity freshRun = workflowRunRepository.findById(runId).orElseThrow();
+        assertThat(freshRun.getStatus()).isEqualTo(WorkflowRunStatus.REJECTED.name());
+
+        // Verify Step was cancelled
+        StepRunEntity freshStep = stepRunRepository.findById(stepId).orElseThrow();
+        assertThat(freshStep.getStatus()).isEqualTo(StepRunStatus.CANCELLED.name());
+
+        // Verify workspace files: BaseA.java is restored to exact baseline, NewClass.java is deleted!
+        assertThat(Files.readString(baseFile)).isEqualTo("public class BaseA { int v = 1; }\n");
+        assertThat(Files.exists(addedFile)).isFalse();
+
+        // Verify audit event
+        List<RunEventEntity> events = runEventRepository.findByRunIdOrderBySequenceNumAsc(runId);
+        assertThat(events.stream().anyMatch(e -> "RUN_REJECTED".equals(e.getEventType()))).isTrue();
+    }
+
+    @Test
+    @DisplayName("测试 10：SUCCEEDED 终态完成的 Run 在质量门禁审查被驳回时合法跃迁至 REJECTED")
+    void testRejectRunOnSucceededRunPermittedAndTransitionsToRejected() throws Exception {
+        String runId = "run-rej-succ-" + UUID.randomUUID().toString().substring(0, 8);
+        createdRunIds.add(runId);
+
+        WorkflowRunEntity run = new WorkflowRunEntity(runId, testProjectId, "def-1", "SUCCEEDED", "key-rej-succ");
+        workflowRunRepository.save(run);
+
+        Path code = testWorkspacePath.resolve("Target.java");
+        Files.writeString(code, "initial content");
+        String baselineHash = gitManager.createBaseline(testWorkspacePath.toFile(), runId, testUserId);
+
+        WorkspaceEntity ws = workspaceRepository.findById(testWorkspaceId).orElseThrow();
+        ws.setGitBaselineCommit(baselineHash);
+        workspaceRepository.save(ws);
+
+        Files.writeString(code, "modified content in run");
+
+        WorkflowRunView result = executionApplication.rejectRun(runId, "Reviewer rejected final delivery");
+        assertThat(result.getStatus()).isEqualTo(WorkflowRunStatus.REJECTED.name());
+        assertThat(Files.readString(code)).isEqualTo("initial content");
+    }
+
+    @Test
+    @DisplayName("测试 11：单文件回滚（revertSingleFile）不污染工作区其他未提交文件")
+    void testSingleFileRevertDoesNotContaminateOtherUncommittedFiles() throws Exception {
+        String runId = "run-iso-rev-" + UUID.randomUUID().toString().substring(0, 8);
+        createdRunIds.add(runId);
+
+        WorkflowRunEntity run = new WorkflowRunEntity(runId, testProjectId, "def-1", "WAITING_APPROVAL", "key-iso");
+        workflowRunRepository.save(run);
+
+        Path file1 = testWorkspacePath.resolve("ServiceA.java");
+        Path file2 = testWorkspacePath.resolve("ServiceB.java");
+        Files.writeString(file1, "ServiceA baseline\n");
+        Files.writeString(file2, "ServiceB baseline\n");
+        String baselineHash = gitManager.createBaseline(testWorkspacePath.toFile(), runId, testUserId);
+
+        WorkspaceEntity ws = workspaceRepository.findById(testWorkspaceId).orElseThrow();
+        ws.setGitBaselineCommit(baselineHash);
+        workspaceRepository.save(ws);
+
+        Files.writeString(file1, "ServiceA modified in step\n");
+        Files.writeString(file2, "ServiceB modified in step\n");
+        String stepHash = gitManager.createStepSnapshot(testWorkspacePath.toFile(), runId, "step-1", "Modified A and B", testUserId).getCommitHash();
+
+        String artId = "art-iso-" + UUID.randomUUID().toString().substring(0, 8);
+        createdArtifactIds.add(artId);
+        ArtifactEntity art = new ArtifactEntity(
+                artId, runId, "step-1", "CODE_DIFF", stepHash, stepHash,
+                "{\"changedFiles\":[\"ServiceA.java\",\"ServiceB.java\"],\"baselineCommit\":\"" + baselineHash + "\"}"
+        );
+        art.setReviewStatus("PENDING");
+        artifactRepository.save(art);
+
+        // Put an uncommitted scratch file into workspace
+        Path scratch = testWorkspacePath.resolve("scratch.tmp");
+        Files.writeString(scratch, "Uncommitted dirty work");
+
+        // Revert ONLY ServiceA.java
+        artifactApplication.revertSingleFile(artId, "ServiceA.java", testUserId);
+
+        assertThat(Files.readString(file1)).isEqualTo("ServiceA baseline\n");
+        assertThat(Files.readString(file2)).isEqualTo("ServiceB modified in step\n");
+        assertThat(Files.readString(scratch)).isEqualTo("Uncommitted dirty work");
+
+        // Verify scratch.tmp is NOT in Git tracked commit log
+        List<String> lastCommitFiles = gitManager.getChangedFilesInCommit(testWorkspacePath.toFile(), "HEAD");
+        assertThat(lastCommitFiles).contains("ServiceA.java");
+        assertThat(lastCommitFiles).doesNotContain("scratch.tmp");
+        assertThat(lastCommitFiles).doesNotContain("ServiceB.java");
+
+        Files.deleteIfExists(scratch);
+    }
+
+    @Test
+    @DisplayName("测试 12：质量门禁精准识别 JSON 格式与 .env 环境变量中的敏感密钥泄漏")
+    void testSecretScannerDetectsJsonKeysAndEnvTokensAndCloudKeys() {
+        String runId = "run-qg-json-sec-" + UUID.randomUUID().toString().substring(0, 8);
+        createdRunIds.add(runId);
+
+        // 1. JSON formatted API key
+        List<FileDiffEntry> jsonDiff = List.of(
+                new FileDiffEntry("config.json", "config.json",
+                        FileDiffEntry.ChangeType.MODIFY,
+                        "+  \"apiKey\": \"sk-proj-123456789012345678901234567890\",",
+                        1, 0)
+        );
+        StructuredDiff diff1 = new StructuredDiff(testWorkspaceId, "b1", "h1", 1, 1, 0, jsonDiff);
+        QualityGateReport report1 = qualityGateEngine.evaluate("art-j1", runId, diff1, List.of());
+        assertThat(report1.getOverallStatus()).isEqualTo(QualityGateStatus.FAILED);
+
+        // 2. .env unquoted format
+        List<FileDiffEntry> envDiff = List.of(
+                new FileDiffEntry(".env", ".env",
+                        FileDiffEntry.ChangeType.MODIFY,
+                        "+ OPENAI_SECRET=sk-123456789012345678901234567890",
+                        1, 0)
+        );
+        StructuredDiff diff2 = new StructuredDiff(testWorkspaceId, "b2", "h2", 1, 1, 0, envDiff);
+        QualityGateReport report2 = qualityGateEngine.evaluate("art-j2", runId, diff2, List.of());
+        assertThat(report2.getOverallStatus()).isEqualTo(QualityGateStatus.FAILED);
+
+        // 3. AWS Access Key
+        List<FileDiffEntry> awsDiff = List.of(
+                new FileDiffEntry("aws.properties", "aws.properties",
+                        FileDiffEntry.ChangeType.MODIFY,
+                        "+ aws_access_key_id=AKIAIOSFODNN7EXAMPLE",
+                        1, 0)
+        );
+        StructuredDiff diff3 = new StructuredDiff(testWorkspaceId, "b3", "h3", 1, 1, 0, awsDiff);
+        QualityGateReport report3 = qualityGateEngine.evaluate("art-j3", runId, diff3, List.of());
+        assertThat(report3.getOverallStatus()).isEqualTo(QualityGateStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("测试 13：PullRequestDraftView 与前端契约全字段对齐（含 changedFiles/riskAssessment/summary/score）")
+    void testPullRequestDraftContractParityWithFrontendView() throws Exception {
+        String runId = "run-pr-parity-" + UUID.randomUUID().toString().substring(0, 8);
+        createdRunIds.add(runId);
+
+        WorkflowRunEntity run = new WorkflowRunEntity(runId, testProjectId, "def-1", "SUCCEEDED", "key-pr-p");
+        workflowRunRepository.save(run);
+
+        Path f = testWorkspacePath.resolve("Logic.java");
+        Files.writeString(f, "class Logic {}\n");
+        String bHash = gitManager.createBaseline(testWorkspacePath.toFile(), runId, testUserId);
+
+        WorkspaceEntity ws = workspaceRepository.findById(testWorkspaceId).orElseThrow();
+        ws.setGitBaselineCommit(bHash);
+        workspaceRepository.save(ws);
+
+        Files.writeString(f, "class Logic { void execute() {} }\n");
+        String sHash = gitManager.createStepSnapshot(testWorkspacePath.toFile(), runId, "step-p", "Added execute", testUserId).getCommitHash();
+
+        String artId = "art-pr-p-" + UUID.randomUUID().toString().substring(0, 8);
+        createdArtifactIds.add(artId);
+        ArtifactEntity art = new ArtifactEntity(
+                artId, runId, "step-p", "CODE_DIFF", sHash, sHash,
+                "{\"changedFiles\":[\"Logic.java\"],\"baselineCommit\":\"" + bHash + "\"}"
+        );
+        art.setReviewStatus("ACCEPTED");
+        artifactRepository.save(art);
+
+        PullRequestDraftView draft = artifactApplication.generatePullRequestDraft(artId);
+
+        assertThat(draft).isNotNull();
+        assertThat(draft.getTitle()).isNotBlank();
+        assertThat(draft.getSummary()).isNotBlank();
+        assertThat(draft.getRiskAssessment()).isNotBlank().contains("LOW_RISK");
+        assertThat(draft.getQualityGateStatus()).isEqualTo("PASSED");
+        assertThat(draft.getQualityGateScore()).isGreaterThanOrEqualTo(90);
+        assertThat(draft.getChangedFiles()).contains("Logic.java");
+        assertThat(draft.getChangedFilesCount()).isEqualTo(1);
+        assertThat(draft.getTotalLinesAdded()).isGreaterThan(0);
+        assertThat(draft.getGeneratedAt()).isNotNull();
+        assertThat(draft.isCanMergeSafely()).isTrue();
     }
 }

@@ -31,6 +31,8 @@ public class DeploymentResponse implements Serializable {
     private String terminationReason;
     private String templateType;
     private String lifecycleTrace;
+    private Long probeLatencyMs;
+    private Boolean healthy;
 
     public DeploymentResponse() {}
 
@@ -99,4 +101,10 @@ public class DeploymentResponse implements Serializable {
 
     public String getLifecycleTrace() { return lifecycleTrace; }
     public void setLifecycleTrace(String lifecycleTrace) { this.lifecycleTrace = lifecycleTrace; }
+
+    public Long getProbeLatencyMs() { return probeLatencyMs; }
+    public void setProbeLatencyMs(Long probeLatencyMs) { this.probeLatencyMs = probeLatencyMs; }
+
+    public Boolean getHealthy() { return healthy; }
+    public void setHealthy(Boolean healthy) { this.healthy = healthy; }
 }

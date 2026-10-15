@@ -7,6 +7,7 @@ import com.agenthub.audit.dto.ArtifactView;
 import com.agenthub.audit.dto.StepLineageNode;
 import com.agenthub.audit.infrastructure.entity.ArtifactEntity;
 import com.agenthub.audit.infrastructure.repository.ArtifactRepository;
+import com.agenthub.domain.workspace.model.FileDiffEntry;
 import com.agenthub.domain.workspace.model.StructuredDiff;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
@@ -639,7 +640,7 @@ public class ArtifactApplicationService implements ArtifactApplication {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public QualityGateReport getQualityGateReport(String artifactId) {
         ArtifactEntity entity = ownershipVerifier != null
                 ? ownershipVerifier.verifyArtifactAccess(artifactId)
@@ -676,11 +677,36 @@ public class ArtifactApplicationService implements ArtifactApplication {
         draft.setSourceBranch("feature/run-" + entity.getRunId());
         draft.setTargetBranch("main");
         draft.setQualityGateReport(gateReport);
-        draft.setChangedFilesCount(diff.getEntries() != null ? diff.getEntries().size() : 0);
+
+        List<String> changedFilesList = new ArrayList<>();
+        if (diff.getEntries() != null) {
+            for (FileDiffEntry entry : diff.getEntries()) {
+                String p = entry.getNewPath() != null && !"/dev/null".equals(entry.getNewPath())
+                        ? entry.getNewPath() : entry.getOldPath();
+                if (p != null && !p.isBlank()) {
+                    changedFilesList.add(p);
+                }
+            }
+        }
+        draft.setChangedFiles(changedFilesList);
+        draft.setChangedFilesCount(changedFilesList.size());
         draft.setAddedLines(diff.getTotalLinesAdded());
         draft.setDeletedLines(diff.getTotalLinesDeleted());
+        draft.setTotalLinesAdded(diff.getTotalLinesAdded());
+        draft.setTotalLinesDeleted(diff.getTotalLinesDeleted());
+        draft.setQualityGateStatus(gateReport.getOverallStatus() != null ? gateReport.getOverallStatus().name() : "UNKNOWN");
+        draft.setQualityGateScore(gateReport.getCompositeScore());
+        draft.setSummary(String.format("本变更包含 %d 个文件的代码修改（+%d/-%d 行），经由受控工作区自动化流水线构建，已通过质量门禁评测。",
+                changedFilesList.size(), diff.getTotalLinesAdded(), diff.getTotalLinesDeleted()));
+        draft.setRiskAssessment(gateReport.getOverallStatus() == QualityGateStatus.PASSED
+                ? "LOW_RISK: 无破坏性改动，未检测到敏感密钥泄漏，已通过 5 大维度质量门禁验证。"
+                : (gateReport.getOverallStatus() == QualityGateStatus.WARNING
+                ? "MEDIUM_RISK: 变更规模较大或触发建议审查项，建议人工二次复核。"
+                : "HIGH_RISK: 触发质量门禁阻断项，必须修复违规项后方可合并。"));
         draft.setCanMergeSafely(gateReport.getOverallStatus() == QualityGateStatus.PASSED && "ACCEPTED".equalsIgnoreCase(entity.getReviewStatus()));
-        draft.setCreatedAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        draft.setCreatedAt(now);
+        draft.setGeneratedAt(now);
 
         StringBuilder sb = new StringBuilder();
         sb.append("## Automated Change Delivery Summary\n\n");
@@ -713,6 +739,10 @@ public class ArtifactApplicationService implements ArtifactApplication {
     public ArtifactView revertSingleFile(String artifactId, String filePath, String actorId) {
         if (filePath == null || filePath.isBlank()) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "File path to revert cannot be empty");
+        }
+        String normalized = filePath.replace('\\', '/').replaceAll("^/+", "");
+        if (normalized.contains("..") || normalized.startsWith("/")) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Invalid file path for single file revert: " + filePath);
         }
         ArtifactEntity entity = ownershipVerifier != null
                 ? ownershipVerifier.verifyArtifactAccess(artifactId, actorId)

@@ -28,10 +28,12 @@ public class QualityGateEngine {
 
     // Regular expressions detecting leaked credentials, tokens, or private keys
     private static final List<Pattern> SECRET_PATTERNS = List.of(
-            Pattern.compile("(?i)(api[_-]?key|secret|password|passwd|token|bearer|private[_-]?key)\\s*[:=]\\s*['\"][a-zA-Z0-9_\\-\\.\\/+=]{12,}['\"]"),
-            Pattern.compile("(?i)-----BEGIN\\s+(RSA\\s+)?PRIVATE\\s+KEY-----"),
+            Pattern.compile("(?i)[\"']?(api[_-]?key|secret|password|passwd|token|bearer|private[_-]?key)[\"']?\\s*[:=]\\s*(['\"][a-zA-Z0-9_\\-\\.\\/+=]{12,}['\"]|[a-zA-Z0-9_\\-\\.\\/+=]{16,})"),
+            Pattern.compile("(?i)-----BEGIN\\s+([A-Z0-9_\\-]+\\s+)?PRIVATE\\s+KEY-----"),
             Pattern.compile("(?i)ghp_[a-zA-Z0-9]{36}"),
-            Pattern.compile("(?i)github_pat_[a-zA-Z0-9_]{50,}")
+            Pattern.compile("(?i)github_pat_[a-zA-Z0-9_]{50,}"),
+            Pattern.compile("(?i)sk-[a-zA-Z0-9]{20,}"),
+            Pattern.compile("(?i)AKIA[0-9A-Z]{16}")
     );
 
     // Forbidden dangerous constructs in submitted changes
@@ -119,6 +121,10 @@ public class QualityGateEngine {
 
         List<String> leakedDetections = new ArrayList<>();
         for (FileDiffEntry file : diff.getEntries()) {
+            String path = file.getNewPath() != null ? file.getNewPath() : file.getOldPath();
+            if (!isScannableFile(path)) {
+                continue;
+            }
             String diffText = file.getDiffContent();
             if (diffText == null) {
                 continue;
@@ -128,7 +134,7 @@ public class QualityGateEngine {
                 if (line.startsWith("+") && !line.startsWith("+++")) {
                     for (Pattern pattern : SECRET_PATTERNS) {
                         if (pattern.matcher(line).find()) {
-                            leakedDetections.add(file.getNewPath() != null ? file.getNewPath() : file.getOldPath());
+                            leakedDetections.add(path);
                             break;
                         }
                     }
@@ -218,13 +224,17 @@ public class QualityGateEngine {
 
         List<String> violations = new ArrayList<>();
         for (FileDiffEntry file : diff.getEntries()) {
+            String path = file.getNewPath() != null ? file.getNewPath() : file.getOldPath();
+            if (!isScannableFile(path)) {
+                continue;
+            }
             String text = file.getDiffContent();
             if (text == null) continue;
             for (String line : text.split("\\r?\\n")) {
                 if (line.startsWith("+") && !line.startsWith("+++")) {
                     for (Pattern p : FORBIDDEN_STATIC_CONSTRUCTS) {
                         if (p.matcher(line).find()) {
-                            violations.add(file.getNewPath() + ": " + line.trim());
+                            violations.add(path + ": " + line.trim());
                         }
                     }
                 }
@@ -356,7 +366,7 @@ public class QualityGateEngine {
         );
     }
 
-    private String computeFingerprint(QualityGateReport report) {
+    public String computeFingerprint(QualityGateReport report) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             String payload = String.format("%s|%s|%s|%d|%d|%d|%s",
@@ -377,7 +387,29 @@ public class QualityGateEngine {
             }
             return hexString.toString();
         } catch (Exception e) {
-            return "sha256-mock-fingerprint-" + UUID.randomUUID();
+            log.error("Failed to compute SHA-256 fingerprint for report: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to compute SHA-256 fingerprint for quality gate report", e);
         }
+    }
+
+    public boolean verifyFingerprint(QualityGateReport report) {
+        if (report == null || report.getSha256Fingerprint() == null || report.getSha256Fingerprint().isBlank()) {
+            return false;
+        }
+        return report.getSha256Fingerprint().equalsIgnoreCase(computeFingerprint(report));
+    }
+
+    private boolean isScannableFile(String path) {
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+        String lower = path.replace('\\', '/').toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".txt") || lower.endsWith(".adoc")) {
+            return false;
+        }
+        if (lower.startsWith("docs/") || lower.startsWith("deliverables/")) {
+            return false;
+        }
+        return true;
     }
 }

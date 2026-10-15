@@ -425,6 +425,11 @@ public class JGitWorkspaceManager {
 
     public void revertStepFiles(File workspaceDir, String baselineCommitHash, List<String> filePaths, String authorEmail) throws Exception {
         initWorkspace(workspaceDir);
+        if (filePaths == null || filePaths.isEmpty()) {
+            resetWorkspaceToBaseline(workspaceDir, baselineCommitHash);
+            return;
+        }
+
         try (Git git = Git.open(workspaceDir)) {
             try {
                 Repository repo = git.getRepository();
@@ -436,45 +441,65 @@ public class JGitWorkspaceManager {
                 String author = (authorEmail != null && !authorEmail.isBlank()) ? authorEmail : DEFAULT_EMAIL;
                 Path wsPath = workspaceDir.toPath().toAbsolutePath().normalize();
 
-                if (filePaths != null) {
-                    for (String relPath : filePaths) {
-                        if (relPath == null || relPath.isBlank() || relPath.contains(".git")) continue;
-                        String normalizedPath = relPath.replace('\\', '/').replaceAll("^/+", "");
-                        Path targetPath = wsPath.resolve(normalizedPath).normalize();
-                        if (!targetPath.startsWith(wsPath)) {
-                            log.warn("Path traversal detected in revertStepFiles, skipping: {}", relPath);
-                            continue;
-                        }
+                boolean hasStagedChanges = false;
+                for (String relPath : filePaths) {
+                    if (relPath == null || relPath.isBlank() || relPath.contains(".git")) continue;
+                    String normalizedPath = relPath.replace('\\', '/').replaceAll("^/+", "");
+                    Path targetPath = wsPath.resolve(normalizedPath).normalize();
+                    if (!targetPath.startsWith(wsPath)) {
+                        log.warn("Path traversal detected in revertStepFiles, skipping: {}", relPath);
+                        continue;
+                    }
 
-                        byte[] baselineContent = readFileAtCommit(repo, baselineCommitHash, normalizedPath);
-                        File fileOnDisk = targetPath.toFile();
+                    byte[] baselineContent = readFileAtCommit(repo, baselineCommitHash, normalizedPath);
+                    File fileOnDisk = targetPath.toFile();
 
-                        if (baselineContent != null) {
-                            if (fileOnDisk.getParentFile() != null && !fileOnDisk.getParentFile().exists()) {
-                                fileOnDisk.getParentFile().mkdirs();
-                            }
-                            Files.write(fileOnDisk.toPath(), baselineContent);
-                            log.info("Restored file [{}] to baseline commit [{}]", normalizedPath, baselineCommitHash);
-                        } else {
-                            if (fileOnDisk.exists()) {
-                                fileOnDisk.delete();
-                                log.info("Deleted newly added file [{}] on revert", normalizedPath);
-                            }
+                    if (baselineContent != null) {
+                        if (fileOnDisk.getParentFile() != null && !fileOnDisk.getParentFile().exists()) {
+                            fileOnDisk.getParentFile().mkdirs();
                         }
+                        Files.write(fileOnDisk.toPath(), baselineContent);
+                        git.add().addFilepattern(normalizedPath).call();
+                        hasStagedChanges = true;
+                        log.info("Restored file [{}] to baseline commit [{}]", normalizedPath, baselineCommitHash);
+                    } else {
+                        if (fileOnDisk.exists()) {
+                            fileOnDisk.delete();
+                            log.info("Deleted newly added file [{}] on revert", normalizedPath);
+                        }
+                        git.rm().addFilepattern(normalizedPath).call();
+                        hasStagedChanges = true;
                     }
                 }
 
-                git.add().addFilepattern(".").call();
-                git.add().setUpdate(true).addFilepattern(".").call();
-
-                Status status = git.status().call();
-                if (!status.isClean()) {
-                    git.commit()
-                            .setMessage("[Revert] Rollback step files to baseline " + baselineCommitHash)
-                            .setAuthor(DEFAULT_AUTHOR, author)
-                            .call();
-                    log.info("Committed revert to baseline {} in workspace {}", baselineCommitHash, workspaceDir.getAbsolutePath());
+                if (hasStagedChanges) {
+                    Status status = git.status().call();
+                    if (!status.getAdded().isEmpty() || !status.getChanged().isEmpty() || !status.getRemoved().isEmpty()) {
+                        git.commit()
+                                .setMessage("[Revert] Rollback step files to baseline " + baselineCommitHash)
+                                .setAuthor(DEFAULT_AUTHOR, author)
+                                .call();
+                        log.info("Committed revert to baseline {} in workspace {}", baselineCommitHash, workspaceDir.getAbsolutePath());
+                    }
                 }
+            } finally {
+                closeRepositoryQuietly(git, workspaceDir);
+            }
+        }
+    }
+
+    public void resetWorkspaceToBaseline(File workspaceDir, String baselineCommitHash) throws Exception {
+        initWorkspace(workspaceDir);
+        try (Git git = Git.open(workspaceDir)) {
+            try {
+                Repository repo = git.getRepository();
+                ObjectId baselineId = repo.resolve(baselineCommitHash);
+                if (baselineId == null || !repo.hasObject(baselineId)) {
+                    throw new IllegalArgumentException("Baseline commit hash not found in repository: " + baselineCommitHash);
+                }
+                git.reset().setMode(ResetType.HARD).setRef(baselineCommitHash).call();
+                git.clean().setCleanDirectories(true).call();
+                log.info("Reset workspace [{}] hard to baseline commit [{}]", workspaceDir.getAbsolutePath(), baselineCommitHash);
             } finally {
                 closeRepositoryQuietly(git, workspaceDir);
             }

@@ -176,7 +176,17 @@ export function DiffArtifactReviewer({
 
   const handleCopyPrMarkdown = () => {
     if (!prDraft) return;
-    const md = `# ${prDraft.title}\n\n## 关联目标\n- 目标分支: \`${prDraft.targetBranch}\`\n- 关联 Run: \`${prDraft.runId}\`\n- 质量门禁: **${prDraft.qualityGateStatus}** (${prDraft.qualityGateScore}分)\n\n## 变更摘要\n${prDraft.summary}\n\n## 风险评估\n${prDraft.riskAssessment}\n\n## 变更文件 (${prDraft.changedFiles.length})\n${prDraft.changedFiles.map((f) => `- ${f}`).join("\n")}\n\n代码统计: +${prDraft.totalLinesAdded} / -${prDraft.totalLinesDeleted}`;
+    const changedFiles = prDraft.changedFiles || [];
+    const filesCount = changedFiles.length || prDraft.changedFilesCount || 0;
+    const gateStatus = prDraft.qualityGateStatus || prDraft.qualityGateReport?.overallStatus || "PASSED";
+    const gateScore = prDraft.qualityGateScore ?? prDraft.qualityGateReport?.compositeScore ?? 100;
+    const added = prDraft.totalLinesAdded ?? prDraft.addedLines ?? 0;
+    const deleted = prDraft.totalLinesDeleted ?? prDraft.deletedLines ?? 0;
+    const summary = prDraft.summary || prDraft.summaryMarkdown || "";
+    const risk = prDraft.riskAssessment || (prDraft.canMergeSafely ? "LOW_RISK: 质量门禁全部通过" : "MEDIUM_RISK: 建议人工审查");
+    const fileListText = changedFiles.length > 0 ? changedFiles.map((f) => `- ${f}`).join("\n") : `共 ${filesCount} 个文件`;
+
+    const md = `# ${prDraft.title}\n\n## 关联目标\n- 目标分支: \`${prDraft.targetBranch}\`\n- 关联 Run: \`${prDraft.runId}\`\n- 质量门禁: **${gateStatus}** (${gateScore}分)\n\n## 变更摘要\n${summary}\n\n## 风险评估\n${risk}\n\n## 变更文件 (${filesCount})\n${fileListText}\n\n代码统计: +${added} / -${deleted}`;
     navigator.clipboard.writeText(md);
     setPrCopied(true);
     setTimeout(() => setPrCopied(false), 2000);
@@ -622,30 +632,34 @@ export function DiffArtifactReviewer({
                 <div>
                   <label className="text-zinc-400 block mb-1 font-medium">变更动机与实现摘要</label>
                   <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 leading-relaxed whitespace-pre-wrap">
-                    {prDraft.summary}
+                    {prDraft.summary || prDraft.summaryMarkdown || "自动化质量门禁与受控交付流水线生成"}
                   </div>
                 </div>
 
                 <div>
                   <label className="text-zinc-400 block mb-1 font-medium">安全与架构风险评估</label>
                   <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 text-emerald-400 font-mono leading-relaxed">
-                    {prDraft.riskAssessment}
+                    {prDraft.riskAssessment || (prDraft.canMergeSafely ? "LOW_RISK: 质量门禁全部通过" : "RISK: 存在未通过门禁项")}
                   </div>
                 </div>
 
                 <div>
                   <label className="text-zinc-400 block mb-1 font-medium">
-                    涉及变更文件 ({prDraft.changedFiles.length})
+                    涉及变更文件 ({prDraft.changedFiles?.length ?? prDraft.changedFilesCount ?? 0})
                   </label>
                   <div className="p-2.5 rounded-lg bg-zinc-900 border border-zinc-800 font-mono text-[11px] text-zinc-400 space-y-1">
-                    {prDraft.changedFiles.map((f, i) => (
-                      <div key={i} className="truncate">
-                        • {f}
-                      </div>
-                    ))}
+                    {(prDraft.changedFiles && prDraft.changedFiles.length > 0) ? (
+                      prDraft.changedFiles.map((f, i) => (
+                        <div key={i} className="truncate">
+                          • {f}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-zinc-500 italic">共 {prDraft.changedFilesCount ?? 0} 个变更文件</div>
+                    )}
                     <div className="pt-1.5 border-t border-zinc-800 flex items-center space-x-3 text-xs">
-                      <span className="text-emerald-400">+{prDraft.totalLinesAdded} 行</span>
-                      <span className="text-rose-400">-{prDraft.totalLinesDeleted} 行</span>
+                      <span className="text-emerald-400">+{prDraft.totalLinesAdded ?? prDraft.addedLines ?? 0} 行</span>
+                      <span className="text-rose-400">-{prDraft.totalLinesDeleted ?? prDraft.deletedLines ?? 0} 行</span>
                     </div>
                   </div>
                 </div>
