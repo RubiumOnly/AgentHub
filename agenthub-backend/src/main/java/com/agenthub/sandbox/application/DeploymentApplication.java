@@ -27,4 +27,6 @@ public interface DeploymentApplication {
     default int reconcileOrphanDeployments() {
         return 0;
     }
+
+    DeploymentResponse probeDeployment(String deploymentId);
 }

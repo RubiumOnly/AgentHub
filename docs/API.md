@@ -214,6 +214,14 @@
 - `POST /api/executions/steps/{stepRunId}/retry`（或 `POST /api/executions/runs/{runId}/steps/{stepRunId}/retry`）：重试失败的 Step 节点
 - `GET /api/executions/runs/{runId}/operations`：**查询运行运维全景视图 (`Result<RunOperationsView>`)**
   - 包含单一统一状态图（`unifiedStatus`、`nextAction`、`requiresHumanIntervention`）、待办决策清单（`pendingDecisions`）、受控工具副作用收据（`toolSideEffects`）、三层拓扑分层上下文记忆摘要（`memorySummary`）、产物血缘节点（`artifactLineage`）、最近事件序列（`recentEvents`）、分布式租约健康度（`leaseStatus`）与三级重试归因（`failureCategory`、`failureReason`、`totalRetries`）。
+- `POST /api/executions/runs/{runId}/steps/{stepRunId}/rework`：**步骤打回重做 (`Result<StepRunView>`)**
+  - Request: `{"feedback": "单元测试覆盖率不足，请补充边界条件测试"}`
+  - 将指定 StepRun 状态重置为 `PENDING`，并将评审人意见注入步骤上下文；工作流重新调度执行该步骤。
+- `POST /api/executions/runs/{runId}/reject`：**全盘驳回运行 (`Result<WorkflowRunView>`)**
+  - Request: `{"reason": "方案不符合架构设计规范"}`
+  - 将受控工作区安全重置至 Baseline Commit，终止所有未完成 Step，将 WorkflowRun 状态收敛为 `REJECTED` 并记录审计事件。
+- `GET /api/executions/runs/{runId}/evidence/export`：**导出带 SHA-256 校验和的运行证据包 (`Result<RunEvidenceBundleView>`)**
+  - 导出包含脱敏完整凭证包、质量门禁指纹与交付元数据的全量运行审计。
 - `GET /api/approvals/runs/{runId}`：查询指定 Run 关联的人工审批门禁列表
 - `POST /api/approvals/{approvalId}/approve` & `POST /api/approvals/{approvalId}/reject`：审批通过或驳回阻塞节点
 
@@ -224,9 +232,17 @@
   - 穿透聚合从 `Run -> StepRun -> Artifact -> JGit Commit Hash -> File Checksums -> Approvals` 全生命周期拓扑血缘；
 - `GET /api/audit/artifacts/{artifactId}/diff`：**获取产物 JGit 结构化行级 Diff 审查数据 (`Result<StructuredDiff>`)**
   - 返回快照 commit 相对基线的受影响文件列表、新增/删除行数、`diffText` 行级补丁、二进制与冲突标记；
+- `GET /api/audit/artifacts/{artifactId}/quality-gate`：**获取产物质量门禁评估报告 (`Result<QualityGateReport>`)**
+  - 评估 5 大核心维度（`BUILD_VERIFICATION`, `UNIT_TEST_REGRESSION`, `STATIC_ANALYSIS_GUARD`, `SECRET_LEAK_SCAN`, `DIFF_BUDGET_GUARD`），返回加权总分（0-100）、门禁状态（`PASSED`, `WARNING`, `FAILED`）、规则明细与 SHA-256 指纹校验和。
+- `POST /api/audit/artifacts/{artifactId}/quality-gate/evaluate`：**实时重新评估产物质量门禁 (`Result<QualityGateReport>`)**
+- `GET /api/audit/artifacts/{artifactId}/pr-draft`：**生成标准化 Pull Request 草稿规范 (`Result<PullRequestDraftView>`)**
+  - 输出可直接复制至 GitHub / GitLab 的结构化 PR 草稿，包含规范 Markdown 正文、变动统计、门禁评分徽章与测试建议。
+- `POST /api/audit/artifacts/{artifactId}/revert-file`：**单文件非破坏性精准回滚 (`Result<ArtifactView>`)**
+  - Request: `{"filePath": "src/main/java/Foo.java"}`（亦支持 `?filePath=...` 查询参数）；
+  - 基于 JGit 将指定单个修改/新增文件精准检出还原至 baseline commit，其他工作区已变更文件与未提交内容完全保持完好，发布 `FILE_REVERTED` 审计事件并更新产物快照。
 - `POST /api/audit/artifacts/{artifactId}/accept`：人工审查通过该 Step 产物（更新审查状态为 `ACCEPTED` 并记录审计事件）；
 - `POST /api/audit/artifacts/{artifactId}/reject`：人工审查拒绝产物（Body: `{"reason":"..."}`，更新审查状态为 `REJECTED`）；
-- `POST /api/audit/artifacts/{artifactId}/revert`：安全非破坏性回滚产物（严格还原目标 Step 所影响的文件至基线 commit，杜绝 `git reset --hard` 硬重置，生成可追踪 Revert Commit 并更新状态为 `REVERTED`）。
+- `POST /api/audit/artifacts/{artifactId}/revert`：安全非破坏性全量回滚产物（严格还原目标 Step 所影响的文件至基线 commit，杜绝 `git reset --hard` 硬重置，生成可追踪 Revert Commit 并更新状态为 `REVERTED`）。
 
 ### 8. 历史非受控工作区接口退役说明 (`ADR-003`)
 - 生产 profile 不注册早期接收客户端工作区路径参数的 `/api/workspace/*` 接口；开发兼容路径只用于迁移诊断，不得产生新的产品数据。所有正式工作区读写、Diff 与快照操作均使用基于服务端 `workspaceId` 解析的 `/api/workspaces/{workspaceId}/*`（见第 3 节）。
@@ -273,6 +289,7 @@
 ### 15. 工作区沙箱与部署自动化 (Sandbox & Deployment Automation)
 - `POST /api/deployments`：创建并启动项目构建与部署
   - Request: `{"projectId": "<project-id>", "artifactId": "<artifact-id>", "target": "STATIC_PREVIEW", "sandboxType": "LOCAL_PROCESS", "templateType": "STATIC_WEB_TEMPLATE", "healthCheckPath": "/"}`
+  - 准入门禁（Admission Control）：强制校验关联 Artifact 审查状态，若产物为 `GATE_FAILED` 或 `REJECTED` 则强行拦截并返回 `400 PARAM_ERROR`，杜绝未过门禁产物泄漏至沙箱环境；
   - Response: `Result<DeploymentResponse>` (`{"id": "dep-...", "status": "RUNNING", "port": 18000, "url": "http://127.0.0.1:18000/", ...}`)
 - `GET /api/deployments/{id}`：查询指定部署详情与实时运行状态 (`CREATED`, `BUILD`, `START`, `HEALTH_CHECK`, `RUNNING`, `STOP`, `CLEANUP`, `STOPPED`, `FAILED`)
   - Response: `Result<DeploymentResponse>`
@@ -280,6 +297,8 @@
   - Response: `Result<String>`
 - `POST /api/deployments/{id}/stop`：主动终止运行中部署并释放绑定的本地端口
   - Response: `Result<DeploymentResponse>`
+- `POST /api/deployments/{id}/probe`：**主动执行沙箱 HTTP 健康探针 (`Result<DeploymentResponse>`)**
+  - 向预览环境的健康检查路径（如 `/`）发起真实 HTTP GET 探测，记录响应 HTTP 状态码与往返延迟（ms），更新探针时间戳并在响应中反馈健康详情。
 - `GET /api/deployments?projectId={projectId}`：按项目分页或全量查询历史部署列表
   - Response: `Result<List<DeploymentResponse>>`
 - `GET /api/sandbox/preview/{projectId}`：渲染并返回项目实时前端静态预览 HTML 页面
@@ -347,11 +366,11 @@
 | `/api/projects`, `/api/projects/{id}`, `/api/projects/{id}/workspace(s)` | `project` | `ProjectController` | `listProjects`, `createProject`, `getProject`, `getWorkspace` | 强制登录 + `ResourceAccessGuard` 校验 `Project.ownerId` | 查询幂等；创建绑定独立 `workspaceId` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留（主链路） |
 | `/api/workspaces/{workspaceId}/*` (`tree`, `file`, `files`, `file/rename`, `download`, `archive`, `diff`, `git/snapshot`, `lock/*`) | `project` | `WorkspaceController` | `listFiles`, `getFileContent`, `saveFile`, `getStructuredDiff`, `getDiff`, `getLockStatus` | 强制登录 + 服务端解析 `workspaceId` 并校验所属 `Project.ownerId` | `workspace_locks` 毫秒级租约互斥 + JGit commit 树快照 | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留（唯一正式工作区接口） |
 | `/api/workflows/definitions`, `/api/workflows/definitions/validate` | `orchestration` | `WorkflowDefinitionController` | `listDefinitions`, `validateDsl` | 强制登录；关联项目时校验 `Project.ownerId` | `validate` 纯函数无副作用；定义按 `id + version` 存储 | `ACTIVE` | `WorkflowDefinitionAndApprovalControllerIntegrationTest` | 长期保留；Phase 3 升级为 `WorkflowTemplate` |
-| `/api/executions/runs*`, `/api/executions/projects/{projectId}/runs`, `/api/executions/steps/{stepRunId}/retry`, `/api/executions/runs/{runId}/operations` | `execution` | `ExecutionController` | `startRun`, `getRun`, `listRunsByProject`, `listStepRuns`, `listEvents`, `cancelRun`, `getRunEvidence`, `exportRunEvidenceFile`, `getRunOperations`, `LiveExecutionTerminal` (SSE) | 强制登录 + `Project.ownerId` 归属校验；SSE 支持一次性 `ticket` 或 Cookie | `startRun` 支持 `idempotencyKey` 防重；SSE 支持 `Last-Event-ID` 断点续传；`evidence` 含确定性 SHA-256 `checksum` | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest`, `PhaseFProductQualityAndEvidenceBundleIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest` | 长期保留（权威执行入口） |
+| `/api/executions/runs*`, `/api/executions/projects/{projectId}/runs`, `/api/executions/steps/{stepRunId}/retry`, `/api/executions/runs/{runId}/operations`, `/rework`, `/reject`, `/evidence/export` | `execution` | `ExecutionController` | `startRun`, `getRun`, `listRunsByProject`, `listStepRuns`, `listEvents`, `cancelRun`, `getRunEvidence`, `exportRunEvidenceFile`, `getRunOperations`, `reworkStep`, `rejectRun`, `exportRunEvidence`, `LiveExecutionTerminal` (SSE) | 强制登录 + `Project.ownerId` 归属校验；SSE 支持一次性 `ticket` 或 Cookie | `startRun` 支持 `idempotencyKey` 防重；SSE 支持 `Last-Event-ID` 断点续传；`evidence` 含确定性 SHA-256 `checksum` | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest`, `PhaseFProductQualityAndEvidenceBundleIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（权威执行入口） |
 | `/api/runs*` (`POST /api/runs`, `GET /api/runs/{runId}`, `/cancel`, `/stream`, `/evidence`, `/evidence/download`) | `execution` | `RunAliasController` | `LiveExecutionTerminal` (兼容别名) | 同 `ExecutionController` | 委托 `ExecutionApplication`，与 `/api/executions/runs` 共享同一状态机与幂等键 | `COMPAT_ALIAS` | `ExecutionSseStreamAndReconnectionTest`, `PhaseFProductQualityAndEvidenceBundleIntegrationTest` | Phase 1 评估与 `/api/executions/runs` 合并为单一路径 |
 | `/api/approvals/runs/{runId}`, `/api/approvals/{id}/approve`, `/api/approvals/{id}/reject` | `orchestration` | `ApprovalController` | `listApprovals`, `approve`, `reject` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 状态机限制仅 `PENDING` 可转换至 `APPROVED`/`REJECTED` | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留（主链路） |
-| `/api/audit/artifacts/run/{runId}`, `/api/audit/artifacts/{id}` (`/accept`, `/reject`, `/revert`, `/diff`), `/api/audit/artifacts/lineage/{runId}` | `audit` | `ArtifactController` | `revertArtifact`, `getArtifactLineage`, `getArtifactDiff`, `acceptArtifact`, `rejectArtifact` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | `accept`/`reject`/`revert` 状态校验，非破坏性精准回滚，禁止重复 `revert`（错误码 `3011`） | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest` | 长期保留（主链路） |
-| `/api/deployments*` (`POST`, `GET /{id}`, `GET /{id}/logs`, `POST /{id}/stop`, `GET ?projectId=`) | `sandbox` | `DeploymentController` | `listDeployments`, `createDeployment`, `stopDeployment`, `getDeploymentLogs` | 强制登录 + `Project.ownerId` 校验 + 强制绑定 `ACCEPTED` 状态 `Artifact` | 端口池原子分配；`stop` 幂等收敛至 `STOPPED` | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest` | 长期保留（主链路） |
+| `/api/audit/artifacts/run/{runId}`, `/api/audit/artifacts/{id}` (`/accept`, `/reject`, `/revert`, `/diff`), `/api/audit/artifacts/lineage/{runId}`, `/quality-gate*`, `/pr-draft`, `/revert-file` | `audit` | `ArtifactController` | `revertArtifact`, `getArtifactLineage`, `getArtifactDiff`, `acceptArtifact`, `rejectArtifact`, `getQualityGateReport`, `evaluateQualityGate`, `getPullRequestDraft`, `revertSingleFile` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | `accept`/`reject`/`revert` 状态校验，单文件/全量非破坏性精准回滚，禁止重复 `revert`（错误码 `3011`） | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（主链路） |
+| `/api/deployments*` (`POST`, `GET /{id}`, `GET /{id}/logs`, `POST /{id}/stop`, `POST /{id}/probe`, `GET ?projectId=`) | `sandbox` | `DeploymentController` | `listDeployments`, `createDeployment`, `stopDeployment`, `getDeploymentLogs`, `probeDeployment` | 强制登录 + `Project.ownerId` 校验 + 强制绑定已通过质量门禁 (`!GATE_FAILED`) 与审查的 `Artifact` | 端口池原子分配；`stop` 幂等收敛至 `STOPPED`；探针执行真实 HTTP 延迟探测 | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（主链路） |
 | `/api/providers*` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /route`, `POST /{id}/test`) | `agent` | `ProviderController` | `listProviders`, `evaluateRoute` | 强制登录；修改/删除校验 `Provider.ownerId` | `route` 无副作用推演；`PUT`/`DELETE` 幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
 | `/api/token-usages/runs/{runId}`, `/steps/{stepRunId}`, `/summary` | `agent` | `TokenUsageController` | `workflowsApi.getTokenSummary` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 只读聚合查询，完全幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
 | `/api/agents`, `/api/agents/platforms`, `/api/agents/execute` | `agent` | `AgentRegistryController` | 后端内部/管理查询 | `AuthFilter` 统一鉴权 | `GET` 幂等 | `ACTIVE` | `AgentAdapterTest`, `Phase1ModuleConvergenceAndContractTest` | Phase 1 已迁入 `com.agenthub.agent.api` |

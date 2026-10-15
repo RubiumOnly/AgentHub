@@ -59,6 +59,11 @@ public class ArtifactLineageView {
     public int getTotalFilesChanged() { return totalFilesChanged; }
     public void setTotalFilesChanged(int totalFilesChanged) { this.totalFilesChanged = totalFilesChanged; }
 
+    private com.agenthub.audit.domain.quality.QualityGateReport qualityGateReport;
+
     public boolean isReverted() { return isReverted; }
     public void setReverted(boolean reverted) { isReverted = reverted; }
+
+    public com.agenthub.audit.domain.quality.QualityGateReport getQualityGateReport() { return qualityGateReport; }
+    public void setQualityGateReport(com.agenthub.audit.domain.quality.QualityGateReport qualityGateReport) { this.qualityGateReport = qualityGateReport; }
 }

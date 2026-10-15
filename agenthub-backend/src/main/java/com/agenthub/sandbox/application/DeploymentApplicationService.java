@@ -169,7 +169,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
                         .orElseThrow(() -> new BusinessException(ErrorCode.ARTIFACT_NOT_FOUND,
                                 "Artifact [" + requestedArtifactId + "] not found"));
                 String reviewStatus = artifact.getReviewStatus();
-                if ("REJECTED".equalsIgnoreCase(reviewStatus) || "REVERTED".equalsIgnoreCase(reviewStatus)) {
+                if ("REJECTED".equalsIgnoreCase(reviewStatus) || "REVERTED".equalsIgnoreCase(reviewStatus) || "GATE_FAILED".equalsIgnoreCase(reviewStatus)) {
                     throw new BusinessException(ErrorCode.PARAM_ERROR,
                             "Artifact [" + requestedArtifactId + "] cannot be deployed because its quality gate status is " + reviewStatus);
                 }
@@ -682,5 +682,41 @@ public class DeploymentApplicationService implements DeploymentApplication {
         resp.setTemplateType(entity.getTemplateType());
         resp.setLifecycleTrace(entity.getLifecycleTrace());
         return resp;
+    }
+
+    @Override
+    public DeploymentResponse probeDeployment(String deploymentId) {
+        DeploymentEntity entity = deploymentRepository.findById(deploymentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
+        checkProjectAccess(entity.getProjectId());
+
+        if (entity.getPort() == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Deployment [" + deploymentId + "] does not have an allocated port");
+        }
+
+        String localProbeUrl;
+        if ("STATIC_PREVIEW".equalsIgnoreCase(entity.getTarget()) || "DOCKER_NGINX".equalsIgnoreCase(entity.getTarget())) {
+            localProbeUrl = "http://127.0.0.1:" + entity.getPort() + "/api/sandbox/preview/" + entity.getProjectId();
+        } else {
+            String path = (entity.getHealthCheckPath() != null && !entity.getHealthCheckPath().isBlank())
+                    ? entity.getHealthCheckPath() : "/";
+            String normalizedPath = path.startsWith("/") ? path : "/" + path;
+            localProbeUrl = "http://127.0.0.1:" + entity.getPort() + normalizedPath;
+        }
+
+        long start = System.currentTimeMillis();
+        boolean healthy = healthCheckProbeService.probe(localProbeUrl, 2, 200);
+        long elapsed = System.currentTimeMillis() - start;
+
+        String logAppend = String.format("\n[PROBE AT %s] URL: %s, Result: %s (latency: %dms)\n",
+                LocalDateTime.now(), localProbeUrl, (healthy ? "HEALTHY" : "UNHEALTHY"), elapsed);
+        String currentLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
+        entity.setLogOutput(currentLogs + logAppend);
+        if (healthy && !DeploymentStatus.RUNNING.name().equals(entity.getStatus())) {
+            transitionState(entity, DeploymentStatus.RUNNING);
+        }
+        entity.setUpdatedAt(LocalDateTime.now());
+        deploymentRepository.save(entity);
+        return toResponse(entity);
     }
 }

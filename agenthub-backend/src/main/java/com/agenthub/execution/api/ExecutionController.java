@@ -264,4 +264,37 @@ public class ExecutionController {
                 .header("X-Execution-Mode", bundle.getExecutionMode())
                 .body(bundle);
     }
+
+    public static class ReworkStepRequest {
+        public String feedback;
+    }
+
+    public static class RejectRunRequest {
+        public String reason;
+    }
+
+    @PostMapping("/runs/{runId}/steps/{stepRunId}/rework")
+    public Result<StepRunView> reworkStep(
+            @PathVariable("runId") String runId,
+            @PathVariable("stepRunId") String stepRunId,
+            @RequestBody(required = false) ReworkStepRequest req) {
+        String feedback = (req != null) ? req.feedback : "Rework requested by reviewer";
+        StepRunView view = executionApplication.reworkStep(runId, stepRunId, feedback);
+        return Result.ok(view);
+    }
+
+    @PostMapping("/runs/{runId}/reject")
+    public Result<WorkflowRunView> rejectRun(
+            @PathVariable("runId") String runId,
+            @RequestBody(required = false) RejectRunRequest req) {
+        String reason = (req != null) ? req.reason : "Run rejected during review";
+        WorkflowRunView view = executionApplication.rejectRun(runId, reason);
+        return Result.ok(view);
+    }
+
+    @GetMapping("/runs/{runId}/evidence/export")
+    public Result<RunEvidenceBundleView> exportRunEvidence(@PathVariable("runId") String runId) {
+        RunEvidenceBundleView bundle = executionApplication.exportRunEvidenceBundle(runId);
+        return Result.ok(bundle);
+    }
 }

@@ -473,3 +473,19 @@ AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；
 普通提交 Subject：feat(phase-4): productize run operations, transactional outbox, hierarchical memory, artifact lineage, and structured diff review
 加固提交 Subject（如有）：无
 ```
+
+### 9.9 Phase 5 阶段验收记录
+
+```text
+阶段：Phase 5
+范围：质量门禁策略引擎（QualityGateEngine：5 大核心防御维度 BUILD_VERIFICATION、UNIT_TEST_REGRESSION、STATIC_ANALYSIS_GUARD、SECRET_LEAK_SCAN、DIFF_BUDGET_GUARD，加权评分 0-100，不可伪造 SHA-256 签名，GATE_FAILED 拦截阻断）；JGit 单文件非破坏性精准回滚（revertSingleFile：基于 JGit checkout 指定文件恢复至 baseline commit，新增文件彻底清理，工作区其他修改完好不受影响，发布 FILE_REVERTED 审计事件）；细粒度审查干预（reworkStep：步骤重做，注入审查指导 feedback，Step 状态重置为 PENDING 重新调度；rejectRun：全盘驳回，工作区严格重置至 baseline commit，状态收敛为 REJECTED）；受控沙箱准入门禁与主动探针（DeploymentApplicationService 严格校验准入，阻断 GATE_FAILED/REJECTED 产物进入部署；probeDeployment 发起真实 HTTP 健康探测并测量往返延迟 ms）；标准化外部交付与离线证据包（PullRequestDraftView 导出符合 GitHub/GitLab 规范 PR 草稿；exportRunEvidenceBundle 导出带完整 SHA-256 Checksum 的运行凭证包）；前端 UI 全面产品化（DiffArtifactReviewer 5 维度门禁抽屉/单文件回滚/PR 草稿、StructuredDiffReviewModal 门禁徽章与单文件回滚、RunOperationsPanel 全盘驳回与步骤重做意见反馈模态框、SandboxPreviewPanel 主动健康探针）；ADR-010 与 OpenAPI/文档契约对齐
+代码完成：是，变更包含 com.agenthub.audit.domain.quality.* (QualityGateRuleType/QualityGateStatus/QualityGateCheckItem/QualityGateReport/QualityGateEngine)、com.agenthub.audit.dto.PullRequestDraftView、JGitWorkspaceManager (revertSingleFile)、ArtifactApplication/ArtifactApplicationService (revertSingleFile/getQualityGateReport/evaluateQualityGate/generatePullRequestDraft)、ArtifactController (4 个端点)、RunCommandModule/ExecutionApplication/ExecutionApplicationService (reworkStep/rejectRun)、ExecutionController (rework/reject/evidence/export)、DeploymentApplication/DeploymentApplicationService (probeDeployment 与 GATE_FAILED 部署准入门禁)、DeploymentController (probe)、Phase5QualityGateAndDeliveryTest (8 用例)、前端 types/index.ts、services/api/* (artifacts.ts/runs.ts/deployments.ts)、DiffArtifactReviewer.tsx、StructuredDiffReviewModal.tsx、ReviewSidebar.tsx、RunOperationsPanel.tsx、SandboxPreviewPanel.tsx、app/page.tsx、docs/adr/ADR-010、docs/API.md、docs/ARCHITECTURE.md、docs/openapi-v1.json、OpsApplicationService.java
+自动化测试：后端 58 test classes / 347 tests 通过（mvn clean test，含 Phase5QualityGateAndDeliveryTest 8 用例、Phase1ModuleConvergenceAndContractTest 6 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet）
+目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
+AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase5QualityGateAndDeliveryTest 锁定受管范围、OpenAPI v1 契约与质量门禁策略防篡改指纹）
+删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
+未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实远程 GitHub/GitLab 生产 OAuth 凭据下的 PR 自动推送与 Webhook 回调
+已知风险与回滚方式：若后续需要回退 Phase 5 功能，可通过 git revert 对应 Phase 5 提交恢复；底层表结构零变更，回滚零数据丢失风险
+普通提交 Subject：feat(phase-5): productize quality gates engine, single-file revert, step rework, and delivery review
+加固提交 Subject（如有）：无
+```

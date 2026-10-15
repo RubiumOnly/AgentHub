@@ -8,6 +8,7 @@ import {
   PendingDecisionItem,
   StepLineageNode,
   ArtifactView,
+  QualityGateReport,
 } from "@/types";
 import { runsApi } from "@/services/api/runs";
 import { artifactsApi } from "@/services/api/artifacts";
@@ -19,6 +20,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BrainCircuit,
+  Check,
   CheckCircle2,
   Clock,
   Compass,
@@ -33,6 +35,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Wrench,
+  X,
   XCircle,
 } from "lucide-react";
 
@@ -51,6 +54,17 @@ export function RunOperationsPanel({ runId, onRefreshParent }: RunOperationsPane
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
   const [artifactDiff, setArtifactDiff] = useState<StructuredDiff | null>(null);
   const [isDiffModalOpen, setIsDiffModalOpen] = useState(false);
+
+  // Phase 5: Step Rework state
+  const [showReworkModal, setShowReworkModal] = useState(false);
+  const [reworkStepRunId, setReworkStepRunId] = useState<string | null>(null);
+  const [reworkStepNodeId, setReworkStepNodeId] = useState<string>("");
+  const [reworkFeedback, setReworkFeedback] = useState<string>("");
+  const [isReworking, setIsReworking] = useState(false);
+
+  // Phase 5: Quality Gate Detail Modal state
+  const [selectedGateReport, setSelectedGateReport] = useState<QualityGateReport | null>(null);
+  const [showGateDetailModal, setShowGateDetailModal] = useState(false);
 
   const fetchOperations = useCallback(async () => {
     if (!runId) return;
@@ -138,6 +152,45 @@ export function RunOperationsPanel({ runId, onRefreshParent }: RunOperationsPane
       alert("取消运行失败: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleRejectRun = async () => {
+    if (!runId) return;
+    const reason = prompt("请输入全盘驳回此 Run 的原因 (工作区将安全重置至基线快照):", "交付物未达到质量门禁标准");
+    if (!reason) return;
+    setActionLoading(true);
+    try {
+      await runsApi.rejectRun(runId, reason);
+      await fetchOperations();
+      onRefreshParent?.();
+    } catch (err: unknown) {
+      alert("全盘驳回失败: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleOpenRework = (stepRunId: string, nodeId: string) => {
+    setReworkStepRunId(stepRunId);
+    setReworkStepNodeId(nodeId);
+    setReworkFeedback("请补充针对核心业务逻辑的边界防御测试用例与异常防御");
+    setShowReworkModal(true);
+  };
+
+  const handleConfirmRework = async () => {
+    if (!runId || !reworkStepRunId) return;
+    setIsReworking(true);
+    try {
+      await runsApi.reworkStep(runId, reworkStepRunId, reworkFeedback.trim());
+      setShowReworkModal(false);
+      setReworkStepRunId(null);
+      await fetchOperations();
+      onRefreshParent?.();
+    } catch (err: unknown) {
+      alert("请求重做失败: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsReworking(false);
     }
   };
 
@@ -277,6 +330,18 @@ export function RunOperationsPanel({ runId, onRefreshParent }: RunOperationsPane
               >
                 <XCircle className="w-3.5 h-3.5" />
                 <span>取消 Run</span>
+              </button>
+            )}
+
+            {status !== "REJECTED" && (
+              <button
+                onClick={handleRejectRun}
+                disabled={actionLoading}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-800/80 bg-rose-950/70 text-rose-300 hover:bg-rose-900 transition"
+                title="全盘驳回此 Run，工作区强一致安全重置至基线快照"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>全盘驳回</span>
               </button>
             )}
           </div>
@@ -539,10 +604,38 @@ export function RunOperationsPanel({ runId, onRefreshParent }: RunOperationsPane
                       <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
                         {node.status}
                       </span>
+                      {node.agentRole && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                          [{node.agentRole}]
+                        </span>
+                      )}
                       {node.commitHash && (
                         <span className="flex items-center space-x-1 font-mono text-[11px] text-indigo-400">
                           <GitCommit className="w-3 h-3" />
                           <span>{node.commitHash.substring(0, 7)}</span>
+                        </span>
+                      )}
+                      {/* Phase 5 Quality Gate Badge */}
+                      {node.qualityGateReport && (
+                        <button
+                          onClick={() => {
+                            setSelectedGateReport(node.qualityGateReport!);
+                            setShowGateDetailModal(true);
+                          }}
+                          className={`flex items-center space-x-1 text-[10px] font-mono px-1.5 py-0.2 rounded border transition ${
+                            node.qualityGateReport.overallStatus === "PASSED"
+                              ? "bg-emerald-950/70 text-emerald-400 border-emerald-800"
+                              : "bg-rose-950/70 text-rose-400 border-rose-800"
+                          }`}
+                          title="查看质量门禁明细"
+                        >
+                          <ShieldCheck className="w-2.5 h-2.5" />
+                          <span>门禁: {node.qualityGateReport.overallStatus} ({node.qualityGateReport.compositeScore}分)</span>
+                        </button>
+                      )}
+                      {node.reviewStatus === "GATE_FAILED" && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 border border-rose-800 font-semibold">
+                          GATE_FAILED (门禁阻断)
                         </span>
                       )}
                     </div>
@@ -551,10 +644,26 @@ export function RunOperationsPanel({ runId, onRefreshParent }: RunOperationsPane
                         修改文件 ({node.changedFiles.length}): {node.changedFiles.join(", ")}
                       </p>
                     )}
+                    {node.reworkFeedback && (
+                      <div className="mt-1 text-[11px] text-amber-300/90 font-mono bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded">
+                        重做反馈: {node.reworkFeedback}
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  {/* Phase 5 Step Rework Button */}
+                  <button
+                    onClick={() => handleOpenRework(node.stepRunId || node.stepId, node.stepId)}
+                    disabled={actionLoading}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-700/60 text-amber-300 text-xs font-mono transition"
+                    title="对该步骤请求重做并提供指导意见"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>请求重做</span>
+                  </button>
+
                   {node.artifactId ? (
                     <button
                       onClick={() => handleInspectDiff(node.artifactId!)}
@@ -624,6 +733,143 @@ export function RunOperationsPanel({ runId, onRefreshParent }: RunOperationsPane
           onReject={handleRejectArtifact}
           onRevert={handleRevertArtifact}
         />
+      )}
+
+      {/* Phase 5: Step Rework Modal */}
+      {showReworkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="max-w-lg w-full rounded-2xl border border-amber-600/50 bg-slate-950 p-5 shadow-2xl flex flex-col text-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2">
+                <RotateCcw className="w-4 h-4 text-amber-400" />
+                <span className="font-semibold text-sm">请求步骤重做 (Step Rework Feedback)</span>
+              </div>
+              <button
+                onClick={() => setShowReworkModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-3 text-xs space-y-3">
+              <div className="p-2.5 rounded bg-slate-900 border border-slate-800">
+                <span className="text-slate-400 block text-[11px]">目标步骤:</span>
+                <span className="font-mono text-amber-300 font-semibold">{reworkStepNodeId}</span>
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-medium">
+                  审查员指导反馈 (将压入步骤记忆并重置状态为 PENDING):
+                </label>
+                <textarea
+                  rows={4}
+                  value={reworkFeedback}
+                  onChange={(e) => setReworkFeedback(e.target.value)}
+                  placeholder="例如：请补充针对核心业务逻辑的边界防御测试用例，并处理潜在的空指针与并发竞态..."
+                  className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-500 font-sans"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex justify-end space-x-2">
+              <button
+                onClick={() => setShowReworkModal(false)}
+                className="px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-400 hover:text-white"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmRework}
+                disabled={isReworking || !reworkFeedback.trim()}
+                className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs flex items-center space-x-1.5 transition disabled:opacity-50"
+              >
+                {isReworking ? (
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5" />
+                )}
+                <span>确认下发重做</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase 5: Quality Gate Detail Inspection Modal */}
+      {showGateDetailModal && selectedGateReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="max-w-2xl w-full rounded-2xl border border-slate-800 bg-slate-950 p-5 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden text-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-100">
+                    Phase 5 质量门禁多维防御细则
+                  </h3>
+                  <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                    产物 ID: {selectedGateReport.artifactId} | 指纹: {selectedGateReport.sha256Fingerprint.substring(0, 16)}...
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowGateDetailModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="my-3 p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-xs text-slate-400 block">门禁加权总分</span>
+                <span className="text-2xl font-bold font-mono text-indigo-400">
+                  {selectedGateReport.compositeScore} / 100 分
+                </span>
+              </div>
+              <div className="flex items-center space-x-3 text-xs font-mono">
+                <span className="text-emerald-400">{selectedGateReport.passedRules} 通过</span>
+                <span className="text-rose-400">{selectedGateReport.failedRules} 阻断</span>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {selectedGateReport.checkItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-xl border text-xs ${
+                    item.status === "PASSED"
+                      ? "bg-slate-900/40 border-slate-800 text-slate-300"
+                      : "bg-rose-950/30 border-rose-700/60 text-rose-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-slate-200">{item.ruleName}</span>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
+                        item.status === "PASSED"
+                          ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                          : "bg-rose-950 text-rose-400 border border-rose-800"
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{item.message}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-slate-800 flex justify-end">
+              <button
+                onClick={() => setShowGateDetailModal(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

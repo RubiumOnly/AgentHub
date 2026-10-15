@@ -55,4 +55,10 @@ public class DeploymentController {
         List<DeploymentResponse> list = deploymentApplication.listDeployments(projectId);
         return Result.ok(list);
     }
+
+    @PostMapping("/{id}/probe")
+    public Result<DeploymentResponse> probeDeployment(@PathVariable("id") String id) {
+        DeploymentResponse response = deploymentApplication.probeDeployment(id);
+        return Result.ok(response);
+    }
 }

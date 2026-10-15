@@ -318,6 +318,27 @@
         "responses": { "200": { "description": "Result<RunOperationsView>" } }
       }
     },
+    "/api/executions/runs/{runId}/steps/{stepRunId}/rework": {
+      "post": {
+        "tags": ["execution"],
+        "summary": "Request step rework with reviewer feedback and reset to PENDING",
+        "responses": { "200": { "description": "Result<StepRunView>" } }
+      }
+    },
+    "/api/executions/runs/{runId}/reject": {
+      "post": {
+        "tags": ["execution"],
+        "summary": "Reject run, reset workspace changes to baseline, and mark status as REJECTED",
+        "responses": { "200": { "description": "Result<WorkflowRunView>" } }
+      }
+    },
+    "/api/executions/runs/{runId}/evidence/export": {
+      "get": {
+        "tags": ["execution"],
+        "summary": "Export deterministic, secret-masked Run Evidence Package with SHA-256 checksum",
+        "responses": { "200": { "description": "Result<RunEvidenceBundleView>" } }
+      }
+    },
     "/api/approvals/runs/{runId}": {
       "get": {
         "tags": ["orchestration"],
@@ -344,6 +365,34 @@
         "tags": ["audit"],
         "summary": "Get structured JGit diff review for artifact",
         "responses": { "200": { "description": "Result<StructuredDiff>" } }
+      }
+    },
+    "/api/audit/artifacts/{artifactId}/quality-gate": {
+      "get": {
+        "tags": ["audit"],
+        "summary": "Get quality gate evaluation report with SHA-256 fingerprint",
+        "responses": { "200": { "description": "Result<QualityGateReport>" } }
+      }
+    },
+    "/api/audit/artifacts/{artifactId}/quality-gate/evaluate": {
+      "post": {
+        "tags": ["audit"],
+        "summary": "Evaluate quality gate rules across 5 dimensions",
+        "responses": { "200": { "description": "Result<QualityGateReport>" } }
+      }
+    },
+    "/api/audit/artifacts/{artifactId}/pr-draft": {
+      "get": {
+        "tags": ["audit"],
+        "summary": "Generate structured Pull Request draft specification",
+        "responses": { "200": { "description": "Result<PullRequestDraftView>" } }
+      }
+    },
+    "/api/audit/artifacts/{artifactId}/revert-file": {
+      "post": {
+        "tags": ["audit"],
+        "summary": "Revert a single modified file to git baseline commit",
+        "responses": { "200": { "description": "Result<ArtifactView>" } }
       }
     },
     "/api/agents": {
@@ -395,6 +444,13 @@
       "post": {
         "tags": ["sandbox"],
         "summary": "Create controlled sandbox preview deployment",
+        "responses": { "200": { "description": "Result<DeploymentResponse>" } }
+      }
+    },
+    "/api/deployments/{id}/probe": {
+      "post": {
+        "tags": ["sandbox"],
+        "summary": "Execute active HTTP health check probe for sandbox deployment",
         "responses": { "200": { "description": "Result<DeploymentResponse>" } }
       }
     },

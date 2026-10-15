@@ -284,6 +284,58 @@ public class RunCommandModule {
         return RunQueryModule.toStepView(updated);
     }
 
+    @Transactional
+    public StepRunView reworkStep(String runId, String stepRunId, String feedback) {
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
+        StepRunEntity step = stepRunRepository.findById(stepRunId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STEP_RUN_NOT_FOUND, "Step run not found: " + stepRunId));
+        if (!run.getId().equals(step.getRunId())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Step [" + stepRunId + "] does not belong to run [" + runId + "]");
+        }
+
+        if (feedback != null && !feedback.isBlank()) {
+            String sanitizedFeedback = feedback.trim();
+            step.setOutputRef("Rework feedback: " + (sanitizedFeedback.length() > 200 ? sanitizedFeedback.substring(0, 200) + "..." : sanitizedFeedback));
+            stepRunRepository.save(step);
+        }
+
+        StepRunEntity updated = stateMachine.transitionStep(stepRunId, StepRunStatus.PENDING, "Rework requested: " + feedback);
+
+        broadcaster.publishEvent(runId, "STEP_REWORK_REQUESTED", "{\"stepRunId\":\"" + stepRunId + "\",\"feedback\":\"" + (feedback != null ? feedback.replace("\"", "\\\"") : "") + "\",\"attempt\":" + updated.getAttempt() + "}");
+        log.info("Step [{}] in run [{}] transitioned to PENDING for rework (attempt {})", stepRunId, runId, updated.getAttempt());
+        return RunQueryModule.toStepView(updated);
+    }
+
+    @Transactional
+    public WorkflowRunView rejectRun(String runId, String reason) {
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
+        String rejectReason = reason != null && !reason.isBlank() ? reason : "Change rejected during quality review";
+
+        workspaceRepository.findByProjectId(run.getProjectId()).ifPresent(ws -> {
+            try {
+                if (ws.getGitBaselineCommit() != null) {
+                    Path root = workspaceResolver.getWorkspaceRoot(ws.getId());
+                    gitManager.revertStepFiles(root.toFile(), ws.getGitBaselineCommit(), null, RequestContext.get().getUserId());
+                    log.info("Reverted workspace [{}] to baseline commit [{}] on run rejection", ws.getId(), ws.getGitBaselineCommit());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to revert workspace on run rejection: {}", e.getMessage());
+            }
+        });
+
+        List<StepRunEntity> steps = stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId);
+        for (StepRunEntity step : steps) {
+            StepRunStatus status = StepRunStatus.fromString(step.getStatus());
+            if (!status.isTerminal()) {
+                stateMachine.transitionStep(step.getId(), StepRunStatus.CANCELLED, "Run rejected: " + rejectReason);
+            }
+        }
+
+        WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.CANCELLED, "Rejected: " + rejectReason);
+        broadcaster.publishEvent(runId, "RUN_REJECTED", "{\"reason\":\"" + rejectReason.replace("\"", "\\\"") + "\"}");
+        return RunQueryModule.toRunView(updated);
+    }
+
     private WorkflowRunEntity verifyRunAccessFallback(String runId) {
         WorkflowRunEntity run = workflowRunRepository.findById(runId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Run not found: " + runId));

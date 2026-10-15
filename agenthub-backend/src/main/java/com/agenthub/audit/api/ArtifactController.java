@@ -69,4 +69,37 @@ public class ArtifactController {
         ArtifactView view = artifactApplication.revertArtifact(artifactId, currentUserId);
         return Result.ok(view);
     }
+
+    public static class RevertFileRequest {
+        public String filePath;
+    }
+
+    @GetMapping("/{artifactId}/quality-gate")
+    public Result<com.agenthub.audit.domain.quality.QualityGateReport> getQualityGateReport(@PathVariable("artifactId") String artifactId) {
+        com.agenthub.audit.domain.quality.QualityGateReport report = artifactApplication.getQualityGateReport(artifactId);
+        return Result.ok(report);
+    }
+
+    @PostMapping("/{artifactId}/quality-gate/evaluate")
+    public Result<com.agenthub.audit.domain.quality.QualityGateReport> evaluateQualityGate(@PathVariable("artifactId") String artifactId) {
+        com.agenthub.audit.domain.quality.QualityGateReport report = artifactApplication.evaluateQualityGate(artifactId);
+        return Result.ok(report);
+    }
+
+    @GetMapping("/{artifactId}/pr-draft")
+    public Result<com.agenthub.audit.dto.PullRequestDraftView> getPullRequestDraft(@PathVariable("artifactId") String artifactId) {
+        com.agenthub.audit.dto.PullRequestDraftView draft = artifactApplication.generatePullRequestDraft(artifactId);
+        return Result.ok(draft);
+    }
+
+    @PostMapping("/{artifactId}/revert-file")
+    public Result<ArtifactView> revertSingleFile(
+            @PathVariable("artifactId") String artifactId,
+            @RequestBody(required = false) RevertFileRequest req,
+            @RequestParam(value = "filePath", required = false) String queryFilePath) {
+        String currentUserId = RequestContext.get().getUserId();
+        String path = (req != null && req.filePath != null && !req.filePath.isBlank()) ? req.filePath : queryFilePath;
+        ArtifactView view = artifactApplication.revertSingleFile(artifactId, path, currentUserId);
+        return Result.ok(view);
+    }
 }

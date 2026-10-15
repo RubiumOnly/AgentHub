@@ -67,4 +67,17 @@ public class StepLineageNode {
 
     public String getApprovalStatus() { return approvalStatus; }
     public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    private com.agenthub.audit.domain.quality.QualityGateReport qualityGateReport;
+    private String agentRole;
+    private String reworkFeedback;
+
+    public com.agenthub.audit.domain.quality.QualityGateReport getQualityGateReport() { return qualityGateReport; }
+    public void setQualityGateReport(com.agenthub.audit.domain.quality.QualityGateReport qualityGateReport) { this.qualityGateReport = qualityGateReport; }
+
+    public String getAgentRole() { return agentRole; }
+    public void setAgentRole(String agentRole) { this.agentRole = agentRole; }
+
+    public String getReworkFeedback() { return reworkFeedback; }
+    public void setReworkFeedback(String reworkFeedback) { this.reworkFeedback = reworkFeedback; }
 }

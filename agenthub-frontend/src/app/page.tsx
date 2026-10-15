@@ -337,6 +337,7 @@ export default function AgentHubExecutiveApp() {
             mode="overview-middle"
             diffs={diffs}
             workspaceId={activeWorkspaceId}
+            runId={activeRunId}
             team={team}
             onRefresh={syncDashboardData}
             onCardAction={handleCardAction}
@@ -371,6 +372,7 @@ export default function AgentHubExecutiveApp() {
           mode="diff"
           diffs={diffs}
           workspaceId={activeWorkspaceId}
+          runId={activeRunId}
           team={team}
           onRefresh={syncDashboardData}
           onCardAction={handleCardAction}

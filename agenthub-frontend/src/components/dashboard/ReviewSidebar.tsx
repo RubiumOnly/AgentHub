@@ -9,6 +9,8 @@ interface ReviewSidebarProps {
   mode: "overview-middle" | "diff";
   diffs: FileDiffEntry[];
   workspaceId: string;
+  runId?: string;
+  artifactId?: string;
   team: TeamView | null;
   onRefresh: () => void;
   onCardAction: (action: string) => void;
@@ -18,6 +20,8 @@ export function ReviewSidebar({
   mode,
   diffs,
   workspaceId,
+  runId,
+  artifactId,
   team,
   onRefresh,
   onCardAction,
@@ -32,6 +36,8 @@ export function ReviewSidebar({
           <DiffArtifactReviewer
             diffs={diffs}
             workspaceId={workspaceId}
+            runId={runId}
+            artifactId={artifactId}
             onRefresh={onRefresh}
           />
         </div>
@@ -44,6 +50,8 @@ export function ReviewSidebar({
       <DiffArtifactReviewer
         diffs={diffs}
         workspaceId={workspaceId}
+        runId={runId}
+        artifactId={artifactId}
         onRefresh={onRefresh}
       />
     </div>

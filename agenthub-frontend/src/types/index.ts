@@ -25,7 +25,8 @@ export type RunStatus =
   | "PAUSED"
   | "SUCCEEDED"
   | "FAILED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "REJECTED";
 
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -182,7 +183,58 @@ export interface ConversationView {
 }
 
 export type DiffChangeType = "ADD" | "MODIFY" | "DELETE" | "RENAME" | "COPY";
-export type ArtifactReviewStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "REVERTED";
+export type ArtifactReviewStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "REVERTED" | "GATE_FAILED";
+
+export type QualityGateStatus = "PASSED" | "FAILED" | "WARNING" | "SKIPPED";
+
+export interface QualityGateCheckItem {
+  ruleType: string;
+  ruleName: string;
+  status: QualityGateStatus;
+  weight: number;
+  message: string;
+  detailJson?: string;
+}
+
+export interface QualityGateReport {
+  reportId: string;
+  artifactId: string;
+  runId: string;
+  overallStatus: QualityGateStatus;
+  compositeScore: number;
+  totalRules: number;
+  passedRules: number;
+  failedRules: number;
+  warningRules: number;
+  checkItems: QualityGateCheckItem[];
+  sha256Fingerprint: string;
+  evaluatedAt: string;
+}
+
+export interface PullRequestDraftView {
+  draftId: string;
+  artifactId: string;
+  runId: string;
+  targetBranch: string;
+  title: string;
+  summary: string;
+  riskAssessment: string;
+  qualityGateStatus: string;
+  qualityGateScore: number;
+  changedFiles: string[];
+  totalLinesAdded: number;
+  totalLinesDeleted: number;
+  generatedAt: string;
+}
+
+export interface DeploymentProbeResult {
+  deploymentId: string;
+  status: string;
+  healthy: boolean;
+  httpStatusCode?: number;
+  latencyMs?: number;
+  message?: string;
+}
 
 export interface FileDiffEntry {
   oldPath: string;
@@ -227,6 +279,8 @@ export interface ArtifactView {
   id: string;
   runId: string;
   stepRunId?: string;
+  stepId?: string;
+  commitHash?: string;
   artifactType?: string;
   type?: string;
   path?: string;
@@ -718,6 +772,9 @@ export interface StepLineageNode {
   reviewStatus?: string;
   approvalId?: string;
   approvalStatus?: string;
+  qualityGateReport?: QualityGateReport;
+  agentRole?: string;
+  reworkFeedback?: string;
 }
 
 export interface ArtifactLineageView {

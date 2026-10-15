@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   PackageCheck,
   Cpu,
+  Activity,
 } from "lucide-react";
 
 interface SandboxPreviewPanelProps {
@@ -44,6 +45,9 @@ export function SandboxPreviewPanel({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
+  const [isProbing, setIsProbing] = useState(false);
+  const [probeLatency, setProbeLatency] = useState<number | null>(null);
+  const [probeStatus, setProbeStatus] = useState<string | null>(null);
   const [iframeKey, setIframeKey] = useState(0);
   const logCursorRef = useRef<number>(0);
   const trackedDeploymentIdRef = useRef<string | null>(null);
@@ -137,6 +141,28 @@ export function SandboxPreviewPanel({
     }
   };
 
+  const handleProbe = async () => {
+    if (!deployment?.id) return;
+    setIsProbing(true);
+    setActionError(null);
+    const start = performance.now();
+    try {
+      await apiClient.probeDeployment(deployment.id);
+      const elapsed = Math.round(performance.now() - start);
+      setProbeLatency(elapsed);
+      setProbeStatus("HEALTHY");
+      onRefresh?.();
+      await fetchLogs(false);
+    } catch (e: any) {
+      const elapsed = Math.round(performance.now() - start);
+      setProbeLatency(elapsed);
+      setProbeStatus("UNHEALTHY");
+      setActionError(e?.message || "健康探针检测失败");
+    } finally {
+      setIsProbing(false);
+    }
+  };
+
   const handleReloadFrame = () => {
     setIframeKey((prev) => prev + 1);
     fetchLogs(false);
@@ -159,6 +185,19 @@ export function SandboxPreviewPanel({
           {currentPort && (
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
               Port :{currentPort}
+            </span>
+          )}
+          {/* Phase 5: Probe latency badge */}
+          {probeLatency !== null && (
+            <span
+              className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                probeStatus === "HEALTHY"
+                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-500/40"
+                  : "bg-rose-950/60 text-rose-300 border-rose-500/40"
+              }`}
+              title="活跃 HTTP 探活延迟测定"
+            >
+              探针: {probeLatency}ms ({probeStatus})
             </span>
           )}
           {deployment?.terminationReason && currentStatus !== "RUNNING" && (
@@ -194,14 +233,27 @@ export function SandboxPreviewPanel({
           />
 
           {currentStatus === "RUNNING" ? (
-            <button
-              onClick={handleStop}
-              disabled={isStopping}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-950/70 text-rose-300 border border-rose-500/30 text-[11px] font-medium transition disabled:opacity-50"
-            >
-              <Square className="w-3 h-3 fill-rose-300" />
-              <span>停止服务</span>
-            </button>
+            <div className="flex items-center space-x-1">
+              {/* Phase 5: Probe button */}
+              <button
+                onClick={handleProbe}
+                disabled={isProbing}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-indigo-950/40 hover:bg-indigo-950/70 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium transition disabled:opacity-50"
+                title="执行 HTTP 探活探针测试"
+              >
+                <Activity className={`w-3 h-3 ${isProbing ? "animate-spin text-indigo-400" : "text-emerald-400"}`} />
+                <span>健康探针</span>
+              </button>
+
+              <button
+                onClick={handleStop}
+                disabled={isStopping}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-950/70 text-rose-300 border border-rose-500/30 text-[11px] font-medium transition disabled:opacity-50"
+              >
+                <Square className="w-3 h-3 fill-rose-300" />
+                <span>停止服务</span>
+              </button>
+            </div>
           ) : currentStatus === "BUILDING" || currentStatus === "BUILD" || currentStatus === "START" || currentStatus === "HEALTH_CHECK" ? (
             <button
               disabled

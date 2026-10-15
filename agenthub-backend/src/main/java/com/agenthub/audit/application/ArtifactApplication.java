@@ -20,5 +20,11 @@ public interface ArtifactApplication {
     ArtifactLineageView getArtifactLineageByRunId(String runId);
     StructuredDiff getArtifactDiff(String artifactId);
 
+    // Phase 5 Quality Gate & Controlled Review
+    com.agenthub.audit.domain.quality.QualityGateReport evaluateQualityGate(String artifactId);
+    com.agenthub.audit.domain.quality.QualityGateReport getQualityGateReport(String artifactId);
+    com.agenthub.audit.dto.PullRequestDraftView generatePullRequestDraft(String artifactId);
+    ArtifactView revertSingleFile(String artifactId, String filePath, String actorId);
+
     default void validateRunWorkspaceBinding(String runId, String workspaceId) {}
 }

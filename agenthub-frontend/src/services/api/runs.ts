@@ -418,6 +418,38 @@ export const runsApi = {
     });
   },
 
+  async reworkStep(runId: string, stepRunId: string, feedback?: string): Promise<StepRunView> {
+    if (isDemoMode()) {
+      const step = MOCK_STEPS.find((s) => s.id === stepRunId) || MOCK_STEPS[0];
+      return {
+        ...step,
+        status: "PENDING",
+        attempt: (step.attempt || 1) + 1,
+        outputRef: `Rework feedback: ${feedback || "Rework requested"}`,
+      };
+    }
+    if (!runId || !stepRunId) throw new Error("runId and stepRunId are required");
+    return fetchJson<StepRunView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(stepRunId)}/rework`, {
+      method: "POST",
+      body: JSON.stringify({ feedback: feedback || "Rework requested by reviewer" }),
+    });
+  },
+
+  async rejectRun(runId: string, reason?: string): Promise<WorkflowRunView> {
+    if (isDemoMode()) {
+      return {
+        ...MOCK_RUN,
+        status: "REJECTED",
+        cancelReason: reason || "Run rejected during review",
+      };
+    }
+    if (!runId) throw new Error("runId is required");
+    return fetchJson<WorkflowRunView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || "Run rejected during review" }),
+    });
+  },
+
   async getRunOperations(runId: string): Promise<RunOperationsView> {
     if (!runId) throw new Error("runId is required");
     return fetchJson<RunOperationsView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/operations`);
@@ -425,6 +457,11 @@ export const runsApi = {
 
   async getRunEvidence(runId: string): Promise<RunEvidenceBundleView> {
     return fetchJson<RunEvidenceBundleView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/evidence`);
+  },
+
+  async exportRunEvidence(runId: string): Promise<RunEvidenceBundleView> {
+    if (!runId) throw new Error("runId is required");
+    return fetchJson<RunEvidenceBundleView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/evidence/export`);
   },
 
   async exportRunEvidenceFile(runId: string): Promise<RunEvidenceBundleView> {

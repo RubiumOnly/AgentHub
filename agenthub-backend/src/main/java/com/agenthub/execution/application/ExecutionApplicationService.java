@@ -158,4 +158,16 @@ public class ExecutionApplicationService implements ExecutionApplication {
     public com.agenthub.execution.dto.RunOperationsView getRunOperations(String runId) {
         return runQueryModule.getRunOperations(runId);
     }
+
+    @Override
+    @Transactional
+    public StepRunView reworkStep(String runId, String stepRunId, String feedback) {
+        return runCommandModule.reworkStep(runId, stepRunId, feedback);
+    }
+
+    @Override
+    @Transactional
+    public WorkflowRunView rejectRun(String runId, String reason) {
+        return runCommandModule.rejectRun(runId, reason);
+    }
 }

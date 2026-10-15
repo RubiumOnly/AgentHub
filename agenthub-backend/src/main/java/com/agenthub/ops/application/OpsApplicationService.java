@@ -156,10 +156,17 @@ public class OpsApplicationService implements OpsApplication {
         paths.put("/api/executions/runs/{runId}/stream", Map.of("get", endpoint("execution", "Subscribe to authoritative Run SSE event stream with Last-Event-ID / afterSeq cursor")));
         paths.put("/api/executions/runs/{runId}/evidence", Map.of("get", endpoint("execution", "Generate deterministic, secret-masked Run Evidence Bundle")));
         paths.put("/api/executions/runs/{runId}/operations", Map.of("get", endpoint("execution", "Get unified execution operations view, state machine decision, and memory summary")));
+        paths.put("/api/executions/runs/{runId}/steps/{stepRunId}/rework", Map.of("post", endpoint("execution", "Request step rework with reviewer feedback and reset to PENDING")));
+        paths.put("/api/executions/runs/{runId}/reject", Map.of("post", endpoint("execution", "Reject run, reset workspace changes to baseline, and mark status as REJECTED")));
+        paths.put("/api/executions/runs/{runId}/evidence/export", Map.of("get", endpoint("execution", "Export deterministic, secret-masked Run Evidence Package with SHA-256 checksum")));
         paths.put("/api/approvals/runs/{runId}", Map.of("get", endpoint("orchestration", "List human-in-the-loop approvals for run")));
         paths.put("/api/audit/artifacts/{artifactId}/revert", Map.of("post", endpoint("audit", "Non-destructively revert artifact change in JGit workspace")));
         paths.put("/api/audit/artifacts/lineage/{runId}", Map.of("get", endpoint("audit", "Get full lifecycle artifact lineage view for run")));
         paths.put("/api/audit/artifacts/{artifactId}/diff", Map.of("get", endpoint("audit", "Get structured JGit diff review for artifact")));
+        paths.put("/api/audit/artifacts/{artifactId}/quality-gate", Map.of("get", endpoint("audit", "Get quality gate evaluation report with SHA-256 fingerprint")));
+        paths.put("/api/audit/artifacts/{artifactId}/quality-gate/evaluate", Map.of("post", endpoint("audit", "Evaluate quality gate rules across 5 dimensions")));
+        paths.put("/api/audit/artifacts/{artifactId}/pr-draft", Map.of("get", endpoint("audit", "Generate structured Pull Request draft specification")));
+        paths.put("/api/audit/artifacts/{artifactId}/revert-file", Map.of("post", endpoint("audit", "Revert a single modified file to git baseline commit")));
         paths.put("/api/agents", Map.of("get", endpoint("agent", "List registered agent definitions")));
         paths.put("/api/agents/tools", Map.of("get", endpoint("agent", "List registered agent tools with schemas and output limits")));
         paths.put("/api/agents/context-assembly", Map.of("post", endpoint("agent", "Assemble layered context with per-layer token budgets and truncation")));
@@ -172,6 +179,7 @@ public class OpsApplicationService implements OpsApplication {
                 "get", endpoint("sandbox", "List sandbox deployments for project"),
                 "post", endpoint("sandbox", "Create controlled sandbox preview deployment")
         ));
+        paths.put("/api/deployments/{id}/probe", Map.of("post", endpoint("sandbox", "Execute active HTTP health check probe for sandbox deployment")));
         paths.put("/api/system/health", Map.of("get", endpoint("ops", "Get system health status in UTC")));
         paths.put("/api/system/contracts/v1", Map.of("get", endpoint("ops", "Get API v1 contract metadata, bounded context registry, and legacy route telemetry")));
         paths.put("/api/system/legacy-endpoints", Map.of("get", endpoint("ops", "Get deprecated legacy endpoint invocation counts")));

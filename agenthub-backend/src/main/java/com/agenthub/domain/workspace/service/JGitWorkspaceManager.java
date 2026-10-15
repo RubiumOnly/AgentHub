@@ -481,6 +481,13 @@ public class JGitWorkspaceManager {
         }
     }
 
+    public void revertSingleFile(File workspaceDir, String baselineCommitHash, String filePath, String authorEmail) throws Exception {
+        if (filePath == null || filePath.isBlank()) {
+            throw new IllegalArgumentException("File path to revert must not be empty");
+        }
+        revertStepFiles(workspaceDir, baselineCommitHash, List.of(filePath), authorEmail);
+    }
+
     public List<String> getChangedFilesInCommit(File workspaceDir, String commitHash) throws Exception {
         initWorkspace(workspaceDir);
         try (Git git = Git.open(workspaceDir)) {

@@ -30,4 +30,8 @@ public interface ExecutionApplication {
 
     // Phase 4: Run Operations & Unified State Visibility
     com.agenthub.execution.dto.RunOperationsView getRunOperations(String runId);
+
+    // Phase 5 Quality Gate & Review Rework Extensions
+    StepRunView reworkStep(String runId, String stepRunId, String feedback);
+    WorkflowRunView rejectRun(String runId, String reason);
 }

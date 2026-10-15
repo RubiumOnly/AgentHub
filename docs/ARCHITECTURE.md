@@ -132,7 +132,28 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
    - 后端统一端点 `GET /api/executions/runs/{runId}/operations`（`RunOperationsView`）；
    - 前端集成 `RunOperationsPanel.tsx`（Bento Grid 运维面板）与 `StructuredDiffReviewModal.tsx`（代码审查与无损回滚模态框）。
 
-## 8. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
+## 8. 质量门禁、代码审查与受控交付产品化 (Phase 5 架构事实)
+
+在 Phase 5 中，系统将自动化质量防御、细粒度人工干预与受控交付流程全面产品化（见 [`ADR-010`](adr/ADR-010-quality-gates-review-and-controlled-delivery.md)）：
+
+1. **质量门禁策略引擎（`QualityGateEngine`）**：
+   - 固化 5 大核心防御维度：`BUILD_VERIFICATION`（构建一票否决）、`UNIT_TEST_REGRESSION`（100% 绿灯回归）、`STATIC_ANALYSIS_GUARD`（架构分层与命名规范）、`SECRET_LEAK_SCAN`（API Key/私钥/Token 敏感泄漏扫描）与 `DIFF_BUDGET_GUARD`（代码变更规模预算）；
+   - 输出结构化 `QualityGateReport` 与 `QualityGateCheckItem` 明细，计算加权综合评分（0～100 分），生成不可伪造的 SHA-256 签名指纹；
+   - 门禁未通过的产物严格标记为 `GATE_FAILED`，任何未过门禁产物坚决阻断后续预览与交付。
+2. **细粒度人工干预：步骤重做（Rework）与全盘驳回（Reject）**：
+   - **`reworkStep`**：支持评审人在任意步骤提供指导意见（`feedback`），系统将 `StepRun` 重置为 `PENDING`，自增 `attempt` 并将意见注入步骤上下文，记录 `STEP_REWORK_REQUESTED` 审计事件后重新唤醒调度器；
+   - **`rejectRun`**：支持全盘驳回运行，将受控工作区严格安全回滚至 Baseline Commit，终止所有未完成 Step，将 WorkflowRun 状态收敛为 `REJECTED` 并记录 `RUN_REJECTED` 事件。
+3. **JGit 单文件非破坏性精准回滚（`revertSingleFile`）**：
+   - `JGitWorkspaceManager` 结合底层 Git Checkout 精准将特定相对路径的文件还原至基线 Commit（新增文件彻底物理安全删除），工作区内其他文件修改完全保持完好；
+   - 生成原子回滚 Commit 并记录 `FILE_REVERTED` 审计条目，避免全局回滚带来的误伤。
+4. **受控沙箱准入门禁与主动探针**：
+   - `DeploymentApplicationService` 严格执行准入检查：拦截关联产物处于 `GATE_FAILED` 或 `REJECTED` 的部署请求（抛出 `400 PARAM_ERROR`）；
+   - 提供 `probeDeployment` 主动 HTTP 健康探针，对目标预览环境发起探测并测量往返延迟（ms），更新探针审计时间戳。
+5. **外部标准化交付物：PR 草稿规范与全量脱机证据包**：
+   - 提供 `PullRequestDraftView` 生成符合 GitHub/GitLab 规范的结构化 PR 草稿，包含 Markdown 动机正文、门禁得分徽章与受影响文件列表；
+   - 提供 `exportRunEvidenceBundle` 导出包含完整状态、JGit 逐行 Diff、门禁评分指纹、脱敏审计流与 SHA-256 Checksum 的确定性证据包。
+
+## 9. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
 
 - Flyway 是唯一 Schema 演进方式；生产使用 `ddl-auto=validate`。
 - Micrometer/Prometheus 暴露 Run、Step、Provider、SSE、锁和 Deployment 指标；日志必须结构化并脱敏。
