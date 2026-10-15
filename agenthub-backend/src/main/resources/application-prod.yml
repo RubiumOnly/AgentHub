@@ -43,6 +43,11 @@ agenthub:
     security-enabled: true
     scrape-token: "${ACTUATOR_PROMETHEUS_TOKEN:}"
     allow-trusted-network: ${AGENTHUB_MANAGEMENT_ALLOW_TRUSTED_NETWORK:true}
+  provider:
+    mode: "${AGENTHUB_PROVIDER_MODE:LIVE_SELF_HOSTED}"
+  budget:
+    hard-limit-usd: ${AGENTHUB_BUDGET_HARD_LIMIT_USD:50.00}
+    warning-ratio: ${AGENTHUB_BUDGET_WARNING_RATIO:0.80}
 
 management:
   endpoints:

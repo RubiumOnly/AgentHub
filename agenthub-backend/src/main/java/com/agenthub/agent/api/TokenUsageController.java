@@ -32,4 +32,14 @@ public class TokenUsageController {
     public Result<TokenSummaryView> getSummary() {
         return Result.ok(tokenUsageApplication.getSummary());
     }
+
+    @GetMapping("/governance")
+    public Result<com.agenthub.agent.dto.TokenGovernanceView> getGovernance() {
+        return Result.ok(tokenUsageApplication.getGovernance());
+    }
+
+    @PostMapping("/budget/check")
+    public Result<com.agenthub.agent.dto.BudgetCheckResultView> checkBudget(@RequestBody(required = false) com.agenthub.agent.dto.BudgetCheckCommand cmd) {
+        return Result.ok(tokenUsageApplication.checkBudget(cmd));
+    }
 }

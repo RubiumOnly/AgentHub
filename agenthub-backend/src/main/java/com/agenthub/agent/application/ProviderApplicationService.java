@@ -195,6 +195,27 @@ public class ProviderApplicationService implements ProviderApplication {
         );
     }
 
+    @Override
+    public ProviderProbeResultView probeProvider(String id) {
+        return router.probeProvider(id);
+    }
+
+    @Override
+    public List<ProviderHealthView> getClusterHealth() {
+        return router.getClusterHealth();
+    }
+
+    @Override
+    public CircuitBreakerView getCircuitBreaker(String id) {
+        return router.getCircuitBreakerView(id);
+    }
+
+    @Override
+    @Transactional
+    public CircuitBreakerView resetCircuitBreaker(String id) {
+        return router.resetCircuitBreaker(id);
+    }
+
     private ProviderView toView(ProviderEntity entity) {
         LlmProvider runtimeProvider = router.getProviderById(entity.getId());
         String circuitStatus = runtimeProvider != null ? runtimeProvider.getCircuitBreaker().getStatus().name() : entity.getCircuitStatus();

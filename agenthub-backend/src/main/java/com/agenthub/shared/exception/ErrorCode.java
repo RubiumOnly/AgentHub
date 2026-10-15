@@ -61,6 +61,8 @@ public enum ErrorCode {
     PROVIDER_RATE_LIMIT(5007, "LLM Provider Rate Limit Exceeded (429)"),
     PROVIDER_AUTH_FAILED(5008, "LLM Provider Authentication Failed"),
     NO_AVAILABLE_PROVIDER(5009, "No Available Provider Satisfying Routing Constraints"),
+    BUDGET_EXCEEDED(5010, "Token or Cost Budget Limit Exceeded"),
+    CIRCUIT_BREAKER_OPEN(5011, "Provider Circuit Breaker is OPEN"),
 
     // Workflow & Execution
     WORKFLOW_INVALID(6001, "Workflow Definition Invalid or Cyclic"),

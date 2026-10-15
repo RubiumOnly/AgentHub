@@ -9,6 +9,8 @@ public interface TokenUsageApplication {
     List<TokenUsageAuditView> getRunTokenUsages(String runId);
     List<TokenUsageAuditView> getStepTokenUsages(String stepRunId);
     TokenSummaryView getSummary();
+    com.agenthub.agent.dto.TokenGovernanceView getGovernance();
+    com.agenthub.agent.dto.BudgetCheckResultView checkBudget(com.agenthub.agent.dto.BudgetCheckCommand cmd);
     TokenUsageAuditView recordUsage(String runId,
                                    String stepRunId,
                                    String providerId,

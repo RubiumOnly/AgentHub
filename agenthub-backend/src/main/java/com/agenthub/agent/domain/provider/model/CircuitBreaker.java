@@ -68,6 +68,10 @@ public class CircuitBreaker {
         status.set(CircuitStatus.CLOSED);
     }
 
+    public void recordFailure() {
+        recordFailure(null);
+    }
+
     /**
      * Record a failure (429, 5xx, timeout, or network exception).
      */
@@ -107,6 +111,7 @@ public class CircuitBreaker {
 
     public String getProviderId() { return providerId; }
     public CircuitStatus getStatus() { return status.get(); }
+    public CircuitStatus getState() { return status.get(); }
     public int getConsecutiveFailures() { return consecutiveFailures.get(); }
     public long getLastFailureTime() { return lastFailureTime.get(); }
     public long getLastSuccessTime() { return lastSuccessTime.get(); }

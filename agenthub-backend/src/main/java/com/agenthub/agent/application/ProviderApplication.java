@@ -13,4 +13,8 @@ public interface ProviderApplication {
     void deleteProvider(String id);
     RouteDecisionView evaluateRoute(ChatRequest request);
     ProviderTestResultView testProvider(String id, String testPrompt);
+    ProviderProbeResultView probeProvider(String id);
+    List<ProviderHealthView> getClusterHealth();
+    CircuitBreakerView getCircuitBreaker(String id);
+    CircuitBreakerView resetCircuitBreaker(String id);
 }

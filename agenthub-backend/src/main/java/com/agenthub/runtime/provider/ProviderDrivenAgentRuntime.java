@@ -30,11 +30,20 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
 
     private final DynamicProviderRouter router;
     private final TokenUsageApplication tokenUsageApplication;
+    private final com.agenthub.agent.application.BudgetGovernanceGuard budgetGovernanceGuard;
 
     public ProviderDrivenAgentRuntime(DynamicProviderRouter router,
                                       TokenUsageApplication tokenUsageApplication) {
+        this(router, tokenUsageApplication, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ProviderDrivenAgentRuntime(DynamicProviderRouter router,
+                                      TokenUsageApplication tokenUsageApplication,
+                                      @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.agent.application.BudgetGovernanceGuard budgetGovernanceGuard) {
         this.router = router;
         this.tokenUsageApplication = tokenUsageApplication;
+        this.budgetGovernanceGuard = budgetGovernanceGuard;
     }
 
     @Override
@@ -79,6 +88,10 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
                 }
 
                 sink.onLog(runId, stepRunId, "INFO", "Dispatching to Dynamic Provider Router with HA failover protection");
+
+                if (budgetGovernanceGuard != null) {
+                    budgetGovernanceGuard.enforceBudget(runId, request.getWorkspacePath(), 0.05, 1000);
+                }
 
                 ChatRequest chatRequest = buildChatRequest(request);
 

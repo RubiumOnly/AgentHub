@@ -1,7 +1,11 @@
 package com.agenthub.agent.domain.provider.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Standard streaming chunk contract across all LLM providers.
+ * Supports content deltas and streaming tool call deltas.
  */
 public class ChatChunk {
 
@@ -9,6 +13,7 @@ public class ChatChunk {
     private String deltaContent;
     private String finishReason;
     private TokenUsage usage;
+    private List<ToolCall> toolCallsDelta = new ArrayList<>();
 
     public ChatChunk() {}
 
@@ -27,6 +32,12 @@ public class ChatChunk {
         return new ChatChunk(id, deltaContent, null, null);
     }
 
+    public static ChatChunk ofToolCalls(List<ToolCall> toolCalls) {
+        ChatChunk chunk = new ChatChunk(null, "", null, null);
+        chunk.setToolCallsDelta(toolCalls);
+        return chunk;
+    }
+
     public static ChatChunk finish(String finishReason, TokenUsage usage) {
         return new ChatChunk(null, "", finishReason, usage);
     }
@@ -39,4 +50,8 @@ public class ChatChunk {
     public void setFinishReason(String finishReason) { this.finishReason = finishReason; }
     public TokenUsage getUsage() { return usage; }
     public void setUsage(TokenUsage usage) { this.usage = usage; }
+    public List<ToolCall> getToolCallsDelta() { return toolCallsDelta; }
+    public void setToolCallsDelta(List<ToolCall> toolCallsDelta) {
+        this.toolCallsDelta = toolCallsDelta != null ? new ArrayList<>(toolCallsDelta) : new ArrayList<>();
+    }
 }

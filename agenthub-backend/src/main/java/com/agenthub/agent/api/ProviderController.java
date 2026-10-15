@@ -54,4 +54,24 @@ public class ProviderController {
                                                        @RequestParam(required = false) String prompt) {
         return Result.ok(providerApplication.testProvider(id, prompt));
     }
+
+    @GetMapping("/health")
+    public Result<List<ProviderHealthView>> getClusterHealth() {
+        return Result.ok(providerApplication.getClusterHealth());
+    }
+
+    @PostMapping("/{id}/probe")
+    public Result<ProviderProbeResultView> probeProvider(@PathVariable String id) {
+        return Result.ok(providerApplication.probeProvider(id));
+    }
+
+    @GetMapping("/{id}/circuit-breaker")
+    public Result<CircuitBreakerView> getCircuitBreaker(@PathVariable String id) {
+        return Result.ok(providerApplication.getCircuitBreaker(id));
+    }
+
+    @PostMapping("/{id}/circuit-breaker/reset")
+    public Result<CircuitBreakerView> resetCircuitBreaker(@PathVariable String id) {
+        return Result.ok(providerApplication.resetCircuitBreaker(id));
+    }
 }

@@ -4,6 +4,7 @@ import java.util.*;
 
 /**
  * Standard unified chat request model for LLM invocations.
+ * Supports OpenAI-compatible tool calling, timeout settings, and mode segregation.
  */
 public class ChatRequest {
 
@@ -16,6 +17,9 @@ public class ChatRequest {
     private String preferredProvider;
     private int timeoutSeconds = 60;
     private boolean requireLive = false;
+    private ProviderExecutionMode executionMode;
+    private List<ToolDefinition> tools = new ArrayList<>();
+    private String toolChoice;
     private Map<String, Object> metadata = new HashMap<>();
 
     public ChatRequest() {}
@@ -72,4 +76,22 @@ public class ChatRequest {
     }
     public boolean isRequireLive() { return requireLive; }
     public void setRequireLive(boolean requireLive) { this.requireLive = requireLive; }
+
+    public ProviderExecutionMode getExecutionMode() { return executionMode; }
+    public void setExecutionMode(ProviderExecutionMode executionMode) {
+        this.executionMode = executionMode != null ? executionMode : ProviderExecutionMode.LIVE_SELF_HOSTED;
+    }
+
+    public List<ToolDefinition> getTools() { return tools; }
+    public void setTools(List<ToolDefinition> tools) {
+        this.tools = tools != null ? new ArrayList<>(tools) : new ArrayList<>();
+    }
+    public void addTool(ToolDefinition tool) {
+        if (tool != null) {
+            this.tools.add(tool);
+        }
+    }
+
+    public String getToolChoice() { return toolChoice; }
+    public void setToolChoice(String toolChoice) { this.toolChoice = toolChoice; }
 }

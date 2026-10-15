@@ -5,17 +5,23 @@ import com.agenthub.agent.domain.provider.exception.ProviderRateLimitException;
 import com.agenthub.agent.domain.provider.exception.ProviderServerException;
 import com.agenthub.agent.domain.provider.model.*;
 import com.agenthub.agent.domain.provider.spi.LlmProvider;
+import com.agenthub.agent.dto.CircuitBreakerView;
+import com.agenthub.agent.dto.ProviderHealthView;
+import com.agenthub.agent.dto.ProviderProbeResultView;
 import com.agenthub.agent.infrastructure.entity.ProviderEntity;
 import com.agenthub.agent.infrastructure.provider.*;
 import com.agenthub.agent.infrastructure.repository.ProviderRepository;
 import com.agenthub.agent.infrastructure.security.SecretMasker;
 import com.agenthub.execution.domain.model.CancelToken;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -24,7 +30,8 @@ import java.util.stream.Collectors;
 
 /**
  * Enterprise Dynamic Provider Router with Automated HA Failover & Circuit Breaking.
- * Evaluates candidate matrix based on priority, model capability, measured latency, and availability.
+ * Evaluates candidate matrix based on priority, model capability, measured latency, availability,
+ * and authoritative mode segregation (DEMO_SIMULATED, LIVE_SELF_HOSTED, LIVE_TEAM).
  */
 @Component
 public class DynamicProviderRouter implements ProviderRouter {
@@ -34,6 +41,10 @@ public class DynamicProviderRouter implements ProviderRouter {
     private final Map<String, LlmProvider> providerRegistry = new ConcurrentHashMap<>();
     private final Environment environment;
     private final ProviderRepository providerRepository;
+
+    public DynamicProviderRouter() {
+        this(null, null);
+    }
 
     public DynamicProviderRouter(Environment environment, ProviderRepository providerRepository) {
         this.environment = environment;
@@ -61,8 +72,8 @@ public class DynamicProviderRouter implements ProviderRouter {
                 100,
                 1,
                 Set.of("code", "general", "reasoning", "fast"),
-                5.0000,
-                15.0000,
+                2.5000,
+                10.0000,
                 environment
         ));
 
@@ -210,6 +221,11 @@ public class DynamicProviderRouter implements ProviderRouter {
                 .collect(Collectors.toSet());
     }
 
+    public ProviderExecutionMode getSystemMode() {
+        String envMode = environment != null ? environment.getProperty("agenthub.provider.mode", "DEMO_SIMULATED") : "DEMO_SIMULATED";
+        return ProviderExecutionMode.fromString(envMode);
+    }
+
     @Override
     public List<LlmProvider> selectCandidates(ChatRequest request) {
         List<LlmProvider> eligible = new ArrayList<>();
@@ -240,15 +256,21 @@ public class DynamicProviderRouter implements ProviderRouter {
             eligible.add(provider);
         }
 
-        if (request != null && request.isRequireLive()) {
+        // Mode segregation: In live mode (LIVE_SELF_HOSTED / LIVE_TEAM / requireLive), strictly exclude simulated/mock
+        ProviderExecutionMode mode = (request != null && request.getExecutionMode() != null)
+                ? request.getExecutionMode()
+                : ((request != null && request.isRequireLive()) ? ProviderExecutionMode.LIVE_SELF_HOSTED : getSystemMode());
+
+        if (mode.isLive() || (request != null && request.isRequireLive())) {
             eligible.removeIf(p -> p.isSimulated() || "MOCK".equalsIgnoreCase(p.getProviderType()) || "prov-mock".equalsIgnoreCase(p.getId()));
         }
 
         if (eligible.isEmpty()) {
-            if (request != null && request.isRequireLive()) {
-                throw new NoAvailableProviderException("No live provider available matching capabilities and constraints (requireLive=true)");
+            if (mode.isLive() || (request != null && request.isRequireLive())) {
+                throw new NoAvailableProviderException(
+                        "No live provider available matching capabilities and constraints (mode=" + mode + "). Mock fallback is strictly blocked in live mode.");
             }
-            // If all preferred providers are circuit-broken or missing, fall back to mock
+            // If all preferred providers are circuit-broken or missing in DEMO mode, fall back to mock
             LlmProvider mock = providerRegistry.get("prov-mock");
             if (mock != null) {
                 return List.of(mock);
@@ -272,7 +294,7 @@ public class DynamicProviderRouter implements ProviderRouter {
             int prioDiff = Integer.compare(p2.getPriority(), p1.getPriority());
             if (prioDiff != 0) return prioDiff;
 
-            // Measured latency ASC (only for positive latency, otherwise penalize non-positive/unknown)
+            // Measured latency ASC
             long lat1 = p1.checkHealth().getLatencyMs();
             long lat2 = p2.checkHealth().getLatencyMs();
             long effLat1 = lat1 > 0 ? lat1 : Long.MAX_VALUE;
@@ -285,15 +307,6 @@ public class DynamicProviderRouter implements ProviderRouter {
         });
 
         return eligible;
-    }
-
-    private int healthScore(ProviderHealth.Status status) {
-        if (status == null) return 0;
-        return switch (status) {
-            case UP -> 2;
-            case DEGRADED -> 1;
-            case DOWN -> 0;
-        };
     }
 
     @Override
@@ -375,6 +388,7 @@ public class DynamicProviderRouter implements ProviderRouter {
             AtomicBoolean chunkEmitted = new AtomicBoolean(false);
             StringBuilder contentAccumulator = new StringBuilder();
             java.util.concurrent.atomic.AtomicReference<TokenUsage> usageRef = new java.util.concurrent.atomic.AtomicReference<>(null);
+            List<ToolCall> collectedToolCalls = new ArrayList<>();
             long start = System.currentTimeMillis();
 
             try {
@@ -387,6 +401,9 @@ public class DynamicProviderRouter implements ProviderRouter {
                         }
                         if (chunk.getUsage() != null) {
                             usageRef.set(chunk.getUsage());
+                        }
+                        if (chunk.getToolCallsDelta() != null && !chunk.getToolCallsDelta().isEmpty()) {
+                            collectedToolCalls.addAll(chunk.getToolCallsDelta());
                         }
                     }
                     if (chunkConsumer != null) {
@@ -419,6 +436,9 @@ public class DynamicProviderRouter implements ProviderRouter {
                         latencyMs,
                         cost
                 );
+                if (!collectedToolCalls.isEmpty()) {
+                    response.setToolCalls(collectedToolCalls);
+                }
 
                 if (candidateIndex > 0) {
                     response.setFallbackUsed(true);
@@ -431,8 +451,6 @@ public class DynamicProviderRouter implements ProviderRouter {
                 lastException = e;
                 int statusCode = (e instanceof ProviderRateLimitException) ? 429 : 500;
 
-                // If chunks have already started streaming to the client, falling back halfway might corrupt output,
-                // but if failed before any chunk, seamlessly fall back!
                 if (!chunkEmitted.get() && (i + 1 < candidates.size())) {
                     LlmProvider backup = candidates.get(i + 1);
                     FallbackEvent fallbackEvent = new FallbackEvent(
@@ -448,13 +466,139 @@ public class DynamicProviderRouter implements ProviderRouter {
                     continue; // Try next candidate
                 }
 
-                // If already emitted chunks or last candidate, rethrow
                 throw new RuntimeException("Stream interrupted on provider [" + candidate.getId() + "]: " + SecretMasker.maskInText(e.getMessage()), e);
             }
         }
 
         throw new NoAvailableProviderException("All candidate providers failed for stream. Last error: " +
                 (lastException != null ? SecretMasker.maskInText(lastException.getMessage()) : "unknown"));
+    }
+
+    /**
+     * Active latency probe for a specific provider.
+     */
+    public ProviderProbeResultView probeProvider(String id) {
+        LlmProvider provider = providerRegistry.get(id);
+        if (provider == null) {
+            throw new BusinessException(ErrorCode.PROVIDER_NOT_FOUND, "Provider not found in runtime router: " + id);
+        }
+
+        long start = System.currentTimeMillis();
+        try {
+            ProviderHealth health = provider.checkHealth();
+            long latency = Math.max(1, System.currentTimeMillis() - start);
+
+            if (health.getStatus() == ProviderHealth.Status.UP) {
+                provider.getCircuitBreaker().recordSuccess(latency);
+            }
+            updateProviderEntityMetrics(id, latency, provider.getCircuitBreaker().getStatus().name(), true);
+
+            return new ProviderProbeResultView(
+                    provider.getId(),
+                    provider.getProviderType(),
+                    provider.getModel(),
+                    health.getStatus().name(),
+                    latency,
+                    provider.getCircuitBreaker().getStatus().name(),
+                    provider.isSimulated(),
+                    health.getMessage(),
+                    LocalDateTime.now()
+            );
+        } catch (Exception e) {
+            long latency = Math.max(1, System.currentTimeMillis() - start);
+            provider.getCircuitBreaker().recordFailure(e);
+            updateProviderEntityMetrics(id, latency, provider.getCircuitBreaker().getStatus().name(), false);
+
+            return new ProviderProbeResultView(
+                    provider.getId(),
+                    provider.getProviderType(),
+                    provider.getModel(),
+                    "DOWN",
+                    latency,
+                    provider.getCircuitBreaker().getStatus().name(),
+                    provider.isSimulated(),
+                    "Probe failed: " + SecretMasker.maskInText(e.getMessage()),
+                    LocalDateTime.now()
+            );
+        }
+    }
+
+    /**
+     * Inspect cluster-wide provider health.
+     */
+    public List<ProviderHealthView> getClusterHealth() {
+        List<ProviderHealthView> list = new ArrayList<>();
+        for (LlmProvider p : providerRegistry.values()) {
+            ProviderHealth health = p.checkHealth();
+            list.add(new ProviderHealthView(
+                    p.getId(),
+                    p.getName(),
+                    p.getProviderType(),
+                    p.getModel(),
+                    health.getStatus().name(),
+                    health.getLatencyMs(),
+                    p.getCircuitBreaker().getStatus().name(),
+                    p.isSimulated(),
+                    health.getMessage()
+            ));
+        }
+        return list;
+    }
+
+    /**
+     * Get detailed circuit breaker status view.
+     */
+    public CircuitBreakerView getCircuitBreakerView(String id) {
+        LlmProvider provider = providerRegistry.get(id);
+        if (provider == null) {
+            throw new BusinessException(ErrorCode.PROVIDER_NOT_FOUND, "Provider not found: " + id);
+        }
+        CircuitBreaker cb = provider.getCircuitBreaker();
+        return new CircuitBreakerView(
+                cb.getProviderId(),
+                cb.getStatus().name(),
+                cb.getConsecutiveFailures(),
+                cb.getFailureThreshold(),
+                cb.getOpenTimeoutMs(),
+                cb.getLastFailureTime(),
+                cb.getLastSuccessTime(),
+                cb.getLastLatencyMs()
+        );
+    }
+
+    /**
+     * Reset circuit breaker to CLOSED.
+     */
+    public CircuitBreakerView resetCircuitBreaker(String id) {
+        LlmProvider provider = providerRegistry.get(id);
+        if (provider == null) {
+            throw new BusinessException(ErrorCode.PROVIDER_NOT_FOUND, "Provider not found: " + id);
+        }
+        provider.getCircuitBreaker().reset();
+        updateProviderEntityMetrics(id, null, "CLOSED", true);
+        return getCircuitBreakerView(id);
+    }
+
+    private void updateProviderEntityMetrics(String id, Long latencyMs, String circuitStatus, boolean success) {
+        try {
+            if (providerRepository != null) {
+                providerRepository.findById(id).ifPresent(entity -> {
+                    if (circuitStatus != null) entity.setCircuitStatus(circuitStatus);
+                    if (latencyMs != null && latencyMs > 0) entity.setAvgLatencyMs(latencyMs);
+                    if (success) {
+                        entity.setLastSuccessAt(LocalDateTime.now());
+                        entity.setConsecutiveFailures(0);
+                    } else {
+                        entity.setLastFailureAt(LocalDateTime.now());
+                        entity.setConsecutiveFailures(entity.getConsecutiveFailures() + 1);
+                    }
+                    entity.setUpdatedAt(LocalDateTime.now());
+                    providerRepository.save(entity);
+                });
+            }
+        } catch (Exception e) {
+            log.warn("Failed to persist provider probe metrics to database: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -480,5 +624,10 @@ public class DynamicProviderRouter implements ProviderRouter {
     public LlmProvider getProviderById(String id) {
         if (id == null) return null;
         return providerRegistry.get(id);
+    }
+
+    public CircuitBreaker getCircuitBreaker(String id) {
+        LlmProvider p = getProviderById(id);
+        return p != null ? p.getCircuitBreaker() : null;
     }
 }

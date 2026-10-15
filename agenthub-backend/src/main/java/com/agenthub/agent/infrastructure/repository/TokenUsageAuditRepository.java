@@ -26,4 +26,10 @@ public interface TokenUsageAuditRepository extends JpaRepository<TokenUsageAudit
 
     @Query("SELECT COALESCE(SUM(t.estimatedCost), 0.0) FROM TokenUsageAuditEntity t")
     double sumTotalEstimatedCost();
+
+    @Query("SELECT t.model, SUM(t.promptTokens), SUM(t.completionTokens), SUM(t.totalTokens), SUM(t.estimatedCost), COUNT(t) FROM TokenUsageAuditEntity t GROUP BY t.model")
+    List<Object[]> summarizeByModel();
+
+    @Query("SELECT COALESCE(t.providerId, 'unassigned'), t.providerType, SUM(t.estimatedCost), SUM(t.totalTokens), AVG(t.latencyMs), COUNT(t) FROM TokenUsageAuditEntity t GROUP BY t.providerId, t.providerType")
+    List<Object[]> summarizeByProvider();
 }

@@ -236,6 +236,12 @@ public class OpsApplicationService implements OpsApplication {
                 "get", endpoint("agent", "List LLM providers"),
                 "post", endpoint("agent", "Register LLM provider")
         ));
+        paths.put("/api/providers/health", Map.of("get", endpoint("agent", "Get provider cluster health status and metrics")));
+        paths.put("/api/providers/{id}/probe", Map.of("post", endpoint("agent", "Actively probe provider endpoint and measure latency")));
+        paths.put("/api/providers/{id}/circuit-breaker", Map.of("get", endpoint("agent", "Get provider circuit breaker status and metrics")));
+        paths.put("/api/providers/{id}/circuit-breaker/reset", Map.of("post", endpoint("agent", "Reset provider circuit breaker state to CLOSED")));
+        paths.put("/api/token-usages/governance", Map.of("get", endpoint("agent", "Get token usage and cost budget governance overview")));
+        paths.put("/api/token-usages/budget/check", Map.of("post", endpoint("agent", "Pre-check cost and token budget before execution")));
         paths.put("/api/deployments", Map.of(
                 "get", endpoint("sandbox", "List sandbox deployments for project"),
                 "post", endpoint("sandbox", "Create controlled sandbox preview deployment")

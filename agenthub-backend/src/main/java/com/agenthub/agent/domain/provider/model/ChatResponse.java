@@ -1,7 +1,11 @@
 package com.agenthub.agent.domain.provider.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Standard unified chat response model across all LLM providers.
+ * Includes support for OpenAI-compatible tool call payloads.
  */
 public class ChatResponse {
 
@@ -16,6 +20,7 @@ public class ChatResponse {
     private double estimatedCost;
     private boolean fallbackUsed = false;
     private String originalProviderId;
+    private List<ToolCall> toolCalls = new ArrayList<>();
 
     public ChatResponse() {}
 
@@ -37,6 +42,20 @@ public class ChatResponse {
         this.usage = usage != null ? usage : TokenUsage.zero();
         this.latencyMs = latencyMs;
         this.estimatedCost = estimatedCost;
+    }
+
+    public boolean hasToolCalls() {
+        return toolCalls != null && !toolCalls.isEmpty();
+    }
+
+    public List<ToolCall> getToolCalls() { return toolCalls; }
+    public void setToolCalls(List<ToolCall> toolCalls) {
+        this.toolCalls = toolCalls != null ? new ArrayList<>(toolCalls) : new ArrayList<>();
+    }
+    public void addToolCall(ToolCall toolCall) {
+        if (toolCall != null) {
+            this.toolCalls.add(toolCall);
+        }
     }
 
     public String getId() { return id; }

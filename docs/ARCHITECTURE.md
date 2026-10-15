@@ -205,9 +205,28 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 | `approvals` | `orchestration` | `ApprovalEntity` | `V1`, `V5` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)`；单次决策状态转换 | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留；人工审批门禁权威记录 |
 | `deployments` | `sandbox` | `DeploymentEntity` | `V1`, `V8`, `V11` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` + 受控端口池原子分配 | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest` | 长期保留；绑定已验收 `artifact_id` 与健康探针轨迹 |
 
+## 10. 真实 Provider 矩阵、模式强隔离与成本预算治理 (Phase 7 产品化事实)
+
+1. **主流模型客户端与统一工具调用（Tool Calling）**：
+   - 固化 `OpenAiCompatibleProvider`（OpenAI 与 DeepSeek）、`AnthropicProvider` 与 `GeminiProvider` 适配层；
+   - 统一 Function Calling 请求结构注入与 `ToolCall` 领域实体提取，支持流式 SSE 增量 delta 片段解析；
+   - 内置指数退避重试算法（Exponential Backoff with Jitter），针对 429 与 5xx 瞬时网络抖动自动补偿。
+2. **运行模式强隔离 (Strict Mode Segregation)**：
+   - `DEMO_SIMULATED`：本地脱机演示与单元测试，允许透明路由到 `MockLlmProvider`；
+   - `LIVE_SELF_HOSTED` 与 `LIVE_TEAM`：生产自托管与企业团队模式，严格拒绝静默降级为 Mock，无可用节点时立即抛出 `NoAvailableProviderException (5009)`。
+3. **模型权威定价与 Prompt Cache 计费字典 (`ModelPricing`)**：
+   - 登记主流厂商标准输入/输出百万 Token 牌价字典；
+   - 支持 Prompt Cache 命中折扣计费核算（`calculateCostWithCache`）。
+4. **调用前硬预算看门狗拦截 (`BudgetGovernanceGuard`)**：
+   - 挂载于 `ProviderDrivenAgentRuntime` 与 `DagAgentInvoker` 前置切面；
+   - 生产硬限额默认 $50.00，80% 预警水位，超限立即抛出 `BUDGET_EXCEEDED (5010)` 阻断执行。
+5. **主动探针与熔断器动态运维**：
+   - 提供 `POST /api/providers/{id}/probe` 主动测量物理往返延迟（ms）；
+   - 提供 `GET & POST /api/providers/{id}/circuit-breaker` 查询与人工重置熔断器（`CLOSED`）。
+
 ## 11. 架构守卫和扩展规则
 
 ArchUnit（`ArchUnitArchitectureTest`）与 Phase 0 基线守卫（`Phase0BaselineAndDebtFreezeGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
 
-详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-011](adr/ADR-011-team-collaboration-rbac-and-operations-productization.md)。
+详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-012](adr/ADR-012-live-providers-and-budget-governance.md)。
 

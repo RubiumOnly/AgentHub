@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BentoCard } from "@/components/common/BentoCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { ProviderView, TokenSummaryView, RouteDecisionView } from "@/types";
+import { ProviderView, TokenSummaryView, RouteDecisionView, TokenGovernanceView } from "@/types";
 import { apiClient, isDemoMode, MOCK_TOKEN_SUMMARY, MOCK_PROVIDERS } from "@/services/api";
 import {
   Cpu,
@@ -16,6 +16,9 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  Radio,
+  Gauge,
+  RefreshCw,
 } from "lucide-react";
 
 interface ProviderCostDashboardProps {
@@ -34,6 +37,11 @@ export function ProviderCostDashboard({
   const [testCapability, setTestCapability] = useState("code,reasoning");
   const [routeDecision, setRouteDecision] = useState<RouteDecisionView | null>(null);
   const [isRouting, setIsRouting] = useState(false);
+  const [governance, setGovernance] = useState<TokenGovernanceView | null>(null);
+  const [probeStates, setProbeStates] = useState<
+    Record<string, { latencyMs?: number; reachable?: boolean; probing?: boolean; message?: string }>
+  >({});
+  const [resettingId, setResettingId] = useState<string | null>(null);
 
   const isDemo = isDemoMode();
   const summary = tokenSummary || (isDemo ? MOCK_TOKEN_SUMMARY : {
@@ -44,10 +52,32 @@ export function ProviderCostDashboard({
     totalInvocations: 0,
   });
 
-  const totalTokens = summary.totalTokens;
-  const promptTokens = summary.totalPromptTokens;
-  const completionTokens = summary.totalCompletionTokens;
-  const totalCost = summary.totalEstimatedCost;
+  const totalTokens = governance?.totalTokensConsumed ?? summary.totalTokens;
+  const promptTokens = governance?.totalPromptTokens ?? summary.totalPromptTokens;
+  const completionTokens = governance?.totalCompletionTokens ?? summary.totalCompletionTokens;
+  const totalCost = governance?.totalEstimatedCostUsd ?? summary.totalEstimatedCost;
+  const hardLimit = governance?.hardBudgetLimitUsd ?? 50.0;
+  const remainingBudget = governance?.remainingBudgetUsd ?? Math.max(0, hardLimit - totalCost);
+  const utilization = governance?.budgetUtilizationPercent ?? Math.min(100, Math.round((totalCost / hardLimit) * 10000) / 100);
+  const mode = governance?.executionMode ?? (isDemo ? "DEMO_SIMULATED" : "LIVE_SELF_HOSTED");
+
+  useEffect(() => {
+    let mounted = true;
+    const loadGovernance = async () => {
+      try {
+        const gov = await apiClient.getTokenGovernance();
+        if (mounted && gov) {
+          setGovernance(gov);
+        }
+      } catch {
+        // fallback to props/defaults
+      }
+    };
+    loadGovernance();
+    return () => {
+      mounted = false;
+    };
+  }, [tokenSummary]);
 
   const handleSimulateRoute = async () => {
     setIsRouting(true);
@@ -84,13 +114,63 @@ export function ProviderCostDashboard({
     }
   };
 
+  const handleProbe = async (providerId: string) => {
+    setProbeStates((prev) => ({
+      ...prev,
+      [providerId]: { ...prev[providerId], probing: true },
+    }));
+    try {
+      const res = await apiClient.probeProvider(providerId);
+      setProbeStates((prev) => ({
+        ...prev,
+        [providerId]: {
+          latencyMs: res.latencyMs,
+          reachable: res.reachable,
+          probing: false,
+          message: res.message,
+        },
+      }));
+    } catch (err: any) {
+      setProbeStates((prev) => ({
+        ...prev,
+        [providerId]: {
+          latencyMs: 0,
+          reachable: false,
+          probing: false,
+          message: err?.message || "探测失败",
+        },
+      }));
+    }
+  };
+
+  const handleResetCircuitBreaker = async (providerId: string) => {
+    setResettingId(providerId);
+    try {
+      await apiClient.resetCircuitBreaker(providerId);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      console.error("Reset circuit breaker failed", err);
+    } finally {
+      setResettingId(null);
+    }
+  };
+
   return (
     <BentoCard
-      title="模型 Provider 动态路由与 Token 成本 (Router & Cost)"
-      subtitle="阶段 5 抽象：统一 SPI 契约、多维度加权路由、三态熔断器与精细化成本核算"
+      title="模型 Provider 治理与成本看板 (Router & Budget)"
+      subtitle="阶段 7 生产级治理：实时客户端适配、LIVE/SIMULATED 模式隔离、硬预算拦截与健康探测"
       icon={<Cpu className="w-4 h-4 text-indigo-400" />}
       badge={
         <div className="flex items-center space-x-1.5">
+          <span
+            className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+              mode === "DEMO_SIMULATED"
+                ? "bg-amber-950/40 text-amber-300 border-amber-500/40"
+                : "bg-emerald-950/40 text-emerald-300 border-emerald-500/40"
+            }`}
+          >
+            {mode}
+          </span>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700/60">
             Providers: {providers.length}
           </span>
@@ -113,13 +193,57 @@ export function ProviderCostDashboard({
       className={`h-full ${className}`}
       bodyClassName="flex flex-col p-4 space-y-4 overflow-y-auto"
     >
+      {/* Top Banner: Hard Budget Governance Bar */}
+      <div className="p-3.5 rounded-xl border border-zinc-800/90 bg-zinc-950/80 space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-1.5 font-semibold text-zinc-200">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>成本硬预算防御 (Hard Budget Limit: ${hardLimit.toFixed(2)})</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            {governance?.budgetExhausted && (
+              <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950/70 text-rose-300 border border-rose-500/50 font-bold">
+                🛑 预算已用尽 (拦截调用)
+              </span>
+            )}
+            {governance?.budgetWarning && !governance?.budgetExhausted && (
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/70 text-amber-300 border border-amber-500/50 font-bold">
+                ⚠️ 预算预警 (&gt;80%)
+              </span>
+            )}
+            <span className="text-[11px] font-mono text-zinc-400">
+              剩余: <span className="text-emerald-400 font-semibold">${remainingBudget.toFixed(4)}</span> ({100 - utilization}%)
+            </span>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800">
+          <div
+            className={`h-full transition-all duration-500 ${
+              utilization >= 100
+                ? "bg-rose-500"
+                : utilization >= 80
+                ? "bg-amber-500"
+                : "bg-emerald-500"
+            }`}
+            style={{ width: `${Math.min(100, Math.max(2, utilization))}%` }}
+          />
+        </div>
+
+        <div className="flex justify-between text-[10px] font-mono text-zinc-500 pt-0.5">
+          <span>消耗: ${totalCost.toFixed(4)} ({utilization}%)</span>
+          <span>模式: {mode} (严格拒绝静默降级)</span>
+        </div>
+      </div>
+
       {/* Top Banner: Token & Cost Breakdown */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 shrink-0">
         <div className="p-3 rounded-xl border border-zinc-800/80 bg-zinc-950/60">
           <div className="text-[11px] text-zinc-400 font-medium">累计调用次数</div>
           <div className="text-lg font-bold font-mono text-zinc-100 mt-1">
-            {tokenSummary?.totalInvocations || 42}{" "}
-            <span className="text-xs font-normal text-zinc-500">runs</span>
+            {governance?.totalInvocations ?? (tokenSummary?.totalInvocations || 42)}{" "}
+            <span className="text-xs font-normal text-zinc-500">calls</span>
           </div>
         </div>
 
@@ -151,7 +275,7 @@ export function ProviderCostDashboard({
       {/* Provider Matrix Cards */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between text-xs font-medium text-zinc-400">
-          <span>注册 Provider 节点与三态熔断器状态</span>
+          <span>注册 Provider 节点与主动健康探测 (Live Probing)</span>
           <span className="text-[11px] font-mono text-zinc-500">
             自动脱敏: sk-*** / env:INJECTION
           </span>
@@ -159,67 +283,116 @@ export function ProviderCostDashboard({
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {providers.map((p) => {
-            const isClosed = p.circuitStatus === "CLOSED";
-            const isHalfOpen = p.circuitStatus === "HALF_OPEN";
+            const isMock = p.providerType === "MOCK" || p.id === "prov-mock";
+            const probe = probeStates[p.id];
 
             return (
               <div
                 key={p.id}
-                className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3 hover:border-zinc-700 transition"
+                className={`rounded-xl border p-3 transition flex flex-col justify-between ${
+                  isMock
+                    ? "border-amber-900/40 bg-zinc-950/60"
+                    : "border-zinc-800/80 bg-zinc-950/70 hover:border-zinc-700"
+                }`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="truncate">
-                    <span className="font-semibold text-xs text-zinc-100 truncate block">
-                      {p.model}
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-500">
-                      {p.providerType}
-                    </span>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="truncate pr-1">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-semibold text-xs text-zinc-100 truncate block">
+                          {p.model}
+                        </span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${
+                            isMock
+                              ? "bg-amber-950/60 text-amber-400 border border-amber-600/30"
+                              : "bg-emerald-950/60 text-emerald-400 border border-emerald-600/30"
+                          }`}
+                        >
+                          {isMock ? "SIMULATED" : "LIVE"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {p.providerType} ({p.id})
+                      </span>
+                    </div>
+                    <StatusBadge status={p.circuitStatus} size="sm" />
                   </div>
-                  <StatusBadge status={p.circuitStatus} size="sm" />
+
+                  <div className="mt-2 space-y-1 font-mono text-[10px] text-zinc-400">
+                    <div className="flex justify-between">
+                      <span>平均延迟:</span>
+                      <span
+                        className={`font-semibold ${
+                          p.avgLatencyMs < 200
+                            ? "text-emerald-400"
+                            : p.avgLatencyMs < 400
+                            ? "text-sky-400"
+                            : "text-amber-400"
+                        }`}
+                      >
+                        {p.avgLatencyMs} ms
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span>权重 / 优先级:</span>
+                      <span className="text-zinc-200">
+                        w={p.weight} / prio={p.priority}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span>牌价 (In/Out 1M):</span>
+                      <span className="text-zinc-300">
+                        ${p.costPerMillionInput} / ${p.costPerMillionOutput}
+                      </span>
+                    </div>
+
+                    {probe && (
+                      <div className="pt-1 text-[10px] flex items-center justify-between">
+                        <span>最新探测:</span>
+                        <span className={probe.reachable ? "text-emerald-400" : "text-rose-400"}>
+                          {probe.probing ? "探测中..." : probe.reachable ? `${probe.latencyMs}ms (在线)` : "离线/异常"}
+                        </span>
+                      </div>
+                    )}
+
+                    {p.capabilities && (
+                      <div className="pt-1.5 border-t border-zinc-800/60 flex flex-wrap gap-1">
+                        {p.capabilities.split(",").map((cap) => (
+                          <span
+                            key={cap}
+                            className="px-1.5 py-0.2 rounded bg-zinc-800/80 text-zinc-400 text-[9px]"
+                          >
+                            {cap}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="mt-2 space-y-1 font-mono text-[10px] text-zinc-400">
-                  <div className="flex justify-between">
-                    <span>平均延迟:</span>
-                    <span
-                      className={`font-semibold ${
-                        p.avgLatencyMs < 200
-                          ? "text-emerald-400"
-                          : p.avgLatencyMs < 400
-                          ? "text-sky-400"
-                          : "text-amber-400"
-                      }`}
+                {/* Action buttons on card */}
+                <div className="pt-2.5 mt-2 border-t border-zinc-900 flex items-center justify-between gap-1.5">
+                  <button
+                    onClick={() => handleProbe(p.id)}
+                    disabled={probe?.probing}
+                    className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-mono flex items-center space-x-1 transition disabled:opacity-50"
+                  >
+                    <Radio className="w-2.5 h-2.5 text-sky-400" />
+                    <span>{probe?.probing ? "探测中" : "主动探测"}</span>
+                  </button>
+
+                  {p.circuitStatus !== "CLOSED" && (
+                    <button
+                      onClick={() => handleResetCircuitBreaker(p.id)}
+                      disabled={resettingId === p.id}
+                      className="px-2 py-1 rounded bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-600/40 text-[10px] font-mono flex items-center space-x-1 transition disabled:opacity-50"
                     >
-                      {p.avgLatencyMs} ms
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>权重 / 优先级:</span>
-                    <span className="text-zinc-200">
-                      w={p.weight} / prio={p.priority}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span>牌价 (In/Out 1M):</span>
-                    <span className="text-zinc-300">
-                      ${p.costPerMillionInput} / ${p.costPerMillionOutput}
-                    </span>
-                  </div>
-
-                  {p.capabilities && (
-                    <div className="pt-1.5 border-t border-zinc-800/60 flex flex-wrap gap-1">
-                      {p.capabilities.split(",").map((cap) => (
-                        <span
-                          key={cap}
-                          className="px-1.5 py-0.2 rounded bg-zinc-800/80 text-zinc-400 text-[9px]"
-                        >
-                          {cap}
-                        </span>
-                      ))}
-                    </div>
+                      <RefreshCw className="w-2.5 h-2.5" />
+                      <span>{resettingId === p.id ? "重置中" : "重置熔断"}</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -227,6 +400,40 @@ export function ProviderCostDashboard({
           })}
         </div>
       </div>
+
+      {/* Model Breakdown Section if present */}
+      {governance?.modelSummaries && governance.modelSummaries.length > 0 && (
+        <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3 space-y-2">
+          <div className="text-xs font-semibold text-zinc-200 flex items-center space-x-1.5">
+            <Activity className="w-3.5 h-3.5 text-indigo-400" />
+            <span>按模型分账与调用统计 (Model Cost Accounting)</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] font-mono text-zinc-300">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500 text-left">
+                  <th className="pb-1">Model</th>
+                  <th className="pb-1">Calls</th>
+                  <th className="pb-1">Prompt</th>
+                  <th className="pb-1">Completion</th>
+                  <th className="pb-1">Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-900">
+                {governance.modelSummaries.map((m) => (
+                  <tr key={m.model}>
+                    <td className="py-1 text-zinc-200 font-semibold">{m.model}</td>
+                    <td className="py-1 text-zinc-400">{m.invocationCount}</td>
+                    <td className="py-1 text-sky-400">{m.promptTokens.toLocaleString()}</td>
+                    <td className="py-1 text-purple-400">{m.completionTokens.toLocaleString()}</td>
+                    <td className="py-1 text-emerald-400 font-semibold">${m.estimatedCostUsd.toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Route Simulation Box */}
       <div className="rounded-xl border border-zinc-800/90 bg-zinc-950/80 p-3.5 space-y-2.5">

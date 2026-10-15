@@ -435,6 +435,48 @@
         "responses": { "200": { "description": "Result<ProviderView>" } }
       }
     },
+    "/api/providers/health": {
+      "get": {
+        "tags": ["agent"],
+        "summary": "Get provider cluster health status and metrics",
+        "responses": { "200": { "description": "Result<List<ProviderHealthView>>" } }
+      }
+    },
+    "/api/providers/{id}/probe": {
+      "post": {
+        "tags": ["agent"],
+        "summary": "Actively probe provider endpoint and measure latency",
+        "responses": { "200": { "description": "Result<ProviderProbeResultView>" } }
+      }
+    },
+    "/api/providers/{id}/circuit-breaker": {
+      "get": {
+        "tags": ["agent"],
+        "summary": "Get provider circuit breaker status and metrics",
+        "responses": { "200": { "description": "Result<CircuitBreakerView>" } }
+      }
+    },
+    "/api/providers/{id}/circuit-breaker/reset": {
+      "post": {
+        "tags": ["agent"],
+        "summary": "Reset provider circuit breaker state to CLOSED",
+        "responses": { "200": { "description": "Result<CircuitBreakerView>" } }
+      }
+    },
+    "/api/token-usages/governance": {
+      "get": {
+        "tags": ["agent"],
+        "summary": "Get token usage and cost budget governance overview",
+        "responses": { "200": { "description": "Result<TokenGovernanceView>" } }
+      }
+    },
+    "/api/token-usages/budget/check": {
+      "post": {
+        "tags": ["agent"],
+        "summary": "Pre-check cost and token budget before execution",
+        "responses": { "200": { "description": "Result<BudgetCheckResultView>" } }
+      }
+    },
     "/api/deployments": {
       "get": {
         "tags": ["sandbox"],

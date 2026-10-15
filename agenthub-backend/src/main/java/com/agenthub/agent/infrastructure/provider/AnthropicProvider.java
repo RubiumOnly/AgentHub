@@ -1,5 +1,6 @@
 package com.agenthub.agent.infrastructure.provider;
 
+import com.agenthub.agent.domain.provider.exception.ProviderUnavailableException;
 import com.agenthub.agent.domain.provider.model.*;
 import com.agenthub.agent.infrastructure.security.SecretMasker;
 import com.agenthub.execution.domain.model.CancelToken;
@@ -17,10 +18,24 @@ import java.util.function.Consumer;
 
 /**
  * Anthropic Claude Provider (Messages Protocol: /v1/messages).
+ * Implements standard Anthropic tools/tool_use schema, streaming SSE,
+ * request timeout configuration, and exponential backoff retry.
  */
 public class AnthropicProvider extends AbstractHttpLlmProvider {
 
     private static final String DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
+
+    public AnthropicProvider(String id,
+                             String baseUrl,
+                             String secretRef,
+                             String model,
+                             int priority,
+                             int weight,
+                             Set<String> capabilities,
+                             Double costPerMillionInput,
+                             Double costPerMillionOutput) {
+        this(id, "ANTHROPIC", id, baseUrl, secretRef, model, priority, weight, capabilities, costPerMillionInput, costPerMillionOutput, null);
+    }
 
     public AnthropicProvider(String id,
                              String providerType,
@@ -43,51 +58,16 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
         String effectiveKey = getEffectiveApiKey("ANTHROPIC_API_KEY");
 
         if (effectiveKey == null || effectiveKey.isBlank() || isSimulated()) {
+            if (isStrictLiveMode(request)) {
+                throw new ProviderUnavailableException(id,
+                        "Live mode [" + (request != null ? request.getExecutionMode() : "LIVE") +
+                        "] strictly forbids simulated fallback for provider [" + id + "]. Valid API key required.");
+            }
             return simulateChat(request, start);
         }
 
         try {
-            String requestUrl = buildEndpointUrl();
-            Map<String, Object> bodyMap = buildAnthropicRequestBody(request, false);
-            String jsonPayload = objectMapper.writeValueAsString(bodyMap);
-
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(requestUrl))
-                    .header("x-api-key", effectiveKey)
-                    .header("anthropic-version", DEFAULT_ANTHROPIC_VERSION)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            long latencyMs = System.currentTimeMillis() - start;
-
-            if (response.statusCode() != 200) {
-                handleHttpError(response.statusCode(), response.body());
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
-            String content = "";
-            if (root.has("content") && root.get("content").isArray()) {
-                StringBuilder sb = new StringBuilder();
-                for (JsonNode block : root.get("content")) {
-                    if ("text".equals(block.path("type").asText())) {
-                        sb.append(block.path("text").asText());
-                    }
-                }
-                content = sb.toString();
-            }
-
-            int promptTokens = 120;
-            int completionTokens = 60;
-            if (root.has("usage")) {
-                JsonNode usageNode = root.get("usage");
-                if (usageNode.has("input_tokens")) promptTokens = usageNode.get("input_tokens").asInt();
-                if (usageNode.has("output_tokens")) completionTokens = usageNode.get("output_tokens").asInt();
-            }
-
-            return buildResponse(content, promptTokens, completionTokens, latencyMs);
-
+            return executeWithBackoff(() -> doChatCall(request, effectiveKey, start), 3, 500L);
         } catch (Exception e) {
             if (e instanceof RuntimeException re && re.getClass().getName().contains("Provider")) {
                 throw re;
@@ -97,12 +77,79 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
         }
     }
 
+    private ChatResponse doChatCall(ChatRequest request, String effectiveKey, long start) throws Exception {
+        String requestUrl = buildEndpointUrl();
+        Map<String, Object> bodyMap = buildAnthropicRequestBody(request, false);
+        String jsonPayload = objectMapper.writeValueAsString(bodyMap);
+
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(requestUrl))
+                .header("x-api-key", effectiveKey)
+                .header("anthropic-version", DEFAULT_ANTHROPIC_VERSION)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
+        applyRequestTimeout(reqBuilder, request);
+        HttpRequest httpRequest = reqBuilder.build();
+
+        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        long latencyMs = Math.max(1, System.currentTimeMillis() - start);
+
+        if (response.statusCode() != 200) {
+            handleHttpError(response.statusCode(), response.body());
+        }
+
+        return parseResponse(response.body(), latencyMs);
+    }
+
+    public ChatResponse parseResponse(String responseBody, long latencyMs) throws Exception {
+        JsonNode root = objectMapper.readTree(responseBody);
+        String content = "";
+        List<ToolCall> toolCalls = new ArrayList<>();
+
+        if (root.has("content") && root.get("content").isArray()) {
+            StringBuilder sb = new StringBuilder();
+            for (JsonNode block : root.get("content")) {
+                String bType = block.path("type").asText();
+                if ("text".equals(bType)) {
+                    sb.append(block.path("text").asText());
+                } else if ("tool_use".equals(bType)) {
+                    String callId = block.path("id").asText("call-" + UUID.randomUUID().toString().substring(0, 8));
+                    String fnName = block.path("name").asText("");
+                    JsonNode inputNode = block.path("input");
+                    String fnArgs = (inputNode == null || inputNode.isMissingNode() || inputNode.isNull())
+                            ? "{}" : objectMapper.writeValueAsString(inputNode);
+                    toolCalls.add(new ToolCall(callId, fnName, fnArgs));
+                }
+            }
+            content = sb.toString();
+        }
+
+        int promptTokens = 120;
+        int completionTokens = 60;
+        if (root.has("usage")) {
+            JsonNode usageNode = root.get("usage");
+            if (usageNode.has("input_tokens")) promptTokens = usageNode.get("input_tokens").asInt();
+            if (usageNode.has("output_tokens")) completionTokens = usageNode.get("output_tokens").asInt();
+        }
+
+        ChatResponse chatResponse = buildResponse(content, promptTokens, completionTokens, latencyMs);
+        if (!toolCalls.isEmpty()) {
+            chatResponse.setToolCalls(toolCalls);
+        }
+        return chatResponse;
+    }
+
     @Override
     public void streamChat(ChatRequest request, Consumer<ChatChunk> chunkConsumer, CancelToken cancelToken) {
         long start = System.currentTimeMillis();
         String effectiveKey = getEffectiveApiKey("ANTHROPIC_API_KEY");
 
         if (effectiveKey == null || effectiveKey.isBlank() || isSimulated()) {
+            if (isStrictLiveMode(request)) {
+                throw new ProviderUnavailableException(id,
+                        "Live mode [" + (request != null ? request.getExecutionMode() : "LIVE") +
+                        "] strictly forbids simulated fallback for provider [" + id + "]. Valid API key required.");
+            }
             simulateStream(request, chunkConsumer, cancelToken, start);
             return;
         }
@@ -112,13 +159,14 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
             Map<String, Object> bodyMap = buildAnthropicRequestBody(request, true);
             String jsonPayload = objectMapper.writeValueAsString(bodyMap);
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(requestUrl))
                     .header("x-api-key", effectiveKey)
                     .header("anthropic-version", DEFAULT_ANTHROPIC_VERSION)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
+            applyRequestTimeout(reqBuilder, request);
+            HttpRequest httpRequest = reqBuilder.build();
 
             HttpResponse<java.io.InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
 
@@ -174,6 +222,10 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
         return base + "/v1/messages";
     }
 
+    public Map<String, Object> buildRequestBody(ChatRequest request, boolean stream) {
+        return buildAnthropicRequestBody(request, stream);
+    }
+
     private Map<String, Object> buildAnthropicRequestBody(ChatRequest request, boolean stream) {
         Map<String, Object> body = new HashMap<>();
         body.put("model", request.getModel() != null && !request.getModel().isBlank() ? request.getModel() : this.model);
@@ -204,6 +256,24 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
             messagesList.add(Map.of("role", "user", "content", "Hello"));
         }
         body.put("messages", messagesList);
+
+        // Anthropic Claude Tools Format
+        if (request.getTools() != null && !request.getTools().isEmpty()) {
+            List<Map<String, Object>> toolsList = new ArrayList<>();
+            for (ToolDefinition td : request.getTools()) {
+                Map<String, Object> toolMap = new HashMap<>();
+                toolMap.put("name", td.getName());
+                if (td.getDescription() != null) toolMap.put("description", td.getDescription());
+                if (td.getParameters() != null) {
+                    toolMap.put("input_schema", td.getParameters());
+                } else {
+                    toolMap.put("input_schema", Map.of("type", "object", "properties", Map.of()));
+                }
+                toolsList.add(toolMap);
+            }
+            body.put("tools", toolsList);
+        }
+
         return body;
     }
 
@@ -230,7 +300,20 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
         long latencyMs = Math.max(18, System.currentTimeMillis() - startTime);
         int promptTokens = Math.max(45, safeSummary.length() / 3);
         int completionTokens = Math.max(55, output.length() / 4);
-        return buildResponse(output, promptTokens, completionTokens, latencyMs);
+
+        ChatResponse resp = buildResponse(output, promptTokens, completionTokens, latencyMs);
+
+        // If tools were requested, simulate tool call
+        if (request != null && request.getTools() != null && !request.getTools().isEmpty()) {
+            ToolDefinition firstTool = request.getTools().get(0);
+            resp.setToolCalls(List.of(new ToolCall(
+                    "call-claude-" + UUID.randomUUID().toString().substring(0, 8),
+                    firstTool.getName(),
+                    "{\"target\":\"claude-analysis\",\"level\":\"strict\"}"
+            )));
+        }
+
+        return resp;
     }
 
     private void simulateStream(ChatRequest request, Consumer<ChatChunk> chunkConsumer, CancelToken cancelToken, long startTime) {
@@ -245,6 +328,9 @@ public class AnthropicProvider extends AbstractHttpLlmProvider {
                 Thread.currentThread().interrupt();
                 break;
             }
+        }
+        if (resp.hasToolCalls()) {
+            chunkConsumer.accept(ChatChunk.ofToolCalls(resp.getToolCalls()));
         }
         chunkConsumer.accept(ChatChunk.finish("stop", resp.getUsage()));
     }

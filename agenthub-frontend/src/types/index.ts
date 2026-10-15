@@ -962,3 +962,96 @@ export interface RestoreVerificationReport {
   restoredWorkspaceFilesCount: number;
   restoreDurationMs: number;
 }
+
+// ============================================================================
+// Phase 7: Live Providers, Budget Governance & Production Monitoring Types
+// ============================================================================
+
+export type ProviderExecutionMode = "DEMO_SIMULATED" | "LIVE_SELF_HOSTED" | "LIVE_TEAM";
+
+export interface ProviderProbeResultView {
+  providerId: string;
+  providerType: string;
+  model: string;
+  reachable: boolean;
+  httpStatusCode?: number;
+  latencyMs: number;
+  message: string;
+  probedAt: string;
+}
+
+export interface CircuitBreakerView {
+  providerId: string;
+  state: "CLOSED" | "OPEN" | "HALF_OPEN";
+  failureThreshold: number;
+  failureCount: number;
+  consecutiveSuccessCount: number;
+  lastFailureTime?: string;
+  openTimeoutSeconds: number;
+  requestAllowed: boolean;
+}
+
+export interface ProviderHealthView {
+  providerId: string;
+  providerType: string;
+  model: string;
+  mode: string;
+  circuitState: "CLOSED" | "OPEN" | "HALF_OPEN";
+  available: boolean;
+  averageLatencyMs: number;
+  totalCalls: number;
+  failedCalls: number;
+  lastProbeSuccess: boolean;
+  statusMessage: string;
+}
+
+export interface ModelCostSummaryView {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  invocationCount: number;
+}
+
+export interface ProviderCostSummaryView {
+  providerId: string;
+  providerType: string;
+  estimatedCostUsd: number;
+  totalTokens: number;
+  averageLatencyMs: number;
+  invocationCount: number;
+}
+
+export interface TokenGovernanceView {
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalTokensConsumed: number;
+  totalEstimatedCostUsd: number;
+  totalInvocations: number;
+  hardBudgetLimitUsd: number;
+  remainingBudgetUsd: number;
+  budgetUtilizationPercent: number;
+  budgetExhausted: boolean;
+  budgetWarning: boolean;
+  executionMode: ProviderExecutionMode;
+  modelSummaries: ModelCostSummaryView[];
+  providerSummaries: ProviderCostSummaryView[];
+}
+
+export interface BudgetCheckCommand {
+  runId?: string;
+  projectId?: string;
+  estimatedCost?: number;
+  requiredTokens?: number;
+}
+
+export interface BudgetCheckResultView {
+  allowed: boolean;
+  currentCostUsd: number;
+  hardLimitUsd: number;
+  remainingBudgetUsd: number;
+  utilizationPercent: number;
+  warning: boolean;
+  reason?: string;
+}

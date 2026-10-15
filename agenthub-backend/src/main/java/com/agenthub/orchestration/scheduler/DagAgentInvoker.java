@@ -33,13 +33,22 @@ public class DagAgentInvoker {
     private final DagStateTransitioner stateTransitioner;
     private final DagEventRecorder eventRecorder;
     private final com.agenthub.orchestration.application.OrchestratorPlanApplication planApplication;
+    private final com.agenthub.agent.application.BudgetGovernanceGuard budgetGovernanceGuard;
     private final SafeExpressionEvaluator evaluator = new SafeExpressionEvaluator();
 
     public DagAgentInvoker(AgentRuntimeRegistry runtimeRegistry,
                            DagLeaseExecutor leaseExecutor,
                            DagStateTransitioner stateTransitioner,
                            DagEventRecorder eventRecorder) {
-        this(runtimeRegistry, leaseExecutor, stateTransitioner, eventRecorder, null);
+        this(runtimeRegistry, leaseExecutor, stateTransitioner, eventRecorder, null, null);
+    }
+
+    public DagAgentInvoker(AgentRuntimeRegistry runtimeRegistry,
+                           DagLeaseExecutor leaseExecutor,
+                           DagStateTransitioner stateTransitioner,
+                           DagEventRecorder eventRecorder,
+                           com.agenthub.orchestration.application.OrchestratorPlanApplication planApplication) {
+        this(runtimeRegistry, leaseExecutor, stateTransitioner, eventRecorder, planApplication, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -47,12 +56,14 @@ public class DagAgentInvoker {
                            DagLeaseExecutor leaseExecutor,
                            DagStateTransitioner stateTransitioner,
                            DagEventRecorder eventRecorder,
-                           com.agenthub.orchestration.application.OrchestratorPlanApplication planApplication) {
+                           @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.orchestration.application.OrchestratorPlanApplication planApplication,
+                           @org.springframework.beans.factory.annotation.Autowired(required = false) com.agenthub.agent.application.BudgetGovernanceGuard budgetGovernanceGuard) {
         this.runtimeRegistry = runtimeRegistry;
         this.leaseExecutor = leaseExecutor;
         this.stateTransitioner = stateTransitioner;
         this.eventRecorder = eventRecorder;
         this.planApplication = planApplication;
+        this.budgetGovernanceGuard = budgetGovernanceGuard;
     }
 
     public boolean executeAgentNodeWithRetry(String runId,
@@ -101,6 +112,17 @@ public class DagAgentInvoker {
             if (cancelToken.isCancelled()) {
                 stateTransitioner.markStepCancelled(stepEntity.getId(), cancelToken.getReason());
                 return false;
+            }
+
+            if (budgetGovernanceGuard != null) {
+                try {
+                    budgetGovernanceGuard.enforceBudget(runId, stepEntity.getRunId(), 0.05, 1000);
+                } catch (Exception e) {
+                    log.warn("Budget limit exceeded for step [{}]: {}", stepEntity.getId(), e.getMessage());
+                    stateTransitioner.transitionStep(stepEntity.getId(), StepRunStatus.FAILED, "scheduler", e.getMessage());
+                    context.recordNodeFailed(node.getId(), e.getMessage());
+                    return false;
+                }
             }
 
             leaseExecutor.claimStepLease(stepEntity, workerId, attempts, null);

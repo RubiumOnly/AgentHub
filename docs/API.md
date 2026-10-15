@@ -69,6 +69,8 @@
 - `5007` PROVIDER_RATE_LIMIT：大模型 Provider 命中 429 速率限制；
 - `5008` PROVIDER_AUTH_FAILED：大模型 Provider 凭证鉴权失败；
 - `5009` NO_AVAILABLE_PROVIDER：无可满足路由与能力约束的可用 Provider；
+- `5010` BUDGET_EXCEEDED：超出预算硬限额，终止 Agent 或工作流调用；
+- `5011` CIRCUIT_BREAKER_OPEN：Provider 熔断器处于开启状态，拒绝流量；
 - `6001` WORKFLOW_INVALID：工作流 DSL 拓扑非法（如存在环路、孤立节点或无效引用）；
 - `6002` RUN_NOT_FOUND：执行实例不存在；
 - `7001` DEPLOYMENT_NOT_FOUND：目标部署记录不存在；
@@ -261,12 +263,21 @@
 - `PUT /api/providers/{id}`：更新 Provider 的优先级、权重、能力标签与费率配置；
 - `DELETE /api/providers/{id}`：注销指定 Provider；
 - `POST /api/providers/route`：传入请求参数进行动态路由推演，返回首选 Primary Provider 与备用 Backup 候选链条；
-- `POST /api/providers/{id}/test`：对指定 Provider 发起测试连通性 Ping 请求，测量真实延迟与连通状态。
+- `POST /api/providers/{id}/test`：对指定 Provider 发起测试连通性 Ping 请求，测量真实延迟与连通状态；
+- `GET /api/providers/health`：获取 Provider 集群探针健康与熔断状态列表 (`Result<List<ProviderHealthView>>`)；
+- `POST /api/providers/{id}/probe`：对指定 Provider 发起主动延迟探测探针 (`Result<ProviderProbeResultView>`)；
+- `GET /api/providers/{id}/circuit-breaker`：查询指定 Provider 熔断器状态快照 (`Result<CircuitBreakerView>`)；
+- `POST /api/providers/{id}/circuit-breaker/reset`：手动运维重置熔断器为 CLOSED 并重置计数 (`Result<CircuitBreakerView>`)。
 
-### 12. Token 消耗审计与成本计量 (Token & Cost Accounting)
+### 12. Token 消耗审计与成本治理 (Token & Cost Governance)
 - `GET /api/token-usages/runs/{runId}`：按 WorkflowRun 实例查询所有步骤调用的详细 Token 消耗与成本审计记录；
 - `GET /api/token-usages/steps/{stepRunId}`：按 StepRun 节点查询单次调用审计明细；
-- `GET /api/token-usages/summary`：获取平台全局累计 Token 消耗（Prompt、Completion、Total）与总美元成本计量汇总。
+- `GET /api/token-usages/summary`：获取平台全局累计 Token 消耗（Prompt、Completion、Total）与总美元成本计量汇总；
+- `GET /api/token-usages/governance`：**获取 Token 消耗治理大盘与预算水位 (`Result<TokenGovernanceView>`)**
+  - 汇总平台累计消耗、当前运行模式 (`DEMO_SIMULATED` / `LIVE_SELF_HOSTED` / `LIVE_TEAM`)、硬预算上限（默认 $50.00）、剩余预算、利用率百分比、预警状态、按模型（`deepseek-chat` / `gpt-4o` / `claude-3-5-sonnet` / `gemini-1.5-flash`）明细与按 Provider 统计；
+- `POST /api/token-usages/budget/check`：**预检预算调用限制 (`Result<BudgetCheckResultView>`)**
+  - Request: `{"runId": "...", "projectId": "...", "estimatedCost": 0.05, "requiredTokens": 1000}`
+  - 前置门禁校验当前累计费用与预估增量是否超出硬限额，超额触发 `5010 BUDGET_EXCEEDED` 阻断。
 
 ### 13. 多智能体团队与协同拓扑 (Multi-Agent Teams & Coordination Topologies)
 - `POST /api/teams`：创建多智能体协同团队（支持 `HIERARCHICAL` 主从层级、`PEER_TO_PEER` 对等协商、`ROUND_ROBIN` 轮询轮转拓扑，指定 leaderAgentId 与 maxTurns 阈值）；
@@ -419,8 +430,8 @@
 | `/api/approvals/runs/{runId}`, `/api/approvals/{id}/approve`, `/api/approvals/{id}/reject` | `orchestration` | `ApprovalController` | `listApprovals`, `approve`, `reject` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 状态机限制仅 `PENDING` 可转换至 `APPROVED`/`REJECTED` | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留（主链路） |
 | `/api/audit/artifacts/run/{runId}`, `/api/audit/artifacts/{id}` (`/accept`, `/reject`, `/revert`, `/diff`), `/api/audit/artifacts/lineage/{runId}`, `/quality-gate*`, `/pr-draft`, `/revert-file` | `audit` | `ArtifactController` | `revertArtifact`, `getArtifactLineage`, `getArtifactDiff`, `acceptArtifact`, `rejectArtifact`, `getQualityGateReport`, `evaluateQualityGate`, `getPullRequestDraft`, `revertSingleFile` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | `accept`/`reject`/`revert` 状态校验，单文件/全量非破坏性精准回滚，禁止重复 `revert`（错误码 `3011`） | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（主链路） |
 | `/api/deployments*` (`POST`, `GET /{id}`, `GET /{id}/logs`, `POST /{id}/stop`, `POST /{id}/probe`, `GET ?projectId=`) | `sandbox` | `DeploymentController` | `listDeployments`, `createDeployment`, `stopDeployment`, `getDeploymentLogs`, `probeDeployment` | 强制登录 + `Project.ownerId` 校验 + 强制绑定已通过质量门禁 (`!GATE_FAILED`) 与审查的 `Artifact` | 端口池原子分配；`stop` 幂等收敛至 `STOPPED`；探针执行真实 HTTP 延迟探测 | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（主链路） |
-| `/api/providers*` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /route`, `POST /{id}/test`) | `agent` | `ProviderController` | `listProviders`, `evaluateRoute` | 强制登录；修改/删除校验 `Provider.ownerId` | `route` 无副作用推演；`PUT`/`DELETE` 幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
-| `/api/token-usages/runs/{runId}`, `/steps/{stepRunId}`, `/summary` | `agent` | `TokenUsageController` | `workflowsApi.getTokenSummary` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 只读聚合查询，完全幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
+| `/api/providers*` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /route`, `POST /{id}/test`, `GET /health`, `POST /{id}/probe`, `GET /{id}/circuit-breaker`, `POST /{id}/circuit-breaker/reset`) | `agent` | `ProviderController` | `listProviders`, `evaluateRoute`, `getProviderHealth`, `probeProvider`, `getCircuitBreaker`, `resetCircuitBreaker` | 强制登录；修改/删除校验 `Provider.ownerId` | `route`/`probe` 延迟测量无副作用；`PUT`/`DELETE`/`reset` 幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest`, `Phase7LiveProvidersAndBudgetGovernanceTest` | 长期保留（Phase 7 升级为集群探针健康与熔断动态管理） |
+| `/api/token-usages/runs/{runId}`, `/steps/{stepRunId}`, `/summary`, `/governance`, `/budget/check` | `agent` | `TokenUsageController` | `workflowsApi.getTokenSummary`, `getTokenGovernance`, `checkBudget` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 只读聚合查询与预算预检完全幂等；预算耗尽前置拦截（错误码 `5010`） | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest`, `Phase7LiveProvidersAndBudgetGovernanceTest` | 长期保留（Phase 7 升级为精细化模型牌价与预算治理大盘） |
 | `/api/agents`, `/api/agents/platforms`, `/api/agents/execute` | `agent` | `AgentRegistryController` | 后端内部/管理查询 | `AuthFilter` 统一鉴权 | `GET` 幂等 | `ACTIVE` | `AgentAdapterTest`, `Phase1ModuleConvergenceAndContractTest` | Phase 1 已迁入 `com.agenthub.agent.api` |
 | `/api/teams*` (`POST`, `GET`, `GET /{id}`, `/members`, `/coordinate`, `/projects/{projectId}/role`, `/projects/{projectId}/members`, `/projects/{projectId}/members/{userId}/role`, `DELETE /projects/{projectId}/members/{userId}`) | `team` | `TeamController` | `workflowsApi.getTeam`, `projectsApi.getCurrentUserRole`, `listProjectMembers`, `addProjectMember`, `updateMemberRole`, `removeProjectMember` | 强制登录 + `ResourceOwnershipVerifier` 校验细粒度 RBAC 权限（`MEMBER_MANAGE` 等） | 查询幂等；成员添加 `UNIQUE(team_id, user_id)`；禁止移除唯一 OWNER | `ACTIVE` | `Phase6TeamRbacAndOperationsTest`, `TeamAndConversationControllerIntegrationTest` | Phase 6 升级为细粒度团队协作与 RBAC 体系 |
 | `/api/conversations*` (`POST`, `GET`, `/{id}/messages`, `/{id}/stream`, `/{id}/context`, `/{id}/summarize`, `/{id}/coordinate`) | `conversation` | `ConversationController` | `workflowsApi.listConversations`, `getMessages`, `sendMessage` | 强制登录 + `Conversation.ownerId` 与 `MessageVisibilityFilter` | 消息通过 128 分段锁 + 悲观写锁保证 `sequence_num` 单调递增 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest`, `ConversationSseStreamAndReconnectionTest` | 唯一正式会话接口（前端已全量切换至 `/api/conversations`） |

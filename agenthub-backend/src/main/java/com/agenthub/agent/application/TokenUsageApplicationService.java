@@ -16,11 +16,14 @@ public class TokenUsageApplicationService implements TokenUsageApplication {
 
     private final TokenUsageAuditRepository repository;
     private final com.agenthub.agent.infrastructure.repository.ProviderRepository providerRepository;
+    private final BudgetGovernanceGuard budgetGovernanceGuard;
 
     public TokenUsageApplicationService(TokenUsageAuditRepository repository,
-                                        com.agenthub.agent.infrastructure.repository.ProviderRepository providerRepository) {
+                                        com.agenthub.agent.infrastructure.repository.ProviderRepository providerRepository,
+                                        BudgetGovernanceGuard budgetGovernanceGuard) {
         this.repository = repository;
         this.providerRepository = providerRepository;
+        this.budgetGovernanceGuard = budgetGovernanceGuard;
     }
 
     @Override
@@ -54,6 +57,18 @@ public class TokenUsageApplicationService implements TokenUsageApplication {
                 cost,
                 invocations
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.agenthub.agent.dto.TokenGovernanceView getGovernance() {
+        return budgetGovernanceGuard.getGovernanceView();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.agenthub.agent.dto.BudgetCheckResultView checkBudget(com.agenthub.agent.dto.BudgetCheckCommand cmd) {
+        return budgetGovernanceGuard.evaluateBudget(cmd);
     }
 
     @Override

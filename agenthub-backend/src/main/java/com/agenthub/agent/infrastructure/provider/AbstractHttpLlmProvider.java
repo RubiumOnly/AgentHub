@@ -12,12 +12,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
 
 /**
  * Base abstract HTTP LLM provider providing common HTTP transport, circuit breaking,
- * secret resolution, pricing calculation, and simulated fallback capabilities.
+ * secret resolution, pricing calculation, exponential backoff, and mode segregation.
  */
 public abstract class AbstractHttpLlmProvider implements LlmProvider {
 
@@ -110,6 +112,79 @@ public abstract class AbstractHttpLlmProvider implements LlmProvider {
     public boolean isSimulated() {
         String key = getEffectiveApiKey(providerType + "_API_KEY");
         return key == null || key.isBlank() || key.startsWith("sk-placeholder") || "none".equalsIgnoreCase(key);
+    }
+
+    /**
+     * Checks whether the given request requires strict live execution.
+     * In live mode, simulated mock responses are strictly prohibited.
+     */
+    protected boolean isStrictLiveMode(ChatRequest request) {
+        if (request == null) return false;
+        if (request.isRequireLive()) return true;
+        if (request.getExecutionMode() != null) {
+            return request.getExecutionMode().isLive();
+        }
+        String envMode = environment != null ? environment.getProperty("agenthub.provider.mode") : null;
+        if (envMode != null) {
+            return ProviderExecutionMode.fromString(envMode).isLive();
+        }
+        return false;
+    }
+
+    /**
+     * Configures request-level HTTP timeout on standard HttpRequest.Builder.
+     */
+    protected void applyRequestTimeout(HttpRequest.Builder builder, ChatRequest request) {
+        int timeoutSeconds = (request != null && request.getTimeoutSeconds() > 0) ? request.getTimeoutSeconds() : 60;
+        builder.timeout(Duration.ofSeconds(timeoutSeconds));
+    }
+
+    /**
+     * Executes an HTTP operation with standardized exponential backoff and jitter for transient errors.
+     */
+    protected <T> T executeWithBackoff(Callable<T> operation, int maxAttempts, long initialBackoffMs) throws Exception {
+        int attempts = 0;
+        long backoff = initialBackoffMs;
+        Exception lastException = null;
+
+        while (attempts < Math.max(1, maxAttempts)) {
+            attempts++;
+            try {
+                return operation.call();
+            } catch (ProviderRateLimitException | ProviderServerException e) {
+                lastException = e;
+                if (attempts >= maxAttempts) {
+                    throw e;
+                }
+                long jitter = (long) (Math.random() * 200);
+                log.info("Provider [{}] retrying after transient error (attempt {}/{}, backoff {}ms): {}",
+                        id, attempts, maxAttempts, backoff + jitter, e.getMessage());
+                try {
+                    Thread.sleep(backoff + jitter);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw ie;
+                }
+                backoff = Math.min(backoff * 2, 4000L);
+            } catch (java.io.IOException e) {
+                lastException = e;
+                if (attempts >= maxAttempts) {
+                    circuitBreaker.recordFailure(e);
+                    throw e;
+                }
+                long jitter = (long) (Math.random() * 200);
+                log.info("Provider [{}] retrying after network error (attempt {}/{}, backoff {}ms): {}",
+                        id, attempts, maxAttempts, backoff + jitter, e.getMessage());
+                try {
+                    Thread.sleep(backoff + jitter);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw ie;
+                }
+                backoff = Math.min(backoff * 2, 4000L);
+            }
+        }
+        throw lastException != null ? lastException : new RuntimeException("Backoff retries exhausted");
     }
 
     protected void handleHttpError(int statusCode, String responseBody) {

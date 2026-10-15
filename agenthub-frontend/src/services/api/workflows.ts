@@ -4,14 +4,20 @@
 // ============================================================================
 
 import {
+  BudgetCheckCommand,
+  BudgetCheckResultView,
+  CircuitBreakerView,
   ConfirmPlanCommand,
   ConversationView,
   GeneratePlanCommand,
   MessageView,
   OrchestrationPlanView,
+  ProviderHealthView,
+  ProviderProbeResultView,
   ProviderView,
   RouteDecisionView,
   TeamView,
+  TokenGovernanceView,
   TokenSummaryView,
   ValidateDslResultView,
   WorkflowDefinitionView,
@@ -112,6 +118,37 @@ export const workflowsApi = {
     return fetchJson<RouteDecisionView>(`${API_BASE}/api/providers/route`, {
       method: "POST",
       body: JSON.stringify(req),
+    });
+  },
+
+  async getProviderHealth(): Promise<ProviderHealthView[]> {
+    return fetchJson<ProviderHealthView[]>(`${API_BASE}/api/providers/health`);
+  },
+
+  async probeProvider(id: string): Promise<ProviderProbeResultView> {
+    return fetchJson<ProviderProbeResultView>(`${API_BASE}/api/providers/${encodeURIComponent(id)}/probe`, {
+      method: "POST",
+    });
+  },
+
+  async getCircuitBreaker(id: string): Promise<CircuitBreakerView> {
+    return fetchJson<CircuitBreakerView>(`${API_BASE}/api/providers/${encodeURIComponent(id)}/circuit-breaker`);
+  },
+
+  async resetCircuitBreaker(id: string): Promise<CircuitBreakerView> {
+    return fetchJson<CircuitBreakerView>(`${API_BASE}/api/providers/${encodeURIComponent(id)}/circuit-breaker/reset`, {
+      method: "POST",
+    });
+  },
+
+  async getTokenGovernance(): Promise<TokenGovernanceView> {
+    return fetchJson<TokenGovernanceView>(`${API_BASE}/api/token-usages/governance`);
+  },
+
+  async checkBudget(cmd?: BudgetCheckCommand): Promise<BudgetCheckResultView> {
+    return fetchJson<BudgetCheckResultView>(`${API_BASE}/api/token-usages/budget/check`, {
+      method: "POST",
+      body: cmd ? JSON.stringify(cmd) : undefined,
     });
   },
 

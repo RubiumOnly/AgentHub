@@ -14,6 +14,10 @@ import java.util.function.Consumer;
  */
 public interface ProviderRouter {
 
+    default ChatResponse routeAndExecute(ChatRequest request) {
+        return routeAndExecute(request, null);
+    }
+
     ChatResponse routeAndExecute(ChatRequest request, Consumer<FallbackEvent> fallbackListener);
 
     ChatResponse routeAndStream(ChatRequest request,
