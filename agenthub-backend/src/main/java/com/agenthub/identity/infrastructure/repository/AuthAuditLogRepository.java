@@ -12,4 +12,8 @@ public interface AuthAuditLogRepository extends JpaRepository<AuthAuditLogEntity
     List<AuthAuditLogEntity> findByUserIdOrderByCreatedAtDesc(String userId);
 
     List<AuthAuditLogEntity> findByEventTypeOrderByCreatedAtDesc(String eventType);
+
+    List<AuthAuditLogEntity> findByUserIdAndEventTypeOrderByCreatedAtDesc(String userId, String eventType);
+
+    List<AuthAuditLogEntity> findAllByOrderByCreatedAtDesc();
 }

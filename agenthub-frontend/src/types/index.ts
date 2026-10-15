@@ -854,3 +854,111 @@ export interface RunOperationsView {
   failureCategory?: string;
   failureReason?: string;
 }
+
+// ============================================================================
+// Phase 6: RBAC & Operations Productization View Types
+// ============================================================================
+
+export type ProjectRbacRole =
+  | "OWNER"
+  | "ADMIN"
+  | "MAINTAINER"
+  | "DEVELOPER"
+  | "VIEWER"
+  | "AUDITOR";
+
+export interface ProjectUserRoleView {
+  userId: string;
+  projectId: string;
+  rbacRole: ProjectRbacRole;
+  role?: ProjectRbacRole;
+  permissions: string[];
+  isOwner: boolean;
+}
+
+export interface ProjectMemberView {
+  memberId: string;
+  id?: string;
+  teamId: string;
+  projectId: string;
+  userId: string;
+  displayName: string;
+  email: string;
+  role: string;
+  rbacRole: ProjectRbacRole;
+  permissions: string[];
+  canDelegate: boolean;
+  createdAt: string;
+}
+
+export interface AddProjectMemberCommand {
+  userId: string;
+  rbacRole: ProjectRbacRole;
+  role?: string;
+  responsibilities?: string;
+  canDelegate?: boolean;
+}
+
+export interface UpdateMemberRoleCommand {
+  rbacRole: ProjectRbacRole;
+  role?: string;
+  responsibilities?: string;
+}
+
+export interface AuthAuditLogView {
+  id: string;
+  eventType: string;
+  userId?: string;
+  email?: string;
+  ipAddress?: string;
+  details?: string;
+  createdAt: string;
+}
+
+export interface OpsMetricsSummaryView {
+  systemHealth: string;
+  activeRuns: number;
+  activeSseConnections: number;
+  workspaceDiskAvailableRatio: number;
+  circuitBreakerStates: Record<string, string>;
+  totalRuns: number;
+  totalSteps: number;
+  totalTokensConsumed: number;
+  totalDeployments: number;
+  rbacEvaluations: Record<string, number>;
+  auditLogsRecorded: number;
+  uptimeSeconds: number;
+  jvmMemoryUsedMb: number;
+  jvmMemoryTotalMb: number;
+  jvmMemoryMaxMb: number;
+  sloStatus: "HEALTHY" | "WARNING" | "CRITICAL";
+}
+
+export interface BackupManifest {
+  backupId: string;
+  consistentPointUtc: string;
+  flywaySchemaVersion: string;
+  encrypted: boolean;
+  encryptionAlgorithm: string;
+  dbSnapshotFileName: string;
+  dbSnapshotSha256: string;
+  tableCounts: Record<string, number>;
+  workspaceFileChecksums: Record<string, string>;
+  sampledRunFingerprints: Record<string, string>;
+  backupDurationMs: number;
+}
+
+export interface RestoreVerificationReport {
+  backupId: string;
+  checksumVerified: boolean;
+  schemaVersionVerified: boolean;
+  sampledRunsVerified: boolean;
+  restoredProjectsCount: number;
+  restoredRunsCount: number;
+  restoredStepsCount: number;
+  restoredEventsCount: number;
+  restoredArtifactsCount: number;
+  restoredDeploymentsCount: number;
+  restoredWorkspaceFilesCount: number;
+  restoreDurationMs: number;
+}

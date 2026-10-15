@@ -153,14 +153,35 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
    - 提供 `PullRequestDraftView` 生成符合 GitHub/GitLab 规范的结构化 PR 草稿，包含 Markdown 动机正文、门禁得分徽章与受影响文件列表；
    - 提供 `exportRunEvidenceBundle` 导出包含完整状态、JGit 逐行 Diff、门禁评分指纹、脱敏审计流与 SHA-256 Checksum 的确定性证据包。
 
-## 9. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
+## 9. 团队协作、组织角色与长期运维体系 (Phase 6 架构事实)
+
+在 Phase 6 中，系统将细粒度组织权限隔离、不可篡改安全审计流水、长期运维指标与灾备还原全面产品化（见 [`ADR-011`](adr/ADR-011-team-collaboration-rbac-and-operations-productization.md)）：
+
+1. **细粒度项目级 RBAC 权限矩阵（`ProjectRbacRole` & `ProjectPermission`）**：
+   - 确权 6 级核心研发角色：`OWNER`（项目所有者）、`ADMIN`（项目管理员）、`MAINTAINER`（核心维护者）、`DEVELOPER`（日常研发）、`VIEWER`（只读观察员）、`AUDITOR`（合规审计员）；
+   - `ResourceOwnershipVerifier` 实现细粒度防越权守卫方法（`verifyWorkspaceWriteAccess`、`verifyRunExecuteAccess`、`verifyApprovalAccess`、`verifyDeploymentAccess` 等），无破坏性映射复用既有 `teams` 与 `team_members` 实体关系表；
+   - 提供团队成员生命周期管理端点：`getCurrentUserRole`、`listProjectMembers`、`addProjectMember`、`updateMemberRole`、`removeProjectMember`，并对唯一 OWNER 施加防误删防降级保护。
+2. **不可篡改安全审计流水（Immutable Security Audit Logs）**：
+   - 基于 `auth_audit_logs` 表记录完整安全事件：`eventId`、`userId`、`eventType`、`ipAddress`、`detailsJson`、`createdAt`；
+   - 核心事件只增不减（Append-Only），`GET /api/system/audit-logs` 提供分页与按用户/事件类型的多维结构化审计查询。
+3. **确定性灾备快照与幂等还原体系（Disaster Recovery Snapshot & Idempotent Restore）**：
+   - `POST /api/system/backup`：生成包含全量表元数据统计、SHA-256 Checksum 与快照清单的 `BackupManifest`；
+   - `POST /api/system/backup/verify`：对快照完整性与防篡改指纹进行真实二次校验并生成 `RestoreVerificationReport`；
+   - `POST /api/system/backup/restore`：执行确定性幂等还原与数据一致性基线重构，完整记录灾备还原事件并自愈运维状态。
+4. **运行时运维指标大盘与 SLO 健康度评测（Ops Metrics & SLO Evaluation）**：
+   - `GET /api/system/metrics/summary` 统一聚合工作流执行吞吐量、失败率、P95/P99 延迟、活动部署数、工作区磁盘容量、JVM 堆内存与 GC 状态，并联动 Prometheus 告警规则；
+   - `AgentHubMetricsCollector` 根据执行成功率与关键性能指标自动评测输出系统级 SLO 健康度评级（`HEALTHY` / `DEGRADED` / `UNHEALTHY`）。
+5. **前端团队协作与运维灾备控制台（TeamRbacPanel & OperationsConsolePanel）**：
+   - Bento Grid 现代美学风格的成员协作卡片、角色授权弹窗、SLO 健康指示灯、灾备快照触发/验证/还原表单与可分页审计日志列表，深度融合于 `ProjectShell` 核心交付大盘。
+
+## 10. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
 
 - Flyway 是唯一 Schema 演进方式；生产使用 `ddl-auto=validate`。
 - Micrometer/Prometheus 暴露 Run、Step、Provider、SSE、锁和 Deployment 指标；日志必须结构化并脱敏。
 - 证据包使用脱敏内容、模式标识和确定性 checksum；证据包只能证明对应 Run 的事实，不能替代目标环境验证。
 
 | 数据库表名 | Owner 模块 | JPA Entity / 访问组件 | 来源迁移 | 认证与归属隔离 | 幂等 / 唯一约束 | 状态 | 核心验证测试 | 删除 / 演进计划 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `users` | `identity` | `UserEntity` | `V1`, `V2` | 自身为主体 (`id`) | `PRIMARY KEY(id)`, `UNIQUE(email)` | `ACTIVE` | `RestApiSecurityAndMultiTenancyIntegrationTest` | 长期保留；`V2` 演示种子在 Phase 1 迁入 demo profile |
 | `invalidated_tokens` | `identity` | `InvalidatedTokenEntity` | `V9` | `user_id` 关联当前用户 | `PRIMARY KEY(token_id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；过期记录按 `expires_at` 清理 |
 | `auth_audit_logs` | `identity` | `AuthAuditLogEntity` | `V9` | 记录 `user_id`、`email`、`ip_address` | `PRIMARY KEY(id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；只追加审计表 |
@@ -171,8 +192,8 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 | `agent_instances` | `agent` | `AgentInstanceEntity` | `V1` | `owner_id` + `project_id` | `PRIMARY KEY(id)` | `ACTIVE` | `FlywayMigrationAndSchemaTest` | Phase 3 与版本化 `AgentDefinition` 快照合并收敛 |
 | `providers` | `agent` | `ProviderEntity` | `V1`, `V6` | `owner_id` (`ResourceAccessGuard`) | `PRIMARY KEY(id)` | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留；`secret_ref` 脱敏存储，`V6` 默认种子 Phase 1 隔离 |
 | `token_usages` | `agent` | `TokenUsageAuditEntity` | `V6` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)` | `ACTIVE` | `TokenCostAccountingAndAuditingTest` | 长期保留；区分真实 Provider 计费与 `DEMO_SIMULATED` |
-| `teams` | `team` | `TeamEntity` | `V1`, `V7` | 经 `project_id` 校验归属 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest` | 作为协作扩展隔离维护，不阻塞研发变更交付主线 |
-| `team_members` | `team` | `TeamMemberEntity` | `V1`, `V7` | 经 `team_id -> teams` 校验 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `TeamTopologyAndCoordinationTest` | 作为协作扩展隔离维护 |
+| `teams` | `team` | `TeamEntity` | `V1`, `V7` | 经 `project_id` 校验归属 | `PRIMARY KEY(id)` | `ACTIVE` | `Phase6TeamRbacAndOperationsTest`, `TeamAndConversationControllerIntegrationTest` | Phase 6 升级为细粒度团队协作与 RBAC 关系基础 |
+| `team_members` | `team` | `TeamMemberEntity` | `V1`, `V7` | 经 `team_id -> teams` 校验 | `PRIMARY KEY(id)` | `ACTIVE` | `Phase6TeamRbacAndOperationsTest`, `TeamTopologyAndCoordinationTest` | Phase 6 承载项目成员角色映射 |
 | `conversations` | `conversation` | `ConversationEntity` | `V1`, `V7` | `owner_id` + `project_id` 校验 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `ConversationEntityRelationAndMessageSchemaTest` | Phase 1 移除 Entity 默认 `user-1`/`proj-default` 赋值 |
 | `conversation_participants` | `conversation` | `ConversationParticipantEntity` | `V1` | 经 `conversation_id` 校验 | `PRIMARY KEY(id)` | `ISOLATED_EXT` | `MessageRoutingAndVisibilityIsolationTest` | 作为协作扩展隔离维护 |
 | `messages` | `conversation` | `MessageEntity` | `V1`, `V7` | 经 `conversation_id` + `MessageVisibilityFilter` | `PRIMARY KEY(id)`, `(conversation_id, sequence_num)` 单调递增 | `ISOLATED_EXT` | `ConversationMonotonicSequenceAndConcurrencyTest` | 作为协作扩展隔离维护 |
@@ -184,9 +205,9 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 | `approvals` | `orchestration` | `ApprovalEntity` | `V1`, `V5` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)`；单次决策状态转换 | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留；人工审批门禁权威记录 |
 | `deployments` | `sandbox` | `DeploymentEntity` | `V1`, `V8`, `V11` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` + 受控端口池原子分配 | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest` | 长期保留；绑定已验收 `artifact_id` 与健康探针轨迹 |
 
-## 9. 架构守卫和扩展规则
+## 11. 架构守卫和扩展规则
 
 ArchUnit（`ArchUnitArchitectureTest`）与 Phase 0 基线守卫（`Phase0BaselineAndDebtFreezeGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
 
-详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-009](adr/ADR-009-run-operations-and-artifact-lineage.md)。
+详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-011](adr/ADR-011-team-collaboration-rbac-and-operations-productization.md)。
 

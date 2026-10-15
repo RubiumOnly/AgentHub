@@ -28,6 +28,8 @@ import {
   Plus,
   Server,
   Users,
+  HardDrive,
+  ShieldCheck,
 } from "lucide-react";
 
 export type DashboardTabId =
@@ -38,7 +40,9 @@ export type DashboardTabId =
   | "providers"
   | "sandbox"
   | "files"
-  | "operations";
+  | "operations"
+  | "team"
+  | "ops";
 
 interface ProjectShellProps {
   backendUp: boolean;
@@ -82,6 +86,8 @@ const TAB_ITEMS: Array<{ id: DashboardTabId; label: string; icon: React.Componen
   { id: "swarm", label: "多智能体协同", icon: Users },
   { id: "diff", label: "JGit 行级代码审查", icon: GitCompare },
   { id: "operations", label: "运维决策与血缘", icon: Activity },
+  { id: "team", label: "团队角色与权限", icon: ShieldCheck },
+  { id: "ops", label: "系统灾备与运维", icon: HardDrive },
   { id: "providers", label: "模型路由与成本", icon: Cpu },
   { id: "sandbox", label: "沙箱预览与部署", icon: Server },
   { id: "files", label: "工作区文件树", icon: FolderTree },

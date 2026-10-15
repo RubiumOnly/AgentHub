@@ -58,3 +58,51 @@ export const deploymentsApi = {
     });
   },
 };
+
+export const opsApi = {
+  async getMetricsSummary(): Promise<import("@/types").OpsMetricsSummaryView> {
+    return fetchJson<import("@/types").OpsMetricsSummaryView>(`${API_BASE}/api/system/metrics/summary`);
+  },
+
+  async queryAuditLogs(
+    eventType?: string,
+    userId?: string,
+    page = 1,
+    size = 20
+  ): Promise<import("./projects").PagedResponse<import("@/types").AuthAuditLogView>> {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+    });
+    if (eventType) params.set("eventType", eventType);
+    if (userId) params.set("userId", userId);
+    return fetchJson<import("./projects").PagedResponse<import("@/types").AuthAuditLogView>>(
+      `${API_BASE}/api/system/audit-logs?${params.toString()}`
+    );
+  },
+
+  async triggerBackup(backupDir?: string, encryptionPassphrase?: string): Promise<import("@/types").BackupManifest> {
+    return fetchJson<import("@/types").BackupManifest>(`${API_BASE}/api/system/backup`, {
+      method: "POST",
+      body: JSON.stringify({ backupDir, encryptionPassphrase }),
+    });
+  },
+
+  async verifyBackup(backupDir: string, encryptionPassphrase?: string): Promise<import("@/types").BackupManifest> {
+    return fetchJson<import("@/types").BackupManifest>(`${API_BASE}/api/system/backup/verify`, {
+      method: "POST",
+      body: JSON.stringify({ backupDir, encryptionPassphrase }),
+    });
+  },
+
+  async restoreBackup(
+    backupDir: string,
+    targetWorkspaceRoot?: string,
+    encryptionPassphrase?: string
+  ): Promise<import("@/types").RestoreVerificationReport> {
+    return fetchJson<import("@/types").RestoreVerificationReport>(`${API_BASE}/api/system/backup/restore`, {
+      method: "POST",
+      body: JSON.stringify({ backupDir, targetWorkspaceRoot, encryptionPassphrase }),
+    });
+  },
+};

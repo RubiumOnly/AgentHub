@@ -9,6 +9,10 @@ import {
   OnboardingSessionView,
   OnboardingStep,
   ContextSourceView,
+  ProjectUserRoleView,
+  ProjectMemberView,
+  AddProjectMemberCommand,
+  UpdateMemberRoleCommand,
 } from "@/types";
 import { API_BASE, fetchJson, RequestOptions } from "./errors";
 
@@ -125,5 +129,40 @@ export const projectsApi = {
       method: "POST",
       body: JSON.stringify(cmd),
     });
+  },
+
+  // Team RBAC API
+  async getCurrentUserRole(projectId: string): Promise<ProjectUserRoleView> {
+    return fetchJson<ProjectUserRoleView>(`${API_BASE}/api/teams/projects/${encodeURIComponent(projectId)}/roles/me`);
+  },
+
+  async listProjectMembers(projectId: string): Promise<ProjectMemberView[]> {
+    return fetchJson<ProjectMemberView[]>(`${API_BASE}/api/teams/projects/${encodeURIComponent(projectId)}/members`);
+  },
+
+  async addProjectMember(projectId: string, cmd: AddProjectMemberCommand): Promise<ProjectMemberView> {
+    return fetchJson<ProjectMemberView>(`${API_BASE}/api/teams/projects/${encodeURIComponent(projectId)}/members`, {
+      method: "POST",
+      body: JSON.stringify(cmd),
+    });
+  },
+
+  async updateMemberRole(projectId: string, memberId: string, cmd: UpdateMemberRoleCommand): Promise<ProjectMemberView> {
+    return fetchJson<ProjectMemberView>(
+      `${API_BASE}/api/teams/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(memberId)}/role`,
+      {
+        method: "PUT",
+        body: JSON.stringify(cmd),
+      }
+    );
+  },
+
+  async removeProjectMember(projectId: string, memberId: string): Promise<void> {
+    await fetchJson<void>(
+      `${API_BASE}/api/teams/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(memberId)}`,
+      {
+        method: "DELETE",
+      }
+    );
   },
 };

@@ -454,6 +454,67 @@
         "responses": { "200": { "description": "Result<DeploymentResponse>" } }
       }
     },
+    "/api/teams/projects/{projectId}/roles/me": {
+      "get": {
+        "tags": ["project"],
+        "summary": "Get current user role and permissions on project",
+        "responses": { "200": { "description": "Result<ProjectUserRoleView>" } }
+      }
+    },
+    "/api/teams/projects/{projectId}/members": {
+      "get": {
+        "tags": ["project"],
+        "summary": "List project team members",
+        "responses": { "200": { "description": "Result<List<ProjectMemberView>>" } }
+      },
+      "post": {
+        "tags": ["project"],
+        "summary": "Add team member to project with RBAC role",
+        "responses": { "200": { "description": "Result<ProjectMemberView>" } }
+      }
+    },
+    "/api/teams/projects/{projectId}/members/{memberId}/role": {
+      "put": {
+        "tags": ["project"],
+        "summary": "Update project team member RBAC role",
+        "responses": { "200": { "description": "Result<ProjectMemberView>" } }
+      }
+    },
+    "/api/system/audit-logs": {
+      "get": {
+        "tags": ["ops"],
+        "summary": "Query immutable audit logs and security trace history",
+        "responses": { "200": { "description": "Result<PageResultView<AuthAuditLogView>>" } }
+      }
+    },
+    "/api/system/metrics/summary": {
+      "get": {
+        "tags": ["ops"],
+        "summary": "Get aggregated Prometheus/Micrometer metrics and SLO indicators",
+        "responses": { "200": { "description": "Result<OpsMetricsSummaryView>" } }
+      }
+    },
+    "/api/system/backup": {
+      "post": {
+        "tags": ["ops"],
+        "summary": "Trigger point-in-time consistent disaster recovery backup snapshot",
+        "responses": { "200": { "description": "Result<BackupManifest>" } }
+      }
+    },
+    "/api/system/backup/verify": {
+      "post": {
+        "tags": ["ops"],
+        "summary": "Verify cryptographic and structural integrity of backup archive",
+        "responses": { "200": { "description": "Result<BackupManifest>" } }
+      }
+    },
+    "/api/system/backup/restore": {
+      "post": {
+        "tags": ["ops"],
+        "summary": "Restore backup snapshot to target workspace and live database",
+        "responses": { "200": { "description": "Result<RestoreVerificationReport>" } }
+      }
+    },
     "/api/system/health": {
       "get": {
         "tags": ["ops"],

@@ -316,6 +316,54 @@
 - `GET /api/agents/platforms`：查询受支持的 Agent 执行平台与沙箱形态；
 - `POST /api/agents/execute`：单次受控 Agent 任务直接执行。
 
+### 17. 团队协作与细粒度 RBAC 权限管理 (Team Collaboration & Project RBAC)
+- `GET /api/teams/projects/{projectId}/role`：获取当前登录用户在项目中的有效 RBAC 角色与权限集合
+  - Header: `Authorization: Bearer <token>`
+  - Response: `Result<ProjectUserRoleView>` (`{"projectId": "...", "userId": "...", "role": "OWNER", "permissions": ["PROJECT_READ", "WORKSPACE_WRITE", ...]}`)
+- `GET /api/teams/projects/{projectId}/members`：获取项目所有协作成人员工列表
+  - Header: `Authorization: Bearer <token>`
+  - Response: `Result<List<ProjectMemberView>>` (`[{"userId": "...", "username": "alice", "email": "alice@agenthub.com", "role": "ADMIN", "joinedAt": "..."}]`)
+- `POST /api/teams/projects/{projectId}/members`：添加/邀请成员至项目团队
+  - Header: `Authorization: Bearer <token>`
+  - Request: `{"userId": "user-uuid", "role": "DEVELOPER"}`
+  - 权限要求：调用者必须具备 `MEMBER_MANAGE` 权限（`OWNER` 或 `ADMIN`），且 `ADMIN` 无法提升成员为 `OWNER`
+  - Response: `Result<ProjectMemberView>`
+- `PUT /api/teams/projects/{projectId}/members/{userId}/role`：更新项目团队成员角色
+  - Header: `Authorization: Bearer <token>`
+  - Request: `{"role": "MAINTAINER"}`
+  - 权限要求：调用者具备 `MEMBER_MANAGE` 权限；禁止降级或撤销项目唯一 `OWNER`
+  - Response: `Result<ProjectMemberView>`
+- `DELETE /api/teams/projects/{projectId}/members/{userId}`：从项目中移除成员
+  - Header: `Authorization: Bearer <token>`
+  - 权限要求：调用者具备 `MEMBER_MANAGE` 权限；禁止移除项目 `OWNER`
+  - Response: `Result<Void>`
+
+### 18. 系统可观测性、不可篡改安全审计与灾备运维 (Ops Metrics, Security Audit & Disaster Recovery)
+- `GET /api/system/audit-logs`：不可篡改安全审计流水多维查询
+  - Header: `Authorization: Bearer <token>`
+  - Query Params: `userId` (可选), `eventType` (可选), `page` (默认 1), `size` (默认 20)
+  - 权限要求：调用者须具备全局审计权限（`AUDIT_VIEW`，如系统管理员或项目 `AUDITOR`/`OWNER`）
+  - Response: `Result<PageResultView<AuthAuditLogView>>`
+- `GET /api/system/metrics/summary`：系统运行时运维指标大盘与 SLO 聚合透视
+  - Header: `Authorization: Bearer <token>`
+  - 聚合内容：工作流执行计数、失败率、P95/P99 耗时、活动沙箱部署数、工作区容量、JVM 堆内存与 GC 状态、Prometheus 告警状态与 SLO 健康度评级 (`HEALTHY` / `DEGRADED` / `UNHEALTHY`)
+  - Response: `Result<OpsMetricsSummaryView>`
+- `POST /api/system/backup`：触发受控灾备快照生成 (Disaster Recovery Snapshot)
+  - Header: `Authorization: Bearer <token>`
+  - Request: `{"notes": "manual pre-upgrade backup"}`
+  - 产出标准 BackupManifest，记录全量元数据计数与 SHA-256 完整性指纹
+  - Response: `Result<BackupManifest>`
+- `POST /api/system/backup/verify`：灾备快照完整性与防篡改验证
+  - Header: `Authorization: Bearer <token>`
+  - Request: `{"manifest": {...}}`
+  - 验证 SHA-256 校验和、表级记录完整度与版本一致性
+  - Response: `Result<RestoreVerificationReport>`
+- `POST /api/system/backup/restore`：灾备快照幂等还原与数据一致性重建
+  - Header: `Authorization: Bearer <token>`
+  - Request: `{"manifest": {...}, "dryRun": false}`
+  - 严格事务保证，重构基线数据与租户状态，记录灾备恢复事件
+  - Response: `Result<RestoreVerificationReport>`
+
 ---
 
 ## 三、 SSE 事件类型定义
@@ -374,9 +422,9 @@
 | `/api/providers*` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /route`, `POST /{id}/test`) | `agent` | `ProviderController` | `listProviders`, `evaluateRoute` | 强制登录；修改/删除校验 `Provider.ownerId` | `route` 无副作用推演；`PUT`/`DELETE` 幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
 | `/api/token-usages/runs/{runId}`, `/steps/{stepRunId}`, `/summary` | `agent` | `TokenUsageController` | `workflowsApi.getTokenSummary` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 只读聚合查询，完全幂等 | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留（主链路） |
 | `/api/agents`, `/api/agents/platforms`, `/api/agents/execute` | `agent` | `AgentRegistryController` | 后端内部/管理查询 | `AuthFilter` 统一鉴权 | `GET` 幂等 | `ACTIVE` | `AgentAdapterTest`, `Phase1ModuleConvergenceAndContractTest` | Phase 1 已迁入 `com.agenthub.agent.api` |
-| `/api/teams*` (`POST`, `GET`, `GET /{id}`, `/members`, `/coordinate`) | `team` | `TeamController` | `workflowsApi.getTeam` | 强制登录 + 关联 `Project.ownerId` 校验 | 查询幂等；`coordinate` 基于当前轮次推演 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest` | 作为协作扩展隔离维护 |
+| `/api/teams*` (`POST`, `GET`, `GET /{id}`, `/members`, `/coordinate`, `/projects/{projectId}/role`, `/projects/{projectId}/members`, `/projects/{projectId}/members/{userId}/role`, `DELETE /projects/{projectId}/members/{userId}`) | `team` | `TeamController` | `workflowsApi.getTeam`, `projectsApi.getCurrentUserRole`, `listProjectMembers`, `addProjectMember`, `updateMemberRole`, `removeProjectMember` | 强制登录 + `ResourceOwnershipVerifier` 校验细粒度 RBAC 权限（`MEMBER_MANAGE` 等） | 查询幂等；成员添加 `UNIQUE(team_id, user_id)`；禁止移除唯一 OWNER | `ACTIVE` | `Phase6TeamRbacAndOperationsTest`, `TeamAndConversationControllerIntegrationTest` | Phase 6 升级为细粒度团队协作与 RBAC 体系 |
 | `/api/conversations*` (`POST`, `GET`, `/{id}/messages`, `/{id}/stream`, `/{id}/context`, `/{id}/summarize`, `/{id}/coordinate`) | `conversation` | `ConversationController` | `workflowsApi.listConversations`, `getMessages`, `sendMessage` | 强制登录 + `Conversation.ownerId` 与 `MessageVisibilityFilter` | 消息通过 128 分段锁 + 悲观写锁保证 `sequence_num` 单调递增 | `ISOLATED_EXT` | `TeamAndConversationControllerIntegrationTest`, `ConversationSseStreamAndReconnectionTest` | 唯一正式会话接口（前端已全量切换至 `/api/conversations`） |
 | `/api/im/conversations*` | `adapter.web` | `IMController` | **0 前端调用**（已迁至 `/api/conversations`） | `@Deprecated` + `@Profile("!prod")`；`prod` 返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DEPRECATED_DISABLED_IN_PROD` | `Phase1ModuleConvergenceAndContractTest` | 生产环境已卸载并拦截 `410 Gone` |
 | `/api/sandbox/preview/{projectId}`, `/api/sandbox/deploy/{projectId}` | `adapter.web` | `SandboxController` | **0 前端调用**（已迁至 `/api/deployments`） | `@Deprecated` + `@Profile("!prod")`；`prod` 返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DEPRECATED_DISABLED_IN_PROD` | `Phase1ModuleConvergenceAndContractTest` | 生产环境已卸载并拦截 `410 Gone` |
-| `/api/system/health`, `/api/system/contracts/v1`, `/api/v1/openapi.json`, `/api/system/legacy-endpoints` | `ops` | `SystemHealthController` | `authApi.getHealth` | 公开探针与契约规范（不暴露内部敏感配置） | 只读完全幂等，附带 `X-API-Version: v1` 与 `UTC` 时区头 | `ACTIVE` | `SystemHealthTest`, `Phase1ModuleConvergenceAndContractTest` | Phase 1 已迁入 `com.agenthub.ops.api` |
+| `/api/system/health`, `/api/system/contracts/v1`, `/api/v1/openapi.json`, `/api/system/legacy-endpoints`, `/api/system/audit-logs`, `/api/system/metrics/summary`, `/api/system/backup*` (`/verify`, `/restore`) | `ops` | `SystemHealthController` | `authApi.getHealth`, `opsApi.getMetricsSummary`, `queryAuditLogs`, `triggerBackup`, `verifyBackup`, `restoreBackup` | 公开探针无权限；安全审计/灾备操作强制登录 + `AUDIT_VIEW` / 管理员权限 | 快照生成防篡改 SHA-256 校验；还原操作具备幂等事务保障与基线对比 | `ACTIVE` | `SystemHealthTest`, `Phase1ModuleConvergenceAndContractTest`, `Phase6TeamRbacAndOperationsTest` | Phase 6 升级为全景指标、安全审计与灾备运维控制台 |
 | `/api/workspace/*` (`diff`, `workflow/execute`, `files`, `file/content`, `file/save`) | `adapter.web` | `WorkflowAndDiffController` | **0 前端调用** | `@Deprecated` + `@Profile("!prod")`；`prod` 强制阻断并返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DEPRECATED_DISABLED_IN_PROD` | `WorkspacePathGuardTest`, `Phase0BaselineAndDebtFreezeGuardTest`, `Phase1ModuleConvergenceAndContractTest` | 生产环境已卸载并拦截 `410 Gone` |

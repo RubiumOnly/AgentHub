@@ -47,4 +47,37 @@ public class TeamController {
     public Result<TeamCoordinateResultView> coordinate(@PathVariable("id") String id, @RequestBody TeamCoordinateCommand cmd) {
         return Result.ok(teamApplication.coordinateNextTurn(id, cmd));
     }
+
+    @GetMapping("/projects/{projectId}/roles/me")
+    public Result<ProjectUserRoleView> getCurrentUserRole(@PathVariable("projectId") String projectId) {
+        return Result.ok(teamApplication.getCurrentUserRole(projectId));
+    }
+
+    @GetMapping("/projects/{projectId}/members")
+    public Result<List<ProjectMemberView>> listProjectMembers(@PathVariable("projectId") String projectId) {
+        return Result.ok(teamApplication.listProjectMembers(projectId));
+    }
+
+    @PostMapping("/projects/{projectId}/members")
+    public Result<ProjectMemberView> addProjectMember(
+            @PathVariable("projectId") String projectId,
+            @RequestBody AddProjectMemberCommand cmd) {
+        return Result.ok(teamApplication.addProjectMember(projectId, cmd));
+    }
+
+    @PutMapping("/projects/{projectId}/members/{memberId}/role")
+    public Result<ProjectMemberView> updateMemberRole(
+            @PathVariable("projectId") String projectId,
+            @PathVariable("memberId") String memberId,
+            @RequestBody UpdateMemberRoleCommand cmd) {
+        return Result.ok(teamApplication.updateMemberRole(projectId, memberId, cmd));
+    }
+
+    @DeleteMapping("/projects/{projectId}/members/{memberId}")
+    public Result<Void> removeProjectMember(
+            @PathVariable("projectId") String projectId,
+            @PathVariable("memberId") String memberId) {
+        teamApplication.removeProjectMember(projectId, memberId);
+        return Result.ok(null);
+    }
 }

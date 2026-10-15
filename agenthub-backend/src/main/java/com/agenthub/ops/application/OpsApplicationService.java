@@ -1,11 +1,26 @@
 package com.agenthub.ops.application;
 
+import com.agenthub.agent.infrastructure.repository.TokenUsageAuditRepository;
+import com.agenthub.execution.infrastructure.repository.StepRunRepository;
+import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
+import com.agenthub.identity.dto.AuthAuditLogView;
+import com.agenthub.identity.infrastructure.repository.AuthAuditLogRepository;
+import com.agenthub.identity.infrastructure.security.AuthAuditService;
+import com.agenthub.infrastructure.metrics.AgentHubMetricsCollector;
+import com.agenthub.infrastructure.ops.DisasterRecoveryBackupService;
+import com.agenthub.ops.dto.*;
+import com.agenthub.sandbox.infrastructure.repository.DeploymentRepository;
+import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.contract.ApiContractHeaders;
 import com.agenthub.shared.contract.BoundedContext;
 import com.agenthub.shared.contract.PageRequestQuery;
+import com.agenthub.shared.contract.PageResultView;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import com.agenthub.shared.filter.LegacyEndpointCallTracker;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -24,8 +39,54 @@ public class OpsApplicationService implements OpsApplication {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final LegacyEndpointCallTracker legacyCallTracker;
 
+    @Autowired(required = false)
+    private DisasterRecoveryBackupService disasterRecoveryBackupService;
+
+    @Autowired(required = false)
+    private AuthAuditService authAuditService;
+
+    @Autowired(required = false)
+    private AuthAuditLogRepository auditLogRepository;
+
+    @Autowired(required = false)
+    private AgentHubMetricsCollector metricsCollector;
+
+    @Autowired(required = false)
+    private WorkflowRunRepository workflowRunRepository;
+
+    @Autowired(required = false)
+    private StepRunRepository stepRunRepository;
+
+    @Autowired(required = false)
+    private DeploymentRepository deploymentRepository;
+
+    @Autowired(required = false)
+    private TokenUsageAuditRepository tokenUsageRepository;
+
     public OpsApplicationService(LegacyEndpointCallTracker legacyCallTracker) {
+        this(legacyCallTracker, null, null, null, null, null, null, null, null);
+    }
+
+    @Autowired
+    public OpsApplicationService(
+            LegacyEndpointCallTracker legacyCallTracker,
+            @Autowired(required = false) DisasterRecoveryBackupService disasterRecoveryBackupService,
+            @Autowired(required = false) AuthAuditService authAuditService,
+            @Autowired(required = false) AuthAuditLogRepository auditLogRepository,
+            @Autowired(required = false) AgentHubMetricsCollector metricsCollector,
+            @Autowired(required = false) WorkflowRunRepository workflowRunRepository,
+            @Autowired(required = false) StepRunRepository stepRunRepository,
+            @Autowired(required = false) DeploymentRepository deploymentRepository,
+            @Autowired(required = false) TokenUsageAuditRepository tokenUsageRepository) {
         this.legacyCallTracker = legacyCallTracker;
+        this.disasterRecoveryBackupService = disasterRecoveryBackupService;
+        this.authAuditService = authAuditService;
+        this.auditLogRepository = auditLogRepository;
+        this.metricsCollector = metricsCollector;
+        this.workflowRunRepository = workflowRunRepository;
+        this.stepRunRepository = stepRunRepository;
+        this.deploymentRepository = deploymentRepository;
+        this.tokenUsageRepository = tokenUsageRepository;
     }
 
     @Override
@@ -180,6 +241,17 @@ public class OpsApplicationService implements OpsApplication {
                 "post", endpoint("sandbox", "Create controlled sandbox preview deployment")
         ));
         paths.put("/api/deployments/{id}/probe", Map.of("post", endpoint("sandbox", "Execute active HTTP health check probe for sandbox deployment")));
+        paths.put("/api/teams/projects/{projectId}/roles/me", Map.of("get", endpoint("project", "Get current user role and permissions on project")));
+        paths.put("/api/teams/projects/{projectId}/members", Map.of(
+                "get", endpoint("project", "List project team members"),
+                "post", endpoint("project", "Add team member to project with RBAC role")
+        ));
+        paths.put("/api/teams/projects/{projectId}/members/{memberId}/role", Map.of("put", endpoint("project", "Update project team member RBAC role")));
+        paths.put("/api/system/audit-logs", Map.of("get", endpoint("ops", "Query immutable audit logs and security trace history")));
+        paths.put("/api/system/metrics/summary", Map.of("get", endpoint("ops", "Get aggregated Prometheus/Micrometer metrics and SLO indicators")));
+        paths.put("/api/system/backup", Map.of("post", endpoint("ops", "Trigger point-in-time consistent disaster recovery backup snapshot")));
+        paths.put("/api/system/backup/verify", Map.of("post", endpoint("ops", "Verify cryptographic and structural integrity of backup archive")));
+        paths.put("/api/system/backup/restore", Map.of("post", endpoint("ops", "Restore backup snapshot to target workspace and live database")));
         paths.put("/api/system/health", Map.of("get", endpoint("ops", "Get system health status in UTC")));
         paths.put("/api/system/contracts/v1", Map.of("get", endpoint("ops", "Get API v1 contract metadata, bounded context registry, and legacy route telemetry")));
         paths.put("/api/system/legacy-endpoints", Map.of("get", endpoint("ops", "Get deprecated legacy endpoint invocation counts")));
@@ -191,6 +263,161 @@ public class OpsApplicationService implements OpsApplication {
     @Override
     public Map<String, Long> getLegacyEndpointInvocationCounts() {
         return legacyCallTracker.snapshot();
+    }
+
+    @Override
+    public PageResultView<AuthAuditLogView> queryAuditLogs(String eventType, String userId, PageRequestQuery query) {
+        if (authAuditService == null) {
+            PageRequestQuery pageQuery = query != null ? query : PageRequestQuery.ofDefaults();
+            return pageQuery.slice(List.of());
+        }
+        int page = query != null ? query.getPage() : 1;
+        int size = query != null ? query.getSize() : 20;
+        return authAuditService.queryAuditLogs(eventType, userId, page, size);
+    }
+
+    @Override
+    public DisasterRecoveryBackupService.BackupManifest triggerBackup(BackupTriggerCommand cmd) {
+        if (disasterRecoveryBackupService == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery backup service not available");
+        }
+        try {
+            Path workspaceRoot = Paths.get("data/workspaces");
+            Path backupOutputDir = (cmd != null && cmd.getBackupDir() != null && !cmd.getBackupDir().isBlank())
+                    ? Paths.get(cmd.getBackupDir())
+                    : Paths.get("data/backups/manual-" + System.currentTimeMillis());
+            String passphrase = cmd != null ? cmd.getEncryptionPassphrase() : null;
+
+            DisasterRecoveryBackupService.BackupManifest manifest =
+                    disasterRecoveryBackupService.createBackup(workspaceRoot, backupOutputDir, passphrase);
+
+            if (authAuditService != null) {
+                authAuditService.record("BACKUP_SNAPSHOT_TRIGGERED", RequestContext.get().getUserId(), null, null,
+                        "Backup snapshot created [" + manifest.backupId + "] at [" + backupOutputDir + "] in " + manifest.backupDurationMs + "ms");
+            }
+            if (metricsCollector != null) {
+                metricsCollector.recordBackupOperation("CREATE", true);
+            }
+            return manifest;
+        } catch (Exception e) {
+            if (metricsCollector != null) {
+                metricsCollector.recordBackupOperation("CREATE", false);
+            }
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery backup creation failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public DisasterRecoveryBackupService.BackupManifest verifyBackup(BackupVerifyCommand cmd) {
+        if (disasterRecoveryBackupService == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery backup service not available");
+        }
+        if (cmd == null || cmd.getBackupDir() == null || cmd.getBackupDir().isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Backup directory is required");
+        }
+        try {
+            Path backupDir = Paths.get(cmd.getBackupDir());
+            DisasterRecoveryBackupService.BackupManifest manifest =
+                    disasterRecoveryBackupService.verifyBackupIntegrity(backupDir, cmd.getEncryptionPassphrase());
+            if (metricsCollector != null) {
+                metricsCollector.recordBackupOperation("VERIFY", true);
+            }
+            return manifest;
+        } catch (Exception e) {
+            if (metricsCollector != null) {
+                metricsCollector.recordBackupOperation("VERIFY", false);
+            }
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Backup integrity verification failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public DisasterRecoveryBackupService.RestoreVerificationReport restoreBackup(BackupRestoreCommand cmd) {
+        if (disasterRecoveryBackupService == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery backup service not available");
+        }
+        if (cmd == null || cmd.getBackupDir() == null || cmd.getBackupDir().isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Backup directory is required");
+        }
+        try {
+            Path backupDir = Paths.get(cmd.getBackupDir());
+            Path targetWorkspaceRoot = (cmd.getTargetWorkspaceRoot() != null && !cmd.getTargetWorkspaceRoot().isBlank())
+                    ? Paths.get(cmd.getTargetWorkspaceRoot())
+                    : Paths.get("data/workspaces");
+
+            DisasterRecoveryBackupService.RestoreVerificationReport report =
+                    disasterRecoveryBackupService.restoreToCleanEnvironment(backupDir, targetWorkspaceRoot, cmd.getEncryptionPassphrase());
+
+            if (authAuditService != null) {
+                authAuditService.record("DISASTER_RESTORE_TRIGGERED", RequestContext.get().getUserId(), null, null,
+                        "Disaster recovery restore executed for backup [" + report.backupId() + "] in " + report.restoreDurationMs() + "ms");
+            }
+            if (metricsCollector != null) {
+                metricsCollector.recordBackupOperation("RESTORE", true);
+            }
+            return report;
+        } catch (Exception e) {
+            if (metricsCollector != null) {
+                metricsCollector.recordBackupOperation("RESTORE", false);
+            }
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery restoration failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public OpsMetricsSummaryView getMetricsSummary() {
+        OpsMetricsSummaryView view = new OpsMetricsSummaryView();
+        view.setSystemHealth("UP");
+
+        int activeRuns = metricsCollector != null ? metricsCollector.getActiveRuns() : 0;
+        int activeSse = metricsCollector != null ? metricsCollector.getActiveSseConnections() : 0;
+        double diskRatio = metricsCollector != null ? metricsCollector.getWorkspaceDiskAvailablePercent() / 100.0 : 0.85;
+        Map<String, String> cbStates = metricsCollector != null ? metricsCollector.getCircuitBreakerStates() : Map.of();
+        Map<String, Long> rbacCounts = metricsCollector != null ? metricsCollector.getRbacEvaluationCounts() : Map.of("allowed", 0L, "denied", 0L);
+
+        view.setActiveRuns(activeRuns);
+        view.setActiveSseConnections(activeSse);
+        view.setWorkspaceDiskAvailableRatio(diskRatio);
+        view.setCircuitBreakerStates(cbStates);
+        view.setRbacEvaluations(rbacCounts);
+
+        long totalRuns = workflowRunRepository != null ? workflowRunRepository.count() : 0L;
+        long totalSteps = stepRunRepository != null ? stepRunRepository.count() : 0L;
+        long totalDeployments = deploymentRepository != null ? deploymentRepository.count() : 0L;
+        long auditCount = auditLogRepository != null ? auditLogRepository.count() : 0L;
+        long totalTokens = 0L;
+        if (tokenUsageRepository != null) {
+            totalTokens = tokenUsageRepository.findAll().stream()
+                    .mapToLong(t -> t.getPromptTokens() + t.getCompletionTokens())
+                    .sum();
+        }
+
+        view.setTotalRuns(totalRuns);
+        view.setTotalSteps(totalSteps);
+        view.setTotalDeployments(totalDeployments);
+        view.setTotalTokensConsumed(totalTokens);
+        view.setAuditLogsRecorded(auditCount);
+
+        long uptime = java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime() / 1000L;
+        view.setUptimeSeconds(uptime);
+
+        Runtime rt = Runtime.getRuntime();
+        long totalMem = rt.totalMemory() / (1024 * 1024);
+        long freeMem = rt.freeMemory() / (1024 * 1024);
+        long maxMem = rt.maxMemory() / (1024 * 1024);
+        view.setJvmMemoryTotalMb(totalMem);
+        view.setJvmMemoryUsedMb(totalMem - freeMem);
+        view.setJvmMemoryMaxMb(maxMem);
+
+        if (diskRatio < 0.15 || cbStates.containsValue("OPEN")) {
+            view.setSloStatus("CRITICAL");
+        } else if (activeRuns > 20 || rbacCounts.getOrDefault("denied", 0L) > 50) {
+            view.setSloStatus("WARNING");
+        } else {
+            view.setSloStatus("HEALTHY");
+        }
+
+        return view;
     }
 
     private Map<String, Object> endpoint(String tag, String summary) {

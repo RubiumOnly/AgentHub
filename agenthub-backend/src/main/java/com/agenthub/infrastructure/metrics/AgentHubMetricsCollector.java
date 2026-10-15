@@ -32,6 +32,9 @@ public class AgentHubMetricsCollector {
     private final ConcurrentMap<String, Counter> tokenCounterCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Counter> deploymentCounterCache = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, AtomicInteger> circuitBreakerStateGauges = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Counter> rbacCounterCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Counter> auditCounterCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Counter> backupCounterCache = new ConcurrentHashMap<>();
     private final AtomicInteger workspaceDiskAvailablePercent = new AtomicInteger(85);
 
     private final Timer workspaceLockWaitTimer;
@@ -180,5 +183,76 @@ public class AgentHubMetricsCollector {
                         .description("Total deployments completed partitioned by status")
                         .register(meterRegistry)
         ).increment();
+    }
+
+    public void recordRbacEvaluation(String role, String decision, String permission) {
+        String safeRole = (role == null || role.isBlank()) ? "UNKNOWN" : role.toUpperCase();
+        String safeDecision = (decision == null || decision.isBlank()) ? "UNKNOWN" : decision.toUpperCase();
+        String safePerm = (permission == null || permission.isBlank()) ? "UNKNOWN" : permission.toUpperCase();
+        String key = safeRole + ":" + safeDecision + ":" + safePerm;
+        rbacCounterCache.computeIfAbsent(key, k ->
+                Counter.builder("agenthub.rbac.evaluations.total")
+                        .tag("role", safeRole)
+                        .tag("decision", safeDecision)
+                        .tag("permission", safePerm)
+                        .description("Total RBAC permission evaluations partitioned by role and decision")
+                        .register(meterRegistry)
+        ).increment();
+    }
+
+    public void recordAuditEvent(String eventType) {
+        String safeType = (eventType == null || eventType.isBlank()) ? "UNKNOWN" : eventType.toUpperCase();
+        auditCounterCache.computeIfAbsent(safeType, k ->
+                Counter.builder("agenthub.audit.events.total")
+                        .tag("event_type", safeType)
+                        .description("Total immutable audit events recorded partitioned by type")
+                        .register(meterRegistry)
+        ).increment();
+    }
+
+    public void recordBackupOperation(String action, boolean success) {
+        String safeAction = (action == null || action.isBlank()) ? "BACKUP" : action.toUpperCase();
+        String status = success ? "SUCCESS" : "FAILURE";
+        String key = safeAction + ":" + status;
+        backupCounterCache.computeIfAbsent(key, k ->
+                Counter.builder("agenthub.backup.operations.total")
+                        .tag("action", safeAction)
+                        .tag("status", status)
+                        .description("Total disaster recovery operations partitioned by action and status")
+                        .register(meterRegistry)
+        ).increment();
+    }
+
+    public int getWorkspaceDiskAvailablePercent() {
+        return workspaceDiskAvailablePercent.get();
+    }
+
+    public java.util.Map<String, String> getCircuitBreakerStates() {
+        java.util.Map<String, String> states = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, java.util.concurrent.atomic.AtomicInteger> entry : circuitBreakerStateGauges.entrySet()) {
+            if (entry.getValue().get() == 1) {
+                String[] parts = entry.getKey().split(":");
+                if (parts.length == 2) {
+                    states.put(parts[0], parts[1]);
+                }
+            }
+        }
+        return states;
+    }
+
+    public java.util.Map<String, Long> getRbacEvaluationCounts() {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        long allowed = 0;
+        long denied = 0;
+        for (java.util.Map.Entry<String, Counter> entry : rbacCounterCache.entrySet()) {
+            if (entry.getKey().contains(":ALLOW:")) {
+                allowed += (long) entry.getValue().count();
+            } else if (entry.getKey().contains(":DENY:")) {
+                denied += (long) entry.getValue().count();
+            }
+        }
+        counts.put("allowed", allowed);
+        counts.put("denied", denied);
+        return counts;
     }
 }

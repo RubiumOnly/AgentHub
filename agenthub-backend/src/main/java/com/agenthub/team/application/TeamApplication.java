@@ -11,4 +11,10 @@ public interface TeamApplication {
     TeamMemberView addTeamMember(String teamId, AddTeamMemberCommand cmd);
     void removeTeamMember(String teamId, String memberId);
     TeamCoordinateResultView coordinateNextTurn(String teamId, TeamCoordinateCommand cmd);
+
+    ProjectUserRoleView getCurrentUserRole(String projectId);
+    List<ProjectMemberView> listProjectMembers(String projectId);
+    ProjectMemberView addProjectMember(String projectId, AddProjectMemberCommand cmd);
+    ProjectMemberView updateMemberRole(String projectId, String memberId, UpdateMemberRoleCommand cmd);
+    void removeProjectMember(String projectId, String memberId);
 }

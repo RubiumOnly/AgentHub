@@ -16,6 +16,8 @@ import { RunWorkspacePanel } from "@/components/dashboard/RunWorkspacePanel";
 import { ReviewSidebar } from "@/components/dashboard/ReviewSidebar";
 import { DeploymentPanel } from "@/components/dashboard/DeploymentPanel";
 import { RunOperationsPanel } from "@/components/dashboard/RunOperationsPanel";
+import { TeamRbacPanel } from "@/components/dashboard/TeamRbacPanel";
+import { OperationsConsolePanel } from "@/components/dashboard/OperationsConsolePanel";
 import { OrchestratorPlanModal } from "@/components/workflow/OrchestratorPlanModal";
 
 export default function AgentHubExecutiveApp() {
@@ -142,27 +144,18 @@ export default function AgentHubExecutiveApp() {
         setSelectedRunId("");
       }
 
-      const [
-        defsData,
-        runData,
-        stepsData,
-        approvalsData,
-        tokensData,
-        provsData,
-        depsData,
-        diffData,
-        teamsData,
-      ] = await Promise.allSettled([
-        workflowsApi.listDefinitions().catch(() => []),
-        currentRunId ? runsApi.getRun(currentRunId) : Promise.resolve(null),
-        currentRunId ? runsApi.listStepRuns(currentRunId) : Promise.resolve([]),
-        currentRunId ? approvalsApi.listApprovals(currentRunId) : Promise.resolve([]),
-        workflowsApi.getTokenSummary().catch(() => null),
-        workflowsApi.listProviders().catch(() => []),
-        deploymentsApi.listDeployments(currentProjId).catch(() => []),
-        currentWorkspaceId ? workspacesApi.getStructuredDiff(currentWorkspaceId).catch(() => null) : Promise.resolve(null),
-        currentProjId ? workflowsApi.listTeams(currentProjId).catch(() => []) : Promise.resolve([]),
-      ]);
+      const [defsData, runData, stepsData, approvalsData, tokensData, provsData, depsData, diffData, teamsData] =
+        await Promise.allSettled([
+          workflowsApi.listDefinitions().catch(() => []),
+          currentRunId ? runsApi.getRun(currentRunId) : Promise.resolve(null),
+          currentRunId ? runsApi.listStepRuns(currentRunId) : Promise.resolve([]),
+          currentRunId ? approvalsApi.listApprovals(currentRunId) : Promise.resolve([]),
+          workflowsApi.getTokenSummary().catch(() => null),
+          workflowsApi.listProviders().catch(() => []),
+          deploymentsApi.listDeployments(currentProjId).catch(() => []),
+          currentWorkspaceId ? workspacesApi.getStructuredDiff(currentWorkspaceId).catch(() => null) : Promise.resolve(null),
+          currentProjId ? workflowsApi.listTeams(currentProjId).catch(() => []) : Promise.resolve([]),
+        ]);
 
       if (defsData.status === "fulfilled" && defsData.value.length > 0 && !activeDefinitionId) {
         setActiveDefinitionId(defsData.value[0].id);
@@ -386,6 +379,14 @@ export default function AgentHubExecutiveApp() {
             onRefreshParent={syncDashboardData}
           />
         </div>
+      )}
+
+      {activeTab === "team" && (
+        <TeamRbacPanel projectId={selectedProjectId} isDemo={isDemo} />
+      )}
+
+      {activeTab === "ops" && (
+        <OperationsConsolePanel isDemo={isDemo} />
       )}
 
       {(activeTab === "providers" || activeTab === "sandbox") && (

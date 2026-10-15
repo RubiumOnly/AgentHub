@@ -15,7 +15,7 @@ import {
   setStoredToken,
   setStoredUser,
 } from "./api/auth";
-import { deploymentsApi } from "./api/deployments";
+import { deploymentsApi, opsApi } from "./api/deployments";
 import {
   API_BASE,
   ApiError,
@@ -67,6 +67,7 @@ export {
   approvalsApi,
   artifactsApi,
   deploymentsApi,
+  opsApi,
   streamApi,
   MOCK_RUN,
   MOCK_STEPS,
@@ -89,5 +90,6 @@ export const apiClient = {
   ...approvalsApi,
   ...artifactsApi,
   ...deploymentsApi,
+  ...opsApi,
   ...streamApi,
 };

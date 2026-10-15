@@ -8,6 +8,7 @@ import java.util.List;
 
 @Repository
 public interface TeamRepository extends JpaRepository<TeamEntity, String> {
+    List<TeamEntity> findByProjectId(String projectId);
     List<TeamEntity> findByProjectIdOrderByCreatedAtDesc(String projectId);
     List<TeamEntity> findAllByOrderByCreatedAtDesc();
 }

@@ -20,6 +20,7 @@
 | **Agent 工作单元、模板与计划门禁 (Phase 3)** | 版本化 `AgentDefinition`（4 预置规范角色）、7 核心 Agent 工具及输出防爆（`guardOutputSize`）；7 阶段工业级 Kahn DAG 模板（`BUG_FIX_WITH_TESTS`, `NEW_FEATURE_ENDPOINT`）与阶段级并行批次计算（`executionStages`）；Orchestrator 结构化 Plan 生成与未确认前阻断高影响工具（`4003 FORBIDDEN`）；6 层上下文装配引擎（预算配额与截断策略）；`requireLive=true` 真实活体 Provider 路由保护（拒绝 Mock）；5 大场景离线自动化评测套件 | `AgentDefinitionManifest`, `ToolRegistry`, `WorkflowTemplateRegistry`, `WorkflowDslValidator`, `OrchestratorPlanApplicationService`, `ContextAssemblyEngine`, `OfflineEvaluationApplicationService` | `Phase3WorkflowTemplatesAndOrchestratorPlanTest` |
 | **Run Operations、统一状态图与产物血缘可靠性 (Phase 4)** | 单一统一状态图（`UnifiedExecutionStateGraph`）与合法状态跃迁防循环盲退；At-Least-Once 执行语义、幂等防重入与三级异常归因（`ExecutionErrorClassifier`：`RETRYABLE_TRANSIENT` / `APPROVAL_REQUIRED` / `FATAL_NON_RETRYABLE`）；事务性发件箱（Transactional Outbox）`afterCommit` 延期广播机制；三层拓扑分层上下文记忆（`HierarchicalContextMemory`）与不变量保留压缩（`ContextMemoryCompressor`）；产物全生命周期血缘穿透（`ArtifactLineageView`）与 JGit 行级结构化 Diff 审查及非破坏性精准回滚（`revertArtifact`）；运维决策控制台（`RunOperationsPanel`）与结构化代码审查模态框（`StructuredDiffReviewModal`） | `UnifiedExecutionStateGraph`, `ExecutionErrorClassifier`, `HierarchicalContextMemory`, `ContextMemoryCompressor`, `ArtifactApplicationService`, `RunOperationsPanel` | `Phase4RunOperationsAndArtifactLineageTest` |
 | **质量门禁、审查与受控交付 (Phase 5)** | 质量门禁策略引擎（`QualityGateEngine`：5 维度 BUILD_VERIFICATION / UNIT_TEST_REGRESSION / STATIC_ANALYSIS_GUARD / SECRET_LEAK_SCAN / DIFF_BUDGET_GUARD，加权评分 0-100，不可伪造 SHA-256 签名，GATE_FAILED 准入拦截）；JGit 单文件非破坏性精准回滚（`revertSingleFile`）；细粒度干预（`reworkStep` 步骤重做与指导意见注入、`rejectRun` 全盘驳回并安全重置基线）；受控沙箱准入门禁（阻断 GATE_FAILED/REJECTED 产物）与主动 HTTP 健康探针（`probeDeployment`）；标准化外部交付 PR 草稿规范（`PullRequestDraftView`）与确定性离线证据包（`exportRunEvidenceBundle`） | `QualityGateEngine`, `JGitWorkspaceManager`, `ArtifactApplicationService`, `RunCommandModule`, `DeploymentApplicationService`, `DiffArtifactReviewer` | `Phase5QualityGateAndDeliveryTest` |
+| **团队协作、RBAC 与运维灾备体系 (Phase 6)** | 6 级细粒度项目角色（`OWNER`/`ADMIN`/`MAINTAINER`/`DEVELOPER`/`VIEWER`/`AUDITOR`）与 10 大权限动作（`ResourceOwnershipVerifier` 防越权拦截与成员管理端点）；不可篡改安全审计流水（`auth_audit_logs` 表，`GET /api/system/audit-logs` 多维分页检索）；确定性灾备快照生成、SHA-256 防篡改校验与幂等全库/租户还原机制（`BackupManifest`、`RestoreVerificationReport`）；运维可观测性指标大盘（`GET /api/system/metrics/summary`）与 SLO 健康度评测引擎（`HEALTHY`/`DEGRADED`/`UNHEALTHY`）；前端 Bento Grid 团队协作与运维灾备控制台（`TeamRbacPanel.tsx`, `OperationsConsolePanel.tsx`） | `ProjectRbacRole`, `ResourceOwnershipVerifier`, `TeamApplicationService`, `AuthAuditService`, `OpsApplicationService`, `AgentHubMetricsCollector` | `Phase6TeamRbacAndOperationsTest` |
 
 ---
 
@@ -37,8 +38,8 @@
    - **前端行为**：顶部导航栏展示翠绿色 **`真实产品模式`** 徽章；所有 API 请求严禁静默回退到伪造 Mock 数据，遇到未登录（401）、越权（403）或后端异常时原样呈现真实错误横幅。
    - **证据包标记**：导出的证据包标记 `"simulated": false` 与 `"executionMode": "LIVE_PROVIDER"`，并附带 `tokenUsageRecords` 实测账单明细。
 
-3. **受控研发团队长期生产模式 (`LIVE_TEAM` — 规划于 Phase 6 完成)**
-   - **目标边界**：面向受控研发团队多人长期协同使用，要求完成组织/成员/角色（Owner/Admin/Developer/Reviewer/Viewer/Auditor）权限矩阵、项目与组织级成本/并发预算、密钥轮换审计、SLO 看板与干净环境恢复演练。在 Phase 6 退出条件达成前，当前系统不宣称已具备 `LIVE_TEAM` 能力。
+3. **受控研发团队长期生产模式 (`LIVE_TEAM` — Phase 6 已落地)**
+   - **已落地闭环**：面向受控研发团队多人长期协同使用，已交付 6 级角色（`OWNER`/`ADMIN`/`MAINTAINER`/`DEVELOPER`/`VIEWER`/`AUDITOR`）细粒度 RBAC 权限矩阵、不可篡改安全审计流水、灾备快照防篡改校验与幂等还原、SLO 运维监控大盘与全量自动化集成测试验证（`Phase6TeamRbacAndOperationsTest`）。
 
 ---
 
@@ -58,9 +59,9 @@
 * **当前实现**：预览沙箱支持 `LocalProcessSandbox`（受控本地子进程，配备命令白名单 `CommandSecurityGuard`、环境变量清洗 `EnvironmentSanitizer` 与超时强杀）以及 `DockerSandbox`（调用宿主机 Docker CLI 启动带 `--memory` / `--cpus` / `--pids-limit` 限制的容器）。
 * **未实现边界**：**未实现** 基于 Kubernetes Operator / Pod 的动态集群调度，也**未采用** Firecracker MicroVM、Kata Containers 或 gVisor 等内核/硬件级强虚拟化隔离。当前沙箱适用于受控研发团队内部预览，不可直接用于执行来自不可信公网用户的任意恶意二进制代码。
 
-### 4. 数据库物理级多租户隔离与细粒度 RBAC 权限矩阵（Application-Layer Owner Isolation Only）
-* **当前实现**：采用共享 MySQL 数据库 + 业务表 `owner_id` 字段隔离，由应用层 `ResourceAccessGuard` 在 Project、Workspace、WorkflowRun、Approval、Deployment、Provider 各入口强制校验资源归属权。
-* **未实现边界**：**未实现** Schema-per-Tenant（独立 Schema）或 Database-per-Tenant（独立物理库）隔离，也**未实现**多角色组织架构（如 Org Admin / Developer / Viewer / Auditor）的细粒度 RBAC/ABAC 权限矩阵。
+### 4. 数据库物理级多租户隔离（Application-Layer RBAC & Owner Isolation Only）
+* **当前实现**：采用共享 MySQL 数据库，在应用层通过 `ResourceOwnershipVerifier` 实现了细粒度的六级项目 RBAC 权限控制矩阵（`OWNER`, `ADMIN`, `MAINTAINER`, `DEVELOPER`, `VIEWER`, `AUDITOR`）与团队协作管理；对工作区写、工作流执行、人工审批、部署与安全审计实施严格基于角色的防御性拦截。
+* **未实现边界**：**未实现** 物理级 Schema-per-Tenant（每个租户独立数据库 Schema）或 Database-per-Tenant（每个租户独立 MySQL 实例）物理隔离；当前适用于同一组织或受控团队内部的多项目/多角色协同。
 
 ---
 

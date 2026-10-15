@@ -37,5 +37,35 @@ public enum TeamRole {
     /**
      * Custom user-defined specialist role.
      */
-    CUSTOM
+    CUSTOM,
+
+    /**
+     * Project Owner.
+     */
+    OWNER,
+
+    /**
+     * Team Administrator.
+     */
+    ADMIN,
+
+    /**
+     * Lead Developer / Maintainer.
+     */
+    MAINTAINER,
+
+    /**
+     * Software Developer.
+     */
+    DEVELOPER,
+
+    /**
+     * Read-only Viewer.
+     */
+    VIEWER,
+
+    /**
+     * Compliance Auditor.
+     */
+    AUDITOR
 }
