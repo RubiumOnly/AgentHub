@@ -152,4 +152,10 @@ public class ExecutionApplicationService implements ExecutionApplication {
     public static String computeDeterministicChecksum(RunEvidenceBundleView bundle) {
         return RunEvidenceModule.computeDeterministicChecksum(bundle);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.agenthub.execution.dto.RunOperationsView getRunOperations(String runId) {
+        return runQueryModule.getRunOperations(runId);
+    }
 }

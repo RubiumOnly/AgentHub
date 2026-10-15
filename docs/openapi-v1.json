@@ -311,6 +311,13 @@
         "responses": { "200": { "description": "Result<RunEvidenceBundleView>" } }
       }
     },
+    "/api/executions/runs/{runId}/operations": {
+      "get": {
+        "tags": ["execution"],
+        "summary": "Get unified execution operations view, state machine decision, and memory summary",
+        "responses": { "200": { "description": "Result<RunOperationsView>" } }
+      }
+    },
     "/api/approvals/runs/{runId}": {
       "get": {
         "tags": ["orchestration"],
@@ -323,6 +330,20 @@
         "tags": ["audit"],
         "summary": "Non-destructively revert artifact change in JGit workspace",
         "responses": { "200": { "description": "Result<ArtifactView>" } }
+      }
+    },
+    "/api/audit/artifacts/lineage/{runId}": {
+      "get": {
+        "tags": ["audit"],
+        "summary": "Get full lifecycle artifact lineage view for run",
+        "responses": { "200": { "description": "Result<ArtifactLineageView>" } }
+      }
+    },
+    "/api/audit/artifacts/{artifactId}/diff": {
+      "get": {
+        "tags": ["audit"],
+        "summary": "Get structured JGit diff review for artifact",
+        "responses": { "200": { "description": "Result<StructuredDiff>" } }
       }
     },
     "/api/agents": {

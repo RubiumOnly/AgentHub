@@ -28,6 +28,18 @@ public class ArtifactController {
         return Result.ok(artifacts);
     }
 
+    @GetMapping("/lineage/{runId}")
+    public Result<com.agenthub.audit.dto.ArtifactLineageView> getArtifactLineage(@PathVariable("runId") String runId) {
+        com.agenthub.audit.dto.ArtifactLineageView lineage = artifactApplication.getArtifactLineageByRunId(runId);
+        return Result.ok(lineage);
+    }
+
+    @GetMapping("/{artifactId}/diff")
+    public Result<com.agenthub.domain.workspace.model.StructuredDiff> getArtifactDiff(@PathVariable("artifactId") String artifactId) {
+        com.agenthub.domain.workspace.model.StructuredDiff diff = artifactApplication.getArtifactDiff(artifactId);
+        return Result.ok(diff);
+    }
+
     @GetMapping("/{artifactId}")
     public Result<ArtifactView> getArtifactById(@PathVariable("artifactId") String artifactId) {
         ArtifactView artifact = artifactApplication.getArtifactById(artifactId);

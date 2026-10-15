@@ -457,3 +457,19 @@ AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；
 普通提交 Subject：feat(phase-3): productize workflow templates, kahn dag parallel stages, orchestrator plan, and tool authorization guards
 加固提交 Subject（如有）：fix(phase-3): harden tool permission enforcement, fix outputRef varchar overflow, align openapi and frontend contracts, and verify instantiated e2e execution
 ```
+
+### 9.8 Phase 4 阶段验收记录
+
+```text
+阶段：Phase 4
+范围：单一统一状态图（UnifiedExecutionStateGraph）与跨实体一致性校验、合法状态跃迁防循环盲退；At-Least-Once 执行语义、幂等防重入与三级异常归因（ExecutionErrorClassifier：RETRYABLE_TRANSIENT / APPROVAL_REQUIRED / FATAL_NON_RETRYABLE）；事务性发件箱（Transactional Outbox）与严格单调序列（RunEventBroadcaster afterCommit 延期广播与 Last-Event-ID 重放）；三层拓扑分层上下文记忆（HierarchicalContextMemory）与不变量保留压缩（ContextMemoryCompressor：绝对保留项目规则、人工审批、错误堆栈与文件收据）；产物全生命周期血缘图谱（ArtifactLineageView：Run -> StepRun -> Artifact -> JGit Commit -> Checksums -> Approvals）；JGit 结构化 Diff 行级审查（StructuredDiff / FileDiffEntry）与非破坏性精准回滚（revertArtifact 保留工作区独立文件，记录 ARTIFACT_REVERTED 审计事件）；运行运维控制台端点（GET /api/executions/runs/{runId}/operations 与 GET /api/audit/artifacts/lineage/{runId}）；前端运行运维控制台（RunOperationsPanel.tsx）与结构化代码审查模态框（StructuredDiffReviewModal.tsx）；ADR-009 与文档契约对齐
+代码完成：是，变更包含 com.agenthub.execution.domain.state.UnifiedExecutionStateGraph、com.agenthub.execution.domain.retry.RetryCategory、com.agenthub.execution.domain.retry.ExecutionErrorClassifier、com.agenthub.execution.domain.memory.HierarchicalContextMemory、com.agenthub.execution.domain.memory.ContextMemoryCompressor、com.agenthub.execution.dto.* (RunOperationsView/PendingDecisionItem/ToolSideEffectView/HierarchicalMemorySummary/LeaseStatusView)、com.agenthub.audit.dto.* (ArtifactLineageView/StepLineageNode)、RunEventBroadcaster (Transactional Outbox afterCommit 广播)、ExecutionApplication/ExecutionApplicationService/RunQueryModule (getRunOperations)、ArtifactApplication/ArtifactApplicationService (getArtifactLineageByRunId/getArtifactDiff)、ExecutionController/ArtifactController 扩展、Phase4RunOperationsAndArtifactLineageTest、前端 RunOperationsPanel.tsx、StructuredDiffReviewModal.tsx、ProjectShell.tsx (运维决策与血缘 Tab)、app/page.tsx、types/index.ts、services/api/runs.ts、services/api/artifacts.ts、docs/adr/ADR-009、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/openapi-v1.json
+自动化测试：后端 57 test classes / 339 tests 通过（mvn clean test，含 Phase4RunOperationsAndArtifactLineageTest 7 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet）
+目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
+AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase4RunOperationsAndArtifactLineageTest 锁定受管范围、OpenAPI v1 契约与认知收据校验）
+删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
+未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实远程网络长时间断线重连（>30分钟）下的超长 SSE 流重放
+已知风险与回滚方式：若后续需要回退 Phase 4 功能，可通过 git revert 对应 Phase 4 提交恢复；底层表结构零变更，回滚零数据丢失风险
+普通提交 Subject：feat(phase-4): productize run operations, transactional outbox, hierarchical memory, artifact lineage, and structured diff review
+加固提交 Subject（如有）：无
+```

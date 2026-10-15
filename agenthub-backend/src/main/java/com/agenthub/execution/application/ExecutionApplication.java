@@ -27,4 +27,7 @@ public interface ExecutionApplication {
     // Phase F Extensions: Sanitized Run Evidence Bundle & Tamper-Evident Checksum
     RunEvidenceBundleView exportRunEvidenceBundle(String runId);
     boolean verifyEvidenceBundleChecksum(RunEvidenceBundleView bundle);
+
+    // Phase 4: Run Operations & Unified State Visibility
+    com.agenthub.execution.dto.RunOperationsView getRunOperations(String runId);
 }

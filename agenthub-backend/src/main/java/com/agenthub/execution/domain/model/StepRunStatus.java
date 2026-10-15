@@ -41,10 +41,7 @@ public enum StepRunStatus {
     }
 
     public boolean canTransitionTo(StepRunStatus target) {
-        if (target == null) return false;
-        if (this == target) return true; // Idempotent same-state check
-        Set<StepRunStatus> allowed = ALLOWED_TRANSITIONS.getOrDefault(this, Collections.emptySet());
-        return allowed.contains(target);
+        return com.agenthub.execution.domain.state.UnifiedExecutionStateGraph.canTransitionStep(this, target);
     }
 
     public static StepRunStatus fromString(String value) {

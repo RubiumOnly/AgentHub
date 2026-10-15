@@ -2,13 +2,18 @@ package com.agenthub.audit.application;
 
 import com.agenthub.adapter.common.BusinessException;
 import com.agenthub.adapter.common.ErrorCode;
+import com.agenthub.audit.dto.ArtifactLineageView;
 import com.agenthub.audit.dto.ArtifactView;
+import com.agenthub.audit.dto.StepLineageNode;
 import com.agenthub.audit.infrastructure.entity.ArtifactEntity;
 import com.agenthub.audit.infrastructure.repository.ArtifactRepository;
+import com.agenthub.domain.workspace.model.StructuredDiff;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.execution.infrastructure.entity.RunEventEntity;
+import com.agenthub.execution.infrastructure.entity.StepRunEntity;
 import com.agenthub.execution.infrastructure.entity.WorkflowRunEntity;
+import com.agenthub.orchestration.infrastructure.entity.ApprovalEntity;
 import com.agenthub.execution.infrastructure.repository.RunEventRepository;
 import com.agenthub.execution.infrastructure.repository.WorkflowRunRepository;
 import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
@@ -45,6 +50,12 @@ public class ArtifactApplicationService implements ArtifactApplication {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.agenthub.execution.service.RunEventBroadcaster broadcaster;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.agenthub.execution.infrastructure.repository.StepRunRepository stepRunRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.agenthub.orchestration.infrastructure.repository.ApprovalRepository approvalRepository;
 
     public ArtifactApplicationService(ArtifactRepository artifactRepository,
                                     WorkflowRunRepository workflowRunRepository,
@@ -308,6 +319,9 @@ public class ArtifactApplicationService implements ArtifactApplication {
         try {
             com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(metadataJson);
             com.fasterxml.jackson.databind.JsonNode filesNode = root.get("files");
+            if (filesNode == null || !filesNode.isArray()) {
+                filesNode = root.get("changedFiles");
+            }
             if (filesNode != null && filesNode.isArray()) {
                 for (com.fasterxml.jackson.databind.JsonNode f : filesNode) {
                     if (f.isTextual() && !f.asText().isBlank()) {
@@ -319,6 +333,171 @@ public class ArtifactApplicationService implements ArtifactApplication {
             log.warn("Failed to parse files from artifact metadata JSON: {}", e.getMessage());
         }
         return files;
+    }
+
+    private Map<String, String> extractChecksumsFromMetadata(String metadataJson) {
+        Map<String, String> checksums = new HashMap<>();
+        if (metadataJson == null || metadataJson.isBlank()) {
+            return checksums;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(metadataJson);
+            com.fasterxml.jackson.databind.JsonNode sumsNode = root.get("fileChecksums");
+            if (sumsNode == null || !sumsNode.isObject()) {
+                sumsNode = root.get("checksums");
+            }
+            if (sumsNode != null && sumsNode.isObject()) {
+                sumsNode.fields().forEachRemaining(entry -> {
+                    if (entry.getValue().isTextual()) {
+                        checksums.put(entry.getKey(), entry.getValue().asText());
+                    }
+                });
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse fileChecksums from artifact metadata: {}", e.getMessage());
+        }
+        return checksums;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ArtifactLineageView getArtifactLineageByRunId(String runId) {
+        if (runId == null || runId.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Run ID must not be null");
+        }
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyRunAccess(runId);
+        } else {
+            WorkflowRunEntity r = workflowRunRepository.findById(runId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + runId));
+            ProjectEntity p = projectRepository.findById(r.getProjectId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + r.getProjectId()));
+            accessGuard.checkOwnership(p.getOwnerId(), RequestContext.get().getUserId());
+        }
+
+        WorkflowRunEntity run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + runId));
+
+        List<ArtifactEntity> artifacts = artifactRepository.findByRunIdOrderByCreatedAtDesc(runId);
+        String baselineCommit = null;
+        for (ArtifactEntity art : artifacts) {
+            if ("BASELINE".equalsIgnoreCase(art.getArtifactType())) {
+                baselineCommit = art.getPathOrRef();
+                break;
+            }
+        }
+
+        WorkspaceEntity ws = workspaceRepository.findByProjectId(run.getProjectId()).orElse(null);
+        if (baselineCommit == null && ws != null && ws.getGitBaselineCommit() != null) {
+            baselineCommit = ws.getGitBaselineCommit();
+        }
+
+        String currentCommit = baselineCommit;
+        boolean isReverted = false;
+        for (ArtifactEntity art : artifacts) {
+            if ("REVERTED".equalsIgnoreCase(art.getReviewStatus())) {
+                isReverted = true;
+            }
+            if ("SNAPSHOT".equalsIgnoreCase(art.getArtifactType()) && currentCommit == null) {
+                currentCommit = art.getPathOrRef();
+            }
+        }
+
+        List<StepLineageNode> stepNodes = new ArrayList<>();
+        if (stepRunRepository != null) {
+            List<StepRunEntity> steps = stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId);
+            Map<String, ApprovalEntity> approvalMap = new HashMap<>();
+            if (approvalRepository != null) {
+                List<ApprovalEntity> apprs = approvalRepository.findByRunId(runId);
+                for (ApprovalEntity a : apprs) {
+                    if (a.getStepRunId() != null) {
+                        approvalMap.put(a.getStepRunId(), a);
+                    }
+                }
+            }
+            Map<String, ArtifactEntity> snapshotMap = new HashMap<>();
+            for (ArtifactEntity a : artifacts) {
+                if (a.getStepRunId() != null) {
+                    snapshotMap.put(a.getStepRunId(), a);
+                }
+            }
+
+            for (StepRunEntity s : steps) {
+                ArtifactEntity art = snapshotMap.get(s.getId());
+                ApprovalEntity appr = approvalMap.get(s.getId());
+                List<String> files = art != null ? extractFilesFromMetadata(art.getMetadataJson()) : List.of();
+                Map<String, String> checksums = art != null ? extractChecksumsFromMetadata(art.getMetadataJson()) : Map.of();
+
+                stepNodes.add(new StepLineageNode(
+                        s.getId(),
+                        s.getNodeId(),
+                        s.getStatus(),
+                        art != null ? art.getId() : null,
+                        art != null ? art.getPathOrRef() : null,
+                        "snapshot-" + s.getId(),
+                        files,
+                        checksums,
+                        art != null ? art.getReviewStatus() : "NONE",
+                        appr != null ? appr.getId() : null,
+                        appr != null ? appr.getStatus() : null
+                ));
+            }
+        }
+
+        int totalFiles = 0;
+        for (StepLineageNode sn : stepNodes) {
+            if (sn.getChangedFiles() != null) {
+                totalFiles += sn.getChangedFiles().size();
+            }
+        }
+
+        return new ArtifactLineageView(
+                runId,
+                run.getProjectId(),
+                ws != null ? ws.getId() : null,
+                baselineCommit,
+                currentCommit,
+                stepNodes,
+                artifacts.stream().map(this::toView).toList(),
+                artifacts.size(),
+                totalFiles,
+                isReverted
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StructuredDiff getArtifactDiff(String artifactId) {
+        ArtifactEntity entity = ownershipVerifier != null
+                ? ownershipVerifier.verifyArtifactAccess(artifactId)
+                : getArtifactByIdFallback(artifactId);
+
+        WorkflowRunEntity run = workflowRunRepository.findById(entity.getRunId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + entity.getRunId()));
+
+        WorkspaceEntity ws = workspaceRepository.findByProjectId(run.getProjectId()).orElse(null);
+        String wsKey = (ws != null) ? ws.getId() : "default";
+        Path wsRoot = workspaceResolver.getWorkspaceRoot(wsKey);
+
+        String baselineCommit = null;
+        if (ws != null && ws.getGitBaselineCommit() != null) {
+            baselineCommit = ws.getGitBaselineCommit();
+        } else {
+            List<ArtifactEntity> baselines = artifactRepository.findByRunIdAndArtifactType(run.getId(), "BASELINE");
+            if (!baselines.isEmpty()) {
+                baselineCommit = baselines.get(0).getPathOrRef();
+            }
+        }
+
+        try {
+            if ("SNAPSHOT".equalsIgnoreCase(entity.getArtifactType()) && baselineCommit != null && entity.getPathOrRef() != null) {
+                return gitManager.computeStructuredDiffBetweenCommits(wsRoot.toFile(), baselineCommit, entity.getPathOrRef());
+            }
+            return gitManager.computeStructuredDiff(wsRoot.toFile());
+        } catch (Exception e) {
+            log.error("Failed to compute structured diff for artifact [{}]: {}", artifactId, e.getMessage());
+            throw new BusinessException(ErrorCode.WORKSPACE_GIT_ERROR, "Failed to compute diff: " + e.getMessage());
+        }
     }
 
     private void recordRunEvent(String runId, String eventType, String payload) {

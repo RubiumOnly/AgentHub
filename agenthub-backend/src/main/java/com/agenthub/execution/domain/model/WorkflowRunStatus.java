@@ -39,10 +39,7 @@ public enum WorkflowRunStatus {
     }
 
     public boolean canTransitionTo(WorkflowRunStatus target) {
-        if (target == null) return false;
-        if (this == target) return true; // Idempotent same-state check
-        Set<WorkflowRunStatus> allowed = ALLOWED_TRANSITIONS.getOrDefault(this, Collections.emptySet());
-        return allowed.contains(target);
+        return com.agenthub.execution.domain.state.UnifiedExecutionStateGraph.canTransitionRun(this, target);
     }
 
     public static WorkflowRunStatus fromString(String value) {

@@ -77,7 +77,17 @@ public class DagAgentInvoker {
                     : (context.getInputs() != null && context.getInputs().get("planId") != null
                             ? String.valueOf(context.getInputs().get("planId")) : null);
             for (String toolName : node.getRequiredTools()) {
-                planApplication.enforceHighImpactToolAuthorization(planId, toolName);
+                try {
+                    planApplication.enforceHighImpactToolAuthorization(planId, toolName);
+                } catch (Exception e) {
+                    log.warn("High-impact tool [{}] authorization failed for node [{}]: {}", toolName, node.getId(), e.getMessage());
+                    com.agenthub.execution.domain.retry.ExecutionErrorClassifier.ClassificationResult cl =
+                            com.agenthub.execution.domain.retry.ExecutionErrorClassifier.classify(e);
+                    stateTransitioner.transitionStep(stepEntity.getId(), StepRunStatus.FAILED, "scheduler",
+                            "Tool authorization blocked (" + cl.getCategory() + "): " + e.getMessage());
+                    context.recordNodeFailed(node.getId(), e.getMessage());
+                    return false;
+                }
             }
         }
 
@@ -122,6 +132,7 @@ public class DagAgentInvoker {
                 String result = stepFuture.get(stepTimeout, TimeUnit.SECONDS);
 
                 context.recordNodeOutput(node.getId(), result);
+
                 stateTransitioner.markStepSucceeded(stepEntity, node, result, context);
                 eventRecorder.publishStepCompleted(runId, stepEntity.getId(), node.getId(), runtimeType, simulatedRuntime);
                 return true;
@@ -133,14 +144,19 @@ public class DagAgentInvoker {
                     return false;
                 }
 
+                com.agenthub.execution.domain.retry.ExecutionErrorClassifier.ClassificationResult cl =
+                        com.agenthub.execution.domain.retry.ExecutionErrorClassifier.classify(e);
+
                 stateTransitioner.transitionStep(stepEntity.getId(), StepRunStatus.FAILED, "scheduler", e.getMessage());
 
-                if (attempts < maxAttempts) {
+                if (cl.isCanAutoRetry() && attempts < maxAttempts) {
                     eventRecorder.publishStepRetrying(runId, stepEntity.getId(), attempts + 1);
-                    stateTransitioner.transitionStep(stepEntity.getId(), StepRunStatus.PENDING, "scheduler", "Retrying after failure");
+                    stateTransitioner.transitionStep(stepEntity.getId(), StepRunStatus.PENDING, "scheduler",
+                            "Retrying after failure (" + cl.getCategory() + ")");
                     Thread.sleep(backoffMs);
                 } else {
                     context.recordNodeFailed(node.getId(), e.getMessage());
+                    break;
                 }
             }
         }

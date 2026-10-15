@@ -155,8 +155,11 @@ public class OpsApplicationService implements OpsApplication {
         paths.put("/api/executions/runs/{runId}", Map.of("get", endpoint("execution", "Get workflow run with weak ETag and If-None-Match (304 Not Modified) support")));
         paths.put("/api/executions/runs/{runId}/stream", Map.of("get", endpoint("execution", "Subscribe to authoritative Run SSE event stream with Last-Event-ID / afterSeq cursor")));
         paths.put("/api/executions/runs/{runId}/evidence", Map.of("get", endpoint("execution", "Generate deterministic, secret-masked Run Evidence Bundle")));
+        paths.put("/api/executions/runs/{runId}/operations", Map.of("get", endpoint("execution", "Get unified execution operations view, state machine decision, and memory summary")));
         paths.put("/api/approvals/runs/{runId}", Map.of("get", endpoint("orchestration", "List human-in-the-loop approvals for run")));
         paths.put("/api/audit/artifacts/{artifactId}/revert", Map.of("post", endpoint("audit", "Non-destructively revert artifact change in JGit workspace")));
+        paths.put("/api/audit/artifacts/lineage/{runId}", Map.of("get", endpoint("audit", "Get full lifecycle artifact lineage view for run")));
+        paths.put("/api/audit/artifacts/{artifactId}/diff", Map.of("get", endpoint("audit", "Get structured JGit diff review for artifact")));
         paths.put("/api/agents", Map.of("get", endpoint("agent", "List registered agent definitions")));
         paths.put("/api/agents/tools", Map.of("get", endpoint("agent", "List registered agent tools with schemas and output limits")));
         paths.put("/api/agents/context-assembly", Map.of("post", endpoint("agent", "Assemble layered context with per-layer token budgets and truncation")));

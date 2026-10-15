@@ -206,7 +206,7 @@ export function DiffArtifactReviewer({
             </div>
 
             <div className="flex-1 overflow-auto p-2 bg-zinc-950 font-mono text-[11px] leading-relaxed">
-              {renderDiffLines(currentEntry.diffContent)}
+              {renderDiffLines(currentEntry.diffContent || currentEntry.diffText || "")}
             </div>
           </>
         ) : (

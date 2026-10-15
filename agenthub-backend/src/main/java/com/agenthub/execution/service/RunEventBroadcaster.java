@@ -121,7 +121,19 @@ public class RunEventBroadcaster {
             saved = runEventRepository.save(event);
         }
 
-        broadcastLive(runId, saved);
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            final RunEventEntity eventToBroadcast = saved;
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            broadcastLive(runId, eventToBroadcast);
+                        }
+                    }
+            );
+        } else {
+            broadcastLive(runId, saved);
+        }
         return saved;
     }
 

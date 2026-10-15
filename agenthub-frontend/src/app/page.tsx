@@ -15,6 +15,7 @@ import { DashboardTabId, ProjectShell } from "@/components/dashboard/ProjectShel
 import { RunWorkspacePanel } from "@/components/dashboard/RunWorkspacePanel";
 import { ReviewSidebar } from "@/components/dashboard/ReviewSidebar";
 import { DeploymentPanel } from "@/components/dashboard/DeploymentPanel";
+import { RunOperationsPanel } from "@/components/dashboard/RunOperationsPanel";
 import { OrchestratorPlanModal } from "@/components/workflow/OrchestratorPlanModal";
 
 export default function AgentHubExecutiveApp() {
@@ -374,6 +375,15 @@ export default function AgentHubExecutiveApp() {
           onRefresh={syncDashboardData}
           onCardAction={handleCardAction}
         />
+      )}
+
+      {activeTab === "operations" && (
+        <div className="flex-1 overflow-y-auto pb-6">
+          <RunOperationsPanel
+            runId={activeRunId}
+            onRefreshParent={syncDashboardData}
+          />
+        </div>
       )}
 
       {(activeTab === "providers" || activeTab === "sandbox") && (

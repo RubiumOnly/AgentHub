@@ -107,14 +107,39 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 8. **离线自动化评测基准（`OfflineEvaluationApplication`）**：
    - 内置覆盖 5 大典型任务的 Benchmark 套件（新端点、缺陷修复、重构、测试补齐、对抗注入防御），量化通过率、工具误用率与 Diff 采纳率。
 
-## 7. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
+### 7. Run Operations、统一状态图与长上下文可靠性 (Phase 4 架构事实)
+
+在 Phase 4 中，系统将运行运维、人工决策与长上下文可靠性收敛为单一产品对象：
+
+1. **单一统一状态图（`UnifiedExecutionStateGraph`）**：
+   - 穷举 `WorkflowRunStatus`（8 种状态）与 `StepRunStatus`（6 种状态）的合法跃迁矩阵，终态严禁跃迁回运行态（非法流转抛出 `IllegalStateException`）；
+   - 提供跨实体一致性校验（`isRunStepConsistent`）与结构化下一步调度决策（`determineNextAction`），输出操作员待办决策清单（`PendingDecisionItem`）。
+2. **At-Least-Once 语义与三级异常归因（`ExecutionErrorClassifier`）**：
+   - 细分为 `RETRYABLE_TRANSIENT`（网络超时、429、连接重置触发自动指数退避）、`APPROVAL_REQUIRED`（高影响工具越权、预算超限转人工确认）与 `FATAL_NON_RETRYABLE`（业务异常、空指针、DSL 语法损坏立即阻断）；
+   - `startRun` 基于 `idempotencyKey` 防重入，重复触发返回已有运行实例。
+3. **事务性发件箱（Transactional Outbox）**：
+   - `RunEventBroadcaster` 采用 Spring 事务同步机制（`afterCommit`），仅在数据库事务提交后向 SSE 派发实时事件，消除事务回滚幻象事件；
+   - 严格单调递增 `sequenceNum` 支持客户端通过 `Last-Event-ID` 增量重放。
+4. **三层拓扑分层上下文记忆与不变量保留压缩**：
+   - `HierarchicalContextMemory` 划分为 Tier 1 (ProjectMemory)、Tier 2 (RunMemory) 与 Tier 3 (StepMemoryItem)；
+   - `ContextMemoryCompressor` 超预算时压缩历史成功日志，绝对保留核心规约、文件改动收据、审批决定与错误堆栈；
+   - `verifyCognitionAndReceipt` 结合 JGit 真实校验工作区未提交文件漂移状态。
+5. **产物全生命周期血缘图谱与非破坏性 JGit 审查回滚**：
+   - 提供 `GET /api/audit/artifacts/lineage/{runId}` 贯穿 `Run -> StepRun -> Artifact -> Commit Hash -> Checksums -> Approvals`；
+   - 提供 `GET /api/audit/artifacts/{artifactId}/diff` 计算结构化行级 Diff；
+   - 提供 `POST /api/audit/artifacts/{artifactId}/revert` 仅还原该产物涉及的文件，保留工作区中用户独立创建的文件，杜绝毁灭性 `git reset --hard`。
+6. **运行运维控制台端点与前端落地**：
+   - 后端统一端点 `GET /api/executions/runs/{runId}/operations`（`RunOperationsView`）；
+   - 前端集成 `RunOperationsPanel.tsx`（Bento Grid 运维面板）与 `StructuredDiffReviewModal.tsx`（代码审查与无损回滚模态框）。
+
+## 8. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
 
 - Flyway 是唯一 Schema 演进方式；生产使用 `ddl-auto=validate`。
 - Micrometer/Prometheus 暴露 Run、Step、Provider、SSE、锁和 Deployment 指标；日志必须结构化并脱敏。
 - 证据包使用脱敏内容、模式标识和确定性 checksum；证据包只能证明对应 Run 的事实，不能替代目标环境验证。
 
 | 数据库表名 | Owner 模块 | JPA Entity / 访问组件 | 来源迁移 | 认证与归属隔离 | 幂等 / 唯一约束 | 状态 | 核心验证测试 | 删除 / 演进计划 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `users` | `identity` | `UserEntity` | `V1`, `V2` | 自身为主体 (`id`) | `PRIMARY KEY(id)`, `UNIQUE(email)` | `ACTIVE` | `RestApiSecurityAndMultiTenancyIntegrationTest` | 长期保留；`V2` 演示种子在 Phase 1 迁入 demo profile |
 | `invalidated_tokens` | `identity` | `InvalidatedTokenEntity` | `V9` | `user_id` 关联当前用户 | `PRIMARY KEY(token_id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；过期记录按 `expires_at` 清理 |
 | `auth_audit_logs` | `identity` | `AuthAuditLogEntity` | `V9` | 记录 `user_id`、`email`、`ip_address` | `PRIMARY KEY(id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；只追加审计表 |
@@ -134,13 +159,13 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 | `workflow_runs` | `execution` | `WorkflowRunEntity` | `V1`, `V4`, `V5`, `V10` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` + `idempotency_key` 防重 + `lease_until` 抢占 | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest` | 长期保留；执行事实唯一权威来源 |
 | `step_runs` | `execution` | `StepRunEntity` | `V1`, `V4`, `V5`, `V10` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)` + `(run_id, node_id)` + `attempt` | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest` | 长期保留；节点级状态机与租约载体 |
 | `run_events` | `execution` | `RunEventEntity` | `V1`, `V10` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)`, `UNIQUE uk_run_events_run_seq(run_id, sequence_num)` | `ACTIVE` | `ExecutionSseStreamAndReconnectionTest` | 长期保留；SSE 断点续传与证据包事件源 |
-| `artifacts` | `audit` | `ArtifactEntity` | `V1`, `V3` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)` + SHA-256 `checksum` | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留；Phase 5 扩展为完整 Artifact Lineage |
+| `artifacts` | `audit` | `ArtifactEntity` | `V1`, `V3` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)` + SHA-256 `checksum` | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest` | 长期保留；Phase 4 落地 Artifact Lineage 与 JGit 结构化 Diff 审查 |
 | `approvals` | `orchestration` | `ApprovalEntity` | `V1`, `V5` | 经 `run_id -> workflow_runs` 校验 | `PRIMARY KEY(id)`；单次决策状态转换 | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留；人工审批门禁权威记录 |
 | `deployments` | `sandbox` | `DeploymentEntity` | `V1`, `V8`, `V11` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` + 受控端口池原子分配 | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest` | 长期保留；绑定已验收 `artifact_id` 与健康探针轨迹 |
 
-## 8. 架构守卫和扩展规则
+## 9. 架构守卫和扩展规则
 
 ArchUnit（`ArchUnitArchitectureTest`）与 Phase 0 基线守卫（`Phase0BaselineAndDebtFreezeGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
 
-详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-008](adr/ADR-008-workflow-templates-kahn-dag-and-orchestrator-plan.md)。
+详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-009](adr/ADR-009-run-operations-and-artifact-lineage.md)。
 

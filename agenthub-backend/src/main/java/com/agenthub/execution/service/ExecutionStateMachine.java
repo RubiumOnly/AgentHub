@@ -86,7 +86,7 @@ public class ExecutionStateMachine {
                 return run;
             }
 
-            if (!currentStatus.canTransitionTo(targetStatus)) {
+            if (!com.agenthub.execution.domain.state.UnifiedExecutionStateGraph.canTransitionRun(currentStatus, targetStatus)) {
                 String errorMsg = String.format("Illegal state transition for run [%s]: Cannot move from [%s] to [%s]. Reason provided: %s",
                         runId, currentStatus, targetStatus, reason);
                 log.error(errorMsg);
@@ -181,7 +181,7 @@ public class ExecutionStateMachine {
                 return step;
             }
 
-            if (!currentStatus.canTransitionTo(targetStatus)) {
+            if (!com.agenthub.execution.domain.state.UnifiedExecutionStateGraph.canTransitionStep(currentStatus, targetStatus)) {
                 String errorMsg = String.format("Illegal state transition for step [%s]: Cannot move from [%s] to [%s]. Reason provided: %s",
                         stepRunId, currentStatus, targetStatus, reason);
                 log.error(errorMsg);

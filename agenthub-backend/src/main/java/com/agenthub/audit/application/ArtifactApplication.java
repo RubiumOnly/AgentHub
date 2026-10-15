@@ -1,6 +1,8 @@
 package com.agenthub.audit.application;
 
+import com.agenthub.audit.dto.ArtifactLineageView;
 import com.agenthub.audit.dto.ArtifactView;
+import com.agenthub.domain.workspace.model.StructuredDiff;
 
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,9 @@ public interface ArtifactApplication {
     ArtifactView recordStepSnapshot(String runId, String stepRunId, String workspaceId,
                                     String commitHash, String tagName, List<String> changedFiles,
                                     Map<String, String> fileChecksums, String author);
+
+    ArtifactLineageView getArtifactLineageByRunId(String runId);
+    StructuredDiff getArtifactDiff(String artifactId);
 
     default void validateRunWorkspaceBinding(String runId, String workspaceId) {}
 }

@@ -18,6 +18,7 @@ import { ApprovalActionCard } from "@/components/dashboard/ApprovalActionCard";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { CreateProjectModal } from "@/components/project/CreateProjectModal";
 import {
+  Activity,
   AlertCircle,
   Cpu,
   FolderTree,
@@ -36,7 +37,8 @@ export type DashboardTabId =
   | "diff"
   | "providers"
   | "sandbox"
-  | "files";
+  | "files"
+  | "operations";
 
 interface ProjectShellProps {
   backendUp: boolean;
@@ -79,6 +81,7 @@ const TAB_ITEMS: Array<{ id: DashboardTabId; label: string; icon: React.Componen
   { id: "dag", label: "DAG 拓扑与执行", icon: Layers },
   { id: "swarm", label: "多智能体协同", icon: Users },
   { id: "diff", label: "JGit 行级代码审查", icon: GitCompare },
+  { id: "operations", label: "运维决策与血缘", icon: Activity },
   { id: "providers", label: "模型路由与成本", icon: Cpu },
   { id: "sandbox", label: "沙箱预览与部署", icon: Server },
   { id: "files", label: "工作区文件树", icon: FolderTree },

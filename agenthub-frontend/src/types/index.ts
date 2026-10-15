@@ -181,24 +181,38 @@ export interface ConversationView {
   createdAt?: string;
 }
 
+export type DiffChangeType = "ADD" | "MODIFY" | "DELETE" | "RENAME" | "COPY";
+export type ArtifactReviewStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "REVERTED";
+
 export interface FileDiffEntry {
   oldPath: string;
   newPath: string;
-  changeType: "ADD" | "MODIFY" | "DELETE" | "RENAME" | "COPY";
-  diffContent: string;
-  linesAdded: number;
-  linesDeleted: number;
+  changeType: DiffChangeType;
+  diffContent?: string;
+  diffText?: string;
+  linesAdded?: number;
+  linesDeleted?: number;
+  addedLines?: number;
+  deletedLines?: number;
+  binary?: boolean;
+  renamed?: boolean;
+  conflict?: boolean;
+  reviewStatus?: ArtifactReviewStatus;
+  checksum?: string;
 }
 
 export interface StructuredDiff {
-  workspaceId: string;
-  baseCommit: string;
-  targetCommit: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  baseCommit?: string;
+  targetCommit?: string;
+  baselineCommitHash?: string;
+  headCommitHash?: string;
   totalFilesChanged: number;
   totalLinesAdded: number;
   totalLinesDeleted: number;
   entries: FileDiffEntry[];
-  clean: boolean;
+  clean?: boolean;
 }
 
 export interface WorkspaceFileNode {
@@ -212,13 +226,22 @@ export interface WorkspaceFileNode {
 export interface ArtifactView {
   id: string;
   runId: string;
-  stepRunId: string;
-  artifactType: string;
-  path: string;
-  checksum: string;
-  status: "CREATED" | "ACCEPTED" | "REJECTED" | "REVERTED";
+  stepRunId?: string;
+  artifactType?: string;
+  type?: string;
+  path?: string;
+  pathOrRef?: string;
+  checksum?: string;
+  fileCount?: number;
+  byteSize?: number;
+  status?: "CREATED" | "ACCEPTED" | "REJECTED" | "REVERTED";
   reviewerId?: string;
   reviewReason?: string;
+  metadataJson?: string;
+  reviewStatus?: ArtifactReviewStatus;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewComment?: string;
   createdAt?: string;
 }
 
@@ -677,4 +700,89 @@ export interface EvaluationReportView {
   toolMisuseRate: number;
   diffAcceptanceRate: number;
   taskResults: EvaluationTaskResult[];
+}
+
+// ============================================================================
+// Phase 4: Run Operations, Artifact Lineage & Structured JGit Diff Types
+// ============================================================================
+
+export interface StepLineageNode {
+  stepRunId: string;
+  stepId: string;
+  status: string;
+  artifactId?: string;
+  commitHash?: string;
+  tagName?: string;
+  changedFiles?: string[];
+  fileChecksums?: Record<string, string>;
+  reviewStatus?: string;
+  approvalId?: string;
+  approvalStatus?: string;
+}
+
+export interface ArtifactLineageView {
+  runId: string;
+  projectId: string;
+  workspaceId?: string;
+  baselineCommitHash?: string;
+  currentCommitHash?: string;
+  stepNodes: StepLineageNode[];
+  artifacts: ArtifactView[];
+  totalArtifacts: number;
+  totalFilesChanged: number;
+  isReverted: boolean;
+}
+
+export interface PendingDecisionItem {
+  decisionType: string;
+  referenceId: string;
+  stepRunId?: string;
+  nodeName: string;
+  description: string;
+  assignedRole: string;
+  requestedAt?: string;
+}
+
+export interface ToolSideEffectView {
+  toolName: string;
+  targetFiles?: string[];
+  command?: string;
+  status?: string;
+  checksums?: Record<string, string>;
+}
+
+export interface HierarchicalMemorySummary {
+  projectId: string;
+  runId: string;
+  totalTiers: number;
+  totalSteps: number;
+  compressedSteps: number;
+  estimatedTokens: number;
+  budgetExceeded: boolean;
+  aociCognitionStatus: string;
+  activeContextSources?: string[];
+}
+
+export interface LeaseStatusView {
+  leaseOwner?: string;
+  leaseUntil?: string;
+  heartbeatAt?: string;
+  isExpired: boolean;
+}
+
+export interface RunOperationsView {
+  workflowRun: WorkflowRunView;
+  stepRuns: StepRunView[];
+  unifiedStatus: string;
+  nextAction: string;
+  requiresHumanIntervention: boolean;
+  pendingDecisions: PendingDecisionItem[];
+  toolSideEffects: ToolSideEffectView[];
+  memorySummary?: HierarchicalMemorySummary;
+  artifactLineage?: ArtifactLineageView;
+  recentEvents?: RunEventView[];
+  leaseStatus?: LeaseStatusView;
+  totalRetries?: number;
+  failureCategory?: string;
+  failureReason?: string;
 }

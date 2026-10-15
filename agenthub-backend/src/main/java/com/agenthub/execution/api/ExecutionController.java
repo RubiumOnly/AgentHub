@@ -78,6 +78,12 @@ public class ExecutionController {
                 .body(Result.ok(run));
     }
 
+    @GetMapping("/runs/{runId}/operations")
+    public Result<com.agenthub.execution.dto.RunOperationsView> getRunOperations(@PathVariable("runId") String runId) {
+        com.agenthub.execution.dto.RunOperationsView view = executionApplication.getRunOperations(runId);
+        return Result.ok(view);
+    }
+
     @GetMapping("/projects/{projectId}/runs")
     public Result<List<WorkflowRunView>> listRunsByProject(@PathVariable("projectId") String projectId) {
         List<WorkflowRunView> runs = executionApplication.listRunsByProjectId(projectId);

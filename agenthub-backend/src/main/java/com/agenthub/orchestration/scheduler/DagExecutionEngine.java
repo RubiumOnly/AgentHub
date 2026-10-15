@@ -436,6 +436,11 @@ public class DagExecutionEngine {
                 completionLatch.countDown();
                 return;
             }
+            try {
+                stateTransitioner.transitionStep(stepEntity.getId(), StepRunStatus.FAILED, "scheduler", e.getMessage());
+            } catch (Exception ex) {
+                log.warn("Failed to transition step [{}] to FAILED: {}", stepEntity.getId(), ex.getMessage());
+            }
             isAborted.set(true);
             nodeStatuses.put(node.getId(), StepRunStatus.FAILED);
             cancelToken.cancel("Node [" + node.getId() + "] error: " + e.getMessage());

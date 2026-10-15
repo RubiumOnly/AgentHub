@@ -9,6 +9,7 @@ import {
   ProviderView,
   RunEventView,
   RunEvidenceBundleView,
+  RunOperationsView,
   StartRunRequest,
   StepRunView,
   TeamView,
@@ -399,6 +400,29 @@ export const runsApi = {
     });
   },
 
+  async pauseRun(runId: string): Promise<WorkflowRunView> {
+    return fetchJson<WorkflowRunView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/pause`, {
+      method: "POST",
+    });
+  },
+
+  async resumeRun(runId: string): Promise<WorkflowRunView> {
+    return fetchJson<WorkflowRunView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/resume`, {
+      method: "POST",
+    });
+  },
+
+  async retryStep(runId: string, stepRunId: string): Promise<StepRunView> {
+    return fetchJson<StepRunView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(stepRunId)}/retry`, {
+      method: "POST",
+    });
+  },
+
+  async getRunOperations(runId: string): Promise<RunOperationsView> {
+    if (!runId) throw new Error("runId is required");
+    return fetchJson<RunOperationsView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/operations`);
+  },
+
   async getRunEvidence(runId: string): Promise<RunEvidenceBundleView> {
     return fetchJson<RunEvidenceBundleView>(`${API_BASE}/api/executions/runs/${encodeURIComponent(runId)}/evidence`);
   },
@@ -439,8 +463,8 @@ export const runsApi = {
           baseCommit: "demo-baseline-000000",
           targetCommit: "demo-snapshot-111111",
           totalFilesChanged: MOCK_DIFFS.length,
-          totalLinesAdded: MOCK_DIFFS.reduce((acc, d) => acc + d.linesAdded, 0),
-          totalLinesDeleted: MOCK_DIFFS.reduce((acc, d) => acc + d.linesDeleted, 0),
+          totalLinesAdded: MOCK_DIFFS.reduce((acc, d) => acc + (d.linesAdded ?? d.addedLines ?? 0), 0),
+          totalLinesDeleted: MOCK_DIFFS.reduce((acc, d) => acc + (d.linesDeleted ?? d.deletedLines ?? 0), 0),
           entries: MOCK_DIFFS,
           clean: false,
         },

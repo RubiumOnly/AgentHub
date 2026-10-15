@@ -2,7 +2,7 @@
 // AgentHub Artifacts & JGit Audit API Module (Bounded Context: audit)
 // ============================================================================
 
-import { ArtifactView } from "@/types";
+import { ArtifactLineageView, ArtifactView, StructuredDiff } from "@/types";
 import { API_BASE, fetchJson } from "./errors";
 
 export const artifactsApi = {
@@ -12,7 +12,17 @@ export const artifactsApi = {
 
   async listArtifactsByRun(runId: string): Promise<ArtifactView[]> {
     if (!runId) return [];
-    return fetchJson<ArtifactView[]>(`${API_BASE}/api/audit/artifacts?runId=${encodeURIComponent(runId)}`);
+    return fetchJson<ArtifactView[]>(`${API_BASE}/api/audit/artifacts/run/${encodeURIComponent(runId)}`);
+  },
+
+  async getArtifactLineage(runId: string): Promise<ArtifactLineageView> {
+    if (!runId) throw new Error("runId is required");
+    return fetchJson<ArtifactLineageView>(`${API_BASE}/api/audit/artifacts/lineage/${encodeURIComponent(runId)}`);
+  },
+
+  async getArtifactDiff(artifactId: string): Promise<StructuredDiff> {
+    if (!artifactId) throw new Error("artifactId is required");
+    return fetchJson<StructuredDiff>(`${API_BASE}/api/audit/artifacts/${encodeURIComponent(artifactId)}/diff`);
   },
 
   async acceptArtifact(artifactId: string, reviewer?: string, comment?: string): Promise<ArtifactView> {
