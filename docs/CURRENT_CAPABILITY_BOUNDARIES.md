@@ -87,11 +87,11 @@
   4. **Provider 熔断与主备故障切换（样本量 `N = 20` 次注入式 HTTP 429/503 故障演练，`ProviderFaultToleranceAndFallbackTest`）**：
      - 主节点触发熔断并完成备节点（Fallback）路由切换耗时（不含备节点首 Token 网络 RTT）：`P50 = 9.2 ms`，`P95 = 24.5 ms`。
   5. **Phase 8 多线程并发吞吐与 P95/P99 延迟（样本量 `N = 12` 并发工作流状态推进，`Phase8PerformanceBenchmarkAndE2ETest`）**：
-     - 吞吐与延迟分布：实测 P50 耗时约 45ms，P95 耗时受控（断言门禁 < 5000ms），12/12 并发任务确定性成功，0 竞态失败。
+     - 吞吐与延迟分布：实测 P50 耗时约 45ms，P95 耗时受控（断言门禁 < 1000ms），12/12 并发任务确定性成功，0 竞态失败。
   6. **Phase 8 SSE 事件广播物理延迟与断线增量单调回放（样本量 `N = 20` 事件广播，`Phase8PerformanceBenchmarkAndE2ETest`）**：
-     - 广播物理往返延迟：实测平均延迟 < 20ms（断言门禁 < 100ms）；
+     - 广播物理往返延迟：实测平均延迟 < 20ms（断言门禁 < 60ms）；
      - 基于 `Last-Event-ID` 增量回放准确率：单调递增保序回放，0 事件丢失。
-  7. **Phase 8 高负载内存有界性与无界泄露防御（循环创建 20 组分层上下文记忆与 100+ 事件对象，`Phase8PerformanceBenchmarkAndE2ETest`）**：
+  7. **Phase 8 高负载内存有界性与无界泄露防御（循环创建 40 组分层上下文记忆与 100+ 事件对象，`Phase8PerformanceBenchmarkAndE2ETest`）**：
      - 负载后有效堆内存增量：实测增量 < 30MB（防御性门禁 < 100MB），无静态集合堆积与内存泄漏。
 
 ---

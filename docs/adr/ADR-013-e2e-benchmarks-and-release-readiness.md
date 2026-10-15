@@ -42,12 +42,12 @@
 通过自动化压测套件确立如下基准并设置防御性门禁：
 1. **多线程并发吞吐与延迟基准**：
    - 在 12 线程并发工作流状态推进压测下，验证并发安全性与确定性；
-   - 确立 P50、P95 与 P99 耗时指标统计，断言 P95 延迟受控（< 5000ms），保障高并发下状态转换与事件落库平稳。
+   - 确立 P50、P95 与 P99 耗时指标统计，断言 P95 延迟受控（< 1000ms），保障高并发下状态转换与事件落库平稳。
 2. **SSE 事件流广播延迟与单调回放基准**：
-   - 验证事件从触发到 SSE 订阅者接收的广播物理延迟受控（< 100ms）；
+   - 验证事件从触发到 SSE 订阅者接收的广播物理延迟受控（< 60ms）；
    - 验证基于 `Last-Event-ID` 的单调递增增量事件回放，确保网络重连时事件无丢失且严格保序。
 3. **高负载内存占用稳定性与有界性**：
-   - 在循环创建大量上下文记忆与事件对象的负载下执行垃圾回收与堆内存对比；
+   - 在循环创建 40 组分层上下文记忆与事件对象的负载下执行垃圾回收与堆内存对比；
    - 断言有效堆内存增量在受控边界内（< 100MB），验证长周期执行不存在静态对象泄露或无界集合堆积。
 
 ### 2.3 Webhook 事件通知契约与安全签名规约
@@ -66,7 +66,7 @@
 1. **统一发行元数据清单（`AgentHubReleaseManifest`）**：
    - 版本号固化为 `1.0.0-RELEASE`，API 契约基线 `v1`；
    - 明确支持的三种运行模式：`DEMO_SIMULATED`、`LIVE_SELF_HOSTED`、`LIVE_TEAM`；
-   - 规范 8 个稳定限界上下文与 5 个稳定资源对象（Project, Run, Artifact, Approval, Deployment）；
+   - 规范 8 个稳定限界上下文与 11 个稳定核心资源对象（`Project`, `Workspace`, `WorkflowDefinition`, `WorkflowRun`, `StepRun`, `Artifact`, `QualityGateReport`, `Approval`, `Deployment`, `TokenUsage`, `AuditLog`）；
    - 提供 v2 到 v1 的字段迁移指引与平台兼容性矩阵。
 2. **最小 SDK 客户端接口契约（`com.agenthub.shared.contract.sdk`）**：
    - `AgentHubProjectClient`：项目与工作区只读/管理契约；
@@ -87,7 +87,7 @@
 
 严格实施部署准入防御逻辑：
 - 当制品评估状态为 `GATE_FAILED`，或审批决策为 `REJECTED` 时；
-- `DeploymentApplication.createDeployment` 抛出 `BusinessException(ErrorCode.QUALITY_GATE_FAILED)`，拒绝分配物理端口与启动进程。
+- `DeploymentApplication.createDeployment` 抛出 `BusinessException(ErrorCode.PARAM_ERROR)`，拒绝分配物理端口与启动进程。
 
 ---
 

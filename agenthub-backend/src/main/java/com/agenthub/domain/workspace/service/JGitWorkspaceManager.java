@@ -935,11 +935,6 @@ public class JGitWorkspaceManager {
 
     private void closeRepositoryQuietly(Git git, File workspaceDir) {
         try {
-            if (git != null) {
-                git.close();
-            }
-        } catch (Exception ignored) {}
-        try {
             org.eclipse.jgit.lib.RepositoryCache.clear();
         } catch (Exception ignored) {}
         try {

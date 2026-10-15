@@ -637,13 +637,14 @@ public class Phase8PerformanceBenchmarkAndE2ETest {
     }
 
     @Test
-    @DisplayName("测试 5：Webhook 标准合同与 HMAC-SHA256 防篡改/防重放签名验证")
-    void test5_webhookContractAndHmacSha256Verification() {
+    @DisplayName("测试 5：Webhook 标准合同与 HMAC-SHA256 防篡改/防重放签名验证（含边界与容错）")
+    void test5_webhookContractAndHmacSha256Verification() throws Exception {
         String secret = "ProdHardenedWebhookSecretKey_2026_SecureKey!";
         Map<String, Object> data = Map.of(
                 "runId", "run-wh-100",
                 "status", "SUCCEEDED",
-                "durationMs", 1420
+                "durationMs", 1420,
+                "message", "你好世界🚀 Unicode UTF-8 test"
         );
 
         WebhookPayload payload = WebhookPayload.create(
@@ -655,35 +656,76 @@ public class Phase8PerformanceBenchmarkAndE2ETest {
         assertThat(payload.getEventId()).isNotBlank();
         assertThat(payload.getEventType()).isEqualTo("run.completed");
         assertThat(payload.getResourceType()).isEqualTo("RUN");
+        assertThat(payload.getData()).containsKey("message");
 
-        String payloadJson = "{\"eventId\":\"" + payload.getEventId() + "\",\"eventType\":\"run.completed\",\"resourceId\":\"run-wh-100\"}";
+        // Verify JSON serialization roundtrip
+        String jsonFromObj = objectMapper.writeValueAsString(payload);
+        WebhookPayload deserializedPayload = objectMapper.readValue(jsonFromObj, WebhookPayload.class);
+        assertThat(deserializedPayload.getEventId()).isEqualTo(payload.getEventId());
+        assertThat(deserializedPayload.getEventType()).isEqualTo("run.completed");
+        assertThat(deserializedPayload.getData().get("message")).isEqualTo("你好世界🚀 Unicode UTF-8 test");
+
+        String payloadJson = "{\"eventId\":\"" + payload.getEventId() + "\",\"eventType\":\"run.completed\",\"resourceId\":\"run-wh-100\",\"unicode\":\"你好世界🚀\"}";
 
         // 1. Generate signature header
-        String signatureHeader = WebhookSignatureVerifier.generateSignatureHeader(payloadJson, secret);
+        long nowTs = System.currentTimeMillis() / 1000;
+        String signatureHeader = WebhookSignatureVerifier.generateSignatureHeader(payloadJson, secret, nowTs);
         assertThat(signatureHeader).startsWith("t=").contains(",v1=");
 
         // 2. Valid signature verification
         boolean valid = WebhookSignatureVerifier.verifySignature(signatureHeader, payloadJson, secret, 300L);
         assertThat(valid).isTrue();
 
-        // 3. Anti-tampering check: modified payload fails
+        // 3. Header spacing resilience: standard HTTP header spacing around commas and '=' delimiters
+        String rawHmac = signatureHeader.substring(signatureHeader.indexOf(",v1=") + 4);
+        String spacedHeader = "t = " + nowTs + " , v1 = " + rawHmac;
+        assertThat(WebhookSignatureVerifier.verifySignature(spacedHeader, payloadJson, secret, 300L)).isTrue();
+
+        // 4. Case-insensitivity defense: uppercase hex signature must verify correctly
+        String upperCaseHeader = "t=" + nowTs + ",v1=" + rawHmac.toUpperCase(Locale.ROOT);
+        assertThat(WebhookSignatureVerifier.verifySignature(upperCaseHeader, payloadJson, secret, 300L)).isTrue();
+
+        // 5. Anti-tampering check: modified payload fails
         String tamperedJson = payloadJson.replace("run-wh-100", "run-wh-attacker");
         boolean tamperedValid = WebhookSignatureVerifier.verifySignature(signatureHeader, tamperedJson, secret, 300L);
         assertThat(tamperedValid).isFalse();
 
-        // 4. Anti-replay check: expired timestamp fails
-        long expiredTimestamp = (System.currentTimeMillis() / 1000) - 500L; // 500 seconds ago > 300s tolerance
-        String expiredHeader = WebhookSignatureVerifier.generateSignatureHeader(payloadJson, secret, expiredTimestamp);
-        boolean expiredValid = WebhookSignatureVerifier.verifySignature(expiredHeader, payloadJson, secret, 300L);
-        assertThat(expiredValid).isFalse();
+        // 6. Anti-replay check: expired timestamp in the past (> 300s tolerance)
+        long pastExpiredTs = nowTs - 500L;
+        String pastExpiredHeader = WebhookSignatureVerifier.generateSignatureHeader(payloadJson, secret, pastExpiredTs);
+        assertThat(WebhookSignatureVerifier.verifySignature(pastExpiredHeader, payloadJson, secret, 300L)).isFalse();
 
-        // 5. Wrong secret check fails
+        // 7. Anti-replay check: clock skew in the future beyond tolerance window (> 300s)
+        long futureExpiredTs = nowTs + 500L;
+        String futureExpiredHeader = WebhookSignatureVerifier.generateSignatureHeader(payloadJson, secret, futureExpiredTs);
+        assertThat(WebhookSignatureVerifier.verifySignature(futureExpiredHeader, payloadJson, secret, 300L)).isFalse();
+
+        // 8. Acceptable clock skew in future within tolerance window (<= 300s)
+        long futureValidTs = nowTs + 60L;
+        String futureValidHeader = WebhookSignatureVerifier.generateSignatureHeader(payloadJson, secret, futureValidTs);
+        assertThat(WebhookSignatureVerifier.verifySignature(futureValidHeader, payloadJson, secret, 300L)).isTrue();
+
+        // 9. Wrong secret check fails
         boolean wrongSecretValid = WebhookSignatureVerifier.verifySignature(signatureHeader, payloadJson, "wrong-secret", 300L);
         assertThat(wrongSecretValid).isFalse();
 
-        // 6. Malformed header check fails
+        // 10. Malformed header checks
         assertThat(WebhookSignatureVerifier.verifySignature("invalid-format", payloadJson, secret, 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature("t=" + nowTs, payloadJson, secret, 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature("v1=" + rawHmac, payloadJson, secret, 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature("t=not-a-number,v1=" + rawHmac, payloadJson, secret, 300L)).isFalse();
         assertThat(WebhookSignatureVerifier.verifySignature(null, payloadJson, secret, 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature("", payloadJson, secret, 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature(signatureHeader, null, secret, 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature(signatureHeader, payloadJson, null, 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature(signatureHeader, payloadJson, "   ", 300L)).isFalse();
+        assertThat(WebhookSignatureVerifier.verifySignature(signatureHeader, payloadJson, secret, -1L)).isFalse();
+
+        // 11. Parameter validation for computeHmacSha256
+        assertThatThrownBy(() -> WebhookSignatureVerifier.computeHmacSha256(null, secret))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> WebhookSignatureVerifier.computeHmacSha256(payloadJson, null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -694,6 +736,11 @@ public class Phase8PerformanceBenchmarkAndE2ETest {
         assertThat(manifest.apiVersion()).isEqualTo("v1");
         assertThat(manifest.supportedExecutionModes()).containsExactly("DEMO_SIMULATED", "LIVE_SELF_HOSTED", "LIVE_TEAM");
         assertThat(manifest.stableContexts()).hasSize(8);
+        assertThat(manifest.stableResources()).contains(
+                "Project", "Workspace", "WorkflowDefinition", "WorkflowRun",
+                "StepRun", "Artifact", "QualityGateReport", "Approval",
+                "Deployment", "TokenUsage", "AuditLog"
+        );
         assertThat(manifest.sdkClientContracts()).contains(
                 "AgentHubProjectClient",
                 "AgentHubRunClient",
@@ -708,6 +755,13 @@ public class Phase8PerformanceBenchmarkAndE2ETest {
                 "WorkflowTemplateExtensionContract",
                 "DeploymentTemplateExtensionContract"
         );
+
+        // Verify JSON roundtrip of ReleaseManifest
+        String manifestJson = objectMapper.writeValueAsString(manifest);
+        AgentHubReleaseManifest roundtripped = objectMapper.readValue(manifestJson, AgentHubReleaseManifest.class);
+        assertThat(roundtripped.releaseVersion()).isEqualTo("1.0.0-RELEASE");
+        assertThat(roundtripped.apiVersion()).isEqualTo("v1");
+        assertThat(roundtripped.stableResources()).hasSameElementsAs(manifest.stableResources());
 
         // Verify via /api/system/contracts/v1 REST endpoint
         MvcResult result = mockMvc.perform(get("/api/system/contracts/v1")

@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.Locale;
 
 /**
  * Standard HMAC-SHA256 signature generator and verifier for AgentHub webhooks.
@@ -55,7 +56,8 @@ public final class WebhookSignatureVerifier {
                                            String payloadJson,
                                            String secret,
                                            long maxToleranceSeconds) {
-        if (signatureHeader == null || payloadJson == null || secret == null || signatureHeader.isBlank()) {
+        if (signatureHeader == null || payloadJson == null || secret == null
+                || signatureHeader.isBlank() || secret.isBlank() || maxToleranceSeconds < 0) {
             return false;
         }
 
@@ -64,16 +66,18 @@ public final class WebhookSignatureVerifier {
 
         String[] parts = signatureHeader.split(",");
         for (String part : parts) {
-            String[] kv = part.trim().split("=", 2);
+            String[] kv = part.split("=", 2);
             if (kv.length == 2) {
-                if ("t".equalsIgnoreCase(kv[0])) {
+                String key = kv[0].trim();
+                String val = kv[1].trim();
+                if ("t".equalsIgnoreCase(key)) {
                     try {
-                        timestamp = Long.parseLong(kv[1]);
+                        timestamp = Long.parseLong(val);
                     } catch (NumberFormatException e) {
                         return false;
                     }
-                } else if ("v1".equalsIgnoreCase(kv[0])) {
-                    providedSignature = kv[1].trim();
+                } else if ("v1".equalsIgnoreCase(key)) {
+                    providedSignature = val;
                 }
             }
         }
@@ -82,7 +86,7 @@ public final class WebhookSignatureVerifier {
             return false;
         }
 
-        // Anti-replay check: ensure timestamp is within tolerance window
+        // Anti-replay check: ensure timestamp is within tolerance window (past or future skew)
         long nowSeconds = Instant.now().getEpochSecond();
         if (Math.abs(nowSeconds - timestamp) > maxToleranceSeconds) {
             return false;
@@ -91,17 +95,19 @@ public final class WebhookSignatureVerifier {
         String signedPayload = timestamp + "." + payloadJson;
         String expectedSignature = computeHmacSha256(signedPayload, secret);
 
-        // Constant-time comparison to protect against timing attacks
-        return MessageDigest.isEqual(
-                expectedSignature.getBytes(StandardCharsets.UTF_8),
-                providedSignature.getBytes(StandardCharsets.UTF_8)
-        );
+        // Constant-time comparison normalized to lowercase ASCII to protect against timing attacks & case sensitivity
+        byte[] expectedBytes = expectedSignature.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
+        byte[] providedBytes = providedSignature.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(expectedBytes, providedBytes);
     }
 
     /**
      * Compute raw HMAC-SHA256 hex string.
      */
     public static String computeHmacSha256(String data, String secret) {
+        if (data == null || secret == null) {
+            throw new IllegalArgumentException("data and secret must not be null");
+        }
         try {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);

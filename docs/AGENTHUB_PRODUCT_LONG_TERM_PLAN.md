@@ -535,5 +535,19 @@ AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；
 未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实跨机网络环境下的千级并发 SSE 广播长连接保活
 已知风险与回滚方式：若后续需要回退 Phase 8 功能，可通过 git revert 对应 Phase 8 提交恢复；底层表结构零变更，回滚零数据丢失风险
 普通提交 Subject：feat(phase-8): productize e2e verification, benchmarks, webhook contracts, and release readiness
-加固提交 Subject（如有）：
+加固提交 Subject（如有）：fix(phase-8): harden webhook signature verification, eliminate jgit double-close, calibrate benchmark latency gates, and sync release milestone matrix
 ```
+
+### 9.13 长期路线各阶段里程碑执行状态盘点
+
+| 阶段 | 核心交付范围 | 提交 Subject / Commit | 自动化测试门禁 | 验收状态 |
+| --- | --- | --- | --- | --- |
+| **Phase 0** | 产品边界基线、收敛清单、前端 localhost 清理与新债务冻结守卫 | `feat(phase-0)` (`91d9f8e`) | 53 test classes / 310 tests | 验收通过 |
+| **Phase 1** | 八大上下文收敛、深模块解耦、API v1 OpenAPI 契约与所有权校验 | `feat(phase-1)` (`4765d7e`), `fix(phase-1)` (`3c74996`) | 54 test classes / 317 tests | 验收通过 |
+| **Phase 2** | 受控项目接入 7 步向导、受控工作区配额守卫与版本化上下文源 | `feat(phase-2)` (`6ee7510`), `fix(phase-2)` (`0b01625`) | 55 test classes / 325 tests | 验收通过 |
+| **Phase 3** | 版本化 AgentDefinition、DAG 校验、Orchestrator 计划生成与工具门禁 | `feat(phase-3)` (`f9cbde5`), `fix(phase-3)` (`4310d6e`) | 56 test classes / 332 tests | 验收通过 |
+| **Phase 4** | 统一状态图、Transactional Outbox、三层分层记忆与代码 Diff 审查 | `feat(phase-4)` (`d4c1cfc`) | 57 test classes / 339 tests | 验收通过 |
+| **Phase 5** | 质量门禁引擎（5 维度）、单文件精准回滚、步骤重做与 PR 草稿交付 | `feat(phase-5)` (`fe2be18`), `fix(phase-5)` (`a087114`) | 58 test classes / 352 tests | 验收通过 |
+| **Phase 6** | 6 级 RBAC 矩阵、不可篡改审计流水、灾备快照还原与 SLO 评测控制台 | `feat(phase-6)` (`835a64b`), `fix(phase-6)` (`ec6060c`) | 59 test classes / 361 tests | 验收通过 |
+| **Phase 7** | 真实 Provider 客户端接入、模式强隔离、硬预算看门狗与成本大盘 | `feat(phase-7)` (`b278800`), `fix(phase-7)` (`e78d745`) | 60 test classes / 377 tests | 验收通过 |
+| **Phase 8** | 10 阶段端到端全流程验证、并发/SSE/内存基准压测、Webhook 签名与 Release Manifest | `feat(phase-8)` (`c158977`), `fix(phase-8)` (本轮加固) | 61 test classes / 384 tests | 验收通过 |
