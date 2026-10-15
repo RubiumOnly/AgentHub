@@ -132,7 +132,7 @@ public class Phase5QualityGateAndDeliveryTest {
         userRepository.save(user);
         RequestContext.get().setUserId(testUserId);
 
-        CreateProjectCommand cmd = new CreateProjectCommand("Proj P5 " + testUserId, "Phase 5 Delivery Test", "REPO");
+        CreateProjectCommand cmd = new CreateProjectCommand("Proj P5 " + testUserId, "Phase 5 Delivery Test", null);
         ProjectView proj = projectApplication.createProject(cmd);
         testProjectId = proj.getId();
 

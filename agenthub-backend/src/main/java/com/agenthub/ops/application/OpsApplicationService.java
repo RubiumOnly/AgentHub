@@ -267,6 +267,10 @@ public class OpsApplicationService implements OpsApplication {
 
     @Override
     public PageResultView<AuthAuditLogView> queryAuditLogs(String eventType, String userId, PageRequestQuery query) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (!RequestContext.get().isSystem() && (currentUserId == null || currentUserId.isBlank())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required to query audit logs");
+        }
         if (authAuditService == null) {
             PageRequestQuery pageQuery = query != null ? query : PageRequestQuery.ofDefaults();
             return pageQuery.slice(List.of());
@@ -278,6 +282,10 @@ public class OpsApplicationService implements OpsApplication {
 
     @Override
     public DisasterRecoveryBackupService.BackupManifest triggerBackup(BackupTriggerCommand cmd) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (!RequestContext.get().isSystem() && (currentUserId == null || currentUserId.isBlank())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required for disaster recovery backup creation");
+        }
         if (disasterRecoveryBackupService == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery backup service not available");
         }
@@ -292,7 +300,7 @@ public class OpsApplicationService implements OpsApplication {
                     disasterRecoveryBackupService.createBackup(workspaceRoot, backupOutputDir, passphrase);
 
             if (authAuditService != null) {
-                authAuditService.record("BACKUP_SNAPSHOT_TRIGGERED", RequestContext.get().getUserId(), null, null,
+                authAuditService.record("BACKUP_SNAPSHOT_TRIGGERED", currentUserId, null, null,
                         "Backup snapshot created [" + manifest.backupId + "] at [" + backupOutputDir + "] in " + manifest.backupDurationMs + "ms");
             }
             if (metricsCollector != null) {
@@ -309,6 +317,10 @@ public class OpsApplicationService implements OpsApplication {
 
     @Override
     public DisasterRecoveryBackupService.BackupManifest verifyBackup(BackupVerifyCommand cmd) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (!RequestContext.get().isSystem() && (currentUserId == null || currentUserId.isBlank())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required for backup verification");
+        }
         if (disasterRecoveryBackupService == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery backup service not available");
         }
@@ -333,6 +345,10 @@ public class OpsApplicationService implements OpsApplication {
 
     @Override
     public DisasterRecoveryBackupService.RestoreVerificationReport restoreBackup(BackupRestoreCommand cmd) {
+        String currentUserId = RequestContext.get().getUserId();
+        if (!RequestContext.get().isSystem() && (currentUserId == null || currentUserId.isBlank())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required for disaster recovery restoration");
+        }
         if (disasterRecoveryBackupService == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Disaster recovery backup service not available");
         }

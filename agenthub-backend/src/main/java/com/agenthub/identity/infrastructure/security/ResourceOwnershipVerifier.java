@@ -258,16 +258,17 @@ public class ResourceOwnershipVerifier {
         return verifyRunAccess(runId, userId, ProjectPermission.WORKFLOW_EXECUTE);
     }
 
-    public void verifyApprovalAccess(String runId) {
-        verifyApprovalAccess(runId, RequestContext.get().getUserId());
+    public WorkflowRunEntity verifyApprovalAccess(String runId) {
+        return verifyApprovalAccess(runId, RequestContext.get().getUserId());
     }
 
-    public void verifyApprovalAccess(String runId, String userId) {
+    public WorkflowRunEntity verifyApprovalAccess(String runId, String userId) {
         WorkflowRunEntity run = workflowRunRepository.findById(runId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RUN_NOT_FOUND, "Workflow run not found: " + runId));
         if (run.getProjectId() != null && !run.getProjectId().isBlank()) {
             verifyProjectAccess(run.getProjectId(), userId, ProjectPermission.APPROVAL_DECIDE);
         }
+        return run;
     }
 
     public ArtifactEntity verifyArtifactAccess(String artifactId) {

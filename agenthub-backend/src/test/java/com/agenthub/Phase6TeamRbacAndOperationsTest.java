@@ -33,6 +33,9 @@ import com.agenthub.team.infrastructure.entity.TeamEntity;
 import com.agenthub.team.infrastructure.entity.TeamMemberEntity;
 import com.agenthub.team.infrastructure.repository.TeamMemberRepository;
 import com.agenthub.team.infrastructure.repository.TeamRepository;
+import com.agenthub.orchestration.dto.ApprovalDecisionCommand;
+import com.agenthub.orchestration.infrastructure.entity.ApprovalEntity;
+import com.agenthub.sandbox.api.dto.CreateDeploymentRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -104,6 +107,27 @@ public class Phase6TeamRbacAndOperationsTest {
     @Autowired
     private com.agenthub.sandbox.infrastructure.repository.DeploymentRepository deploymentRepository;
 
+    @Autowired
+    private com.agenthub.project.application.WorkspaceApplication workspaceApplication;
+
+    @Autowired
+    private com.agenthub.orchestration.application.ApprovalApplication approvalApplication;
+
+    @Autowired
+    private com.agenthub.sandbox.application.DeploymentApplication deploymentApplication;
+
+    @Autowired
+    private com.agenthub.domain.workspace.service.WorkspaceResolver workspaceResolver;
+
+    @Autowired
+    private com.agenthub.orchestration.infrastructure.repository.ApprovalRepository approvalRepository;
+
+    @Autowired
+    private com.agenthub.execution.infrastructure.repository.RunEventRepository runEventRepository;
+
+    @Autowired
+    private com.agenthub.execution.infrastructure.repository.StepRunRepository stepRunRepository;
+
     private String ownerUserId;
     private String devUserId;
     private String viewerUserId;
@@ -116,6 +140,7 @@ public class Phase6TeamRbacAndOperationsTest {
     private final List<String> createdUserIds = new ArrayList<>();
     private final List<String> createdRunIds = new ArrayList<>();
     private final List<String> createdDeploymentIds = new ArrayList<>();
+    private final List<String> createdApprovalIds = new ArrayList<>();
     private final List<Path> createdTempDirs = new ArrayList<>();
 
     @BeforeEach
@@ -132,7 +157,7 @@ public class Phase6TeamRbacAndOperationsTest {
 
         RequestContext.get().setUserId(ownerUserId);
 
-        CreateProjectCommand cmd = new CreateProjectCommand("Phase 6 Proj " + ownerUserId, "Team RBAC and Ops Test", "REPO");
+        CreateProjectCommand cmd = new CreateProjectCommand("Phase 6 Proj " + ownerUserId, "Team RBAC and Ops Test", null);
         ProjectView proj = projectApplication.createProject(cmd);
         testProjectId = proj.getId();
 
@@ -170,8 +195,20 @@ public class Phase6TeamRbacAndOperationsTest {
             } catch (Exception ignored) {}
         }
 
+        for (String apprId : createdApprovalIds) {
+            try {
+                approvalRepository.deleteById(apprId);
+            } catch (Exception ignored) {}
+        }
+
         for (String runId : createdRunIds) {
             try {
+                if (stepRunRepository != null) {
+                    stepRunRepository.deleteAll(stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId));
+                }
+                if (runEventRepository != null) {
+                    runEventRepository.deleteAll(runEventRepository.findByRunIdOrderBySequenceNumAsc(runId));
+                }
                 workflowRunRepository.deleteById(runId);
             } catch (Exception ignored) {}
         }
@@ -201,6 +238,15 @@ public class Phase6TeamRbacAndOperationsTest {
             try {
                 if (Files.exists(tempDir)) {
                     FileSystemUtils.deleteRecursively(tempDir);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        if (testWorkspaceId != null && workspaceResolver != null) {
+            try {
+                Path wsPath = workspaceResolver.getWorkspaceRoot(testWorkspaceId);
+                if (Files.exists(wsPath)) {
+                    FileSystemUtils.deleteRecursively(wsPath);
                 }
             } catch (Exception ignored) {}
         }
@@ -396,5 +442,108 @@ public class Phase6TeamRbacAndOperationsTest {
         assertThat(summary.getJvmMemoryTotalMb()).isGreaterThan(0L);
         assertThat(summary.getRbacEvaluations()).isNotNull();
         assertThat(summary.getWorkspaceDiskAvailableRatio()).isGreaterThan(0.0);
+    }
+
+    @Test
+    @DisplayName("测试 7：项目 Owner 不可变性防御（禁止新增、修改角色或删除 Owner）")
+    void testProjectOwnerImmutabilityProtection() {
+        RequestContext.get().setUserId(ownerUserId);
+
+        // 1. 禁止将已有 Owner 作为成员重复添加或降级
+        AddProjectMemberCommand addOwnerCmd = new AddProjectMemberCommand(ownerUserId, ProjectRbacRole.DEVELOPER, "Attempt demote");
+        assertThatThrownBy(() -> teamApplication.addProjectMember(testProjectId, addOwnerCmd))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.PARAM_ERROR);
+
+        // 2. 禁止通过 updateMemberRole 修改 Owner 角色
+        UpdateMemberRoleCommand updateCmd = new UpdateMemberRoleCommand(ProjectRbacRole.VIEWER);
+        assertThatThrownBy(() -> teamApplication.updateMemberRole(testProjectId, "owner-" + ownerUserId, updateCmd))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.PARAM_ERROR);
+
+        // 3. 禁止通过 removeProjectMember 移除 Owner
+        assertThatThrownBy(() -> teamApplication.removeProjectMember(testProjectId, "owner-" + ownerUserId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.PARAM_ERROR);
+    }
+
+    @Test
+    @DisplayName("测试 8：Application 层真实业务方法 RBAC 越权拦截（Workspace/Approval/Deployment）")
+    void testApplicationServicesRbacEnforcement() throws Exception {
+        RequestContext.get().setUserId(ownerUserId);
+
+        // 添加 DEVELOPER 和 VIEWER
+        teamApplication.addProjectMember(testProjectId, new AddProjectMemberCommand(devUserId, ProjectRbacRole.DEVELOPER, "Dev"));
+        teamApplication.addProjectMember(testProjectId, new AddProjectMemberCommand(viewerUserId, ProjectRbacRole.VIEWER, "Viewer"));
+
+        // 创建一个 PENDING 审批用于测试
+        String approvalId = "appr-p6-" + UUID.randomUUID().toString().substring(0, 8);
+        ApprovalEntity approval = new ApprovalEntity(approvalId, testRunId, "step-1", "PENDING", ownerUserId);
+        approvalRepository.save(approval);
+        createdApprovalIds.add(approvalId);
+
+        // 1. VIEWER 尝试写文件 -> 必须被阻断 (FORBIDDEN)
+        RequestContext.get().setUserId(viewerUserId);
+        assertThatThrownBy(() -> workspaceApplication.saveFile(testWorkspaceId, "unauthorized.txt", "content"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.FORBIDDEN);
+
+        // 2. DEVELOPER 尝试决策审批 (需要 APPROVAL_DECIDE，DEVELOPER 没有) -> 必须被阻断 (FORBIDDEN)
+        RequestContext.get().setUserId(devUserId);
+        ApprovalDecisionCommand decideCmd = new ApprovalDecisionCommand("APPROVED", "Dev trying to approve");
+        assertThatThrownBy(() -> approvalApplication.decide(approvalId, decideCmd))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.FORBIDDEN);
+
+        // 3. DEVELOPER 尝试部署沙箱 (需要 DEPLOYMENT_MANAGE，DEVELOPER 没有) -> 必须被阻断 (FORBIDDEN)
+        CreateDeploymentRequest deployCmd = new CreateDeploymentRequest(testProjectId, "LOCAL_PROCESS", "LOCAL_PROCESS");
+        assertThatThrownBy(() -> deploymentApplication.createAndDeploy(deployCmd))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.FORBIDDEN);
+
+        // 4. OWNER 具备完整写权限与审批权限
+        RequestContext.get().setUserId(ownerUserId);
+        workspaceApplication.saveFile(testWorkspaceId, "owner_test.txt", "owner content");
+        assertThat(approvalApplication.decide(approvalId, decideCmd)).isNotNull();
+    }
+
+    @Test
+    @DisplayName("测试 9：Ops 运维和灾备接口必须要求认证（未认证直接拒绝）")
+    void testOpsApplicationUnauthenticatedAccessDenied() {
+        // 清理 RequestContext 模拟未认证请求
+        RequestContext.clear();
+
+        // 1. 未认证查询审计日志 -> UNAUTHORIZED
+        assertThatThrownBy(() -> opsApplication.queryAuditLogs(null, null, PageRequestQuery.of(1, 10)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
+
+        // 2. 未认证触发备份 -> UNAUTHORIZED
+        BackupTriggerCommand triggerCmd = new BackupTriggerCommand("./data/backup", "pass");
+        assertThatThrownBy(() -> opsApplication.triggerBackup(triggerCmd))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
+
+        // 3. 未认证验证备份 -> UNAUTHORIZED
+        BackupVerifyCommand verifyCmd = new BackupVerifyCommand("./data/backup", "pass");
+        assertThatThrownBy(() -> opsApplication.verifyBackup(verifyCmd))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
+
+        // 4. 未认证还原备份 -> UNAUTHORIZED
+        BackupRestoreCommand restoreCmd = new BackupRestoreCommand("./data/backup", "./data/restore", "pass");
+        assertThatThrownBy(() -> opsApplication.restoreBackup(restoreCmd))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 }

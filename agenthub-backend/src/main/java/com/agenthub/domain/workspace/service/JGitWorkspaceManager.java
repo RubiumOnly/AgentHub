@@ -78,7 +78,8 @@ public class JGitWorkspaceManager {
             workspaceDir.mkdirs();
         }
         File gitDir = new File(workspaceDir, ".git");
-        if (!gitDir.exists()) {
+        File headFile = new File(gitDir, "HEAD");
+        if (!gitDir.exists() || !headFile.exists()) {
             try (Git git = Git.init().setDirectory(workspaceDir).call()) {
                 try {
                     File readme = new File(workspaceDir, "README.md");

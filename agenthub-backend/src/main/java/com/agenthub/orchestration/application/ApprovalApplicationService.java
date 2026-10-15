@@ -93,7 +93,7 @@ public class ApprovalApplicationService implements ApprovalApplication {
         ApprovalEntity entity = approvalRepository.findById(approvalId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.APPROVAL_NOT_FOUND, "Approval not found: " + approvalId));
 
-        checkRunAccess(entity.getRunId());
+        checkApprovalAccess(entity.getRunId());
 
         if (!"PENDING".equalsIgnoreCase(entity.getStatus())) {
             throw new BusinessException(ErrorCode.APPROVAL_ALREADY_DECIDED, "Approval has already been decided: " + entity.getStatus());
@@ -144,6 +144,14 @@ public class ApprovalApplicationService implements ApprovalApplication {
     @Transactional
     public ApprovalView reject(String approvalId, String reason) {
         return decide(approvalId, new ApprovalDecisionCommand("REJECTED", reason != null ? reason : "Rejected by user"));
+    }
+
+    private void checkApprovalAccess(String runId) {
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyApprovalAccess(runId);
+            return;
+        }
+        checkRunAccess(runId);
     }
 
     private void checkRunAccess(String runId) {

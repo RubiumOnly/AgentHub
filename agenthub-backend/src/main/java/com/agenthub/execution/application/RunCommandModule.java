@@ -127,7 +127,7 @@ public class RunCommandModule {
         }
 
         if (ownershipVerifier != null) {
-            ownershipVerifier.verifyProjectAccess(cmd.getProjectId());
+            ownershipVerifier.verifyProjectAccess(cmd.getProjectId(), RequestContext.get().getUserId(), com.agenthub.team.domain.rbac.ProjectPermission.WORKFLOW_EXECUTE);
         } else {
             ProjectEntity project = projectRepository.findById(cmd.getProjectId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + cmd.getProjectId()));
@@ -235,7 +235,7 @@ public class RunCommandModule {
 
     @Transactional
     public WorkflowRunView cancelRun(String runId, String reason) {
-        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunExecuteAccess(runId) : verifyRunAccessFallback(runId);
 
         String cancelReason = reason != null && !reason.isBlank() ? reason : "User cancelled execution";
 
@@ -257,7 +257,7 @@ public class RunCommandModule {
 
     @Transactional
     public WorkflowRunView pauseRun(String runId) {
-        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunExecuteAccess(runId) : verifyRunAccessFallback(runId);
 
         WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.PAUSED, "Paused by user");
         broadcaster.publishEvent(runId, "RUN_PAUSED", "{\"reason\":\"Paused by user\"}");
@@ -266,7 +266,7 @@ public class RunCommandModule {
 
     @Transactional
     public WorkflowRunView resumeRun(String runId) {
-        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunExecuteAccess(runId) : verifyRunAccessFallback(runId);
 
         WorkflowRunEntity updated = stateMachine.transitionRun(runId, WorkflowRunStatus.RUNNING, "Resumed by user");
         broadcaster.publishEvent(runId, "RUN_RESUMED", "{\"reason\":\"Resumed by user\"}");
@@ -277,7 +277,7 @@ public class RunCommandModule {
     public StepRunView retryStep(String stepRunId) {
         StepRunEntity step = stepRunRepository.findById(stepRunId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STEP_RUN_NOT_FOUND, "Step run not found: " + stepRunId));
-        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(step.getRunId()) : verifyRunAccessFallback(step.getRunId());
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunExecuteAccess(step.getRunId()) : verifyRunAccessFallback(step.getRunId());
 
         StepRunEntity updated = stateMachine.transitionStep(stepRunId, StepRunStatus.PENDING, "Retry requested by user");
         broadcaster.publishEvent(run.getId(), "STEP_RETRY_INITIATED", "{\"stepRunId\":\"" + stepRunId + "\"}");
@@ -286,7 +286,7 @@ public class RunCommandModule {
 
     @Transactional
     public StepRunView reworkStep(String runId, String stepRunId, String feedback) {
-        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyApprovalAccess(runId) : verifyRunAccessFallback(runId);
         StepRunEntity step = stepRunRepository.findById(stepRunId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STEP_RUN_NOT_FOUND, "Step run not found: " + stepRunId));
         if (!run.getId().equals(step.getRunId())) {
@@ -308,7 +308,7 @@ public class RunCommandModule {
 
     @Transactional
     public WorkflowRunView rejectRun(String runId, String reason) {
-        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyRunAccess(runId) : verifyRunAccessFallback(runId);
+        WorkflowRunEntity run = ownershipVerifier != null ? ownershipVerifier.verifyApprovalAccess(runId) : verifyRunAccessFallback(runId);
         String rejectReason = reason != null && !reason.isBlank() ? reason : "Change rejected during quality review";
 
         workspaceRepository.findByProjectId(run.getProjectId()).ifPresent(ws -> {

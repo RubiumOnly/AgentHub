@@ -180,9 +180,13 @@ public class ArtifactApplicationService implements ArtifactApplication {
     @Transactional
     public ArtifactView acceptArtifact(String artifactId, String reviewerId) {
         String actor = (reviewerId != null && !reviewerId.isBlank()) ? reviewerId : RequestContext.get().getUserId();
-        ArtifactEntity entity = ownershipVerifier != null
-                ? ownershipVerifier.verifyArtifactAccess(artifactId, actor)
-                : getArtifactByIdWithActorFallback(artifactId, actor);
+        ArtifactEntity entity = artifactRepository.findById(artifactId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ARTIFACT_NOT_FOUND, "Artifact not found: " + artifactId));
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyApprovalAccess(entity.getRunId(), actor);
+        } else {
+            getArtifactByIdWithActorFallback(artifactId, actor);
+        }
 
         // Phase 5 Anti-Forgery Quality Gate Defense: evaluate gate and ensure it passes
         QualityGateReport report = evaluateQualityGate(artifactId);
@@ -210,9 +214,13 @@ public class ArtifactApplicationService implements ArtifactApplication {
     @Transactional
     public ArtifactView rejectArtifact(String artifactId, String reviewerId, String reason) {
         String actor = (reviewerId != null && !reviewerId.isBlank()) ? reviewerId : RequestContext.get().getUserId();
-        ArtifactEntity entity = ownershipVerifier != null
-                ? ownershipVerifier.verifyArtifactAccess(artifactId, actor)
-                : getArtifactByIdWithActorFallback(artifactId, actor);
+        ArtifactEntity entity = artifactRepository.findById(artifactId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ARTIFACT_NOT_FOUND, "Artifact not found: " + artifactId));
+        if (ownershipVerifier != null) {
+            ownershipVerifier.verifyApprovalAccess(entity.getRunId(), actor);
+        } else {
+            getArtifactByIdWithActorFallback(artifactId, actor);
+        }
 
         entity.setReviewStatus("REJECTED");
         entity.setReviewedBy(actor);
@@ -239,13 +247,15 @@ public class ArtifactApplicationService implements ArtifactApplication {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + entity.getRunId()));
         ProjectEntity project = projectRepository.findById(run.getProjectId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
-        String actor = (actorId != null && !actorId.isBlank()) ? actorId : RequestContext.get().getUserId();
-        accessGuard.checkOwnership(project.getOwnerId(), actor);
-
-        // Locate workspace root
         WorkspaceEntity workspace = workspaceRepository.findByProjectId(project.getId()).orElse(null);
         String workspaceKey = (workspace != null) ? workspace.getId() : "default";
         Path workspaceRoot = workspaceResolver.getWorkspaceRoot(workspaceKey);
+        String actor = (actorId != null && !actorId.isBlank()) ? actorId : RequestContext.get().getUserId();
+        if (ownershipVerifier != null && workspace != null) {
+            ownershipVerifier.verifyWorkspaceWriteAccess(workspace.getId(), actor);
+        } else {
+            accessGuard.checkOwnership(project.getOwnerId(), actor);
+        }
 
         // Find baseline commit for this run
         String baselineCommit = null;
@@ -752,12 +762,15 @@ public class ArtifactApplicationService implements ArtifactApplication {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + entity.getRunId()));
         ProjectEntity project = projectRepository.findById(run.getProjectId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Project not found: " + run.getProjectId()));
-        String actor = (actorId != null && !actorId.isBlank()) ? actorId : RequestContext.get().getUserId();
-        accessGuard.checkOwnership(project.getOwnerId(), actor);
-
         WorkspaceEntity workspace = workspaceRepository.findByProjectId(project.getId()).orElse(null);
         String workspaceKey = (workspace != null) ? workspace.getId() : "default";
         Path workspaceRoot = workspaceResolver.getWorkspaceRoot(workspaceKey);
+        String actor = (actorId != null && !actorId.isBlank()) ? actorId : RequestContext.get().getUserId();
+        if (ownershipVerifier != null && workspace != null) {
+            ownershipVerifier.verifyWorkspaceWriteAccess(workspace.getId(), actor);
+        } else {
+            accessGuard.checkOwnership(project.getOwnerId(), actor);
+        }
 
         String baselineCommit = null;
         if (workspace != null && workspace.getGitBaselineCommit() != null) {

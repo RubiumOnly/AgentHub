@@ -372,6 +372,9 @@ public class TeamApplicationService implements TeamApplication {
 
         ProjectEntity project = projectRepository != null ? projectRepository.findById(projectId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId)) : null;
+        if (project != null && project.getOwnerId().equals(cmd.getUserId())) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Cannot alter project owner: user is already permanent project OWNER");
+        }
 
         List<TeamEntity> teams = teamRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
         TeamEntity targetTeam;
@@ -451,6 +454,12 @@ public class TeamApplicationService implements TeamApplication {
         if (ownershipVerifier != null) {
             ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), ProjectPermission.PROJECT_MANAGE);
         }
+        ProjectEntity project = projectRepository != null ? projectRepository.findById(projectId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId)) : null;
+        if (project != null && (memberId.equals("owner-" + project.getOwnerId()) || memberId.equals(project.getOwnerId()))) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Cannot modify project owner role: " + project.getOwnerId());
+        }
+
         TeamMemberEntity member = teamMemberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TEAM_MEMBER_NOT_FOUND, "Team member not found: " + memberId));
 
@@ -488,6 +497,12 @@ public class TeamApplicationService implements TeamApplication {
         if (ownershipVerifier != null) {
             ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), ProjectPermission.PROJECT_MANAGE);
         }
+        ProjectEntity project = projectRepository != null ? projectRepository.findById(projectId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId)) : null;
+        if (project != null && (memberId.equals("owner-" + project.getOwnerId()) || memberId.equals(project.getOwnerId()))) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "Cannot remove project owner: " + project.getOwnerId());
+        }
+
         TeamMemberEntity member = teamMemberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TEAM_MEMBER_NOT_FOUND, "Team member not found: " + memberId));
         teamMemberRepository.delete(member);

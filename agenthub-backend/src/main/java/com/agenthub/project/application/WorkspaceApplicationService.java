@@ -165,6 +165,43 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     }
 
     @Override
+    public void checkWorkspaceWriteAccess(String workspaceIdOrPath) {
+        if (RequestContext.get().isSystem()) {
+            return;
+        }
+        if (workspaceRepository != null && projectRepository != null && accessGuard != null) {
+            String currentUserId = RequestContext.get().getUserId();
+            Optional<WorkspaceEntity> wsOpt = workspaceRepository.findById(workspaceIdOrPath);
+            if (wsOpt.isEmpty()) {
+                wsOpt = workspaceRepository.findByProjectId(workspaceIdOrPath);
+            }
+            if (wsOpt.isPresent()) {
+                if (ownershipVerifier != null) {
+                    ownershipVerifier.verifyWorkspaceWriteAccess(wsOpt.get().getId(), currentUserId);
+                    return;
+                }
+                ProjectEntity project = projectRepository.findById(wsOpt.get().getProjectId()).orElse(null);
+                if (project != null) {
+                    accessGuard.checkOwnership(project.getOwnerId(), currentUserId);
+                    return;
+                }
+            }
+            Optional<ProjectEntity> projOpt = projectRepository.findById(workspaceIdOrPath);
+            if (projOpt.isPresent()) {
+                if (ownershipVerifier != null) {
+                    ownershipVerifier.verifyProjectAccess(projOpt.get().getId(), currentUserId, com.agenthub.team.domain.rbac.ProjectPermission.WORKSPACE_WRITE);
+                    return;
+                }
+                accessGuard.checkOwnership(projOpt.get().getOwnerId(), currentUserId);
+                return;
+            }
+            if (currentUserId == null || currentUserId.isBlank()) {
+                accessGuard.checkOwnership("unauthenticated-resource", null);
+            }
+        }
+    }
+
+    @Override
     public StructuredDiff computeStructuredDiff(String workspaceIdOrPath) throws Exception {
         checkWorkspaceAccess(workspaceIdOrPath);
         Path safeDir = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
@@ -280,7 +317,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public void saveFile(String workspaceIdOrPath, String relativePath, String content) throws Exception {
-        checkWorkspaceAccess(workspaceIdOrPath);
+        checkWorkspaceWriteAccess(workspaceIdOrPath);
         validateWriteSize(content);
         Path safeFile = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, relativePath);
         Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
@@ -298,7 +335,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public void renameFile(String workspaceIdOrPath, String oldRelativePath, String newRelativePath) throws Exception {
-        checkWorkspaceAccess(workspaceIdOrPath);
+        checkWorkspaceWriteAccess(workspaceIdOrPath);
         Path src = workspaceResolver.resolvePathForRead(workspaceIdOrPath, oldRelativePath);
         Path dest = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, newRelativePath);
 
@@ -317,7 +354,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public void deleteFile(String workspaceIdOrPath, String relativePath) throws Exception {
-        checkWorkspaceAccess(workspaceIdOrPath);
+        checkWorkspaceWriteAccess(workspaceIdOrPath);
         Path target = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, relativePath);
         if (!Files.exists(target)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + relativePath);
@@ -512,7 +549,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public WorkspaceView resyncWorkspace(String workspaceId) throws Exception {
-        checkWorkspaceAccess(workspaceId);
+        checkWorkspaceWriteAccess(workspaceId);
         WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
         Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
@@ -526,7 +563,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public WorkspaceView changeBaseline(String workspaceId, String targetCommitHash, boolean confirmed) throws Exception {
-        checkWorkspaceAccess(workspaceId);
+        checkWorkspaceWriteAccess(workspaceId);
         if (!confirmed) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "Baseline change requires explicit user confirmation (confirmed=true)");
         }
@@ -549,7 +586,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public WorkspaceView discardWorkspace(String workspaceId, boolean confirmed, String reason) throws Exception {
-        checkWorkspaceAccess(workspaceId);
+        checkWorkspaceWriteAccess(workspaceId);
         if (!confirmed) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "Discard workspace changes requires explicit user confirmation (confirmed=true)");
         }
@@ -566,7 +603,7 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
 
     @Override
     public WorkspaceView restoreSnapshot(String workspaceId, String snapshotCommitOrTag, boolean confirmed) throws Exception {
-        checkWorkspaceAccess(workspaceId);
+        checkWorkspaceWriteAccess(workspaceId);
         if (!confirmed) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "Restoring snapshot requires explicit user confirmation (confirmed=true)");
         }

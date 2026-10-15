@@ -46,6 +46,8 @@ public interface WorkspaceApplication {
 
     void checkWorkspaceAccess(String workspaceIdOrPath);
 
+    void checkWorkspaceWriteAccess(String workspaceIdOrPath);
+
     Map<String, Object> createGitSnapshot(String workspaceId, String runId, String stepRunId, String message, String author) throws Exception;
 
     boolean acquireLock(String workspaceId, String requestedOwnerId, long waitTimeoutMs, long leaseTtlMs);

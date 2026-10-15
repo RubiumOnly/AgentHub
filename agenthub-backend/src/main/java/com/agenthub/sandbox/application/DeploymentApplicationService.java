@@ -162,6 +162,30 @@ public class DeploymentApplicationService implements DeploymentApplication {
         }
     }
 
+    private void checkDeploymentManageAccess(String projectId) {
+        if (RequestContext.get().isSystem()) {
+            return;
+        }
+        if (projectRepository != null && accessGuard != null && projectId != null) {
+            ProjectEntity project = projectRepository.findById(projectId).orElse(null);
+            if (project != null) {
+                if (ownershipVerifier != null) {
+                    ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), com.agenthub.team.domain.rbac.ProjectPermission.DEPLOYMENT_MANAGE);
+                } else {
+                    accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
+                }
+            } else if (accessGuard.isAllowSuperuserBypass()) {
+                return;
+            } else if (ownershipVerifier != null) {
+                ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), com.agenthub.team.domain.rbac.ProjectPermission.DEPLOYMENT_MANAGE);
+            } else {
+                throw new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId);
+            }
+        } else if (ownershipVerifier != null && projectId != null) {
+            ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), com.agenthub.team.domain.rbac.ProjectPermission.DEPLOYMENT_MANAGE);
+        }
+    }
+
     private String resolveAndValidateArtifact(String projectId, String requestedArtifactId, String deployId) {
         if (requestedArtifactId != null && !requestedArtifactId.isBlank()) {
             if (artifactRepository != null) {
@@ -243,7 +267,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
         }
 
         String projectId = request.getProjectId().trim();
-        checkProjectAccess(projectId);
+        checkDeploymentManageAccess(projectId);
         Path workspaceRoot = workspaceResolver.getWorkspaceRoot(projectId);
 
         String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
@@ -479,7 +503,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
     public DeploymentResponse stopDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
-        checkProjectAccess(entity.getProjectId());
+        checkDeploymentManageAccess(entity.getProjectId());
 
         if (ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())) {
             transitionState(entity, DeploymentStatus.STOP);
