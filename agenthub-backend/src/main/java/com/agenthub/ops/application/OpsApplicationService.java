@@ -15,6 +15,9 @@ import com.agenthub.shared.contract.ApiContractHeaders;
 import com.agenthub.shared.contract.BoundedContext;
 import com.agenthub.shared.contract.PageRequestQuery;
 import com.agenthub.shared.contract.PageResultView;
+import com.agenthub.shared.contract.sdk.AgentHubReleaseManifest;
+import com.agenthub.shared.contract.webhook.WebhookEventType;
+import com.agenthub.shared.contract.webhook.WebhookSignatureVerifier;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
 import com.agenthub.shared.filter.LegacyEndpointCallTracker;
@@ -146,6 +149,21 @@ public class OpsApplicationService implements OpsApplication {
                 ))
                 .toList());
         meta.put("legacyEndpoints", legacyCallTracker.snapshot());
+        AgentHubReleaseManifest manifest = AgentHubReleaseManifest.createDefault();
+        meta.put("releaseManifest", manifest);
+        meta.put("webhookSpecification", Map.of(
+                "signatureHeader", WebhookSignatureVerifier.SIGNATURE_HEADER,
+                "algorithm", WebhookSignatureVerifier.HMAC_ALGORITHM,
+                "defaultToleranceSeconds", WebhookSignatureVerifier.DEFAULT_TOLERANCE_SECONDS,
+                "supportedEvents", Arrays.stream(WebhookEventType.values())
+                        .map(WebhookEventType::getEventName)
+                        .toList()
+        ));
+        meta.put("sdkSpecification", Map.of(
+                "stableResources", manifest.stableResources(),
+                "clientContracts", manifest.sdkClientContracts()
+        ));
+        meta.put("extensionContracts", manifest.extensionContracts());
         return meta;
     }
 

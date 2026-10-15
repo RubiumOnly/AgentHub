@@ -411,3 +411,28 @@ $Evidence.data | Select-Object bundleId, simulated, executionMode, checksum
 ```
 
 * **样本文件参考**：仓库已附带由真实集成测试生成的标准脱敏运行证据包样本 [`docs/evidence/sample-run-evidence-bundle.json`](evidence/sample-run-evidence-bundle.json)，供面试官与代码审计者直接核验数据结构与 SHA-256 防篡改签名。
+
+### 步骤 10：发行元数据、Webhook 契约与 SDK 客户端查询 (`OpsController` - `/api/system/contracts/v1`)
+
+> **契约声明**：该端点提供 1.0.0-RELEASE 发行清单、支持的运行模式（`DEMO_SIMULATED`, `LIVE_SELF_HOSTED`, `LIVE_TEAM`）、22 种标准化 Webhook 事件类型、`X-AgentHub-Signature` (HMAC-SHA256) 防篡改/防重放签名规约，以及 5 个核心 SDK 客户端契约（Project, Run, Artifact, Approval, Deployment）与 5 大扩展 SPI 清单。
+
+**Bash**:
+```bash
+# 查询系统发行清单与元数据契约
+curl -s http://localhost:8080/api/system/contracts/v1 \
+  -H "Authorization: Bearer $TOKEN" | jq '{
+    releaseVersion: .data.releaseManifest.releaseVersion,
+    apiVersion: .data.releaseManifest.apiVersion,
+    signatureHeader: .data.webhookSpecification.signatureHeader,
+    algorithm: .data.webhookSpecification.algorithm,
+    supportedEventsCount: (.data.webhookSpecification.supportedEvents | length),
+    sdkContracts: .data.sdkSpecification.clientContracts
+  }'
+```
+
+**PowerShell**:
+```powershell
+$Contracts = Invoke-RestMethod -Uri "http://localhost:8080/api/system/contracts/v1" -Method Get -Headers $Headers
+$Contracts.data.releaseManifest | Select-Object releaseVersion, apiVersion, supportedExecutionModes
+$Contracts.data.webhookSpecification | Select-Object signatureHeader, algorithm, defaultToleranceSeconds
+```

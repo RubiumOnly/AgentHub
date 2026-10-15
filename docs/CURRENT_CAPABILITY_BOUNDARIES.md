@@ -22,6 +22,7 @@
 | **质量门禁、审查与受控交付 (Phase 5)** | 质量门禁策略引擎（`QualityGateEngine`：5 维度 BUILD_VERIFICATION / UNIT_TEST_REGRESSION / STATIC_ANALYSIS_GUARD / SECRET_LEAK_SCAN / DIFF_BUDGET_GUARD，加权评分 0-100，不可伪造 SHA-256 签名，GATE_FAILED 准入拦截）；JGit 单文件非破坏性精准回滚（`revertSingleFile`）；细粒度干预（`reworkStep` 步骤重做与指导意见注入、`rejectRun` 全盘驳回并安全重置基线）；受控沙箱准入门禁（阻断 GATE_FAILED/REJECTED 产物）与主动 HTTP 健康探针（`probeDeployment`）；标准化外部交付 PR 草稿规范（`PullRequestDraftView`）与确定性离线证据包（`exportRunEvidenceBundle`） | `QualityGateEngine`, `JGitWorkspaceManager`, `ArtifactApplicationService`, `RunCommandModule`, `DeploymentApplicationService`, `DiffArtifactReviewer` | `Phase5QualityGateAndDeliveryTest` |
 | **团队协作、RBAC 与运维灾备体系 (Phase 6)** | 6 级细粒度项目角色（`OWNER`/`ADMIN`/`MAINTAINER`/`DEVELOPER`/`VIEWER`/`AUDITOR`）与 10 大权限动作（`ResourceOwnershipVerifier` 防越权拦截与成员管理端点）；不可篡改安全审计流水（`auth_audit_logs` 表，`GET /api/system/audit-logs` 多维分页检索）；确定性灾备快照生成、SHA-256 防篡改校验与幂等全库/租户还原机制（`BackupManifest`、`RestoreVerificationReport`）；运维可观测性指标大盘（`GET /api/system/metrics/summary`）与 SLO 健康度评测引擎（`HEALTHY`/`DEGRADED`/`UNHEALTHY`）；前端 Bento Grid 团队协作与运维灾备控制台（`TeamRbacPanel.tsx`, `OperationsConsolePanel.tsx`） | `ProjectRbacRole`, `ResourceOwnershipVerifier`, `TeamApplicationService`, `AuthAuditService`, `OpsApplicationService`, `AgentHubMetricsCollector` | `Phase6TeamRbacAndOperationsTest` |
 | **真实 Provider 接入、成本治理与生产验证 (Phase 7)** | OpenAI / Anthropic / Gemini / DeepSeek 真实客户端适配与统一 Tool Calling；运行模式强隔离（`DEMO_SIMULATED` / `LIVE_SELF_HOSTED` / `LIVE_TEAM`，生产严禁静默 Mock 降级）；精细化模型牌价字典与 Prompt Cache 折扣计费（`ModelPricing`）；调用前硬预算看门狗拦截（`BudgetGovernanceGuard` 默认 $50.00，80% 预警水位，`5010 BUDGET_EXCEEDED` 阻断）；Provider 主动网络延迟探测（`POST /probe`）与三态熔断器动态运维（`GET/POST /circuit-breaker`）；前端 Provider 成本大盘、探针按钮、熔断器重置与预算进度条 | `DynamicProviderRouter`, `OpenAiCompatibleProvider`, `AnthropicProvider`, `GeminiProvider`, `BudgetGovernanceGuard`, `ModelPricing`, `ProviderCostDashboard` | `Phase7LiveProvidersAndBudgetGovernanceTest` |
+| **端到端验收、性能基准与开源/交付就绪 (Phase 8)** | 10 阶段全流程自动化闭环验证（Project -> JGit Baseline -> WorkflowTemplate -> Orchestrator Plan & Confirm -> Agent Execution -> Quality Gate -> PR Draft -> Controlled Preview & Probe -> Audit Lineage -> Evidence Bundle）；12 线程并发吞吐与 P95/P99 延迟分布；SSE 广播延迟 <100ms 与 `Last-Event-ID` 单调回放；高负载内存稳定性（堆增量 <100MB）；22 种标准化 Webhook 事件类型与 HMAC-SHA256 防篡改/防重放签名规约（`X-AgentHub-Signature`）；1.0.0-RELEASE 发行清单、5 大核心 SDK 客户端与 5 大扩展 SPI 契约；质量门禁准入拦截与防御 | `AgentHubReleaseManifest`, `WebhookSignatureVerifier`, `WebhookEventType`, `AgentHubProjectClient`, `OpsApplicationService`, `QualityGateEngine`, `DeploymentApplicationService` | `Phase8PerformanceBenchmarkAndE2ETest` |
 
 ---
 
@@ -85,6 +86,13 @@
      - 基线创建 + 快照提交 + Tree-to-Tree Diff 解析耗时：`P50 = 38 ms`，`P95 = 82 ms`。
   4. **Provider 熔断与主备故障切换（样本量 `N = 20` 次注入式 HTTP 429/503 故障演练，`ProviderFaultToleranceAndFallbackTest`）**：
      - 主节点触发熔断并完成备节点（Fallback）路由切换耗时（不含备节点首 Token 网络 RTT）：`P50 = 9.2 ms`，`P95 = 24.5 ms`。
+  5. **Phase 8 多线程并发吞吐与 P95/P99 延迟（样本量 `N = 12` 并发工作流状态推进，`Phase8PerformanceBenchmarkAndE2ETest`）**：
+     - 吞吐与延迟分布：实测 P50 耗时约 45ms，P95 耗时受控（断言门禁 < 5000ms），12/12 并发任务确定性成功，0 竞态失败。
+  6. **Phase 8 SSE 事件广播物理延迟与断线增量单调回放（样本量 `N = 20` 事件广播，`Phase8PerformanceBenchmarkAndE2ETest`）**：
+     - 广播物理往返延迟：实测平均延迟 < 20ms（断言门禁 < 100ms）；
+     - 基于 `Last-Event-ID` 增量回放准确率：单调递增保序回放，0 事件丢失。
+  7. **Phase 8 高负载内存有界性与无界泄露防御（循环创建 20 组分层上下文记忆与 100+ 事件对象，`Phase8PerformanceBenchmarkAndE2ETest`）**：
+     - 负载后有效堆内存增量：实测增量 < 30MB（防御性门禁 < 100MB），无静态集合堆积与内存泄漏。
 
 ---
 

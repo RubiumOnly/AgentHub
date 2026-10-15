@@ -224,9 +224,27 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
    - 提供 `POST /api/providers/{id}/probe` 主动测量物理往返延迟（ms）；
    - 提供 `GET & POST /api/providers/{id}/circuit-breaker` 查询与人工重置熔断器（`CLOSED`）。
 
-## 11. 架构守卫和扩展规则
+## 11. 端到端验收、性能基准与开源/交付就绪事实 (Phase 8 产品化事实)
+
+1. **10 阶段全流程自动化闭环验证**：
+   - 固化覆盖 Project Onboarding、Workspace JGit Baseline、WorkflowTemplate 拓扑解析、Orchestrator 计划生成与确认、Agent 运行时状态流转、质量门禁多维评估、Pull Request 草稿生成、受控预览部署与主动探针、审计流水与血缘追踪、脱敏运行证据包导出的全生命周期集成测试。
+2. **性能基准指标与防衰退断言**：
+   - 确立 12 线程并发工作流状态推进压测基准，断言 P95 延迟受控（< 5000ms）；
+   - 确立 SSE 事件广播物理延迟受控（< 100ms），并通过 `Last-Event-ID` 保证断线重连单调递增回放；
+   - 确立高负载内存稳定性基准，断言有效堆内存增量在受控边界内（< 100MB），杜绝静态对象泄漏。
+3. **Webhook 事件契约与安全签名规约**：
+   - 固化 22 种覆盖核心生命周期的标准事件类型（`WebhookEventType`）；
+   - 提供基于 HMAC-SHA256 的防篡改签名规约（`X-AgentHub-Signature`）与时间戳防重放容差校验（`WebhookSignatureVerifier`）。
+4. **稳定发行清单与最小 SDK / 扩展 SPI 契约**：
+   - 固化 `1.0.0-RELEASE` 发行清单（`AgentHubReleaseManifest`）；
+   - 规范 Project、Run、Artifact、Approval、Deployment 5 大核心 SDK 客户端契约；
+   - 规范 Provider、Tool、AgentDefinition、WorkflowTemplate、DeploymentTemplate 5 大扩展 SPI 契约，经 `GET /api/system/contracts/v1` 统一暴露。
+5. **质量门禁准入防御**：
+   - 部署服务严格拦截未通过质量门禁（`GATE_FAILED`）或人工拒绝（`REJECTED`）的制品，保障受控发布。
+
+## 12. 架构守卫和扩展规则
 
 ArchUnit（`ArchUnitArchitectureTest`）与 Phase 0 基线守卫（`Phase0BaselineAndDebtFreezeGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
 
-详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-012](adr/ADR-012-live-providers-and-budget-governance.md)。
+详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-013](adr/ADR-013-e2e-benchmarks-and-release-readiness.md)。
 

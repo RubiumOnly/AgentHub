@@ -374,6 +374,14 @@
   - Request: `{"manifest": {...}, "dryRun": false}`
   - 严格事务保证，重构基线数据与租户状态，记录灾备恢复事件
   - Response: `Result<RestoreVerificationReport>`
+- `GET /api/system/contracts/v1`：契约元数据、发行版本清单、Webhook 规约与 SDK 客户端规范
+  - Header: `Authorization: Bearer <token>`
+  - 响应内容：
+    - `releaseManifest`：版本 `1.0.0-RELEASE`、API 基线 `v1`、支持的运行模式（`DEMO_SIMULATED`, `LIVE_SELF_HOSTED`, `LIVE_TEAM`）、稳定限界上下文与核心资源；
+    - `webhookSpecification`：签名头 `X-AgentHub-Signature`、签名算法 `HmacSHA256`、默认防重放时间戳容差 `300` 秒、22 种标准化事件类型；
+    - `sdkSpecification`：5 大核心客户端接口契约（`ProjectClient`, `RunClient`, `ArtifactClient`, `ApprovalClient`, `DeploymentClient`）；
+    - `extensionContracts`：5 大扩展 SPI 清单（`ProviderExtensionContract`, `ToolExtensionContract`, `AgentDefinitionExtensionContract`, `WorkflowTemplateExtensionContract`, `DeploymentTemplateExtensionContract`）。
+  - Response: `Result<Map<String, Object>>`
 
 ---
 

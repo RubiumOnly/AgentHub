@@ -521,3 +521,19 @@ AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；
 普通提交 Subject：feat(phase-7): productize live providers, mode segregation, and budget governance
 加固提交 Subject（如有）：fix(phase-7): harden circuit breaker state recovery, live ollama mode segregation, and dashboard probe contracts
 ```
+
+### 9.12 Phase 8 阶段验收记录
+
+```text
+阶段：Phase 8
+范围：端到端验收、性能基准与开源/交付就绪（10 阶段全流程自动化闭环验证：Project Onboarding -> Workspace JGit Baseline -> WorkflowTemplate -> Orchestrator Plan & Confirmation -> Agent Invocation -> Quality Gate Verification -> Pull Request Draft -> Controlled Deployment Admission & Active Health Probe -> Audit Log & Lineage -> Evidence Bundle Export；多线程并发吞吐与 P95/P99 延迟分布压测、SSE 事件流广播延迟与 Last-Event-ID 单调增量回放基准、高负载内存稳定性与堆增量 <100MB 防御性门禁；22 种标准化 Webhook 事件枚举 WebhookEventType、WebhookPayload、HMAC-SHA256 签名规约 X-AgentHub-Signature 与防重放时间戳校验器 WebhookSignatureVerifier；1.0.0-RELEASE 发行版本清单 AgentHubReleaseManifest、5 大核心客户端 SDK 接口契约 AgentHubProjectClient / AgentHubRunClient / AgentHubArtifactClient / AgentHubApprovalClient / AgentHubDeploymentClient 与 5 大扩展 SPI 契约 Provider / Tool / AgentDefinition / WorkflowTemplate / DeploymentTemplate，经 GET /api/system/contracts/v1 统一暴露；部署准入防御性拦截未通过质量门禁 GATE_FAILED 或被驳回 REJECTED 的产物；前端 TypeScript Webhook/ReleaseManifest 类型定义扩展保持严格 39 文件冻结；ADR-013 与全量文档严格对齐）
+代码完成：是，变更包含 com.agenthub.shared.contract.webhook.WebhookEventType、com.agenthub.shared.contract.webhook.WebhookPayload、com.agenthub.shared.contract.webhook.WebhookSignatureVerifier、com.agenthub.shared.contract.sdk.AgentHubReleaseManifest、com.agenthub.shared.contract.sdk.AgentHubProjectClient、com.agenthub.shared.contract.sdk.AgentHubRunClient、com.agenthub.shared.contract.sdk.AgentHubArtifactClient、com.agenthub.shared.contract.sdk.AgentHubApprovalClient、com.agenthub.shared.contract.sdk.AgentHubDeploymentClient、com.agenthub.shared.contract.extension.ProviderExtensionContract、com.agenthub.shared.contract.extension.ToolExtensionContract、com.agenthub.shared.contract.extension.AgentDefinitionExtensionContract、com.agenthub.shared.contract.extension.WorkflowTemplateExtensionContract、com.agenthub.shared.contract.extension.DeploymentTemplateExtensionContract、OpsApplicationService 扩展、Phase8PerformanceBenchmarkAndE2ETest (7 用例)、前端 types/index.ts (扩展 Webhook/SDK/ReleaseManifest 类型，严格保持 39 个源码文件)、docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md、docs/E2E_DEMO_GUIDE.md、docs/ARCHITECTURE.md、docs/API.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md
+自动化测试：后端 61 test classes / 384 tests 通过（mvn clean test，含 Phase8PerformanceBenchmarkAndE2ETest 7 用例、Phase7LiveProvidersAndBudgetGovernanceTest 14 用例、Phase6TeamRbacAndOperationsTest 9 用例、Phase5QualityGateAndDeliveryTest 13 用例、Phase1ModuleConvergenceAndContractTest 6 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.ci -f docker-compose.prod.yml config --quiet 与 .env.production.example 校验通过）
+目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
+AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase8PerformanceBenchmarkAndE2ETest 锁定受管范围、OpenAPI v1 契约、Release Manifest 与 Webhook 签名防篡改指纹）
+删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
+未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实跨机网络环境下的千级并发 SSE 广播长连接保活
+已知风险与回滚方式：若后续需要回退 Phase 8 功能，可通过 git revert 对应 Phase 8 提交恢复；底层表结构零变更，回滚零数据丢失风险
+普通提交 Subject：feat(phase-8): productize e2e verification, benchmarks, webhook contracts, and release readiness
+加固提交 Subject（如有）：
+```

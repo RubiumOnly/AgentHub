@@ -1070,3 +1070,66 @@ export interface BudgetCheckResultView {
   warning: boolean;
   reason?: string;
 }
+
+// ============================================================================
+// Phase 8: Webhook & Release Readiness Types
+// ============================================================================
+
+export type WebhookEventType =
+  | "project.created"
+  | "workspace.baseline_initialized"
+  | "run.started"
+  | "run.completed"
+  | "run.failed"
+  | "run.cancelled"
+  | "run.rejected"
+  | "step.started"
+  | "step.completed"
+  | "step.failed"
+  | "step.rework_requested"
+  | "approval.requested"
+  | "approval.decided"
+  | "artifact.created"
+  | "quality_gate.evaluated"
+  | "artifact.accepted"
+  | "artifact.rejected"
+  | "artifact.reverted"
+  | "deployment.created"
+  | "deployment.healthy"
+  | "deployment.failed"
+  | "deployment.stopped";
+
+export interface WebhookPayload {
+  eventId: string;
+  eventType: WebhookEventType;
+  occurredAt: string;
+  resourceType: string;
+  resourceId: string;
+  projectId: string;
+  data: Record<string, unknown>;
+}
+
+export interface AgentHubReleaseManifest {
+  releaseVersion: string;
+  apiVersion: string;
+  releaseDateUtc: string;
+  supportedExecutionModes: string[];
+  stableContexts: string[];
+  stableResources: string[];
+  sdkClientContracts: string[];
+  extensionContracts: string[];
+  migrationGuideV2ToV1: Record<string, string>;
+  compatibilityMatrix: Record<string, string>;
+}
+
+export interface WebhookSpecificationView {
+  signatureHeader: string;
+  algorithm: string;
+  defaultToleranceSeconds: number;
+  supportedEvents: string[];
+}
+
+export interface SdkSpecificationView {
+  stableResources: string[];
+  clientContracts: string[];
+}

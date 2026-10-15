@@ -567,7 +567,7 @@
     "/api/system/contracts/v1": {
       "get": {
         "tags": ["ops"],
-        "summary": "Get API v1 contract metadata, bounded context registry, and legacy route telemetry",
+        "summary": "Get API v1 contract metadata, bounded context registry, release manifest, webhook specification, and SDK contracts",
         "responses": { "200": { "description": "Result<Map<String, Object>>" } }
       }
     },
