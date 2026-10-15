@@ -61,7 +61,7 @@ public class ProviderDrivenAgentRuntime implements AgentRuntime {
     @Override
     public RuntimeHealth checkHealth() {
         List<LlmProvider> active = router.listProviders().stream()
-                .filter(p -> p.getCircuitBreaker().allowRequest())
+                .filter(p -> !p.getCircuitBreaker().isOpen())
                 .toList();
         if (active.isEmpty()) {
             return RuntimeHealth.degraded("All LLM providers are circuit broken or offline", 0);

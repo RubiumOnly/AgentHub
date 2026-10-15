@@ -1,5 +1,6 @@
 package com.agenthub.agent.infrastructure.provider;
 
+import com.agenthub.agent.domain.provider.exception.ProviderUnavailableException;
 import com.agenthub.agent.domain.provider.model.*;
 import com.agenthub.agent.infrastructure.security.SecretMasker;
 import com.agenthub.execution.domain.model.CancelToken;
@@ -37,22 +38,41 @@ public class OllamaProvider extends AbstractHttpLlmProvider {
     }
 
     @Override
+    public boolean isSimulated() {
+        return baseUrl == null || baseUrl.isBlank() || baseUrl.startsWith("simulated://");
+    }
+
+    @Override
     public ChatResponse chat(ChatRequest request) {
         long start = System.currentTimeMillis();
+
+        if (!circuitBreaker.allowRequest()) {
+            throw new ProviderUnavailableException(id, "Circuit breaker is OPEN or probe in flight for provider " + id);
+        }
+
+        if (isSimulated()) {
+            if (isStrictLiveMode(request)) {
+                throw new ProviderUnavailableException(id,
+                        "Live mode [" + (request != null ? request.getExecutionMode() : "LIVE") +
+                        "] strictly forbids simulated fallback for provider [" + id + "]. Real Ollama service required.");
+            }
+            return simulateChat(request, start);
+        }
 
         try {
             String requestUrl = buildEndpointUrl();
             Map<String, Object> bodyMap = buildOllamaRequestBody(request, false);
             String jsonPayload = objectMapper.writeValueAsString(bodyMap);
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(requestUrl))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
+            applyRequestTimeout(reqBuilder, request);
+            HttpRequest httpRequest = reqBuilder.build();
 
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            long latencyMs = System.currentTimeMillis() - start;
+            long latencyMs = Math.max(1, System.currentTimeMillis() - start);
 
             if (response.statusCode() != 200) {
                 handleHttpError(response.statusCode(), response.body());
@@ -67,10 +87,18 @@ public class OllamaProvider extends AbstractHttpLlmProvider {
             return buildResponse(content, promptTokens, completionTokens, latencyMs);
 
         } catch (Exception e) {
-            if (isSimulated() || e instanceof java.net.ConnectException) {
+            circuitBreaker.recordFailure(e);
+            if (isStrictLiveMode(request)) {
+                if (e instanceof RuntimeException re && re.getClass().getName().contains("Provider")) {
+                    throw re;
+                }
+                throw new ProviderUnavailableException(id,
+                        "Live mode [" + (request != null ? request.getExecutionMode() : "LIVE") +
+                        "] Ollama call failed (simulated fallback strictly blocked): " + SecretMasker.maskInText(e.getMessage()));
+            }
+            if (e instanceof java.net.ConnectException || (e.getCause() instanceof java.net.ConnectException)) {
                 return simulateChat(request, start);
             }
-            circuitBreaker.recordFailure(e);
             throw new RuntimeException("Ollama provider call failed: " + SecretMasker.maskInText(e.getMessage()), e);
         }
     }
@@ -79,16 +107,31 @@ public class OllamaProvider extends AbstractHttpLlmProvider {
     public void streamChat(ChatRequest request, Consumer<ChatChunk> chunkConsumer, CancelToken cancelToken) {
         long start = System.currentTimeMillis();
 
+        if (!circuitBreaker.allowRequest()) {
+            throw new ProviderUnavailableException(id, "Circuit breaker is OPEN or probe in flight for provider " + id);
+        }
+
+        if (isSimulated()) {
+            if (isStrictLiveMode(request)) {
+                throw new ProviderUnavailableException(id,
+                        "Live mode [" + (request != null ? request.getExecutionMode() : "LIVE") +
+                        "] strictly forbids simulated fallback for provider [" + id + "]. Real Ollama service required.");
+            }
+            simulateStream(request, chunkConsumer, cancelToken, start);
+            return;
+        }
+
         try {
             String requestUrl = buildEndpointUrl();
             Map<String, Object> bodyMap = buildOllamaRequestBody(request, true);
             String jsonPayload = objectMapper.writeValueAsString(bodyMap);
 
-            HttpRequest httpRequest = HttpRequest.newBuilder()
+            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(requestUrl))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
+            applyRequestTimeout(reqBuilder, request);
+            HttpRequest httpRequest = reqBuilder.build();
 
             HttpResponse<java.io.InputStream> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
 
@@ -115,16 +158,24 @@ public class OllamaProvider extends AbstractHttpLlmProvider {
                 }
             }
 
-            long latencyMs = System.currentTimeMillis() - start;
+            long latencyMs = Math.max(1, System.currentTimeMillis() - start);
             circuitBreaker.recordSuccess(latencyMs);
             chunkConsumer.accept(ChatChunk.finish("stop", TokenUsage.of(promptTokens, completionTokens)));
 
         } catch (Exception e) {
-            if (isSimulated() || e instanceof java.net.ConnectException) {
+            circuitBreaker.recordFailure(e);
+            if (isStrictLiveMode(request)) {
+                if (e instanceof RuntimeException re && re.getClass().getName().contains("Provider")) {
+                    throw re;
+                }
+                throw new ProviderUnavailableException(id,
+                        "Live mode [" + (request != null ? request.getExecutionMode() : "LIVE") +
+                        "] Ollama stream failed (simulated fallback strictly blocked): " + SecretMasker.maskInText(e.getMessage()));
+            }
+            if (e instanceof java.net.ConnectException || (e.getCause() instanceof java.net.ConnectException)) {
                 simulateStream(request, chunkConsumer, cancelToken, start);
                 return;
             }
-            circuitBreaker.recordFailure(e);
             throw new RuntimeException("Ollama stream failed: " + SecretMasker.maskInText(e.getMessage()), e);
         }
     }

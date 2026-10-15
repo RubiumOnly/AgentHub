@@ -171,4 +171,76 @@ class ProviderFaultToleranceAndFallbackTest {
         assertThat(cb.getStatus()).isEqualTo(CircuitStatus.OPEN);
         assertThat(cb.allowRequest()).isFalse();
     }
+
+    @Test
+    @DisplayName("测试 Router 熔断恢复全链路：主节点超时后探针放行，观测性巡检不造成死锁，探测成功自动恢复 CLOSED")
+    void shouldRecoverPrimaryThroughRouterAfterOpenTimeoutWithoutObservationalDeadlock() throws Exception {
+        // Create primary with a fast 50ms timeout
+        CircuitBreaker fastBreaker = new CircuitBreaker("prov-fast", 2, 50L);
+        MockLlmProvider fastPrimary = new MockLlmProvider("prov-fast", "Fast Primary", "gpt-4o", 100, 1, Set.of("code", "general"), fastBreaker);
+        router.registerProvider(fastPrimary);
+
+        // Trip the primary
+        fastPrimary.setSimulatedFailure(500, "Primary down");
+        for (int i = 0; i < 2; i++) {
+            try { fastPrimary.chat(ChatRequest.of("gpt-4o", "Task")); } catch (Exception ignored) {}
+        }
+        assertThat(fastBreaker.getStatus()).isEqualTo(CircuitStatus.OPEN);
+
+        // While OPEN, candidates must not include fastPrimary
+        List<LlmProvider> candidatesWhileOpen = router.selectCandidates(ChatRequest.of("code", "Task"));
+        assertThat(candidatesWhileOpen.stream().noneMatch(p -> p.getId().equals("prov-fast"))).isTrue();
+
+        // Perform multiple observational queries (dashboard health polls) - MUST NOT deadlock breaker
+        for (int i = 0; i < 5; i++) {
+            router.getClusterHealth();
+            fastPrimary.checkHealth();
+        }
+
+        // Wait for openTimeout to elapse
+        Thread.sleep(60L);
+
+        // Observational check should now report DEGRADED (ready for probe), NOT DOWN
+        assertThat(fastBreaker.isOpen()).isFalse();
+        assertThat(fastPrimary.checkHealth().getStatus()).isNotEqualTo(ProviderHealth.Status.DOWN);
+
+        // Clear failure so the probe request will succeed
+        fastPrimary.clearFailure();
+
+        // Router candidate selection must now include fastPrimary
+        List<LlmProvider> candidatesAfterTimeout = router.selectCandidates(ChatRequest.of("code", "Task"));
+        assertThat(candidatesAfterTimeout.stream().anyMatch(p -> p.getId().equals("prov-fast"))).isTrue();
+
+        // Route and execute should pick fastPrimary, execute successfully, and close circuit
+        ChatResponse response = router.routeAndExecute(ChatRequest.of("code", "Recovered task"));
+        assertThat(response).isNotNull();
+        assertThat(response.getProviderId()).isEqualTo("prov-fast");
+        assertThat(fastBreaker.getStatus()).isEqualTo(CircuitStatus.CLOSED);
+        assertThat(fastBreaker.getConsecutiveFailures()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("测试 半开探针并发保护：探针在途时并发请求安全降级至备用 Provider，避免击穿")
+    void shouldFallbackWhenPrimaryProbeInFlightDuringHalfOpen() throws Exception {
+        CircuitBreaker fastBreaker = new CircuitBreaker("prov-halfopen", 2, 50L);
+        MockLlmProvider fastPrimary = new MockLlmProvider("prov-halfopen", "HalfOpen Primary", "gpt-4o", 100, 1, Set.of("code", "general"), fastBreaker);
+        router.registerProvider(fastPrimary);
+
+        fastBreaker.trip();
+        Thread.sleep(60L);
+
+        // Manually claim probe permit (simulating in-flight probe)
+        assertThat(fastBreaker.allowRequest()).isTrue();
+        assertThat(fastBreaker.getStatus()).isEqualTo(CircuitStatus.HALF_OPEN);
+
+        // Second concurrent request arrives while probe is in flight
+        // It must gracefully fall back to backup (prov-primary or prov-backup) rather than crashing
+        ChatResponse fallbackResp = router.routeAndExecute(ChatRequest.of("code", "Concurrent task"));
+        assertThat(fallbackResp).isNotNull();
+        assertThat(fallbackResp.getProviderId()).isNotEqualTo("prov-halfopen");
+
+        // Release the probe
+        fastBreaker.recordSuccess(20L);
+        assertThat(fastBreaker.getStatus()).isEqualTo(CircuitStatus.CLOSED);
+    }
 }

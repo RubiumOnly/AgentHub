@@ -53,6 +53,11 @@ public class OpenAiCompatibleProvider extends AbstractHttpLlmProvider {
     @Override
     public ChatResponse chat(ChatRequest request) {
         long start = System.currentTimeMillis();
+
+        if (!circuitBreaker.allowRequest()) {
+            throw new ProviderUnavailableException(id, "Circuit breaker is OPEN or probe in flight for provider " + id);
+        }
+
         String effectiveKey = getEffectiveApiKey(providerType.toUpperCase() + "_API_KEY");
 
         if (effectiveKey == null || effectiveKey.isBlank() || isSimulated()) {
@@ -138,6 +143,11 @@ public class OpenAiCompatibleProvider extends AbstractHttpLlmProvider {
     @Override
     public void streamChat(ChatRequest request, Consumer<ChatChunk> chunkConsumer, CancelToken cancelToken) {
         long start = System.currentTimeMillis();
+
+        if (!circuitBreaker.allowRequest()) {
+            throw new ProviderUnavailableException(id, "Circuit breaker is OPEN or probe in flight for provider " + id);
+        }
+
         String effectiveKey = getEffectiveApiKey(providerType.toUpperCase() + "_API_KEY");
 
         if (effectiveKey == null || effectiveKey.isBlank() || isSimulated()) {

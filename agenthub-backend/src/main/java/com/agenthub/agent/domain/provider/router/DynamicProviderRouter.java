@@ -232,7 +232,7 @@ public class DynamicProviderRouter implements ProviderRouter {
 
         for (LlmProvider provider : providerRegistry.values()) {
             // 1. Skip providers whose circuit is OPEN
-            if (!provider.getCircuitBreaker().allowRequest()) {
+            if (provider.getCircuitBreaker().isOpen()) {
                 continue;
             }
 

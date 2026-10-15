@@ -38,6 +38,10 @@ public class MockLlmProvider implements LlmProvider {
     private final AtomicBoolean tripOnFailure = new AtomicBoolean(true);
 
     public MockLlmProvider(String id, String name, String model, int priority, int weight, Set<String> capabilities) {
+        this(id, name, model, priority, weight, capabilities, new CircuitBreaker(id));
+    }
+
+    public MockLlmProvider(String id, String name, String model, int priority, int weight, Set<String> capabilities, CircuitBreaker circuitBreaker) {
         this.id = id;
         this.name = name;
         this.model = model;
@@ -46,7 +50,7 @@ public class MockLlmProvider implements LlmProvider {
         if (capabilities != null) {
             this.capabilities.addAll(capabilities);
         }
-        this.circuitBreaker = new CircuitBreaker(id);
+        this.circuitBreaker = circuitBreaker != null ? circuitBreaker : new CircuitBreaker(id);
     }
 
     public void setSimulatedFailure(int statusCode, String errorMessage) {
@@ -137,7 +141,7 @@ public class MockLlmProvider implements LlmProvider {
 
     @Override
     public ProviderHealth checkHealth() {
-        if (!circuitBreaker.allowRequest()) {
+        if (circuitBreaker.isOpen()) {
             return ProviderHealth.down("Circuit OPEN due to failures");
         }
         if (simulatedStatusCode.get() != 200) {

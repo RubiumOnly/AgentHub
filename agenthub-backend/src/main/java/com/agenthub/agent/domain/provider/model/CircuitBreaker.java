@@ -21,6 +21,7 @@ public class CircuitBreaker {
     private final AtomicLong lastSuccessTime = new AtomicLong(0L);
     private final AtomicLong lastLatencyMs = new AtomicLong(0L);
     private final AtomicBoolean probeInFlight = new AtomicBoolean(false);
+    private final AtomicLong probeStartTime = new AtomicLong(0L);
 
     public CircuitBreaker(String providerId) {
         this(providerId, 3, 30_000L);
@@ -33,6 +34,22 @@ public class CircuitBreaker {
     }
 
     /**
+     * Non-mutating state query: returns true if the circuit is currently in an unexpired OPEN state.
+     * When openTimeoutMs has elapsed or status is CLOSED/HALF_OPEN, returns false.
+     */
+    public boolean isOpen() {
+        CircuitStatus current = status.get();
+        if (current == CircuitStatus.CLOSED) {
+            return false;
+        }
+        if (current == CircuitStatus.OPEN) {
+            long now = System.currentTimeMillis();
+            return (now - lastFailureTime.get() < openTimeoutMs);
+        }
+        return false;
+    }
+
+    /**
      * Determines whether a request is allowed to proceed to this provider.
      */
     public boolean allowRequest() {
@@ -41,20 +58,37 @@ public class CircuitBreaker {
             return true;
         }
 
+        long now = System.currentTimeMillis();
         if (current == CircuitStatus.OPEN) {
-            long now = System.currentTimeMillis();
             if (now - lastFailureTime.get() >= openTimeoutMs) {
                 // Try transition to HALF_OPEN to probe recovery
                 if (status.compareAndSet(CircuitStatus.OPEN, CircuitStatus.HALF_OPEN)) {
                     probeInFlight.set(true);
+                    probeStartTime.set(now);
                     return true;
                 }
             }
             return false;
         }
 
+        // HALF_OPEN: check probe lease timeout (30 seconds) to prevent permanent deadlock
+        if (probeInFlight.get() && (now - probeStartTime.get() > 30_000L)) {
+            probeInFlight.set(false);
+        }
+
         // HALF_OPEN allows exactly ONE probe request in flight to avoid stampede
-        return probeInFlight.compareAndSet(false, true);
+        if (probeInFlight.compareAndSet(false, true)) {
+            probeStartTime.set(now);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Release probe in flight without recording success or failure.
+     */
+    public void releaseProbe() {
+        probeInFlight.set(false);
     }
 
     /**

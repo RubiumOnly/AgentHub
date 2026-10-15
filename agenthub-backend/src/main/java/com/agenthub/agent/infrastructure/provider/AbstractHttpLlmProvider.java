@@ -94,12 +94,15 @@ public abstract class AbstractHttpLlmProvider implements LlmProvider {
 
     @Override
     public ProviderHealth checkHealth() {
-        if (!circuitBreaker.allowRequest()) {
+        if (circuitBreaker.isOpen()) {
             return ProviderHealth.down("Circuit breaker is OPEN due to " + circuitBreaker.getConsecutiveFailures() + " consecutive failures");
         }
         long measuredLatency = circuitBreaker.getLastLatencyMs();
         if (measuredLatency <= 0) {
             measuredLatency = isSimulated() ? 5L : 25L;
+        }
+        if (circuitBreaker.getStatus() == CircuitStatus.HALF_OPEN) {
+            return ProviderHealth.degraded(measuredLatency, "Circuit breaker in HALF_OPEN recovery probing");
         }
         String key = getEffectiveApiKey(providerType + "_API_KEY");
         if (key == null || key.isBlank() || key.startsWith("sk-placeholder") || "none".equalsIgnoreCase(key)) {
@@ -169,7 +172,6 @@ public abstract class AbstractHttpLlmProvider implements LlmProvider {
             } catch (java.io.IOException e) {
                 lastException = e;
                 if (attempts >= maxAttempts) {
-                    circuitBreaker.recordFailure(e);
                     throw e;
                 }
                 long jitter = (long) (Math.random() * 200);

@@ -114,12 +114,13 @@ public class BudgetGovernanceGuard {
         List<Object[]> rawModel = tokenUsageRepository.summarizeByModel();
         if (rawModel != null) {
             for (Object[] row : rawModel) {
-                String model = String.valueOf(row[0]);
-                long pTokens = ((Number) row[1]).longValue();
-                long cTokens = ((Number) row[2]).longValue();
-                long tTokens = ((Number) row[3]).longValue();
-                double cost = round(((Number) row[4]).doubleValue(), 4);
-                long cnt = ((Number) row[5]).longValue();
+                if (row == null) continue;
+                String model = row[0] != null ? String.valueOf(row[0]) : "unknown";
+                long pTokens = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+                long cTokens = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+                long tTokens = row[3] != null ? ((Number) row[3]).longValue() : 0L;
+                double cost = row[4] != null ? round(((Number) row[4]).doubleValue(), 4) : 0.0;
+                long cnt = row[5] != null ? ((Number) row[5]).longValue() : 0L;
                 modelBreakdown.add(new ModelCostSummaryView(model, pTokens, cTokens, tTokens, cost, cnt));
             }
         }
@@ -128,12 +129,13 @@ public class BudgetGovernanceGuard {
         List<Object[]> rawProvider = tokenUsageRepository.summarizeByProvider();
         if (rawProvider != null) {
             for (Object[] row : rawProvider) {
-                String pId = String.valueOf(row[0]);
-                String pType = String.valueOf(row[1]);
-                double cost = round(((Number) row[2]).doubleValue(), 4);
-                long tTokens = ((Number) row[3]).longValue();
-                long latency = ((Number) row[4]).longValue();
-                long cnt = ((Number) row[5]).longValue();
+                if (row == null) continue;
+                String pId = row[0] != null ? String.valueOf(row[0]) : "unassigned";
+                String pType = row[1] != null ? String.valueOf(row[1]) : "UNKNOWN";
+                double cost = row[2] != null ? round(((Number) row[2]).doubleValue(), 4) : 0.0;
+                long tTokens = row[3] != null ? ((Number) row[3]).longValue() : 0L;
+                long latency = row[4] != null ? ((Number) row[4]).longValue() : 0L;
+                long cnt = row[5] != null ? ((Number) row[5]).longValue() : 0L;
                 providerBreakdown.add(new ProviderCostSummaryView(pId, pType, cost, tTokens, latency, cnt));
             }
         }

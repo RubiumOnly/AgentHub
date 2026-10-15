@@ -5,6 +5,7 @@ import com.agenthub.agent.application.ProviderApplication;
 import com.agenthub.agent.application.TokenUsageApplication;
 import com.agenthub.agent.domain.provider.model.CircuitBreaker;
 import com.agenthub.agent.domain.provider.exception.NoAvailableProviderException;
+import com.agenthub.agent.domain.provider.exception.ProviderUnavailableException;
 import com.agenthub.agent.domain.provider.model.*;
 import com.agenthub.agent.domain.provider.router.DynamicProviderRouter;
 import com.agenthub.agent.dto.*;
@@ -12,6 +13,7 @@ import com.agenthub.agent.infrastructure.entity.TokenUsageAuditEntity;
 import com.agenthub.agent.infrastructure.provider.AnthropicProvider;
 import com.agenthub.agent.infrastructure.provider.GeminiProvider;
 import com.agenthub.agent.infrastructure.provider.MockLlmProvider;
+import com.agenthub.agent.infrastructure.provider.OllamaProvider;
 import com.agenthub.agent.infrastructure.provider.OpenAiCompatibleProvider;
 import com.agenthub.agent.infrastructure.repository.ProviderRepository;
 import com.agenthub.agent.infrastructure.repository.TokenUsageAuditRepository;
@@ -366,6 +368,66 @@ public class Phase7LiveProvidersAndBudgetGovernanceTest {
         ChatResponse demoResponse = testRouter.routeAndExecute(demoRequest);
         assertThat(demoResponse).isNotNull();
         assertThat(demoResponse.getProviderType()).isEqualTo("MOCK");
+    }
+
+    @Test
+    @DisplayName("测试 Ollama 本地 Provider 模式隔离：LIVE 模式下连接失败严禁静默回退为模拟输出，DEMO 模式允许降级")
+    void shouldStrictlyBlockOllamaSilentFallbackInLiveModes() {
+        // Point Ollama to an unreachable port to trigger ConnectException
+        OllamaProvider unreachableOllama = new OllamaProvider(
+                "prov-ollama-test",
+                "OLLAMA",
+                "Unreachable Local Ollama",
+                "http://127.0.0.1:59999",
+                "none",
+                "llama3.2:3b",
+                50,
+                1,
+                Set.of("code", "local"),
+                0.0,
+                0.0,
+                null
+        );
+
+        ChatRequest liveRequest = new ChatRequest();
+        liveRequest.setMessages(List.of(ChatMessage.user("Generate rust function")));
+        liveRequest.setExecutionMode(ProviderExecutionMode.LIVE_SELF_HOSTED);
+
+        // Under LIVE_SELF_HOSTED, connection failure MUST throw ProviderUnavailableException
+        assertThatThrownBy(() -> unreachableOllama.chat(liveRequest))
+                .isInstanceOf(ProviderUnavailableException.class)
+                .hasMessageContaining("simulated fallback strictly blocked");
+
+        // Under DEMO_SIMULATED, connection failure gracefully falls back to simulation
+        ChatRequest demoRequest = new ChatRequest();
+        demoRequest.setMessages(List.of(ChatMessage.user("Generate rust function")));
+        demoRequest.setExecutionMode(ProviderExecutionMode.DEMO_SIMULATED);
+
+        ChatResponse demoResp = unreachableOllama.chat(demoRequest);
+        assertThat(demoResp).isNotNull();
+        assertThat(demoResp.getContent()).contains("Local Llama / Ollama Output");
+    }
+
+    @Test
+    @DisplayName("测试 ProviderProbeResultView 探针结果的 reachable 字段契约与序列化对齐")
+    void shouldSerializeReachableInProviderProbeResultView() {
+        ProviderProbeResultView upView = new ProviderProbeResultView(
+                "prov-test-up", "OPENAI", "gpt-4o", "UP", 35L, "CLOSED", false, "Endpoint healthy", null
+        );
+        assertThat(upView.isReachable()).isTrue();
+        assertThat(upView.getReachable()).isTrue();
+
+        ProviderProbeResultView downView = new ProviderProbeResultView(
+                "prov-test-down", "OPENAI", "gpt-4o", "DOWN", 0L, "OPEN", false, "Connection refused", null
+        );
+        assertThat(downView.isReachable()).isFalse();
+        assertThat(downView.getReachable()).isFalse();
+
+        ProviderProbeResultView degradedView = new ProviderProbeResultView(
+                "prov-test-deg", "OPENAI", "gpt-4o", "DEGRADED", 150L, "HALF_OPEN", false, "Probing recovery", null
+        );
+        assertThat(degradedView.isReachable()).isTrue();
+        assertThat(degradedView.getReachable()).isTrue();
     }
 
     // =========================================================================

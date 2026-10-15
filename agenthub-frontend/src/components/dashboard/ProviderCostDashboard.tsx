@@ -121,11 +121,12 @@ export function ProviderCostDashboard({
     }));
     try {
       const res = await apiClient.probeProvider(providerId);
+      const isReachable = res.reachable ?? (res.status === "UP" || res.status === "DEGRADED");
       setProbeStates((prev) => ({
         ...prev,
         [providerId]: {
           latencyMs: res.latencyMs,
-          reachable: res.reachable,
+          reachable: isReachable,
           probing: false,
           message: res.message,
         },

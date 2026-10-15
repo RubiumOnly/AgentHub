@@ -53,6 +53,8 @@ public class ProviderProbeResultView implements Serializable {
     public void setSimulated(boolean simulated) { this.simulated = simulated; }
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
+    public boolean isReachable() { return !"DOWN".equalsIgnoreCase(status); }
+    public boolean getReachable() { return isReachable(); }
     public LocalDateTime getCheckedAt() { return checkedAt; }
     public void setCheckedAt(LocalDateTime checkedAt) { this.checkedAt = checkedAt; }
 }

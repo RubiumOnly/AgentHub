@@ -973,36 +973,51 @@ export interface ProviderProbeResultView {
   providerId: string;
   providerType: string;
   model: string;
-  reachable: boolean;
-  httpStatusCode?: number;
+  status: "UP" | "DEGRADED" | "DOWN";
   latencyMs: number;
+  circuitStatus: "CLOSED" | "HALF_OPEN" | "OPEN";
+  simulated: boolean;
   message: string;
-  probedAt: string;
+  checkedAt?: string;
+  reachable?: boolean;
+  httpStatusCode?: number;
+  probedAt?: string;
 }
 
 export interface CircuitBreakerView {
   providerId: string;
+  status?: "CLOSED" | "OPEN" | "HALF_OPEN";
   state: "CLOSED" | "OPEN" | "HALF_OPEN";
   failureThreshold: number;
-  failureCount: number;
-  consecutiveSuccessCount: number;
-  lastFailureTime?: string;
-  openTimeoutSeconds: number;
+  consecutiveFailures?: number;
+  failureCount?: number;
+  consecutiveSuccessCount?: number;
+  lastFailureTime?: number | string;
+  lastSuccessTime?: number | string;
+  lastLatencyMs?: number;
+  openTimeoutMs?: number;
+  openTimeoutSeconds?: number;
   requestAllowed: boolean;
 }
 
 export interface ProviderHealthView {
   providerId: string;
+  name: string;
   providerType: string;
   model: string;
-  mode: string;
-  circuitState: "CLOSED" | "OPEN" | "HALF_OPEN";
-  available: boolean;
-  averageLatencyMs: number;
-  totalCalls: number;
-  failedCalls: number;
-  lastProbeSuccess: boolean;
-  statusMessage: string;
+  status: "UP" | "DEGRADED" | "DOWN";
+  latencyMs: number;
+  circuitStatus: "CLOSED" | "OPEN" | "HALF_OPEN";
+  simulated: boolean;
+  message: string;
+  mode?: string;
+  circuitState?: "CLOSED" | "OPEN" | "HALF_OPEN";
+  available?: boolean;
+  averageLatencyMs?: number;
+  totalCalls?: number;
+  failedCalls?: number;
+  lastProbeSuccess?: boolean;
+  statusMessage?: string;
 }
 
 export interface ModelCostSummaryView {
