@@ -3,7 +3,7 @@ package com.agenthub.sandbox.api;
 import com.agenthub.sandbox.api.dto.CreateDeploymentRequest;
 import com.agenthub.sandbox.api.dto.DeploymentResponse;
 import com.agenthub.sandbox.application.DeploymentApplication;
-import com.agenthub.shared.response.Result;
+import com.agenthub.adapter.common.Result;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

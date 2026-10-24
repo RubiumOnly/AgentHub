@@ -1,5 +1,7 @@
 package com.agenthub.adapter.common;
 
+import com.agenthub.shared.exception.ErrorCode;
+
 import java.io.Serializable;
 import java.time.Instant;
 

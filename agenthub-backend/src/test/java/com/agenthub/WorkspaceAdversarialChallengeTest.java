@@ -1,7 +1,7 @@
 package com.agenthub;
 
-import com.agenthub.adapter.common.BusinessException;
-import com.agenthub.adapter.common.ErrorCode;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.infrastructure.concurrency.WorkspaceLockManager;
 import org.junit.jupiter.api.DisplayName;

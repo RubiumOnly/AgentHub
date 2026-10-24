@@ -1,5 +1,7 @@
 package com.agenthub.adapter.common;
 
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -9,16 +11,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * Phase 10 收敛后唯一异常到统一响应的转换器：错误模型只有 shared.exception 一套。
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-    @ExceptionHandler(com.agenthub.shared.exception.BusinessException.class)
-    public Result<Void> handleSharedBusinessException(com.agenthub.shared.exception.BusinessException ex) {
-        log.warn("Business exception occurred: code={}, message={}", ex.getErrorCode().getCode(), ex.getMessage());
-        return Result.fail(ex.getErrorCode().getCode(), ex.getMessage());
-    }
 
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException ex) {

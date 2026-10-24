@@ -1,7 +1,7 @@
 package com.agenthub.domain.workspace.service;
 
-import com.agenthub.adapter.common.BusinessException;
-import com.agenthub.adapter.common.ErrorCode;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
 import com.agenthub.project.infrastructure.repository.WorkspaceRepository;
 import org.springframework.beans.factory.annotation.Autowired;

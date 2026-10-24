@@ -107,17 +107,12 @@ tailwind.config.ts[CU2T]: F:Tailwind主题与扫描范围 | R:code:agenthub-fron
 AgentHubApplication.java[EG8T]: F:Spring Boot启动入口 | R:code:shared/filter/RequestCorrelationFilter.java | A:java -jar | S:@EnableAsync与@EnableScheduling开启异步调度；组件扫描根为com.agenthub
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/adapter/common/===
-BusinessException.java[CG6T]: F:Web层业务异常 | R:code:adapter/common/GlobalExceptionHandler.java | A:Controller层 | S:与shared/exception同名类并存属历史分叉；Phase10收敛必须合并
-ErrorCode.java[CG6T]: F:Web层错误码枚举 | R:code:shared/exception/ErrorCode.java | A:GlobalExceptionHandler | S:与shared/exception/ErrorCode码段重叠；收敛前同一响应不得混用两套
-GlobalExceptionHandler.java[CG8T]: F:统一异常到Result转换 | R:code:adapter/common/Result.java | A:RestControllerAdvice | S:兼容两套BusinessException；兜底500不向客户端泄露堆栈
-Result.java[CG7T]: F:统一响应体包装 | R:code:shared/context/RequestContext.java | A:全部Controller | S:requestId自动取自RequestContext；前端契约以此结构为准
+GlobalExceptionHandler.java[CG8S]: F:统一异常到Result转换 | R:code:adapter/common/Result.java | A:RestControllerAdvice | S:错误模型仅shared.exception一套；兜底500不向客户端泄露堆栈
+Result.java[CG7M]: F:统一响应体包装 | R:code:shared/context/RequestContext.java | A:全部Controller | S:requestId自动取自RequestContext；fail重载绑定shared错误码字典
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/exception/===
 BusinessException.java[CG7T]: F:领域与应用层标准业务异常 | R:code:shared/exception/ErrorCode.java | A:Application/Domain层 | S:仅携带ErrorCode；适配层异常不得向领域层回传
 ErrorCode.java[CG9S]: F:企业标准错误码字典 | R:code:shared/contract/BoundedContext.java | A:全后端模块 | S:码段按限界上下文划分；新增码必须落对应码段
-
-===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/response/===
-Result.java[CG6S]: F:共享层响应包装 | R:code:adapter/common/Result.java | A:shared层 | S:与adapter/common/Result结构重复；删除前必须先证明零引用
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/context/===
 RequestContext.java[CG8T]: F:ThreadLocal请求上下文 | R:code:shared/filter/RequestCorrelationFilter.java | A:全后端 | S:get()惰性生成req-id；异步线程不自动继承需显式传递
@@ -513,7 +508,7 @@ FileDiffEntry.java[DE4T]: F:文件Diff条目值对象 | R:code:domain/workspace/
 StructuredDiff.java[DE5T]: F:结构化Diff值对象 | R:code:domain/workspace/service/JGitWorkspaceManager.java | A:审查界面 | S:Tree-to-Tree结构化结果；替代行级旧Diff
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/===
-DefaultWorkspaceResolver.java[DR8M]: F:受控路径解析实现 | R:code:domain/workspace/service/WorkspaceResolver.java | A:全文件链路 | S:阻断../与绝对路径与符号链接逃逸；.git只读；安全边界不容放宽
+DefaultWorkspaceResolver.java[DR8S]: F:受控路径解析实现 | R:code:domain/workspace/service/WorkspaceResolver.java | A:全文件链路 | S:阻断../与绝对路径与符号链接逃逸；.git只读；安全边界不容放宽
 JGitWorkspaceManager.java[DP9L]: F:JGit工作区操作 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:工作区链路 | S:基线/快照/结构化Diff/Revert；大文件与锁行为需真实Git远端验证
 WorkspaceResolver.java[DR6T]: F:受控路径解析端口 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:全文件链路 | S:所有文件访问必须经此解析，禁止旁路拼接路径
 
@@ -674,7 +669,7 @@ TeamMemberRepository.java[PI4T]: F:成员数据访问 | R:code:team/infrastructu
 TeamRepository.java[PI4T]: F:团队数据访问 | R:code:team/infrastructure/entity/TeamEntity.java | A:Application层 | S:团队存取
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/api/===
-DeploymentController.java[EI6T]: F:部署REST入口 | R:code:sandbox/application/DeploymentApplicationService.java | A:前端 | S:创建/查询/日志/停止/探针；仅接受ACCEPTED产物
+DeploymentController.java[EI6S]: F:部署REST入口 | R:code:sandbox/application/DeploymentApplicationService.java | A:前端 | S:创建/查询/日志/停止/探针；仅接受ACCEPTED产物
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/api/dto/===
 CreateDeploymentRequest.java[DI4T]: F:创建部署请求DTO | R:code:sandbox/application/DeploymentApplicationService.java | A:DeploymentController | S:模板类型+产物绑定
@@ -839,22 +834,22 @@ Phase7LiveProvidersAndBudgetGovernanceTest.java[TQ6L]: F:验证Provider适配与
 Phase8PerformanceBenchmarkAndE2ETest.java[TQ6L]: F:验证E2E与性能基准 | R:code:docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md | A:mvn test | S:十阶段闭环；延迟门禁已按真实环境校准
 Phase9BaselineAndGovernanceGuardTest.java[TQ9M]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹/AOCI资产与旧路由410六重守护
 PhaseASecurityAndResourceBoundaryIntegrationTest.java[TQ7L]: F:验证生产安全边界 | R:code:identity/infrastructure/security/TokenProvider.java | A:mvn test | S:prod弱密钥拒绝启动；越权阻断
-PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java[TQ7L]: F:验证沙箱交付真实可达 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:真实HTTP访问+目录穿越拦截+停止真下线
+PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java[TQ7M]: F:验证沙箱交付真实可达 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:真实HTTP访问+停止真下线；旧preview路由已退场，Dockerfile守护保留
 PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java[TQ7L]: F:验证生产预检与灾备演练 | R:code:infrastructure/ops/DisasterRecoveryBackupService.java | A:mvn test | S:占位符拦截+篡改档拒绝恢复；CI真实MySQL必跑
-PhaseFProductQualityAndEvidenceBundleIntegrationTest.java[TQ7L]: F:验证E2E契约与证据包 | R:code:execution/application/RunEvidenceModule.java | A:mvn test | S:脱敏+确定性SHA-256
+PhaseFProductQualityAndEvidenceBundleIntegrationTest.java[TQ7M]: F:验证E2E契约与证据包 | R:code:execution/application/RunEvidenceModule.java | A:mvn test | S:脱敏+确定性SHA-256；下载断言统一v1路径
 PortAllocationAndHealthCheckTest.java[TQ5S]: F:验证端口分配边界 | R:code:sandbox/domain/service/PortAllocationService.java | A:mvn test | S:严格落在[18000,18999]且真实可用
 ProfileIsolationTest.java[TQ4S]: F:验证test profile隔离 | R:code:agenthub-backend/src/main/resources/application-test.yml | A:mvn test | S:防止测试误激活生产配置
 ProviderAndTokenUsageControllerIntegrationTest.java[TQ5S]: F:验证Provider列表脱敏 | R:code:agent/api/ProviderController.java | A:mvn test | S:API Key绝不回显
 ProviderDrivenAgentRuntimeIntegrationTest.java[TQ7S]: F:验证Provider运行时闭环 | R:code:runtime/provider/ProviderDrivenAgentRuntime.java | A:mvn test | S:流式+用量核算+审计落库
 ProviderFaultToleranceAndFallbackTest.java[TQ7M]: F:验证429降级切换 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:mvn test | S:主备无缝切换+降级留痕
 ProviderSpiAndPolymorphismContractTest.java[TQ5S]: F:验证Provider适配契约 | R:code:agent/infrastructure/provider/OpenAiCompatibleProvider.java | A:mvn test | S:消息转换+token统计契约
-RestApiSecurityAndMultiTenancyIntegrationTest.java[TQ7M]: F:验证认证全生命周期 | R:code:identity/api/AuthController.java | A:mvn test | S:注册/登录/刷新/注销/吊销闭环
+RestApiSecurityAndMultiTenancyIntegrationTest.java[TQ7M]: F:验证认证全生命周期 | R:code:identity/api/AuthController.java | A:mvn test | S:注册/登录/刷新/注销/吊销闭环；会话越权隔离经/api/conversations
 SafeExpressionEvaluatorAndDataFlowTest.java[TQ6S]: F:验证安全求值与数据流 | R:code:orchestration/domain/evaluation/SafeExpressionEvaluator.java | A:mvn test | S:步骤输出引用传递；反射注入被拒
 SandboxProviderAndExecutionTest.java[TQ5S]: F:验证进程沙箱执行 | R:code:sandbox/domain/provider/LocalProcessSandbox.java | A:mvn test | S:合规命令exitCode 0
 SandboxSecurityGuardAndFirewallTest.java[TQ7M]: F:验证命令防火墙 | R:code:sandbox/domain/security/CommandSecurityGuard.java | A:mvn test | S:破坏性命令严格阻断
 SecretMaskingAndCredentialSecurityTest.java[TQ6T]: F:验证脱敏算法 | R:code:agent/infrastructure/security/SecretMasker.java | A:mvn test | S:sk-格式密钥中间脱敏
 SystemHealthTest.java[TQ4T]: F:验证健康接口元信息 | R:code:ops/api/SystemHealthController.java | A:mvn test | S:UP状态与系统信息
-TeamAndConversationControllerIntegrationTest.java[TQ5S]: F:验证团队REST接口 | R:code:team/api/TeamController.java | A:mvn test | S:团队创建/查询/拓扑决策
+TeamAndConversationControllerIntegrationTest.java[TQ5S]: F:验证团队与会话REST接口 | R:code:team/api/TeamController.java | A:mvn test | S:团队创建/查询/拓扑决策；会话交互走/api/conversations
 TeamTopologyAndCoordinationTest.java[TQ6S]: F:验证层级拓扑协调 | R:code:team/domain/strategy/HierarchicalTopologyCoordinator.java | A:mvn test | S:控制权严格回摆Leader
 TokenCostAccountingAndAuditingTest.java[TQ6S]: F:验证定价核算 | R:code:agent/domain/provider/model/ModelPricing.java | A:mvn test | S:主流模型计费精度
 WorkflowAndJGitTest.java[TQ5S]: F:验证JGit初始化与Diff | R:code:domain/workspace/service/JGitWorkspaceManager.java | A:mvn test | S:行级Diff准确性
@@ -863,6 +858,6 @@ WorkflowCancellationAndTimeoutTest.java[TQ6S]: F:验证取消令牌与超时 | R
 WorkflowDagSchedulingAndParallelExecutionTest.java[TQ7M]: F:验证菱形DAG并行汇聚 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:mvn test | S:真并行+汇聚等待全量成功
 WorkflowDefinitionAndApprovalControllerIntegrationTest.java[TQ5S]: F:验证定义与审批REST | R:code:orchestration/api/WorkflowDefinitionController.java | A:mvn test | S:创建/校验/查询契约
 WorkflowDslValidationAndCycleDetectionTest.java[TQ5M]: F:验证拓扑排序 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:mvn test | S:线性DAG排序正确
-WorkspaceAdversarialChallengeTest.java[TQ7M]: F:验证对抗路径攻击 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:深层穿越与系统目录访问必须阻断
-WorkspacePathGuardTest.java[TQ6M]: F:验证路径穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:错误码3004
-WorkspaceSecurityAndJGitAuditIntegrationTest.java[TQ6L]: F:验证读写边界拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:读写双向穿越拦截
+WorkspaceAdversarialChallengeTest.java[TQ7S]: F:验证对抗路径攻击 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:深层穿越与系统目录访问必须阻断
+WorkspacePathGuardTest.java[TQ6S]: F:验证路径穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:错误码3004
+WorkspaceSecurityAndJGitAuditIntegrationTest.java[TQ6S]: F:验证读写边界与REST穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:读写双向穿越拦截；Phase10承接Web层对抗覆盖

@@ -1,7 +1,7 @@
 package com.agenthub;
 
-import com.agenthub.adapter.common.BusinessException;
-import com.agenthub.adapter.common.ErrorCode;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import com.agenthub.audit.application.ArtifactApplication;
 import com.agenthub.audit.dto.ArtifactView;
 import com.agenthub.audit.infrastructure.entity.ArtifactEntity;

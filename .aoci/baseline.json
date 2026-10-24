@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T06:03:13Z",
+  "updated_at": "2026-10-24T06:17:20Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -101,15 +101,15 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/adapter/common/GlobalExceptionHandler.java": {
       "role": "index",
-      "sha256": "f846381ddf09eabe3b255ab3e35b26f6a10a85a06d1ad5744652900be2365fa7",
-      "size": 1973,
-      "normalized_sha256": "f846381ddf09eabe3b255ab3e35b26f6a10a85a06d1ad5744652900be2365fa7"
+      "sha256": "50273a3b93d992e047e4e9ae7c9d0106d2bcba307670153dad508dd936542acf",
+      "size": 1812,
+      "normalized_sha256": "50273a3b93d992e047e4e9ae7c9d0106d2bcba307670153dad508dd936542acf"
     },
     "agenthub-backend/src/main/java/com/agenthub/adapter/common/Result.java": {
       "role": "index",
-      "sha256": "44499b84da0e270436b2875a6a12c55b8759c4a8559226ca4d983df18cd149b0",
-      "size": 2218,
-      "normalized_sha256": "44499b84da0e270436b2875a6a12c55b8759c4a8559226ca4d983df18cd149b0"
+      "sha256": "65e02d9c29fb73b0595daef5399ec6f0ac9216f0314f210c3b3b8ad74d091434",
+      "size": 2267,
+      "normalized_sha256": "65e02d9c29fb73b0595daef5399ec6f0ac9216f0314f210c3b3b8ad74d091434"
     },
     "agenthub-backend/src/main/java/com/agenthub/adapter/web/IMController.java": {
       "role": "index",
@@ -929,9 +929,9 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/domain/workflow/service/WorkflowEngineService.java": {
       "role": "index",
-      "sha256": "899f54d6dfb9063ad553332ffadaf2487feabf503c9633527695dbc7b60fbd75",
-      "size": 6126,
-      "normalized_sha256": "899f54d6dfb9063ad553332ffadaf2487feabf503c9633527695dbc7b60fbd75"
+      "sha256": "9c39fcbdad5cb87bf96d08bbe6033e1a747717a295395ee574b8661022d983c3",
+      "size": 6130,
+      "normalized_sha256": "9c39fcbdad5cb87bf96d08bbe6033e1a747717a295395ee574b8661022d983c3"
     },
     "agenthub-backend/src/main/java/com/agenthub/domain/workspace/model/FileDiffEntry.java": {
       "role": "index",
@@ -947,9 +947,9 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/DefaultWorkspaceResolver.java": {
       "role": "index",
-      "sha256": "8101e1b8d89b053319e0c71d0e9fa280aa64893e4b1f284172d6f8cc64713a45",
-      "size": 13143,
-      "normalized_sha256": "8101e1b8d89b053319e0c71d0e9fa280aa64893e4b1f284172d6f8cc64713a45"
+      "sha256": "5567ab8c0df7db85ccc0bfc3b4bdc168380e9cfac639ebd63697a1c1213f0547",
+      "size": 13147,
+      "normalized_sha256": "5567ab8c0df7db85ccc0bfc3b4bdc168380e9cfac639ebd63697a1c1213f0547"
     },
     "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/JGitWorkspaceManager.java": {
       "role": "index",
@@ -1769,9 +1769,9 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/project/application/WorkspaceApplicationService.java": {
       "role": "index",
-      "sha256": "6c860eeeb52484ea51a29edadd628e6fc993990895fcc166973ceb81fc92fe93",
-      "size": 33088,
-      "normalized_sha256": "6c860eeeb52484ea51a29edadd628e6fc993990895fcc166973ceb81fc92fe93"
+      "sha256": "4e02e800bf5109c4e77db56bfd92cdd28daa84e38ea314f548a54798dcb14b11",
+      "size": 33092,
+      "normalized_sha256": "4e02e800bf5109c4e77db56bfd92cdd28daa84e38ea314f548a54798dcb14b11"
     },
     "agenthub-backend/src/main/java/com/agenthub/project/application/WorkspaceQuotaGuard.java": {
       "role": "index",
@@ -1997,9 +1997,9 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/sandbox/api/DeploymentController.java": {
       "role": "index",
-      "sha256": "731bf7f9a0859719aecd6eb0e55b97d9ff6e3a9257fff0e54a8b0ae7989864de",
-      "size": 2556,
-      "normalized_sha256": "731bf7f9a0859719aecd6eb0e55b97d9ff6e3a9257fff0e54a8b0ae7989864de"
+      "sha256": "06a5b08c2dea67688996d6330bc55f834f001de7c48d6a011086e94bb0e6d0e4",
+      "size": 2555,
+      "normalized_sha256": "06a5b08c2dea67688996d6330bc55f834f001de7c48d6a011086e94bb0e6d0e4"
     },
     "agenthub-backend/src/main/java/com/agenthub/sandbox/api/dto/CreateDeploymentRequest.java": {
       "role": "index",
@@ -2795,9 +2795,9 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java": {
       "role": "index",
-      "sha256": "9467a1feba63f1627488c01dc3e1d560b240aacccca61e5fdf6e355781f1571e",
-      "size": 31553,
-      "normalized_sha256": "9467a1feba63f1627488c01dc3e1d560b240aacccca61e5fdf6e355781f1571e"
+      "sha256": "2d787eeff73cc010366e6a71cb4a66522399674271467b14d2e74cb82a70e575",
+      "size": 30411,
+      "normalized_sha256": "2d787eeff73cc010366e6a71cb4a66522399674271467b14d2e74cb82a70e575"
     },
     "agenthub-backend/src/test/java/com/agenthub/PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java": {
       "role": "index",
@@ -2807,9 +2807,9 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/PhaseFProductQualityAndEvidenceBundleIntegrationTest.java": {
       "role": "index",
-      "sha256": "3a3de2fcc57826cce90a47ecbac0471afbafca895c5f1b55ec1327789e17c2da",
-      "size": 58800,
-      "normalized_sha256": "3a3de2fcc57826cce90a47ecbac0471afbafca895c5f1b55ec1327789e17c2da"
+      "sha256": "0904d6b460d2c7b1a52379f0153a71ce732d3ac725d52a2a59c1721d90c1ac2d",
+      "size": 58833,
+      "normalized_sha256": "0904d6b460d2c7b1a52379f0153a71ce732d3ac725d52a2a59c1721d90c1ac2d"
     },
     "agenthub-backend/src/test/java/com/agenthub/PortAllocationAndHealthCheckTest.java": {
       "role": "index",
@@ -2849,9 +2849,9 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/RestApiSecurityAndMultiTenancyIntegrationTest.java": {
       "role": "index",
-      "sha256": "96c7c53b82a2f002b10be2bc1f66ad6973c528f9765c5b9e1d8aa1fef5128fa2",
-      "size": 17214,
-      "normalized_sha256": "96c7c53b82a2f002b10be2bc1f66ad6973c528f9765c5b9e1d8aa1fef5128fa2"
+      "sha256": "afeb5415a72c643f978d62a612e3aaaedcdc5a34a292932828f41787e83b61fd",
+      "size": 17193,
+      "normalized_sha256": "afeb5415a72c643f978d62a612e3aaaedcdc5a34a292932828f41787e83b61fd"
     },
     "agenthub-backend/src/test/java/com/agenthub/SafeExpressionEvaluatorAndDataFlowTest.java": {
       "role": "index",
@@ -2891,9 +2891,9 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/TeamAndConversationControllerIntegrationTest.java": {
       "role": "index",
-      "sha256": "f8b60826a24dfd9619ee311353eab7dad5764d2a0d22446ef92a81ae04d9ae10",
-      "size": 8946,
-      "normalized_sha256": "f8b60826a24dfd9619ee311353eab7dad5764d2a0d22446ef92a81ae04d9ae10"
+      "sha256": "d9874a9b39e33c864609b22ca5c31de13efc58c047a79772320c90f0b45058e2",
+      "size": 8925,
+      "normalized_sha256": "d9874a9b39e33c864609b22ca5c31de13efc58c047a79772320c90f0b45058e2"
     },
     "agenthub-backend/src/test/java/com/agenthub/TeamTopologyAndCoordinationTest.java": {
       "role": "index",
@@ -2945,21 +2945,21 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/WorkspaceAdversarialChallengeTest.java": {
       "role": "index",
-      "sha256": "f8885a1df5af519f4349767bfbfc616cbcc278d7168e4581dbaab13bad700c33",
-      "size": 10698,
-      "normalized_sha256": "f8885a1df5af519f4349767bfbfc616cbcc278d7168e4581dbaab13bad700c33"
+      "sha256": "06521ff65815fe365626377ad22d2934fffa077328712e61ed2a882b7cdd2bae",
+      "size": 8841,
+      "normalized_sha256": "06521ff65815fe365626377ad22d2934fffa077328712e61ed2a882b7cdd2bae"
     },
     "agenthub-backend/src/test/java/com/agenthub/WorkspacePathGuardTest.java": {
       "role": "index",
-      "sha256": "45669598687c6c5605d7b8a238afbbc6610759662476f47b0b6088c580fb913b",
-      "size": 12326,
-      "normalized_sha256": "45669598687c6c5605d7b8a238afbbc6610759662476f47b0b6088c580fb913b"
+      "sha256": "5c9a3164321f64ecdb8ebed8c9c614ba3361514de5e42de8fa6b14b1d973b6bf",
+      "size": 10776,
+      "normalized_sha256": "5c9a3164321f64ecdb8ebed8c9c614ba3361514de5e42de8fa6b14b1d973b6bf"
     },
     "agenthub-backend/src/test/java/com/agenthub/WorkspaceSecurityAndJGitAuditIntegrationTest.java": {
       "role": "index",
-      "sha256": "106e0c1ea8bd1fd1cf87c81c3543e6123ff926505e86f913fba4e5a647873cb5",
-      "size": 34424,
-      "normalized_sha256": "106e0c1ea8bd1fd1cf87c81c3543e6123ff926505e86f913fba4e5a647873cb5"
+      "sha256": "e3d1eb8b4c2d6911de4722b049466c3ab5e788dc321a99fcae8b7f343ae4622f",
+      "size": 35349,
+      "normalized_sha256": "e3d1eb8b4c2d6911de4722b049466c3ab5e788dc321a99fcae8b7f343ae4622f"
     },
     "agenthub-frontend/Dockerfile": {
       "role": "index",
@@ -3257,9 +3257,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "ec742649b431fb4a5dbfdb6d5f34afdeb5681644e9e1432d96cf6e8fb9fab2b4",
-      "size": 116972,
-      "normalized_sha256": "ec742649b431fb4a5dbfdb6d5f34afdeb5681644e9e1432d96cf6e8fb9fab2b4"
+      "sha256": "5760aa35812e901bbfda4e0620fd1359cc9d6724b7f1d7bf8917fdad285ff2f6",
+      "size": 116524,
+      "normalized_sha256": "5760aa35812e901bbfda4e0620fd1359cc9d6724b7f1d7bf8917fdad285ff2f6"
     },
     "aoci.database.txt": {
       "role": "index",

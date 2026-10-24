@@ -1,7 +1,7 @@
 package com.agenthub.domain.workflow.service;
 
-import com.agenthub.adapter.common.BusinessException;
-import com.agenthub.adapter.common.ErrorCode;
+import com.agenthub.shared.exception.BusinessException;
+import com.agenthub.shared.exception.ErrorCode;
 import com.agenthub.domain.agent.model.AgentExecutionRequest;
 import com.agenthub.domain.agent.model.AgentExecutionResult;
 import com.agenthub.domain.agent.service.AgentAdapterFactory;
