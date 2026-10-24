@@ -6,6 +6,10 @@ import com.agenthub.conversation.domain.model.MessageProtocolType;
 import com.agenthub.conversation.domain.model.MessageType;
 import com.agenthub.conversation.domain.service.*;
 import com.agenthub.conversation.domain.sse.ConversationEventBroadcaster;
+import com.agenthub.conversation.application.pipeline.ContextWindowManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.agenthub.conversation.application.pipeline.LegacyMentionPipeline;
+import com.agenthub.conversation.application.pipeline.TeamTurnCoordinator;
 import com.agenthub.conversation.dto.*;
 import com.agenthub.conversation.infrastructure.entity.ConversationParticipantEntity;
 import com.agenthub.conversation.infrastructure.repository.ConversationParticipantRepository;
@@ -52,6 +56,16 @@ import java.util.stream.Collectors;
 @Primary
 @Service
 public class ConversationApplicationService implements ConversationApplication {
+
+    @Autowired
+    private com.agenthub.conversation.application.pipeline.TeamTurnCoordinator teamTurnCoordinator;
+
+    @Autowired
+    private com.agenthub.conversation.application.pipeline.ContextWindowManager contextWindowManager;
+
+    @Autowired
+    private com.agenthub.conversation.application.pipeline.LegacyMentionPipeline legacyMentionPipeline;
+
 
     private static final Logger log = LoggerFactory.getLogger(ConversationApplicationService.class);
 
@@ -324,9 +338,9 @@ public class ConversationApplicationService implements ConversationApplication {
         CompletableFuture.runAsync(() -> {
             try {
                 if (conversation.getTeamId() != null && !conversation.getTeamId().isBlank()) {
-                    triggerTeamTurn(conversationId);
+                    teamTurnCoordinator.triggerTeamTurn(conversationId, this::toMessageView, this::generateRollingSummary);
                 } else {
-                    handleLegacyMentions(conversation, cmd.getContent(), mentions, senderType, messageType);
+                    legacyMentionPipeline.handleLegacyMentions(conversation, cmd.getContent(), mentions, senderType, messageType, this::toMessageView);
                 }
             } catch (Exception e) {
                 log.error("Failed to execute asynchronous turn for conversation {}: ", conversationId, e);
@@ -362,30 +376,7 @@ public class ConversationApplicationService implements ConversationApplication {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
         accessGuard.checkOwnership(conv.getOwnerId(), RequestContext.get().getUserId());
 
-        List<MessageView> allMessages = messageRepository.findByConversationIdOrderBySequenceNumAsc(conversationId).stream()
-                .map(this::toMessageView)
-                .collect(Collectors.toList());
-
-        int effectiveWindowSize = windowSize > 0 ? windowSize : 8;
-        int effectiveMaxTokens = maxTokens > 0 ? maxTokens : 4000;
-
-        SlidingWindowContextTrimmer.WindowSplit split = contextTrimmer.trimToWindow(allMessages, effectiveWindowSize);
-        List<MessageView> fitted = tokenBudgetManager.fitToBudget(split.getActiveMessages(), conv.getSummary(), effectiveMaxTokens);
-
-        int totalTokens = tokenBudgetManager.estimateTokens(conv.getSummary());
-        for (MessageView mv : fitted) {
-            totalTokens += tokenBudgetManager.estimateMessageTokens(mv);
-        }
-
-        int trimmedCount = allMessages.size() - fitted.size();
-
-        return new ContextWindowView(
-                conversationId,
-                fitted,
-                conv.getSummary(),
-                totalTokens,
-                trimmedCount
-        );
+        return contextWindowManager.getContextWindow(conversationId, windowSize, maxTokens, this::toMessageView);
     }
 
     @Override
@@ -394,265 +385,12 @@ public class ConversationApplicationService implements ConversationApplication {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
         accessGuard.checkOwnership(conv.getOwnerId(), RequestContext.get().getUserId());
 
-        List<MessageView> allMessages = messageRepository.findByConversationIdOrderBySequenceNumAsc(conversationId).stream()
-                .map(this::toMessageView)
-                .collect(Collectors.toList());
-
-        String effectiveSummary = conv.getSummary();
-        if (allMessages.size() > 4) {
-            SlidingWindowContextTrimmer.WindowSplit split = contextTrimmer.trimToWindow(allMessages, 4);
-            if (!split.getOlderMessages().isEmpty()) {
-                String updatedSummary = rollingSummaryService.synthesizeRollingSummary(conv.getSummary(), split.getOlderMessages());
-                conversationRepository.updateSummary(conversationId, updatedSummary, LocalDateTime.now());
-                effectiveSummary = updatedSummary;
-                broadcastEvent(conversationId, "summary_generated", Map.of(
-                        "conversationId", conversationId,
-                        "summary", updatedSummary
-                ));
-            }
-        }
-
-        return new ConversationSummaryView(
-                conversationId,
-                effectiveSummary,
-                allMessages.size(),
-                tokenBudgetManager.estimateTokens(effectiveSummary)
-        );
+        return contextWindowManager.generateRollingSummary(conversationId, this::toMessageView);
     }
 
     @Override
     public void triggerTeamTurn(String conversationId) {
-        ConversationEntity conv = conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CONVERSATION_NOT_FOUND, "Conversation not found: " + conversationId));
-
-        if (conv.getTeamId() == null || conv.getTeamId().isBlank() || "TERMINATED".equalsIgnoreCase(conv.getStatus())) {
-            return;
-        }
-
-        TeamEntity team = teamRepository.findById(conv.getTeamId()).orElse(null);
-        if (team == null) return;
-
-        List<TeamMemberEntity> members = teamMemberRepository.findByTeamIdOrderBySortOrderAsc(team.getId());
-        if (members.isEmpty()) return;
-
-        List<MessageView> recent = messageRepository.findByConversationIdOrderBySequenceNumAsc(conversationId).stream()
-                .map(this::toMessageView)
-                .collect(Collectors.toList());
-
-        String currentSpeaker = recent.isEmpty() ? null : recent.get(recent.size() - 1).getSenderId();
-
-        TeamCoordinationContext context = new TeamCoordinationContext(
-                conversationId,
-                currentSpeaker,
-                recent.size(),
-                team.getMaxTurns(),
-                null,
-                null,
-                conv.getTitle(),
-                recent
-        );
-
-        TeamTopologyStrategy strategy = strategyFactory.getStrategy(team.getTopology());
-        NextSpeakerDecision decision = strategy.decideNextSpeaker(team, members, context);
-
-        if (decision.getAction() == NextSpeakerDecision.Action.TERMINATE) {
-            conversationRepository.updateStatus(conversationId, "TERMINATED", LocalDateTime.now());
-            long seq = sequenceManager.nextSequenceNum(conversationId);
-            MessageEntity finishMsg = new MessageEntity(
-                    "msg-" + UUID.randomUUID().toString().substring(0, 8),
-                    conversationId,
-                    "SYSTEM",
-                    SenderType.SYSTEM,
-                    null,
-                    MessageType.SYSTEM,
-                    MessageProtocolType.NORMAL,
-                    "【团队协作完成】" + decision.getReason(),
-                    "v1",
-                    seq,
-                    0,
-                    null
-            );
-            messageRepository.save(finishMsg);
-            broadcastEvent(conversationId, "message", toMessageView(finishMsg));
-            return;
-        }
-
-        if (decision.getAction() == NextSpeakerDecision.Action.SUMMARIZE) {
-            generateRollingSummary(conversationId);
-            long seq = sequenceManager.nextSequenceNum(conversationId);
-            MessageEntity summaryMsg = new MessageEntity(
-                    "msg-" + UUID.randomUUID().toString().substring(0, 8),
-                    conversationId,
-                    decision.getNextSpeakerId(),
-                    SenderType.AGENT,
-                    null,
-                    MessageType.BROADCAST,
-                    MessageProtocolType.SUMMARIZE,
-                    "【团队交付汇总结论】已完成协同编排并收敛产物：\n" + (conv.getSummary() != null ? conv.getSummary() : "多智能体任务已顺利达成共识并执行完毕。"),
-                    "v1",
-                    seq,
-                    tokenBudgetManager.estimateTokens(conv.getSummary()),
-                    null
-            );
-            messageRepository.save(summaryMsg);
-            conversationRepository.updateStatus(conversationId, "COMPLETED", LocalDateTime.now());
-            broadcastEvent(conversationId, "message", toMessageView(summaryMsg));
-            return;
-        }
-
-        // Active speaker action (CONTINUE or HANDOFF)
-        String speaker = decision.getNextSpeakerId();
-        long seq = sequenceManager.nextSequenceNum(conversationId);
-        MessageProtocolType proto = decision.getAction() == NextSpeakerDecision.Action.HANDOFF
-                ? MessageProtocolType.HANDOFF
-                : MessageProtocolType.NORMAL;
-
-        String content = "【" + decision.getNextSpeakerRole() + "】响应执行协同动作 (" + decision.getReason() + ")";
-        int tokens = tokenBudgetManager.estimateTokens(content);
-
-        MessageEntity speakerMsg = new MessageEntity(
-                "msg-" + UUID.randomUUID().toString().substring(0, 8),
-                conversationId,
-                speaker,
-                SenderType.AGENT,
-                null,
-                MessageType.BROADCAST,
-                proto,
-                content,
-                "v1",
-                seq,
-                tokens,
-                null
-        );
-        messageRepository.save(speakerMsg);
-        broadcastEvent(conversationId, "message", toMessageView(speakerMsg));
-    }
-
-    private void handleLegacyMentions(ConversationEntity conversation, String content, List<String> mentions,
-                                      SenderType senderType, MessageType messageType) {
-        String convId = conversation.getId();
-        String workspaceDir = workspaceBaseDir + "/default";
-
-        boolean isOrchestratorTargeted = mentionParser.hasOrchestratorMention(content) ||
-                (senderType == SenderType.USER && messageType == MessageType.BROADCAST &&
-                 conversation.getType() == ConversationType.GROUP_COLLABORATION && mentions.isEmpty());
-
-        if (isOrchestratorTargeted) {
-            InteractiveCard card = orchestratorTaskDecomposer.decomposeTask(content);
-            try {
-                String cardJson = objectMapper.writeValueAsString(card);
-                long cardSeq = sequenceManager.nextSequenceNum(convId);
-                MessageEntity cardMsg = new MessageEntity(
-                        "msg-" + UUID.randomUUID().toString().substring(0, 8),
-                        convId,
-                        "Orchestrator",
-                        SenderType.ORCHESTRATOR,
-                        null,
-                        MessageType.BROADCAST,
-                        MessageProtocolType.NORMAL,
-                        "已完成多 Agent 协作任务拆解与编排派发。",
-                        "v1",
-                        cardSeq,
-                        tokenBudgetManager.estimateTokens(cardJson),
-                        null
-                );
-                cardMsg.setCardPayloadJson(cardJson);
-                messageRepository.save(cardMsg);
-                broadcastEvent(convId, "message", toMessageView(cardMsg));
-
-                UnifiedAgentAdapter apiAdapter = agentAdapterFactory.getAdapter(AgentPlatformType.SPRING_AI_API);
-                AgentExecutionRequest backendReq = new AgentExecutionRequest(
-                        "BackendArchitect",
-                        AgentPlatformType.SPRING_AI_API,
-                        workspaceDir,
-                        "你作为资深后端架构师，请针对业务需求「" + content + "」编写完整的 Spring Boot 3 控制器或服务层核心代码。"
-                );
-                AgentExecutionResult backendRes = apiAdapter.execute(backendReq);
-                long backendSeq = sequenceManager.nextSequenceNum(convId);
-                MessageEntity backendMsg = new MessageEntity(
-                        "msg-" + UUID.randomUUID().toString().substring(0, 8),
-                        convId,
-                        "BackendArchitect",
-                        SenderType.AGENT,
-                        null,
-                        MessageType.BROADCAST,
-                        MessageProtocolType.NORMAL,
-                        "【阶段一完成】后端领域服务代码已编写并写入工作区：\n" + backendRes.getOutput(),
-                        "v1",
-                        backendSeq,
-                        tokenBudgetManager.estimateTokens(backendRes.getOutput()),
-                        null
-                );
-                messageRepository.save(backendMsg);
-                broadcastEvent(convId, "message", toMessageView(backendMsg));
-
-                AgentExecutionRequest frontendReq = new AgentExecutionRequest(
-                        "FrontendEngineer",
-                        AgentPlatformType.SPRING_AI_API,
-                        workspaceDir,
-                        "你作为资深前端工程师，请针对业务需求「" + content + "」编写完整的 Next.js 14 / React 响应式界面组件代码。"
-                );
-                AgentExecutionResult frontendRes = apiAdapter.execute(frontendReq);
-                long frontendSeq = sequenceManager.nextSequenceNum(convId);
-                MessageEntity frontendMsg = new MessageEntity(
-                        "msg-" + UUID.randomUUID().toString().substring(0, 8),
-                        convId,
-                        "FrontendEngineer",
-                        SenderType.AGENT,
-                        null,
-                        MessageType.BROADCAST,
-                        MessageProtocolType.NORMAL,
-                        "【阶段二完成】前端交互界面代码已编写并写入工作区：\n" + frontendRes.getOutput(),
-                        "v1",
-                        frontendSeq,
-                        tokenBudgetManager.estimateTokens(frontendRes.getOutput()),
-                        null
-                );
-                messageRepository.save(frontendMsg);
-                broadcastEvent(convId, "message", toMessageView(frontendMsg));
-
-            } catch (Exception e) {
-                log.error("Failed to execute Orchestrator workflow: ", e);
-            }
-        }
-
-        for (String mention : mentions) {
-            if ("orchestrator".equalsIgnoreCase(mention)) continue;
-
-            AgentPlatformType platformType = AgentPlatformType.fromCode(mention);
-            UnifiedAgentAdapter adapter = agentAdapterFactory.getAdapter(platformType);
-
-            AgentExecutionRequest request = new AgentExecutionRequest(
-                    mention,
-                    platformType,
-                    workspaceDir,
-                    content
-            );
-
-            adapter.executeStream(
-                    request,
-                    chunk -> broadcastEvent(convId, "message_delta", Map.of("sender", mention, "delta", chunk)),
-                    result -> {
-                        long seq = sequenceManager.nextSequenceNum(convId);
-                        MessageEntity agentMsg = new MessageEntity(
-                                "msg-" + UUID.randomUUID().toString().substring(0, 8),
-                                convId,
-                                mention,
-                                SenderType.AGENT,
-                                null,
-                                MessageType.BROADCAST,
-                                MessageProtocolType.NORMAL,
-                                result.getOutput(),
-                                "v1",
-                                seq,
-                                tokenBudgetManager.estimateTokens(result.getOutput()),
-                                null
-                        );
-                        messageRepository.save(agentMsg);
-                        broadcastEvent(convId, "message", toMessageView(agentMsg));
-                    }
-            );
-        }
+        teamTurnCoordinator.triggerTeamTurn(conversationId, this::toMessageView, this::generateRollingSummary);
     }
 
     private ConversationView populateAndConvertToView(ConversationEntity entity) {

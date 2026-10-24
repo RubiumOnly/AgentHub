@@ -589,7 +589,7 @@ ConversationController.java[EI7S]: F:会话REST与SSE入口 | R:code:conversatio
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/conversation/application/===
 ConversationApplication.java[AI5T]: F:会话用例端口 | R:code:conversation/application/ConversationApplicationService.java | A:ConversationController | S:会话与消息用例接口
-ConversationApplicationService.java[AB9L]: F:会话与多Agent消息编排 | R:code:conversation/domain/service/ConversationSequenceManager.java | A:ConversationController | S:消息序列/环路检测/团队协调集中地；服务变更主线不扩展通用IM
+ConversationApplicationService.java[AB9M]: F:会话创建与消息发送编排 | R:code:conversation/application/pipeline/TeamTurnCoordinator.java | A:ConversationController | S:序列定序与环路终止语义在服务内；团队轮次/上下文/提及已外移到pipeline缝
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/===
 ContextWindow.java[DA4T]: F:上下文窗口值对象 | R:code:conversation/domain/service/SlidingWindowContextTrimmer.java | A:上下文管理 | S:窗口内消息与token计数
@@ -804,7 +804,7 @@ agenthub-alerts.yml[OO7T]: F:核心告警规则 | R:code:docs/ops/ALERTING_RULES
 ActuatorAndMetricsIntegrationTest.java[TQ5T]: F:验证health端点与指标暴露 | R:code:identity/infrastructure/security/ActuatorSecurityFilter.java | A:mvn test | S:health开放而prometheus受限的组合行为回归
 AgentAdapterTest.java[TQ4T]: F:验证平台适配器工厂解析 | R:code:domain/agent/service/AgentAdapterFactory.java | A:mvn test | S:每种平台类型必须能解析出适配器
 AociCognitionVerificationTest.java[TQ7M]: F:验证AOCI认知状态机诚实性 | R:code:execution/domain/memory/ContextMemoryCompressor.java | A:mvn test | S:杜绝无凭据默认ALIGNED；NOT_CONFIGURED/UNAVAILABLE矩阵回归
-ArchUnitArchitectureTest.java[TQ9M]: F:架构分层守护 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:Controller禁依赖Repository等9条规则；违例即构建失败
+ArchUnitArchitectureTest.java[TQ9M]: F:架构分层守护 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:9条规则；冻结适配器豁免名单含LegacyMentionPipeline迁移链
 AuthenticationAndResourceGuardTest.java[TI6S]: F:验证注册登录与令牌签发 | R:code:identity/application/AuthApplicationService.java | A:mvn test | S:BCrypt存储与JWT签发行为回归
 ContextWindowAndRollingSummaryTest.java[TQ5S]: F:验证滑窗裁剪与滚动摘要 | R:code:conversation/domain/service/SlidingWindowContextTrimmer.java | A:mvn test | S:窗口划分与归档历史精确性
 ConversationEntityRelationAndMessageSchemaTest.java[TQ5S]: F:验证会话参与者表结构 | R:code:conversation/infrastructure/entity/ConversationParticipantEntity.java | A:mvn test | S:多Agent参与者入库，禁止逗号字符串回潮
@@ -880,3 +880,8 @@ DeploymentAccessGuard.java[SI6S]: F:部署项目访问判定 | R:code:identity/i
 DeploymentLifecycleSupport.java[AR7S]: F:部署状态轨迹与响应映射 | R:code:sandbox/infrastructure/entity/DeploymentEntity.java | A:部署域各缝 | S:lifecycleTrace追加语义与ACTIVE状态清单唯一权威；URL受external-base-url覆盖
 DeploymentOrphanReconciler.java[AR8S]: F:回收失活孤儿部署 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:启动/定时/按需 | S:启动+定时+按需三路径统一语义；回收必经STOP->CLEANUP->FAILED并释放端口
 DeploymentProbeCoordinator.java[AR6S]: F:执行真实HTTP探针 | R:code:sandbox/domain/service/HealthCheckProbeService.java | A:DeploymentApplicationService | S:探针结果留痕日志；健康回迁RUNNING、失败记错误信息
+
+===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/conversation/application/pipeline/===
+ContextWindowManager.java[DA6S]: F:上下文窗口投影与滚动摘要 | R:code:conversation/domain/service/SlidingWindowContextTrimmer.java | A:ConversationController | S:摘要刷新含广播副作用；窗口与预算默认值8/4000集中于此
+LegacyMentionPipeline.java[AI6S]: F:旧版提及代理调用管线 | R:code:domain/agent/service/AgentAdapterFactory.java | A:ConversationApplicationService | S:继承自被豁免的会话服务调用链；非团队会话专用
+TeamTurnCoordinator.java[AW7S]: F:团队拓扑轮次协调 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:ConversationApplicationService | S:TERMINATE/SUMMARIZE语义集中；SUMMARIZE先刷新摘要再沿用入口快照

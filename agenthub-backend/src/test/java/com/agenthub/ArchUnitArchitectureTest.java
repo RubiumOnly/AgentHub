@@ -108,6 +108,7 @@ class ArchUnitArchitectureTest {
                 )
                 .and().doNotHaveFullyQualifiedName("com.agenthub.agent.application.AgentApplicationService")
                 .and().doNotHaveFullyQualifiedName("com.agenthub.conversation.application.ConversationApplicationService")
+                .and().doNotHaveFullyQualifiedName("com.agenthub.conversation.application.pipeline.LegacyMentionPipeline")
                 .should().dependOnClassesThat().haveNameMatching(
                         "com\\.agenthub\\.domain\\.agent\\.(service\\.AgentAdapterFactory|spi\\.UnifiedAgentAdapter)(\\$.*)?"
                 )
