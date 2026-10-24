@@ -56,7 +56,7 @@ run-e2e-demo.ps1[TV5S]: F:Windows E2E演练脚本 | R:code:scripts/run-e2e-demo.
 test-ci-local.ps1[TV6S]: F:Windows本地门禁脚本 | R:code:scripts/test-ci-local.sh | A:提交前验证 | S:与sh版本语义对齐
 
 ===D:/work/agenthub/docs/===
-AGENTHUB_PRODUCT_LONG_TERM_PLAN.md[SG9M]: F:唯一长期路线与阶段验收 | R:code:docs/ARCHITECTURE.md | A:每个Run开始时读取 | S:唯一计划；阶段验收只追加本文；禁止另建平行计划
+AGENTHUB_PRODUCT_LONG_TERM_PLAN.md[SG9M]: F:唯一长期路线与阶段验收 | R:code:docs/ARCHITECTURE.md | A:每个Run开始时读取 | S:唯一计划；Phase 9/10 验收记录只追加本文；禁止另建平行计划
 AOCI_COGNITION.md[SO7S]: F:AOCI资产与运维唯一文档 | R:code:.mcp.json | A:运维与会话恢复 | S:版本/接入/恢复唯一权威；未对齐不得宣称aligned
 API.md[SN9L]: F:REST/SSE接口契约全景 | R:code:docs/openapi-v1.json | A:前后端契约对齐 | S:Controller矩阵唯一权威；新增Controller必须登记
 ARCHITECTURE.md[SA8L]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与22表矩阵是守卫测试断言来源

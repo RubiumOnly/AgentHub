@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T08:06:16Z",
+  "updated_at": "2026-10-24T08:12:32Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -3383,9 +3383,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "9c741e085cdae4ded3fc2768003bf7aad51aa15e60854150e432f09ce6e70d52",
-      "size": 122203,
-      "normalized_sha256": "9c741e085cdae4ded3fc2768003bf7aad51aa15e60854150e432f09ce6e70d52"
+      "sha256": "571633427a7e53c9844c9a590cfb912680a58605189a4f47df007d4db68d1654",
+      "size": 122214,
+      "normalized_sha256": "571633427a7e53c9844c9a590cfb912680a58605189a4f47df007d4db68d1654"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3443,9 +3443,9 @@
     },
     "docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md": {
       "role": "index",
-      "sha256": "1ebfc35e4de0d599478d5ecaf502d210e9ab5d1bf5f773bddcfd819a4d9ff794",
-      "size": 28410,
-      "normalized_sha256": "1ebfc35e4de0d599478d5ecaf502d210e9ab5d1bf5f773bddcfd819a4d9ff794"
+      "sha256": "4591cad761d1bf03fd066f771982d29fca8c2fc6f2cae0713f02a912d447ddc6",
+      "size": 33475,
+      "normalized_sha256": "4591cad761d1bf03fd066f771982d29fca8c2fc6f2cae0713f02a912d447ddc6"
     },
     "docs/AOCI_COGNITION.md": {
       "role": "index",

@@ -49,7 +49,7 @@ Run 创建时必须冻结模式、DSL、AgentDefinition、Prompt/Tool 版本、P
 
 | 项目 | 当前事实 | 解释 |
 | --- | --- | --- |
-| 后端生产 Java | 400 个文件 | 已具备较完整的模块化单体，文件数量冻结收敛 |
+| 后端生产 Java | 408 个文件 | Phase 10 深模块拆分后（六大类 4032→2322 行，净增子模块文件），文件数量增长为缝组件 |
 | 后端测试 | 62 个测试类 | 实测 387 个测试用例全部通过（含 AOCI 诚实性状态机校验） |
 | 前端 | 39 个 TS/TSX、1 个 CSS | 生产构建通过，静态生成 4/4 路由；`types/index.ts` 仍偏大 |
 | Web 层 | 14 个 Controller | 13 个 ACTIVE，1 个 COMPATIBILITY；Phase 9 登记的 4 个 DELETE_CANDIDATE 已于 2026-10-24（Phase 10 R1）物理退场 |
@@ -308,4 +308,22 @@ AOCI：官方 aoci CLI v0.1.0-rc21（commit cfa8e93）已安装并记入 docs/AO
 已知风险和回滚方式：本地 Database 证据容器（docker MySQL 8.4）需保持可用以支撑 `aoci database verify`；CI/生产环境 MySQL 8.0 与其小版本差异已记录。observe 策略与 Scope 变更均可经官方 preview/approve/apply 事务回滚。业务代码回滚依赖 Git 提交粒度。
 阶段退出条件：是。全部退出证据齐备：AOCI 能证明当前受管范围与 aligned 状态（check 五净、governance_aligned=true，覆盖 code+database 双域）；Whole-Index 完整交付与 Attestation 通过；全量本地门禁（62 类/387 用例）与远端目标环境门禁（GitHub Actions 三 Job 对 e4465fd/09baef9 全绿）有新日志；inventory 含 owner、引用、替代路径与删除顺序；文档旧引用清零；无未解决的基线漂移。
 下一阶段唯一入口：Phase 10——核心内核收敛与兼容路径退场（10～14 周）。
+```
+
+### Phase 10 阶段验收记录 (2026-10-24)
+
+```text
+阶段：Phase 10：核心内核收敛与兼容路径退场
+目标：以 API v1 为唯一生产契约退场兼容路径，把六大类拆成深模块，生产启动零固定主体。
+范围：兼容 Controller 退场、错误模型双轨合并、演示种子退出迁移路径、六大类深模块拆分（RunEvidenceModule/Artifact/Deployment/Conversation/Workspace/JGit）、AOCI 双域持续维护。
+代码完成：是。R1 物理删除 4 个兼容 Controller（IMController/RunAliasController/SandboxController/WorkflowAndDiffController）及 IMCollaborationService、SandboxApplication/PreviewSandboxService/DeploymentManifest 原型（-999 行），旧前缀仅由 LegacyEndpointMigrationFilter 响应 410+迁移头；R2 合并错误模型双轨（删除 adapter/common BusinessException+ErrorCode 与 shared/response/Result，-280 行），错误模型仅 shared.exception 一套；R3 以 V13（纯 DML）将 V2/V6/V7 注入的全部演示主体退出迁移路径，生产启动零固定主体，DemoBaselineSeedFixture（@Profile demo/test）承载夹具；R4-R9 六大类深模块拆分：RunEvidenceModule 627→460（evidence 校验和/用量聚合两缝）、ArtifactApplicationService 803→621（血缘/PR草稿/metadata三缝）、DeploymentApplicationService 752→529（生命周期支撑/访问控制/孤儿回收/探针四缝）、ConversationApplicationService 702→443（团队轮次/上下文窗口/旧版提及三缝）、WorkspaceApplicationService 652→397（文件读写/锁租约/JGit操作三缝）、JGitWorkspaceManager 956→333 门面（快照/Diff/回滚/JGitSupport四缝）。公开端口全部不变，Controller 调用面零改动。
+自动化测试：mvn clean test（Windows 11）62 个测试类/383 个用例全部通过（每轮提交前实测）；前端 npm ci + tsc --noEmit + npm run build 全绿；compose config 校验通过。R1 后用例数由 387 降为 383（删除 SandboxAndDeployTest 弱覆盖重复与旧路由直测方法，安全语义已迁移到 v1 路由测试）。
+目标环境验证：GitHub Actions（ubuntu-latest + 真实 MySQL 8.0 容器）三 Job 对 R1-R9 各提交运行：e6568df/a7c927b/4d8918d/538dbb5/0edbca2/e81e2f2/ac4f8b2/eae372d 全部 success；d822677 的 MySQL 门禁失败经本地新空 MySQL 复现同款门禁 45/45 全绿判定为并发时序瞬时抖动，且 ac4f8b2（含同代码路径）远端全绿覆盖验证。未验证项：真实团队多实例长周期运行（Phase 11+）；非 UTC 时区生产环境。
+跨平台回归评估：异步执行（租约/恢复：PersistentExecutionRecoveryAndLeaseTest、HighConcurrencyStressIntegrationTest）、SSE（ExecutionSseStreamAndReconnectionTest、ConversationSseStreamAndReconnectionTest，单调序列+Last-Event-ID 重放）、JGit（WorkspaceAndJGitTest、WorkspaceAdversarialChallengeTest、WorkspaceSecurityAndJGitAuditIntegrationTest、FullLifecycle 端到端）、备份（PhaseE 备份篡改恢复演练 + scripts/backup-prod 双平台脚本 + 生产 compose/DR 门禁 Job）四类回归均在"本地 Windows 全量 + 远端 ubuntu-latest/MySQL CI"双环境持续覆盖，R1-R9 全部重跑通过；Windows 本地即为 JGit 换行符/路径敏感环境的真实对照。
+AOCI：官方 CLI 0.1.0-rc21 管线每轮维护——R1 九孤儿删除+七重绑、R2 三孤儿+十三重绑、R3 五条、R4 新文件 Missing 签发+四条、R5 五条、R6 六条、R7 六条完整批次、R8 五条、R9 六条（JGitSupport 方法体自 git HEAD 逐字恢复）；每轮收尾 check 五净、governance_aligned=true（code+database 双域）。
+瘦身结果：净删除约 1900 行兼容/重复代码；Controller 18→14；错误模型 2→1 套；迁移路径演示主体 23→0；六大类 4032→2322 行（-42%）且每例保留拆分前后行为证据（对应契约测试原样通过）。
+指标证据：后端 408 个生产 Java 文件、62 个测试类、383 个用例；数据库 22 张表（V1-V13，V13 为 DML）；AOCI 受管基线 591 文件、609 条认知条目（586 code + 23 database）。
+已知风险和回滚方式：MySQL 并发门禁出现过一次瞬时抖动（d822677），已由本地复现与后续远端全绿覆盖验证；如再现需仓库所有者协助获取远端日志。V13 为 DML 删除，回滚为按 V2/V6/V7 原文反向 INSERT。各拆分轮均可 git revert 单独恢复。
+阶段退出条件：是。退出证据齐备：生产主链路不依赖兼容 Controller（4 个已物理删除，14 个 Controller 全 ACTIVE/COMPATIBILITY 且矩阵同步）；调用矩阵只剩一套接口（API.md v1 唯一契约，前端零旧路由调用）；六大类有拆分前后行为证据（每轮契约测试原样通过）；删除代码与文档 diff 可回滚（每轮独立提交）；全量门禁与 Linux+MySQL CI 通过；AOCI 重新 aligned（五净、双域）。
+下一阶段唯一入口：Phase 11——真实团队工作区与外部交付（12～16 周）。
 ```
