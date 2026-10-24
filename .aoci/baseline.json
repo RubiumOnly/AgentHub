@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T03:53:31Z",
+  "updated_at": "2026-10-24T04:23:20Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -2783,9 +2783,9 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/Phase9BaselineAndGovernanceGuardTest.java": {
       "role": "index",
-      "sha256": "477887e435c9ea6298f92cf52a6160d4e1e0389e51ac516729730c7ec90f28c0",
-      "size": 28062,
-      "normalized_sha256": "477887e435c9ea6298f92cf52a6160d4e1e0389e51ac516729730c7ec90f28c0"
+      "sha256": "53fd4a1ace2a0aabbf070bb42d0770a4382dd1c5a92b74430fee713d369398e1",
+      "size": 27978,
+      "normalized_sha256": "53fd4a1ace2a0aabbf070bb42d0770a4382dd1c5a92b74430fee713d369398e1"
     },
     "agenthub-backend/src/test/java/com/agenthub/PhaseASecurityAndResourceBoundaryIntegrationTest.java": {
       "role": "index",
@@ -3257,9 +3257,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "e46b198df902514e95b601757d42d6d8b2a2f3f254773d184398c921e5655cc1",
-      "size": 14378,
-      "normalized_sha256": "e46b198df902514e95b601757d42d6d8b2a2f3f254773d184398c921e5655cc1"
+      "sha256": "73de388df71b37e029fb8c32428f5fcea030266686bc4e0005c63d7184c656bc",
+      "size": 119004,
+      "normalized_sha256": "73de388df71b37e029fb8c32428f5fcea030266686bc4e0005c63d7184c656bc"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -3311,9 +3311,9 @@
     },
     "docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md": {
       "role": "index",
-      "sha256": "4fb012795a01fdce37965704070464fa426392d277ac327c3acf77b5c0019cb4",
-      "size": 27005,
-      "normalized_sha256": "4fb012795a01fdce37965704070464fa426392d277ac327c3acf77b5c0019cb4"
+      "sha256": "792aeb1d495594fa6f6a967845bf28b412933187853be27c761cc77bd7d1c0dd",
+      "size": 27725,
+      "normalized_sha256": "792aeb1d495594fa6f6a967845bf28b412933187853be27c761cc77bd7d1c0dd"
     },
     "docs/AOCI_COGNITION.md": {
       "role": "index",
