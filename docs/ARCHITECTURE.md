@@ -244,7 +244,85 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 
 ## 12. 架构守卫和扩展规则
 
-ArchUnit（`ArchUnitArchitectureTest`）与 Phase 0 基线守卫（`Phase0BaselineAndDebtFreezeGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
+ArchUnit（`ArchUnitArchitectureTest`）与 Phase 9 基线与治理守卫（`Phase9BaselineAndGovernanceGuardTest`）联合守护分层依赖、Controller 位置、Entity 泄露、废弃组件零新增调用、前端零 `localhost:8080` 直连及默认 ID 冻结。新增 Provider、节点类型、工具或部署模板必须同时提供真实用户旅程、权限模型、成本边界、契约测试、可观测字段和删除条件。没有真实使用者的适配器进入瘦身清单，不继续堆叠。
+
+**AOCI 门禁闭合规约**：当前处于 AOCI 官方 CLI 外部供给阻塞期，守卫测试默认执行“未接入模式”（校验禁止伪造 `.aoci` 与 `aoci.txt`）；待官方工具就绪并完成 Whole-Index/Baseline 正式生成后，CI（`.github/workflows/ci.yml`）与本地全量门禁必须显式启用 `-Dagenthub.aoci.required=true`，完成从“禁止伪造”到“强制官方存在”的门禁闭环。
 
 详细取舍保存在 [ADR-001](adr/ADR-001-modular-monolith-architecture.md) 至 [ADR-013](adr/ADR-013-e2e-benchmarks-and-release-readiness.md)。
 
+## 13. 系统资产与只读治理 Inventory (Phase 9 事实基线)
+
+依据长期计划 v4.0 Phase 9 规约，本节建立系统全量资产只读盘点矩阵。分类标记标准：
+- `ACTIVE`：生产主链路核心资产，具备完整测试与业务调用；
+- `COMPATIBILITY`：向后兼容过渡资产，已冻结新增能力，收敛到受限场景；
+- `DEMO_ONLY` / `TEST_ONLY`：测试夹具或确定性演示专用，生产环境严格隔离；
+- `DELETE_CANDIDATE`：无前端调用、生产已切断（410 Gone）或已被新架构替代，排定 Phase 10 退场。
+
+### 13.1 控制器与 Web 接入层 Inventory (18 个 @RestController)
+
+| 控制器名称 | 归属包路径 | 治理状态 | 职责与收敛去向 |
+| :--- | :--- | :--- | :--- |
+| `AuthController` | `com.agenthub.identity.api` | `ACTIVE` | 身份认证、JWT 签发与作废令牌维护 |
+| `ProjectController` | `com.agenthub.project.api` | `ACTIVE` | 项目生命周期、版本化 Context Source 查询与注册 |
+| `WorkspaceController` | `com.agenthub.project.api` | `ACTIVE` | 受控工作区文件操作、JGit 快照、配额与文件树 |
+| `WorkflowDefinitionController` | `com.agenthub.orchestration.api` | `ACTIVE` | 工作流模板定义、DAG Kahn 拓扑校验 |
+| `ExecutionController` | `com.agenthub.execution.api` | `ACTIVE` | 执行生命周期、调度、单步骤重做、运维全景视图与 SSE 广播 |
+| `ApprovalController` | `com.agenthub.orchestration.api` | `ACTIVE` | 人工介入审批网关、决策审计 |
+| `ArtifactController` | `com.agenthub.audit.api` | `ACTIVE` | 制品审计、单文件/整树精准回滚、质量门禁与 PR 草稿 |
+| `DeploymentController` | `com.agenthub.sandbox.api` | `ACTIVE` | 预览容器部署、主动健康探针、端口分配与销毁 |
+| `ProviderController` | `com.agenthub.agent.api` | `ACTIVE` | 多模型 Provider 动态路由、熔断控制与延迟探针 |
+| `TokenUsageController` | `com.agenthub.agent.api` | `ACTIVE` | Token 消耗审计、项目级预算看门狗 |
+| `AgentRegistryController` | `com.agenthub.agent.api` | `ACTIVE` | AgentDefinition 注册与离线评测能力暴露 |
+| `TeamController` | `com.agenthub.team.api` | `ACTIVE` | 团队成员生命周期与 RBAC 权限矩阵校验 |
+| `SystemHealthController` | `com.agenthub.ops.api` | `ACTIVE` | 探针、v1 契约、OpenAPI、安全审计检索、指标与灾备备份还原 |
+| `ConversationController` | `com.agenthub.conversation.api` | `COMPATIBILITY` | 收敛为 Run 审查与执行上下文讨论，停止通用 IM 扩张 |
+| `RunAliasController` | `com.agenthub.execution.api` | `DELETE_CANDIDATE` | `/api/runs/*` 别名，前端零调用，Phase 10 正式物理删除 |
+| `IMController` | `com.agenthub.adapter.web` | `DELETE_CANDIDATE` | 早期原型 IM 接口，prod 返回 410 Gone，Phase 10 物理删除 |
+| `SandboxController` | `com.agenthub.adapter.web` | `DELETE_CANDIDATE` | 早期沙箱接口，prod 返回 410 Gone，已被 DeploymentController 替代 |
+| `WorkflowAndDiffController` | `com.agenthub.adapter.web` | `DELETE_CANDIDATE` | 早期工作区与 Diff，prod 拦截 410 Gone，Phase 10 物理删除 |
+
+### 13.2 智能体提供商 (Provider)、运行时 (Runtime) 与沙箱 (Sandbox) Inventory
+
+| 类型 | 组件名称 | 治理状态 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **Provider** | `OpenAiCompatibleProvider` | `ACTIVE` | 主流 OpenAI 兼容模型通用 HTTP 协议接入 |
+| **Provider** | `OllamaProvider` | `ACTIVE` | 本地自托管开源大模型直连 |
+| **Provider** | `GeminiProvider` | `ACTIVE` | 官方 Gemini API HTTP 规范适配 |
+| **Provider** | `AnthropicProvider` | `ACTIVE` | 官方 Anthropic Claude API 规范适配 |
+| **Provider** | `MockLlmProvider` | `DEMO_ONLY` / `TEST_ONLY` | 自动化测试与离线演示专用，严禁在生产被硬编码直连 |
+| **Runtime** | `ProviderDrivenAgentRuntime` | `ACTIVE` | 生产标准运行时，基于 LlmProvider SPI 与 DynamicProviderRouter |
+| **Runtime** | `OpenAiCompatibleRuntime` | `COMPATIBILITY` | 早期直连运行时，Phase 10 统一收敛至 ProviderDrivenAgentRuntime |
+| **Runtime** | `CliAgentRuntime` | `COMPATIBILITY` | 本地 CLI 进程执行运行时 |
+| **Runtime** | `MockAgentRuntime` | `DEMO_ONLY` / `TEST_ONLY` | 离线测试模拟运行时 |
+| **Sandbox** | `DockerSandbox` | `ACTIVE` | 受控 Docker 容器隔离预览与部署沙箱 |
+| **Sandbox** | `LocalProcessSandbox` | `ACTIVE` | 本地进程受限执行沙箱（带配额与超时防护） |
+| **Sandbox** | `PreviewSandboxService` | `COMPATIBILITY` | 早期原型适配服务，委托至 DeploymentApplicationService |
+
+### 13.3 核心持久化表结构 Inventory (22 张 Flyway 核心数据库表)
+
+当前数据库全部 22 张业务表均处于 `ACTIVE` 状态，由 Flyway V1~V12 严格版本控制，禁止无版本变更操作表结构：
+- 用户与权限（4 张）：`users`, `teams`, `team_members`, `invalidated_tokens`
+- 项目与工作区（3 张）：`projects`, `workspaces`, `workspace_locks`
+- 智能体与模型（4 张）：`agent_definitions`, `agent_instances`, `providers`, `token_usages`
+- 协同会话（3 张，受控收敛）：`conversations`, `conversation_participants`, `messages`
+- 工作流与执行（3 张）：`workflow_definitions`, `workflow_runs`, `step_runs`
+- 制品与审批（3 张）：`run_events`, `artifacts`, `approvals`
+- 部署与运维（2 张）：`deployments`, `auth_audit_logs`
+
+### 13.4 脚本与文档单一事实来源 Inventory
+
+1. **运维与自动化脚本 (10 个文件)**：
+   - 生产灾备备份与还原：`scripts/backup-prod.ps1`, `scripts/backup-prod.sh`, `scripts/restore-prod.ps1`, `scripts/restore-prod.sh` (`ACTIVE`)
+   - 生产部署验证：`scripts/deploy-prod.ps1`, `scripts/deploy-prod.sh` (`ACTIVE`)
+   - 本地 CI 门禁运行器：`scripts/test-ci-local.ps1`, `scripts/test-ci-local.sh` (`ACTIVE` / `TEST_ONLY`)
+   - 端到端演练驱动：`scripts/run-e2e-demo.ps1`, `scripts/run-e2e-demo.sh` (`ACTIVE` / `DEMO_ONLY`)
+2. **核心文档单一事实划分 (23 个受管 Markdown)**：
+   - 系统级规约：`AGENTS.md`（仓库唯一系统规则，仅本地生效）
+   - 产品长期路线：`docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md`（唯一长期演进权威）
+   - 接口契约：`docs/API.md`（全量 REST/SSE 接口事实与调用矩阵）
+   - 架构事实：`docs/ARCHITECTURE.md`（分层事实、实体关系、表与组件全景）
+   - 能力边界：`docs/CURRENT_CAPABILITY_BOUNDARIES.md`（已验证能力与未实现范围对照）
+   - 快速演练：`docs/E2E_DEMO_GUIDE.md`（确定性端到端验证指南）
+   - 技术答辩：`docs/TECH_WHITEPAPER_AND_DEFENSE.md`（设计取舍与架构答辩白皮书）
+   - 架构决策：`docs/adr/`（ADR-001 至 ADR-013 对应 13 份不可逆技术决策）
+   - 运维灾备：`docs/ops/ALERTING_RULES.md`, `docs/ops/DISASTER_RECOVERY_RUNBOOK.md`（告警与灾备规约）

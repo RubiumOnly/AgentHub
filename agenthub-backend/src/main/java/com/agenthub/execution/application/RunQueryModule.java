@@ -25,6 +25,7 @@ import com.agenthub.project.infrastructure.entity.WorkspaceEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -210,14 +211,12 @@ public class RunQueryModule {
             gitBaseline = lineage.getBaselineCommitHash();
         }
 
-        String aociStatus = "ALIGNED";
+        String aociStatus = "NOT_CONFIGURED";
         if (ws != null && workspaceResolver != null) {
             try {
                 java.nio.file.Path wsRoot = workspaceResolver.getWorkspaceRoot(ws.getId());
-                var receipt = ContextMemoryCompressor.verifyCognitionAndReceipt(wsRoot.toFile(), gitBaseline);
-                if (!receipt.isClean()) {
-                    aociStatus = "REPAIR_REQUIRED";
-                }
+                File rootDir = wsRoot != null ? wsRoot.toFile() : null;
+                aociStatus = ContextMemoryCompressor.determineAociCognitionStatus(rootDir, gitBaseline);
             } catch (Exception ignored) {}
         }
 

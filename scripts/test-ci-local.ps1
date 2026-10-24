@@ -51,7 +51,7 @@ try {
 
         if ($Quick) {
             Write-Host "Running quick backend tests..." -ForegroundColor Yellow
-            mvn test -Dtest="Phase0BaselineAndDebtFreezeGuardTest,ArchUnitArchitectureTest,Phase1ModuleConvergenceAndContractTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest"
+            mvn test -Dtest="Phase9BaselineAndGovernanceGuardTest,ArchUnitArchitectureTest,Phase1ModuleConvergenceAndContractTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest"
         } else {
             Write-Host "Running full backend test suite with alphabetical runOrder..." -ForegroundColor Yellow
             mvn clean test

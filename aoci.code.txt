@@ -1,0 +1,105 @@
+#AOCI-CODE-VOLUME: 1
+
+===D:/work/agenthub/===
+.env.example[FC2T]: F:提供 Provider 凭据环境变量模板 | R:code:agenthub-backend/src/main/resources/application.yml | A:cp .env | S:真实密钥只存在于被Git忽略的.env，严禁写回本文件
+.env.production.example[FC6T]: F:生产编排环境变量模板 | R:code:docker-compose.prod.yml | A:scripts/deploy-prod | S:ChangeMe占位符未全部替换前禁止部署；真实文件严禁提交
+.gitattributes[FC1T]: F:统一跨平台文本换行策略 | R:code:.gitignore | A:git | S:sh/sql/yml强制LF而ps1强制CRLF；改前评估双端影响
+.gitignore[FC2T]: F:声明 Git 忽略边界 | R:code:SECURITY.md | A:git | S:排除.env与AOCI运行时产物；不得掩盖应入库治理资产
+LICENSE[EZ1T]: F:声明 MIT 开源许可 | R:- | A:法律 | S:变更许可类型是不可逆法律决策，需评估贡献者授权
+README.md[EG8M]: F:项目入口与产品主线速览 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:新成员 | S:能力表述不得超前于能力边界文档
+CHANGELOG.md[SG3M]: F:按版本记录历史变更快照 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:维护者发布 | S:仅记录历史；当前能力权威在能力边界文档
+CONTRIBUTING.md[SG3M]: F:贡献流程与提交规范 | R:code:.github/workflows/ci.yml | A:外部贡献者 | S:PR前必须后端测试与前端构建全绿
+SECURITY.md[SS7M]: F:安全策略与凭证隔离规范 | R:code:docs/adr/ADR-003-workspace-distrusts-client-paths.md | A:安全评审与运维 | S:真实密钥严禁入库；prod弱密钥启动即熔断
+docker-compose.yml[OV6M]: F:本地开发容器编排 | R:code:.env.production.example | A:docker compose up | S:仅MySQL与Redis基础设施；应用服务由prod编排文件定义
+docker-compose.prod.yml[OV7M]: F:生产容器编排与安全约束 | R:code:.env.production.example | A:scripts/deploy-prod | S:非root用户与健康探针强制；密钥全部来自env-file占位注入
+.mcp.json[CV6T]: F:声明AOCI MCP宿主接入 | R:code:docs/AOCI_COGNITION.md | A:MCP宿主加载 | S:command指向本机CLI绝对路径；跨机器需按实际安装路径调整
+
+===D:/work/agenthub/.github/workflows/===
+ci.yml[OV7M]: F:远端CI门禁编排 | R:code:scripts/test-ci-local.sh | A:GitHub Actions push/PR | S:Ubuntu+真实MySQL8迁移门禁；本地单次通过不等价远端安全
+
+===D:/work/agenthub/agenthub-backend/===
+Dockerfile[OV7S]: F:构建生产后端镜像 | R:code:docker-compose.prod.yml | A:docker build | S:非root UID10001与健康探针强制；OOM即退出
+pom.xml[FV8M]: F:Maven构建与依赖基线 | R:code:.github/workflows/ci.yml | A:mvn | S:Boot3.3.4/Java17；surefire锁alphabetical保证跨平台确定性
+
+===D:/work/agenthub/agenthub-backend/src/main/resources/===
+application.yml[CV9M]: F:应用主配置与默认档 | R:code:agenthub-backend/src/main/resources/application-prod.yml | A:Spring Boot启动 | S:默认dev+H2；密钥全靠env注入，内置默认密钥仅限本地
+application-prod.yml[CV9S]: F:生产profile配置 | R:code:docker-compose.prod.yml | A:prod部署 | S:强制MySQL与ddl validate；模式默认LIVE_SELF_HOSTED
+application-dev.yml[CV4S]: F:开发profile配置 | R:code:agenthub-backend/src/main/resources/application.yml | A:本地开发 | S:H2内存库+ddl update；仅限本地，不代表生产行为
+application-demo.yml[CV3T]: F:演示profile配置 | R:code:agenthub-backend/src/main/resources/application.yml | A:demo演示 | S:显式DEMO_SIMULATED；演示主体可env覆盖；不得混入LIVE结果
+application-test.yml[CV6S]: F:测试profile配置 | R:code:agenthub-backend/src/test/java | A:mvn test | S:H2 MODE=MySQL；固定主体user-1/proj-default仅限测试夹具
+application-local.yml.example[CV2T]: F:本地私有配置模板 | R:code:.gitignore | A:cp为application-local.yml | S:重命名后即被Git排除；真实Key严禁提交
+
+===D:/work/agenthub/agenthub-backend/src/main/resources/db/migration/===
+V1__init_schema.sql[PD9M]: F:初始22表核心Schema | R:code:docs/ARCHITECTURE.md | A:Flyway | S:结构变更需新迁移；已应用基线严禁改写
+V2__seed_system_baseline.sql[PD5S]: F:注入演示基线种子 | R:code:V1__init_schema.sql | A:Flyway | S:演示主体种子在主迁移路径；Phase10拟迁demo profile
+V3__phase2_workspace_audit_artifacts.sql[PD5S]: F:产物评审与工作区锁 | R:code:V1__init_schema.sql | A:Flyway | S:artifacts评审字段；新增workspace_locks支撑并发互斥
+V4__phase3_execution_kernel_and_state_machine.sql[PD6S]: F:执行内核状态机字段 | R:code:V1__init_schema.sql | A:Flyway | S:取消原因与correlation_id；步骤计时字段铺底
+V5__phase4_workflow_dag_and_orchestration.sql[PD6S]: F:DAG编排与上下文字段 | R:code:V1__init_schema.sql | A:Flyway | S:step_runs获得inputs/outputs JSON
+V6__phase5_agent_providers_and_routing.sql[PD6M]: F:Provider路由与成本字段 | R:code:V1__init_schema.sql | A:Flyway | S:priority/weight/熔断状态/单价进入providers表
+V7__phase6_multi_agent_teams_and_message_bus.sql[PD5M]: F:多Agent团队与消息字段 | R:code:V1__init_schema.sql | A:Flyway | S:teams拓扑/领导Agent/轮次上限与成员角色扩展
+V8__phase7_sandbox_and_deployments.sql[PD5S]: F:沙箱部署执行字段 | R:code:V1__init_schema.sql | A:Flyway | S:端口/构建/健康检查命令进入deployments表
+V9__phase_a_security_revocation_and_audit.sql[PS7S]: F:令牌吊销与认证审计表 | R:code:V1__init_schema.sql | A:Flyway | S:invalidated_tokens跨重启生效；审计落auth_audit_logs
+V10__phase_c_scheduling_leases_and_recovery.sql[PR8M]: F:租约与恢复调度字段 | R:code:V1__init_schema.sql | A:Flyway | S:lease_owner/attempt/dsl_snapshot支撑at-least-once幂等
+V11__phase_d_sandbox_lifecycle_and_isolation.sql[PD5S]: F:部署生命周期与隔离字段 | R:code:V1__init_schema.sql | A:Flyway | S:进程ID/日志游标/终止原因进入deployments表
+V12__phase_e_production_ops_and_lock_precision.sql[PR5T]: F:工作区锁毫秒精度过期 | R:code:V1__init_schema.sql | A:Flyway | S:expires_at_epoch_ms消除秒级锁精度误差
+
+===D:/work/agenthub/scripts/===
+backup-prod.sh[OR7M]: F:生产一致性加密备份 | R:code:scripts/restore-prod.sh | A:运维 | S:single-transaction快照+SHA256SUMS；默认保留14天最少3份
+backup-prod.ps1[OR6M]: F:Windows生产备份脚本 | R:code:scripts/backup-prod.sh | A:运维 | S:与sh版本语义对齐；跨平台需双端验证
+deploy-prod.sh[OV8M]: F:生产部署预检门禁 | R:code:docker-compose.prod.yml | A:运维 | S:ChangeMe占位校验不过即拒绝部署
+deploy-prod.ps1[OV6M]: F:Windows生产部署脚本 | R:code:scripts/deploy-prod.sh | A:运维 | S:与sh版本语义对齐
+restore-prod.sh[OR8M]: F:灾备恢复与篡改校验 | R:code:scripts/backup-prod.sh | A:运维 | S:先验SHA256拒绝篡改档；--verify-only非破坏演练
+restore-prod.ps1[OR6M]: F:Windows灾备恢复脚本 | R:code:scripts/restore-prod.sh | A:运维 | S:与sh版本语义对齐
+run-e2e-demo.sh[TV6M]: F:跨平台E2E演练导证据 | R:code:docs/E2E_DEMO_GUIDE.md | A:演示与验收 | S:demo模式必须带simulated标识；live模式需真实Provider
+run-e2e-demo.ps1[TV5M]: F:Windows E2E演练脚本 | R:code:scripts/run-e2e-demo.sh | A:演示与验收 | S:与sh版本语义对齐
+test-ci-local.sh[TV7M]: F:本地CI门禁模拟 | R:code:.github/workflows/ci.yml | A:提交前验证 | S:对齐CI三Job；通过不替代远端Linux证据
+test-ci-local.ps1[TV6M]: F:Windows本地门禁脚本 | R:code:scripts/test-ci-local.sh | A:提交前验证 | S:与sh版本语义对齐
+
+===D:/work/agenthub/docs/===
+AGENTHUB_PRODUCT_LONG_TERM_PLAN.md[SG9L]: F:唯一长期路线与阶段验收 | R:code:docs/ARCHITECTURE.md | A:每个Run开始时读取 | S:唯一计划；阶段验收只追加本文；禁止另建平行计划
+AOCI_COGNITION.md[SO7S]: F:AOCI资产与运维唯一文档 | R:code:.mcp.json | A:运维与会话恢复 | S:版本/接入/恢复唯一权威；未对齐不得宣称aligned
+API.md[SN9L]: F:REST/SSE接口契约全景 | R:code:docs/openapi-v1.json | A:前后端契约对齐 | S:Controller矩阵唯一权威；新增Controller必须登记
+ARCHITECTURE.md[SA8L]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与22表矩阵是守卫测试断言来源
+CURRENT_CAPABILITY_BOUNDARIES.md[SQ8M]: F:能力真相与未实现边界 | R:code:docs/ARCHITECTURE.md | A:表述能力前必读 | S:能力矩阵唯一权威；禁止超前宣称
+TECH_WHITEPAPER_AND_DEFENSE.md[SS4S]: F:技术答辩要点 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:答辩交流 | S:非能力证明；超出证据范围不得承诺
+openapi-v1.json[SN8M]: F:OpenAPI v1静态快照 | R:code:docs/API.md | A:契约消费方 | S:与/api/v1/openapi.json对齐；漂移需重新生成
+E2E_DEMO_GUIDE.md[SQ6M]: F:E2E演练双平台步骤 | R:code:scripts/run-e2e-demo.sh | A:演练执行者 | S:接口路径与测试对齐；demo/live显式区分
+
+===D:/work/agenthub/docs/adr/===
+ADR-001-modular-monolith-architecture.md[SO7S]: F:模块化单体选型决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:拆微服务前必须先有真实负载证据与ADR修订
+ADR-002-sse-and-persistent-event-stream.md[SN6S]: F:SSE与持久化事件流决策 | R:code:docs/API.md | A:架构评审 | S:事件流事实以数据库持久化为准，不引入空壳MQ
+ADR-003-workspace-distrusts-client-paths.md[SS8S]: F:受控工作区路径安全决策 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:安全评审 | S:拒止../与绝对路径逃逸；该边界不可为便利性放宽
+ADR-004-mock-runtime-for-test-and-degraded-demo.md[SQ6S]: F:Mock Runtime边界决策 | R:code:docs/E2E_DEMO_GUIDE.md | A:架构评审 | S:Mock仅限测试与显式降级演示；严禁混入LIVE成功统计
+ADR-005-database-driven-lease-and-crash-recovery.md[PR7S]: F:数据库租约与崩溃恢复决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:at-least-once+幂等；不宣称分布式exactly-once
+ADR-006-context-convergence-and-api-contract-v1.md[SN6S]: F:限界上下文与API v1决策 | R:code:docs/API.md | A:架构评审 | S:兼容接口必须有期限退场计划
+ADR-007-project-onboarding-and-controlled-workspace-policy.md[SP6S]: F:项目接入与受控工作区策略 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:接入向导与版本化上下文源不可绕过
+ADR-008-workflow-templates-kahn-dag-and-orchestrator-plan.md[SA7S]: F:工作流模板与Orchestrator决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:Kahn拓扑校验；计划未经确认不得执行高影响工具
+ADR-009-run-operations-and-artifact-lineage.md[PD6S]: F:Run操作与产物血缘决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:产物状态跃迁必须回到统一状态图
+ADR-010-quality-gates-review-and-controlled-delivery.md[SQ7S]: F:质量门禁与受控交付决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:门禁不通过不得进入交付
+ADR-011-team-collaboration-rbac-and-operations-productization.md[SI7S]: F:RBAC与运维体系决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:资源动作统一权限矩阵；审计不可篡改
+ADR-012-live-providers-and-budget-governance.md[SC7S]: F:真实Provider与预算治理决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:LIVE与DEMO严格隔离；预算阻断无绕过路径
+ADR-013-e2e-benchmarks-and-release-readiness.md[SQ6S]: F:E2E基准与发布就绪决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:目标环境未验证不得宣称发布就绪
+
+===D:/work/agenthub/docs/images/===
+01-orchestrator-collaboration-stream.png[SZ2T]: F:编排协作流UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+02-jgit-diff-audit.png[SZ2T]: F:JGit Diff审计UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+03-workflow-dag-canvas.png[SZ2T]: F:DAG画布UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+04-workspace-file-explorer.png[SZ2T]: F:工作区文件浏览UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+05-sandbox-preview.png[SZ2T]: F:沙箱预览UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+
+===D:/work/agenthub/docs/ops/===
+ALERTING_RULES.md[SO6M]: F:Prometheus告警规则与策略 | R:code:docker/prometheus/agenthub-alerts.yml | A:值班运维 | S:机器可加载配置为准；规则变更需演练验证
+DISASTER_RECOVERY_RUNBOOK.md[SR8M]: F:灾备演练与恢复SOP | R:code:scripts/restore-prod.sh | A:值班运维 | S:严禁--volumes清理生产数据卷；演练后更新证据
+
+===D:/work/agenthub/docs/evidence/===
+sample-run-evidence-bundle.json[SQ4S]: F:证据包结构样例 | R:code:docs/E2E_DEMO_GUIDE.md | A:理解证据结构 | S:simulated=true样例；真实证据以导出接口为准
+
+===D:/work/agenthub/agenthub-frontend/===
+tsconfig.json[CV4S]: F:TypeScript编译约束 | R:code:agenthub-frontend/package.json | A:npx tsc --noEmit | S:strict模式；@/*映射src；类型错误必须清零
+Dockerfile[OV6S]: F:构建前端生产镜像 | R:code:docker-compose.prod.yml | A:docker build | S:standalone多阶段构建+非root隔离
+postcss.config.js[CV1T]: F:PostCSS插件链 | R:code:agenthub-frontend/tailwind.config.ts | A:前端构建 | S:仅tailwindcss与autoprefixer
+next-env.d.ts[CL1T]: F:Next生成类型声明 | R:code:agenthub-frontend/tsconfig.json | A:tsc | S:Next自动生成；严禁手工编辑
+package-lock.json[CV3L]: F:锁定依赖完整依赖图 | R:code:agenthub-frontend/package.json | A:npm ci | S:与package.json同步变更；npm ci以此为准
+package.json[CV5S]: F:前端依赖与脚本基线 | R:code:agenthub-frontend/next.config.mjs | A:npm | S:Next 14.2.13/React 18；升级依赖须过tsc与build门禁
+next.config.mjs[CV6S]: F:Next配置与API代理 | R:code:agenthub-frontend/src | A:next build/dev | S:standalone输出；/api与/actuator重写到后端，禁止直连其他来源
+tailwind.config.ts[CU2T]: F:Tailwind主题与扫描范围 | R:code:agenthub-frontend/postcss.config.js | A:前端构建 | S:content仅覆盖src目录；新目录需显式登记

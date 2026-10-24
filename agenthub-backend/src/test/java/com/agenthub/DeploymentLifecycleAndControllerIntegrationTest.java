@@ -79,16 +79,23 @@ class DeploymentLifecycleAndControllerIntegrationTest {
     @DisplayName("部署生命周期 2：按项目查询历史部署列表")
     void shouldListDeploymentsForProject() throws Exception {
         CreateDeploymentRequest request = new CreateDeploymentRequest("proj-default", "STATIC_PREVIEW", "LOCAL_PROCESS");
-        mockMvc.perform(post("/api/deployments")
+        MvcResult res = mockMvc.perform(post("/api/deployments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+        String deploymentId = objectMapper.readTree(res.getResponse().getContentAsString()).at("/data/id").asText();
 
         mockMvc.perform(get("/api/deployments?projectId=proj-default"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data", hasSize(greaterThanOrEqualTo(1))));
+
+        if (deploymentId != null && !deploymentId.isBlank()) {
+            mockMvc.perform(post("/api/deployments/" + deploymentId + "/stop"))
+                    .andExpect(status().isOk());
+        }
     }
 
     @Test

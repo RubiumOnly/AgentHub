@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aoci": {
+      "command": "C:/Tools/aoci/0.1.0-rc21/aoci.exe",
+      "args": ["--repo", "D:/work/agenthub", "mcp"]
+    }
+  }
+}

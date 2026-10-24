@@ -157,10 +157,12 @@ public class Phase4RunOperationsAndArtifactLineageTest {
         testWorkspaceId = ws.getId();
         testWorkspaceDir = workspaceResolver.getWorkspaceRoot(testWorkspaceId);
 
-        // Ensure workspace directory exists and has a git baseline commit
+        // Ensure workspace directory exists and has a git baseline commit with official AOCI receipt
         Files.createDirectories(testWorkspaceDir);
         File initFile = new File(testWorkspaceDir.toFile(), "README.md");
         Files.writeString(initFile.toPath(), "# Phase 4 Baseline\n", StandardCharsets.UTF_8);
+        Files.createDirectories(testWorkspaceDir.resolve(".aoci"));
+        Files.writeString(testWorkspaceDir.resolve(".aoci/receipt.json"), "{\"status\":\"ALIGNED\"}\n", StandardCharsets.UTF_8);
         String baselineHash = gitManager.createBaseline(testWorkspaceDir.toFile(), "init-p4", "test@agenthub.local");
         ws.setGitBaselineCommit(baselineHash);
         workspaceRepository.save(ws);

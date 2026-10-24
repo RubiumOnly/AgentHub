@@ -34,17 +34,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Phase 0（产品边界、事实基线与瘦身冻结）自动化守卫测试套件。
+ * Phase 9（可信基线、AOCI 接入与治理守卫）自动化测试套件。
  * 覆盖：
  * 1. 唯一权威长期计划（docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md）与废弃计划/旧认知索引零残留及文档口径校准校验；
  * 2. 前端源码（agenthub-frontend/src）零 localhost、零 /api/workspace/ 旧接口调用、零宿主机绝对路径硬编码、零非演示模式静默 Mock 回退及默认 ID 冻结校验；
  * 3. 后端源码（agenthub-backend/src/main/java）默认常量（"user-1" / "proj-default" / "run-default"）按相对路径+出现次数上限双重冻结及生产环境阻断 /api/workspace/* 校验；
- * 4. 22 张 Flyway 核心数据库表、18 个 @RestController 与 docs/ARCHITECTURE.md、docs/API.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md 词汇及矩阵全量对齐校验；
+ * 4. 22 张 Flyway 核心数据库表、最多 18 个 @RestController 与 docs/ARCHITECTURE.md、docs/API.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md 词汇及矩阵全量对齐校验；
  * 5. 受管范围（Managed Scope）与 Flyway V1-V12 迁移脚本完整性及固定 SHA-256 指纹基线校验。
  */
 @SpringBootTest
 @ActiveProfiles("test")
-class Phase0BaselineAndDebtFreezeGuardTest {
+class Phase9BaselineAndGovernanceGuardTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -119,32 +119,31 @@ class Phase0BaselineAndDebtFreezeGuardTest {
                 .as("Deprecated docs/AGENTHUB_NEXT_LONG_TERM_PLAN.md must remain deleted")
                 .isFalse();
 
-        // 2) 唯一权威长期计划必须存在且包含 Phase 0 交付物与验收记录
+        // 2) 唯一权威长期计划必须存在且符合 v4.0 的当前阶段结构；历史 Phase 0 章节不再作为执行入口
         Path longTermPlan = repoRoot.resolve("docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md");
         assertThat(Files.exists(longTermPlan)).isTrue();
         String planContent = Files.readString(longTermPlan, StandardCharsets.UTF_8);
-        assertThat(planContent).contains("9.1 Phase 0 Product Brief 正式基线");
-        assertThat(planContent).contains("9.2 Phase 0 瘦身与收敛清单");
-        assertThat(planContent).contains("9.3 Phase 0 AOCI-CODE 认知治理基线与阻塞记录");
-        assertThat(planContent).contains("9.4 Phase 0 阶段验收记录");
+        assertThat(planContent)
+                .contains("> 版本：v4.0")
+                .contains("## 6. 24～36 个月阶段路线")
+                .contains("### Phase 9：可信基线、AOCI 接入与瘦身冻结")
+                .contains("### Phase 10：核心内核收敛与兼容路径退场")
+                .contains("### Phase 15：受控 Beta、生态边界与维护期")
+                .contains("## 10. 阶段证据模板")
+                .contains("AOCI 不可用时明确记录阻塞")
+                .doesNotContain("9.1 Phase 0 Product Brief 正式基线")
+                .doesNotContain("9.4 Phase 0 阶段验收记录");
 
-        // 3) 活跃文档严禁残留旧计划引用或未经实测的夸大表述（含“生产级”“全部完成”“真实全链路”）
-        List<Path> activeDocs = List.of(
-                repoRoot.resolve("README.md"),
-                repoRoot.resolve("docs/ARCHITECTURE.md"),
-                repoRoot.resolve("docs/API.md"),
-                repoRoot.resolve("docs/CURRENT_CAPABILITY_BOUNDARIES.md"),
-                repoRoot.resolve("docs/E2E_DEMO_GUIDE.md"),
-                repoRoot.resolve("docs/TECH_WHITEPAPER_AND_DEFENSE.md"),
-                repoRoot.resolve("docs/ops/ALERTING_RULES.md"),
-                repoRoot.resolve("docs/ops/DISASTER_RECOVERY_RUNBOOK.md"),
-                repoRoot.resolve("docs/adr/ADR-001-modular-monolith-architecture.md"),
-                repoRoot.resolve("docs/adr/ADR-002-sse-and-persistent-event-stream.md"),
-                repoRoot.resolve("docs/adr/ADR-003-workspace-distrusts-client-paths.md"),
-                repoRoot.resolve("docs/adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md"),
-                repoRoot.resolve("docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md"),
-                repoRoot.resolve("docs/adr/ADR-006-context-convergence-and-api-contract-v1.md")
-        );
+        // 3) 所有当前 Markdown（长期计划除外）严禁残留旧计划引用或未经实测的夸大表述。
+        // 动态扫描允许 Phase 9 删除重复文档，而不会因为测试仍列出旧文件而阻止瘦身。
+        List<Path> activeDocs = new ArrayList<>();
+        activeDocs.add(repoRoot.resolve("README.md"));
+        try (Stream<Path> docs = Files.walk(repoRoot.resolve("docs"))) {
+            docs.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".md"))
+                    .filter(path -> !path.equals(longTermPlan))
+                    .forEach(activeDocs::add);
+        }
 
         for (Path doc : activeDocs) {
             assertThat(Files.exists(doc)).as("Active documentation must exist: " + doc).isTrue();
@@ -367,7 +366,7 @@ class Phase0BaselineAndDebtFreezeGuardTest {
             assertThat(archDoc).as("docs/ARCHITECTURE.md must document table: %s", table).contains("`" + table + "`");
         }
 
-        // 2) 验证长期计划 §6.2 规定的 11 个核心资源与事件词汇在 docs/ARCHITECTURE.md §2 全部登记
+        // 2) 验证当前架构契约要求的核心资源与事件词汇在 docs/ARCHITECTURE.md §2 全部登记
         List<String> requiredVocabulary = List.of(
                 "Project", "Workspace", "WorkflowDefinition", "Run", "StepRun",
                 "Event", "Artifact", "Approval", "Deployment", "Agent Policy", "Context Source"
@@ -376,7 +375,7 @@ class Phase0BaselineAndDebtFreezeGuardTest {
             assertThat(archDoc).as("docs/ARCHITECTURE.md §2 must define vocabulary term: %s", term).contains(term);
         }
 
-        // 3) 动态扫描后端全部 @RestController 类（共 18 个），验证每一个均在 docs/API.md 矩阵中完整登记
+        // 3) 动态扫描后端 @RestController，验证每一个均在 docs/API.md 矩阵中完整登记；18 是当前基线硬上限
         Path backendMainJava = repoRoot.resolve("agenthub-backend/src/main/java");
         List<String> restControllerSimpleNames = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(backendMainJava)) {
@@ -394,7 +393,7 @@ class Phase0BaselineAndDebtFreezeGuardTest {
                         }
                     });
         }
-        assertThat(restControllerSimpleNames).hasSize(18);
+        assertThat(restControllerSimpleNames).hasSizeLessThanOrEqualTo(18);
         assertThat(apiDoc).contains("REST/SSE 接口与前端调用全景矩阵");
         for (String controllerName : restControllerSimpleNames) {
             assertThat(apiDoc)
@@ -455,10 +454,27 @@ class Phase0BaselineAndDebtFreezeGuardTest {
         assertThat(applied).hasSize(12);
         assertThat(flyway.info().pending()).isEmpty();
 
-        // 3) 严禁在未安装 aoci-code CLI 时伪造 .aoci 内部目录
-        assertThat(Files.exists(repoRoot.resolve(".aoci")))
-                .as("Must not fabricate .aoci internal state directory when official aoci-code CLI is unavailable")
-                .isFalse();
+        // 3) AOCI 正式认知与治理资产已由官方 aoci CLI init/scan 生成并随 Phase 9 提交入库；
+        //    这些资产机器无关且必须随仓库存在，任何缺失都表示治理链断裂，只能用官方 CLI 重建，不得手工伪造。
+        Path aociDir = repoRoot.resolve(".aoci");
+        assertThat(Files.isDirectory(aociDir))
+                .as("AOCI .aoci governance directory must exist as a committed official asset")
+                .isTrue();
+        assertThat(Files.isRegularFile(repoRoot.resolve("aoci.txt")))
+                .as("AOCI Root cognition asset must exist as a committed official asset")
+                .isTrue();
+        assertThat(Files.isRegularFile(repoRoot.resolve("aoci.meta.txt")))
+                .as("AOCI Meta cognition asset must exist as a committed official asset")
+                .isTrue();
+        assertThat(Files.isRegularFile(repoRoot.resolve("aoci.code.txt")))
+                .as("AOCI Code cognition asset must exist as a committed official asset")
+                .isTrue();
+        assertThat(Files.isRegularFile(repoRoot.resolve(".aoci/config.json")))
+                .as("AOCI governance config must exist as a committed official asset")
+                .isTrue();
+        assertThat(Files.isRegularFile(repoRoot.resolve(".aoci/baseline.json")))
+                .as("AOCI baseline fingerprint must exist as a committed official asset")
+                .isTrue();
     }
 
     private int countOccurrences(String content, String token) {

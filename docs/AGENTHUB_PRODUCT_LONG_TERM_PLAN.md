@@ -1,553 +1,311 @@
 # AgentHub 产品化长期演进计划
 
-> 版本：v3.0
-> 基线日期：2026-10-12
-> 基线提交：`d245597`（Phase F 加固完成）
-> 计划跨度：约 18～24 个月；除非产品定位、部署边界或安全假设发生变化，不重新起草计划，只在本文件的阶段记录中更新事实。
-> 目标：把 AgentHub 从“功能和工程能力齐全的多 Agent 演示/验证平台”推进为“面向小型研发团队的、可审查的 AI 软件变更交付产品”。
+> 版本：v4.0
+> 基线日期：2026-10-16
+> 规划跨度：24～36 个月；本文件是唯一长期计划。除非产品定位、部署边界或安全假设发生变化，不重新起草下一份计划，只在本文件末尾追加阶段证据。
+> 当前状态：上一份计划的 Phase 0～Phase 8 已完成其代码和自动化验收记录；真实目标环境、AOCI 正式接入和可持续运营仍未完成。
 
-本文只规划后续工作，不代表当前功能已经按本文实施。当前版本的“代码已完成”“自动化测试通过”“目标环境验证通过”必须分别记录，任何一项都不能替代另外两项。
+本文定义 AgentHub 从“功能齐全的验证平台”到“可被小型研发团队长期使用的 AI 软件变更交付产品”的后续路径。它不是功能愿望清单。每个阶段都必须先收敛事实、再实施最小范围、最后用代码、测试、目标环境和运行证据证明结果。
 
-## 1. 当前基线与客观判断
+## 1. 终点和产品选择
 
-### 1.1 已有证据
+### 1.1 产品承诺
 
-当前仓库已经完成上一份长期计划的 Phase A～F，主链路包含身份、项目、工作区、Provider/Runtime、DAG、Run/Step/Event、SSE 回放、人工审批、JGit Diff、受控预览、Prometheus、备份恢复和脱敏运行证据包。当前可观察到的仓库规模为：
+AgentHub 面向已有 Git 仓库和代码评审习惯的 3～10 人研发团队，承诺一条可审查的变更交付链路：
 
-- 后端生产 Java 文件 276 个，测试类 53 个；`mvn clean test`（2026-10-12，Windows 11 / OpenJDK 17 / H2 MySQL Mode）实测汇总为 310 个测试用例、0 failures、0 errors、0 skipped。
-- 前端源码文件 21 个（`agenthub-frontend/src`，含 20 个 `.ts`/`.tsx` 文件与 1 个 `.css` 全局样式文件），包含 Next.js 14 控制台、DAG、终端、Diff、审批和预览面板；`npx tsc --noEmit` 与 `npm run build`（2026-10-12，Node.js 20）构建通过。
-- Java、TypeScript/TSX 和前端源码合计约 3.85 万行；Flyway 迁移已到 V12（共 22 张业务表）。
-- CI 已包含 Maven 测试、真实 MySQL/Flyway 关键测试、Phase 0 债务冻结与基线守卫、前端类型检查和构建、Compose 配置、Prometheus 规则、镜像非 root 检查及灾备脚本演练。
-- `docs/CURRENT_CAPABILITY_BOUNDARIES.md` 已经明确标识模拟模式、多节点广播、对象存储、强隔离沙箱和细粒度 RBAC 等尚未实现边界。
+```text
+接入项目 -> 选择变更模板 -> Orchestrator 生成计划 -> 用户确认
+-> Agent 在受控 Workspace 执行 -> Diff/测试/风险门禁
+-> 人工审批 -> 预览或外部交付 -> Run Evidence
+```
 
-以上数字是当前工作树的静态和历史运行证据；后续代码变更后必须重新采集，不能直接沿用旧文档中的测试数字。
+产品的核心对象是 Project、Workspace、Workflow Template、Run、Step、Artifact、Approval、Deployment 和 Evidence。Conversation、Mention、Team Chat 只服务于这条链路，不把 AgentHub 继续扩展成通用 IM 或 Agent 社区。
 
-### 1.2 当前仍然存在的产品化问题
+首批长期支持的变更模板保持窄而稳定：
 
-项目已经有较强的工程骨架，但仍然有“能力很多、产品主线不够窄、真实来源不够统一、历史兼容代码较多”的问题。以下问题必须进入后续计划，而不是用新增功能掩盖：
+1. 为 Spring Boot 服务修复一个带回归测试的缺陷；
+2. 为已有 Spring Boot 服务增加一个小型接口并更新测试；
+3. 为已有 Next.js 页面完成一个受质量门禁约束的局部变更。
 
-1. **系统认知资产刚完成切换**：原根目录 `ARCHITECTURE_INDEX.md` 曾记录早期 13 个测试和旧模块结构，现已删除；`CHANGELOG.md` 仍保留部分历史口径。AOCI 的 Managed Scope、Receipt、Baseline、漂移和恢复证据尚未完成接入，不能把当前 Markdown 摘要当作长期 Agent 上下文的唯一来源。
-2. **默认数据仍污染产品语义**：迁移和部分应用服务仍可见 `user-1`、`proj-default`、`run-default`、`system` 等默认值。即使生产鉴权已阻断若干旁路，真实产品仍会被演示种子和隐式默认上下文污染。
-3. **旧新接口并存**：`/api/workspace`、`WorkflowAndDiffController`、`RunAliasController`、`WorkspaceApplication` 等兼容路径仍在代码中；前端 `WorkflowCanvas.tsx` 仍存在直接访问 `localhost:8080` 的路径。双轨接口会持续制造授权、契约和测试分叉。
-4. **模块深度不足且应用服务过大**：`ExecutionApplicationService`、`DagExecutionEngine`、`ConversationApplicationService`、`DeploymentApplicationService` 和 `JGitWorkspaceManager` 都已经成为数百行的大模块。它们内部有价值，但接口、事务、调度、序列化、审计和错误处理混在一起，后续维护会越来越依赖整文件阅读。
-5. **Agent 能力仍偏适配器集合**：Provider、Runtime、CLI、Mock 和安全降级路径较多，但用户还不能以稳定的“模板、工具权限、上下文预算、质量门禁、成本预算”来复用一个 Agent 工作单元。
-6. **多 Agent 仍容易被误解为 IM 产品**：Team、Conversation、Mention 和消息序列是基础能力，却不是当前最有价值的用户结果。产品应围绕“研发变更交付”组织协作，而不是继续扩展飞书/微信式社交功能。
-7. **真实生产边界尚未被产品契约固定**：本地 Process、Docker CLI、静态预览和多种 Provider 仍需用配置组合。产品需要明确支持的模板、部署环境、数据保留、成本上限和故障处理，否则每一次演示都可能产生不同结论。
+新模板必须有真实用户旅程、预算、工具权限、质量门禁、回滚方案、评测样本和删除条件；只有为了演示而增加的模板不得进入生产注册表。
 
-### 1.3 本计划的战略结论
+### 1.2 运行模式
 
-未来的核心不是继续堆 Provider、节点类型、聊天特效或新的部署目标，而是收敛到一条可重复的价值链：
-
-> 连接一个受控代码项目 → 选择一个研发变更模板 → Orchestrator 生成并解释计划 → Agent 在受控工作区执行 → 用户审查 Diff、测试和风险 → 审批后生成可访问预览或交付物 → 导出可追溯证据。
-
-这条链路必须同时满足 Java 后端工程师的技术深度和 Agent 应用开发的产品深度：状态、事务、租约、幂等、限流、成本、上下文和安全都要落到可验证的运行行为，而不是只存在于白皮书中。
-
-## 2. 长期产品定义
-
-### 2.1 首个目标用户和产品承诺
-
-首个目标用户是 3～10 人、需要交付内部系统或业务服务的研发团队。团队已有 Git 仓库和代码评审习惯，希望把一次“需求到可审查变更”的过程交给可控的多 Agent 流程，同时保留人工决策权。
-
-产品承诺限定为：
-
-- Agent 可以解释它准备做什么、使用哪些工具、需要多少预算，并在执行前接受用户确认。
-- 每次运行都有不可变的项目、工作区、工作流、Provider、输入和权限快照。
-- 每个文件变更、测试结果、审批决定、部署状态和 Provider 消耗都可以回溯到同一次 Run。
-- 外部模型失败、进程重启、SSE 断线、审批等待和部署失败都显示真实状态，并允许恢复、重试、取消或回滚。
-- 任何模拟或降级行为都带有明确标识，不进入“真实成功”统计。
-
-首个版本不承诺公网不可信代码执行、任意 Shell 平台、通用 Agent 市场、物理隔离多租户、移动端和无限 Provider 矩阵。
-
-### 2.2 产品模式
-
-产品长期保留三种明确模式，并在页面、API、证据包和运维指标中使用同一命名：
-
-| 模式 | 用途 | 允许的事实 | 禁止的表述 |
-| --- | --- | --- | --- |
-| `DEMO_SIMULATED` | 离线评审、CI、无密钥体验 | Mock 输出、确定性工作区、模拟部署 | 真实模型调用、生产性能、真实部署成功 |
-| `LIVE_SELF_HOSTED` | 个人或团队自托管 | 已配置的真实 Provider、受控模板、单节点或明确的 Worker | 未验证的集群能力、强隔离承诺 |
-| `LIVE_TEAM` | 受控研发团队长期使用 | 组织、角色、预算、审计、备份、SLO | 公网任意租户和无限制执行 |
-
-模式不能依赖“是否出现过一条 Token 记录”这类事后猜测，而应在 Run 创建时固化执行策略，并在完成时用 Provider、Runtime、工具和部署证据核对。
-
-### 2.3 关键产品指标
-
-从 Phase 0 起持续采集下列指标。指标只服务于产品取舍，不用于制造简历数字：
-
-- **交付成功率**：Run 在质量门禁、审批和部署验证后产生可接受 Artifact 的比例。
-- **人工干预率**：每次 Run 被用户暂停、重试、修改计划或回滚的比例及原因。
-- **从目标到可审查 Diff 的时间**：不含 Provider 网络等待时，统计执行内核耗时；另记录端到端时间。
-- **真实 Provider 占比与降级率**：Mock、Provider 失败、Fallback 和取消必须分开统计。
-- **单位交付成本**：按输入/输出 Token、Provider 费用、执行时长和沙箱资源统计。
-- **恢复成功率**：进程重启、租约过期、SSE 断线、Provider 暂时失败后的可恢复比例。
-- **产品可信度指标**：假数据命中次数、未关联 Artifact 的“成功”次数、过期索引、过期证据和资源越权拒绝数，目标均为零。
-
-## 3. 长期不变量与架构原则
-
-1. **一个用户动作只能有一个事实来源**：Run、Step、Approval、Artifact、Deployment 的状态由后端持久化模型决定，前端只是投影。
-2. **一个领域只保留一个生产接口**：兼容接口可以在过渡期只读或返回迁移提示，但不得继续产生新的业务状态。
-3. **一次执行是不可变快照**：工作流 DSL、Prompt/工具版本、Provider 策略、预算、权限、工作区基线和输入在 Run 创建后不可被静默替换。
-4. **异步操作使用 at-least-once + 幂等**：不宣称分布式 exactly-once；每个副作用都有幂等键、尝试号、超时和补偿记录。
-5. **上下文是受治理的产品资源**：系统提示、项目规则、代码索引、数据库 Schema、Run 事件、摘要和工具输出必须有来源、版本、预算和安全级别。
-6. **模拟和真实行为隔离**：Mock 只能用于 Demo/Test profile 或用户明确选择的模拟模板，不能作为真实 Provider 全局静默兜底。
-7. **默认安全关闭**：没有身份、预算、项目归属、工具权限、受控模板或健康证据时，Run 必须停在可解释状态。
-8. **继续保持模块化单体**：在达到明确的吞吐、隔离或独立发布门槛之前，不拆成微服务；优先加深模块接口，减少跨模块调用和重复状态机。
-
-## 4. 瘦身与架构收敛策略
-
-### 4.1 目标不是减少行数，而是减少认知和行为分叉
-
-38.5k 行源码本身不是问题。真正的风险是一个概念有多个名称、多个接口、多个默认值和多个恢复逻辑。瘦身验收以以下结果为准：
-
-- Project、Workspace、Workflow、Run、Step、Event、Artifact、Approval、Deployment、Agent Policy 各自只有一个生产模型和一个应用入口。
-- 旧接口在生产 profile 不再注册；兼容代码集中在一个 migration 包并有删除日期。
-- 大模块按用例和事务边界拆成深模块：调用者只知道少量命令/查询接口，锁、状态、重试、审计和持久化细节留在实现内部。
-- 前端不再由一个页面和一个 700 行 API 文件管理全部状态；按资源和用例拆分查询、命令、SSE、错误和缓存策略。
-- 任何 Provider/Runtime/Sandbox 适配器都必须有真实使用者、契约测试和能力声明，否则进入候选删除清单。
-
-### 4.2 保留、合并、隔离和删除
-
-| 决策 | 当前对象 | 处理方向 |
+| 模式 | 允许的事实 | 启用条件 |
 | --- | --- | --- |
-| 保留并加深 | Identity、Project/Workspace、Workflow、Execution、Audit、Sandbox、Provider/Runtime | 作为产品主链路；补齐契约、预算、策略和操作体验 |
-| 合并 | `com.agenthub.domain.*` 原型模型与现有模块模型；`WorkflowEngineService`、`ExecutionScheduler`、`DagExecutionEngine`；多套 Workspace Lock 入口 | 先迁移调用者，再删除旧实现；不再增加平行抽象 |
-| 隔离 | Team、Conversation、Mention、IM、Mock Runtime、CLI 适配器 | 作为协作扩展、测试模式或受控插件，不阻塞核心交付 |
-| 收缩 | Provider 适配器、Sandbox 目标、部署命令类型 | 首个产品只支持经验证的 OpenAI-compatible/Anthropic 或本地 Ollama，以及静态 Web 和一个明确服务模板；其余只保留 SPI 和实验标识 |
-| 删除或下线 | `/api/workspace`、`WorkflowAndDiffController`、`RunAliasController`、`WorkspaceApplication`、固定默认项目/用户、前端 localhost 直连 | 先加监控和迁移提示，连续一个版本无生产调用后移除；删除前补契约回归 |
-| 重新定位 | 已删除的手工 `ARCHITECTURE_INDEX.md`、历史 Changelog、声称“终局”的白皮书段落 | 人类文档只描述当前事实；机器可消费认知交给受治理的 AOCI 资产 |
+| `DEMO_SIMULATED` | 确定性 Mock、离线工作区、模拟 Provider 和模拟部署 | 可用于 CI 和离线演示；所有结果必须带模拟标识 |
+| `LIVE_SELF_HOSTED` | 真实 Provider、单节点受控执行、真实 Git 和预览 | 目标环境验证通过，不能静默回退到 Mock |
+| `LIVE_TEAM` | 团队成员、RBAC、预算、审计、备份、SLO、恢复和外部交付 | Phase 11 以后经真实团队试用验收才可标记为可用 |
 
-### 4.3 反膨胀规则
+Run 创建时必须冻结模式、DSL、AgentDefinition、Prompt/Tool 版本、Provider、预算、权限、Workspace 基线和输入。前端永远只是后端事实的投影。
 
-- 新增一个 Provider、节点类型或部署模板，必须同时提交真实用户旅程、能力声明、契约测试、成本/权限说明和删除条件。
-- 不为“以后可能拆微服务”预先复制 DTO、Repository、事件总线或配置层；先在模块内部形成真实 seam。
-- 不为演示新增默认种子。Demo 数据放在 Demo profile 的 fixture 中，并与生产数据库迁移分开。
-- 不把已有测试数量当作质量目标。新增测试优先覆盖事务边界、资源归属、恢复、幂等、真实 MySQL、浏览器和目标环境。
-- 每个阶段都要有“删除/合并清单”，阶段完成时清理至少一组已经被证明无价值的旧路径。
+### 1.3 不承诺的范围
 
-## 5. AOCI-CODE 与长上下文认知治理
+长期计划不把公网任意不可信代码执行、物理隔离多租户、通用 Agent 市场、无限 Provider 矩阵、移动端、任意 Shell 平台或微服务拆分作为默认目标。只有真实负载、隔离需求或组织合规要求证明必要时，才允许改变这些边界，并先记录 ADR 和替代方案。
 
-aoci-code 的价值不在于给仓库再加一份摘要，而在于让 AI Agent 在行动前获得与代码版本绑定、可验证、可增量维护的系统认知。当前仓库仍缺少受治理的 Scope、Baseline、Receipt、漂移检查和恢复语义，因此下一阶段应采用 AOCI-CODE 的正式工作流，同时保留人类可读的架构文档。
+## 2. 当前基线与客观判断
 
-参考实现：[aoci-spec/aoci-code](https://github.com/aoci-spec/aoci-code)。本次复核已阅读其 README、Cognition Volumes、Cognition Refresh 和公开协议；它强调 Whole-Index、Managed Scope、Evidence/Receipt、Baseline、漂移检测和上下文压缩后的重新认证，这些概念被转化为下面的 AgentHub 工程要求。
+以下是 2026-10-17 工作树的静态盘点；测试数字由 Phase 9 全量门禁实测获取：
 
-### 5.1 接入原则
+| 项目 | 当前事实 | 解释 |
+| --- | --- | --- |
+| 后端生产 Java | 400 个文件 | 已具备较完整的模块化单体，文件数量冻结收敛 |
+| 后端测试 | 62 个测试类 | 实测 387 个测试用例全部通过（含 AOCI 诚实性状态机校验） |
+| 前端 | 39 个 TS/TSX、1 个 CSS | 生产构建通过，静态生成 4/4 路由；`types/index.ts` 仍偏大 |
+| Web 层 | 18 个 Controller | 13 个 ACTIVE，1 个 COMPATIBILITY，4 个 DELETE_CANDIDATE，已建立退场清单 |
+| 数据库 | 12 个 Flyway 迁移 | 22 张业务表的历史演进已较完整，全部处于 ACTIVE 状态 |
+| Markdown | 23 个受管文件 | 13 个 ADR、API/E2E/架构/能力/运维/白皮书等职责已明确收敛归位 |
+| 外部参考 | `reference-shrimp-crab/` 为被忽略的参考仓库 | 不进入 AgentHub 构建、AOCI Managed Scope 或发布包；不因为参考存在就复制功能 |
 
-1. 在稳定的绝对路径安装经过校验的 AOCI-CODE Release；若必须源码构建，记录 Git commit、构建命令和校验结果。安装工具不得读取业务数据、上传源码或保存 Provider 凭据。
-2. 对 AgentHub 执行 `init` 和 `scan`，建立 Code Cognition；先不把 `target`、`node_modules`、生成证据、日志、密钥和临时工作区纳入 Managed Scope。
-3. 对 Flyway 迁移和 JPA/Repository 结构启用只读 Database Cognition。只读取 Schema Evidence，不读取业务行数据，不将数据库密码写入索引。
-4. 为八个高价值深模块建立 FRAS 语义条目：Identity、Project/Workspace、Workflow、Execution、Provider/Runtime、Conversation/Team、Artifact/Review、Sandbox/Deployment，以及前端 API 契约。
-5. 以 Git 版本化正式认知资产；`.aoci` 中的 Ledger、草稿和 Recovery 状态按工具规则处理。AOCI 索引是 Agent 的认知入口，不是源码、测试和运行证据的替代品。
-6. 在阶段收尾执行 `verify`/`check`，要求认知回到 `aligned`。发生大规模重构、数据库迁移或已知上下文压缩时，先重新读取 Rules、Whole-Index 和当前任务证据，再继续工作。
-7. 在 CI 中先使用 AOCI 官方可执行文件做确定性校验；若组织暂时不能在 CI 安装该工具，则至少校验索引指纹、受管范围、数据库迁移版本和源码变更清单，禁止手工改 Baseline 掩盖漂移。
+当前最重要的产品问题不是缺少页面，而是：
 
-### 5.2 不把 AOCI 用成新的复杂度来源
+1. Phase 8 仍主要由 H2、静态构建和 Compose 语法证明，真实 Linux、MySQL 8、Docker、Provider、Git 远端和灾备恢复证据不足；
+2. AOCI-CODE 尚未完成官方二进制校验、Managed Scope、Baseline、Whole-Index、Receipt/Evidence 和 `verify/check` 对齐；
+3. 18 个 Controller、兼容接口、默认演示值和部分旧路径继续制造授权、契约和测试分叉；
+4. `JGitWorkspaceManager`、`ArtifactApplicationService`、`DeploymentApplicationService`、`ConversationApplicationService`、`WorkspaceApplicationService`、`RunEvidenceModule` 等大模块把事务、协议、调度、审计和外部副作用挤在一起；
+5. Provider、Runtime、Sandbox、Chat 和扩展 SPI 已经很多，但真实团队还没有一条可重复、可定价、可支持的上线路径；
+6. 文档和 CHANGELOG 中存在历史状态、当前事实和路线内容混写的风险。
 
-- 不复制 AOCI 内部状态机到脚本或 Java 业务代码，只使用其 CLI/MCP 合同。
-- 不为每个类写长篇条目；优先维护模块职责、强关系、公开接口、事务边界、不可破坏约束和验证入口。
-- 不让模型生成的关系覆盖精确调用图、源码和测试事实；任务执行仍必须回到源码、数据库和运行结果核对。
-- 认知条目过期时标记 `stale` 或 `repair_required`，不能继续以“完整理解”口径修改高风险模块。
+因此，下一阶段先做可靠性与收敛，再做真实团队产品和扩展生态。继续增加 Provider、聊天功能或视觉组件会掩盖问题，暂不批准。
 
-## 6. 分阶段长期路线
+## 3. 不可破坏的工程不变量
 
-各阶段按顺序推进，预计总周期 18～24 个月。时间是排期参考，退出条件是完成标准。每阶段都必须完成：现状基线 → 方案/ADR → 实现 → 自动化验证 → 目标环境验证 → 文档/认知对齐 → 删除旧路径 → 阶段验收。
+1. **单一事实来源**：Run、Step、Approval、Artifact、Deployment、预算和证据的状态只能由后端持久化事实产生。
+2. **快照不可静默改变**：运行开始后，DSL、输入、规则、Provider、权限、预算和工作区基线不可被覆盖。
+3. **至少一次执行，幂等副作用**：每个异步动作必须有 attempt、租约、超时、取消、幂等键、审计和补偿；不宣称分布式 exactly-once。
+4. **高影响工具先计划后确认**：写文件、执行构建、网络访问、部署、外部交付和凭据使用必须有 allowlist、schema、角色、预算、审计和可恢复失败。
+5. **真实与模拟严格分离**：`DEMO_SIMULATED` 的结果不能进入真实成功、成本、SLO 或上线统计。
+6. **模块化单体优先**：Controller 只负责协议和权限入口，Application 编排用例，Domain 承载规则，Infrastructure 承载数据库、文件、Provider、进程和外部系统。
+7. **认知不等于摘要**：AOCI Whole-Index、源代码、测试、审批、错误和运行证据各自有职责；任何摘要都不能替代原始证据。
+8. **跨平台门禁有效**：Windows 单次通过不能代替 Linux + MySQL 8 + Docker 验证；后台线程、测试数据、租约和全局状态必须在测试后清理。
 
-### Phase 0：产品边界、事实基线与瘦身冻结（3～4 周）
+## 4. 瘦身策略与量化边界
 
-**目标**：在继续写功能前固定产品主线、认知资产和代码收敛规则，停止“为了展示而扩展”。
+瘦身的目标是降低行为分叉、认知成本和发布风险，不是为了追求低行数。所有删除都必须有调用证据、替代路径、回滚方式和回归测试。
 
-**必须完成**：
+### 4.1 代码瘦身
 
-1. 写出 Product Brief：目标用户、首个项目模板、核心旅程、明确不做的能力、三种运行模式、数据保留和安全边界。
-2. 建立资源和事件词汇表：Project、Workspace、WorkflowDefinition、Run、StepRun、Event、Artifact、Approval、Deployment、Agent Policy、Context Source；发现代码与文档冲突时以实际持久化模型和 API 契约为准。
-3. 重新生成 API、数据库表、前端调用、Provider/Runtime/Sandbox 能力矩阵；每一项标明 owner、来源、认证、幂等、状态、测试和删除日期。
-4. 接入 AOCI-CODE，完成 Code/Database Cognition 初始化、Managed Scope、首个 Baseline 和 `aligned` 验证；把本次删除的 `ARCHITECTURE_INDEX.md` 内容仅作为迁移参考，不能重新恢复为无治理的唯一索引。
-5. 建立瘦身清单：旧包、旧 Controller、默认种子、兼容 DTO、重复状态机、未使用 Provider、过大前端文件。每项写明调用证据、替代路径、迁移窗口和删除负责人。
-6. 把 `CHANGELOG.md`、白皮书、能力边界、E2E 指南和 README 中的“全部完成”“生产级”“真实全链路”等表述改成有证据的当前状态；每个数字注明采集命令、环境和时间。
-7. 增加禁止新债务的自动检查：生产代码不得新增固定 user/project/path，前端不得新增 localhost 直连，生产 API 不得新增 Mock fallback，旧路径不得出现新调用。
+- 先生成 Controller、路由、DTO、Repository、Provider、Runtime、Sandbox、脚本和测试的引用矩阵；没有生产调用、没有测试价值、没有明确迁移用途的适配器进入删除候选。
+- 只保留一个生产接口。旧接口最多保留一个有期限的迁移响应和计数器，迁移期结束后删除 Controller、DTO、测试和文档引用。
+- 对大类做“深模块”拆分：外部接口减少，复杂事务、路径保护、JGit、序列化和审计逻辑隐藏在内部模块；禁止为了拆文件建立只有一行转发的包装层。
+- 默认值、演示种子、`user-1`/`proj-default`/`run-default` 等必须只存在于显式 demo profile 和测试夹具，生产代码不得依赖。
+- Provider、Tool、AgentDefinition、WorkflowTemplate、DeploymentTemplate 每增加一个实现，必须同时增加实际用户旅程、契约测试、成本和停用条件；否则删除或隔离到参考区。
+- Phase 10 结束时，所有兼容 Controller 都应有删除结果；生产主链路不得依赖兼容过滤器。大于 600 行的生产 Java/TSX 文件必须有拆分 ADR 或在该阶段完成收敛，行数不是唯一验收指标。
 
-**禁止事项**：不新增 Provider、不新增聊天功能、不拆微服务、不做视觉重构、不把 AOCI 索引当作业务数据库。
+### 4.2 文档瘦身
 
-**退出证据**：Product Brief、词汇表、API/Schema/能力矩阵、AOCI Receipt 和 Baseline、瘦身清单、更新后的能力声明均进入同一阶段交付；CI 能检测到默认值、旧路径和索引漂移；Phase 0 结束后冻结新增范围。
+- `AGENTS.md` 是项目级系统规约，本文是唯一长期路线；不要恢复 `GEMINI.md`、旧长期计划或第二份系统提示词。
+- README 只保留入口、产品主线、模式和快速验证；当前架构放 `ARCHITECTURE.md`，接口放 `API.md`，能力真相放 `CURRENT_CAPABILITY_BOUNDARIES.md`，演练放 `E2E_DEMO_GUIDE.md`，运维放 `docs/ops/`，不可逆决策放 ADR。
+- 一个事实只在一个文档中作为权威来源，其他文档只链接，不复制完整表格、阶段记录或历史数字。
+- 白皮书只保留答辩需要的取舍；如果内容不能指导用户、维护者或运维人员，删除或移入 Git 历史。
+- 阶段验收只追加到本文对应的阶段记录，禁止每个阶段新建一个长期计划、总结或“最终版” Markdown。
+- Phase 9 结束时形成 Markdown inventory、引用检查和删除清单；目标是将 26 个活跃 Markdown 收敛到约 18～22 个，不牺牲安全、接口、运维和 ADR 事实。CHANGELOG 只记录历史变更，不再承担当前能力说明。
 
-### Phase 1：模块收敛与 API/数据契约 v1（5～7 周）
+## 5. AOCI-CODE 使用边界
 
-**目标**：让调用者面对少量、稳定、可版本化的深模块接口，消除旧新双轨行为。
+AOCI-CODE 的正式仓库已完成只读审视。应吸收的原则是：Git 忽略规则作为 Safe Inventory 权威、Scope 和 Baseline 先于索引、Whole-Index 交付有完整链、认知变更绑定 Receipt/Evidence、`verify/check` 失败时禁止宣称 aligned。不得复制 AOCI 的内部 Plan、Stage、CAS、Recovery 或 MCP 状态机到 Java 业务代码。
 
-**后端**：
+Phase 9 的正式接入必须遵循官方发布或可复现源码构建流程：
 
-- 选定 `identity`、`project`、`orchestration`、`execution`、`agent`、`audit`、`sandbox`、`ops` 八个生产上下文；原型 `domain.*` 只作为迁移源，不再作为新的业务入口。
-- 为每个上下文定义 Command、Query、Event 和错误码；Controller 不直接编排线程、JPA Entity 或文件路径。
-- 将 `ExecutionApplicationService` 拆成 Run Command、Run Query、Run Evidence、Event Stream 四个内部深模块；将 `DagExecutionEngine` 拆成拓扑计划、租约执行、状态转换、Agent 调用、事件记录五个内部 seam，但对外保留一个 Run 执行接口。
-- 统一 Workspace、Workflow、Run、Artifact 和 Deployment 的资源归属查询；移除隐式 `user-1`、`proj-default`、`run-default` 和 `system` 业务默认值，Demo 种子迁移到独立 profile。
-- 只保留一个工作区 REST 资源模型（`/api/workspaces/{workspaceId}` 族）；为旧接口提供短期 410/迁移信息和调用计数，然后删除。
-- 固化分页、排序、错误响应、幂等键、ETag/版本号、SSE 游标和时区规则，生成 OpenAPI 或等价契约快照。
+1. 将经校验的 `aoci`/`aoci.exe` 放在稳定绝对路径，记录版本、来源、构建输入和校验结果；
+2. 用 `init` 和 `scan` 建立 Code Cognition，明确排除 `target/`、`node_modules/`、`.next/`、构建产物、运行数据、参考仓库、凭据、日志和宿主配置；
+3. 如启用数据库认知，先提供只读 Schema Evidence，再建立 Database Cognition；不得读取业务数据或保存 Provider 凭据；
+4. 由受支持的 MCP Host 建立 Whole-Index，完成 Host delivery、Attestation、Baseline 和治理对齐；不手工伪造 `aoci.txt`、Receipt、Ledger 或 `aligned`；
+5. 代码和测试稳定后维护受影响 Entry，CI 使用官方 `verify`/`check`，未对齐时阻断高影响修改；
+6. AOCI 不可用时明确记录阻塞，继续的工作只能依赖源码、测试和其他真实证据，不能把 Markdown 摘要写成 AOCI 结果。
 
-**前端**：
+## 6. 24～36 个月阶段路线
 
-- 将 845 行 API 文件（`services/api.ts`）拆成 auth、projects、workspaces、workflows、runs、approvals、artifacts、deployments、stream 和 errors 模块；统一请求、重试、取消、401/403 和空状态。
-- 将 677 行主页面（`app/page.tsx`）拆为项目壳、Run 工作区、审查侧栏和部署面板；页面只依赖资源查询和命令接口。
-- 删除 `WorkflowCanvas.tsx` 的 localhost 直连、默认 ID 和兼容请求；所有资源通过当前 Project/Workspace/Run 上下文注入。
+### Phase 9：可信基线、AOCI 接入与瘦身冻结（6～8 周）
 
-**退出证据**：生产 profile 无旧 Controller 注册；旧接口调用计数为零后完成删除；同一业务状态不存在两个 Repository/状态机；OpenAPI 与前端契约测试一致；ArchUnit/静态检查阻止跨层直连；Phase 1 至少删除或合并一组重复实现。
-
-### Phase 2：项目接入与受控工作区产品化（6～8 周）
-
-**目标**：用户可以把一个真实代码项目安全接入 AgentHub，并在隔离分支/工作区中开始一次可审查变更。
-
-**必须完成**：
-
-1. 首先支持一个清晰的 Git 来源范围：本地受控目录和一个远程 Git Provider（优先 GitHub HTTPS/只读 Token）。凭据只保存 secretRef，clone/fetch 日志全程脱敏。
-2. 增加 Project Onboarding 向导：连接来源、验证权限、选择默认分支、创建 Workspace、扫描语言/构建命令、生成项目规则、创建初始基线；失败步骤可重试或清理。
-3. Workspace 只接受内部 `workspaceId` 和相对路径；所有 clone、branch、snapshot、diff、revert、cleanup 都由服务端策略执行。明确符号链接、子模块、大文件和 `.git` 目录策略。
-4. 建立工作区容量、文件数、单文件大小、执行时长、网络访问和并发锁配额；超限进入可解释的 `BLOCKED_POLICY`，不能静默截断。
-5. 将 AOCI Code/Database Cognition、项目规则、构建文件、测试约定作为版本化 Context Source，显示来源、commit、更新时间和安全级别。
-6. 提供“重新同步、基线变更、放弃工作区、恢复上一次快照”操作；每项都有审计记录和确认门槛。
-
-**禁止事项**：不允许用户提交宿主绝对路径、不把 GitHub Token 写入数据库正文、不默认执行未知仓库的任意构建命令、不把扫描结果直接当作 Agent 指令。
-
-**退出证据**：在真实 Git 仓库上完成接入、同步、创建隔离分支、Agent 修改、JGit Diff、回滚和清理；两个用户不能看见彼此的仓库文件；故意断网、权限失效、超限和路径穿越均有可恢复错误；AOCI/项目规则与 commit 指纹绑定。
-
-### Phase 3：Agent 工作单元、模板和策略产品化（8～10 周）
-
-**目标**：把“适配器集合”变成可复用、可评估、可限权的 Agent 工作单元。
+**目标**：让团队和 Agent 看到同一份当前事实，停止继续膨胀。
 
 **必须完成**：
 
-- 定义版本化 `AgentDefinition`：角色目标、系统提示、输入输出 schema、工具清单、Provider 策略、上下文来源、预算、超时、重试、停止条件和安全等级。
-- 定义版本化 `WorkflowTemplate`：需求澄清、计划、实现、测试、审查、审批和交付节点；模板引用 AgentDefinition 快照，不直接引用可变 Provider 配置。
-- Orchestrator 先生成结构化 Plan，再由用户确认范围、文件、工具和预算；未经确认不能执行高影响工具。
-- 工具以 allowlist 和参数 schema 暴露，文件写入、命令执行、网络请求、Git 操作和部署分别授权；工具输出必须带来源和大小上限。
-- 设计 Context Assembly：项目规则、AOCI 条目、相关文件、历史 Run 摘要、工具结果和用户输入分层装配；每层记录 token 预算、截断方式和安全等级。
-- Provider 路由只在能力、成本、延迟、区域和数据策略满足时选择；真实失败要进入失败或明确降级状态，Mock 不得隐式成为产品成功。
-- 建立离线评测集：至少包含新增接口、修复缺陷、重构、测试补齐和恶意 Prompt 五类任务；评测通过率、工具误用率、Diff 可接受率、Token 成本和人工修改量。
+1. 重跑后端全量门禁、前端类型/生产构建、Compose、真实 MySQL/Flyway CI 和现有 E2E，更新本文件的静态数字与证据日期；
+2. 完成 AOCI 官方安装、Scope、Code/Database Cognition、Baseline、Whole-Index、Receipt/Evidence、`verify/check`，并把 MCP 配置、版本和恢复方式记录到运维文档；
+3. 生成代码、路由、数据库表、Provider、Runtime、Sandbox、脚本和 Markdown inventory，标记 `ACTIVE`、`COMPATIBILITY`、`DEMO_ONLY`、`TEST_ONLY`、`DELETE_CANDIDATE`；
+4. 盘点默认值、旧接口、localhost、固定路径、重复 DTO、未使用适配器、巨型测试夹具、失败日志和参考仓库边界；
+5. 建立产品术语和能力矩阵，只修正事实与链接，不借此新增功能。
 
-**首批模板建议**：`修复一个带测试的后端缺陷`、`为现有 Spring Boot 服务新增一个小接口并更新测试`。多 Agent 角色只服务于这两个模板，不为展示而扩展角色数量。
+**禁止**：新增 Provider、模板、聊天玩法、数据库表、微服务或 UI 重构。
 
-**退出证据**：两个模板在 Demo 和 Live Provider 模式均能运行；所有 Agent 工具调用可审计、可取消、可重放；同一评测集有基线模型和版本化结果；用户能在执行前看到计划、权限和预算；失败不会被模拟输出掩盖。
+**退出证据**：AOCI 能证明当前受管范围和 aligned 状态；全量门禁有新日志；inventory 有 owner、引用、替代路径和删除顺序；文档旧引用为零；未解决的基线漂移会阻止 Phase 10。
 
-### Phase 4：Run Operations、人工决策与长上下文可靠性（8～10 周）
+### Phase 10：核心内核收敛与兼容路径退场（10～14 周）
 
-**目标**：把一次 Run 做成可观察、可暂停、可恢复、可审查的产品对象，而不是后台线程的外显。
+**目标**：把当前代码量变成可长期维护的深模块，减少接口和状态机分叉。
 
 **必须完成**：
 
-1. 将 Run 状态、Step 状态、租约、事件、Outbox、Approval 和 Artifact 形成单一状态图；所有转换通过状态机和条件更新完成。
-2. 完善 at-least-once 执行：幂等键、attempt、外部调用 requestId、工具副作用记录、重试分类、超时、取消和人工接管；把“可自动重试”和“必须人工确认”分开。
-3. 完成 transactional outbox 或同等机制，保证数据库状态、SSE 回放、通知和审计不会互相失配；多实例广播只有在负载证据表明需要时才引入 Redis Stream。
-4. 让用户能查看计划、上下文来源、工具调用、成本、风险、失败原因、重试次数和待决策项；任何暂停都能说明下一步需要谁做什么。
-5. 将长上下文拆为项目级、Run 级和 Step 级记忆。摘要必须引用原始事件范围和版本；超过预算时优先压缩低价值日志，不能丢失约束、审批、错误和文件来源。
-6. 已知上下文压缩或换 Agent 后，先重新读取 AOCI Whole-Index、当前 Run 快照和未完成操作 Receipt；摘要只能帮助定位，不能证明系统认知仍然可靠。
-7. 增加浏览器真实操作：刷新、断线、重复点击、并行打开两个 Run、审批后恢复、取消后重试；页面始终从 API 恢复事实。
+1. 以 API v1/OpenAPI 为唯一生产契约，迁移并删除旧 Workspace、Workflow/Diff、Run Alias 和其他兼容 Controller；前端删除旧调用与重复 API 包装；
+2. 将 Workspace/JGit、Artifact/Diff、Deployment 生命周期、Run Evidence、Conversation 和 Ops 大类按用例拆成深模块，保留少量稳定接口；
+3. 合并重复状态判断、错误码、分页、ETag、幂等和资源归属校验；所有状态跃迁回到统一状态图；
+4. 迁移演示种子到 demo profile/测试夹具，生产启动不创建固定主体、项目、运行或 Provider；
+5. 对异步执行、SSE、JGit、备份恢复和测试清理补充跨平台回归，删除无价值的过度集成测试和重复 fixture。
 
-**退出证据**：强杀/重启、数据库连接短暂中断、SSE 断线、Provider 超时、重复提交、审批等待和取消场景都能得到可验证终态；已成功 Step 不重复产生外部副作用；长上下文任务的来源、预算、摘要和恢复流程可在证据包中核查。
+**退出证据**：生产主链路不依赖兼容 Controller；调用矩阵只剩一套接口；大模块有拆分前后行为证据；删除代码和文档的 diff 可回滚；全量门禁和 Linux + MySQL CI 通过；AOCI 重新 aligned。
 
-### Phase 5：质量门禁、审查和交付产品化（8～10 周）
+### Phase 11：真实团队工作区与外部交付（12～16 周）
 
-**目标**：让 AgentHub 交付的是“可接受变更”，而不是“生成了一段代码”。
+**目标**：让 `LIVE_TEAM` 成为可试用产品，而不是模式枚举。
 
 **必须完成**：
 
-- 把 Diff、测试、静态分析、依赖/秘密扫描、构建产物、人工意见和 Approval 统一为 Artifact Lineage；每个 Artifact 绑定 Run、Workspace commit、工具版本和校验和。
-- 建立质量门禁策略：后端 Maven、前端 Next、格式/静态检查、安全扫描和最小回归必须按项目模板配置；失败门禁不能靠前端按钮伪造通过。
-- 审查页面支持按文件、风险、Agent、工具和测试结果过滤；用户可以请求某个 Step 重做、回滚单个文件或退回整个 Run。
-- 预览部署只允许已接受 Artifact 和受控模板；明确静态 Web 与一个服务模板的 BUILD/START/HEALTH_CHECK/RUNNING/STOP/CLEANUP 证据，记录资源、端口、日志游标、TTL 和清理结果。
-- 可选接入一个远程 Git Provider 的 Pull Request 草稿/只读审查能力；外部写操作必须有明确用户授权、幂等键和审计回执。
-- 证据包按用户、项目、Run 和保留策略导出，支持离线审计；脱敏、checksum、版本和模式标识必须保持稳定。
+1. 完成一个 Git 提供商的 OAuth/凭据引用、仓库连接、分支策略、Webhook 验签、变更同步和撤销授权；凭据只保存引用和审计信息；
+2. 完成 Project/Team/Member/Role/Workspace 的生命周期、邀请和离职处理，所有资源查询和动作走同一权限矩阵；
+3. 将 PR 草稿扩展为受控外部交付：用户确认目标、分支、标题、描述和变更摘要后才能创建；回调状态必须幂等并进入 Evidence；
+4. 提供项目级预算、并发、Workspace 容量、数据保留和 Provider 使用策略；超限显示可恢复原因；
+5. 以 2～3 个真实仓库和至少两个不同角色完成试用，记录失败、人工干预、成本和恢复数据。
 
-**退出证据**：真实仓库变更必须经过质量门禁和用户批准才能进入预览；部署 URL 能从另一客户端访问并通过健康探针；停止/TTL/失败后端口、进程、容器和工作区临时文件全部回收；回滚结果可访问且证据链完整。
+**禁止**：通用市场、无限 Git 平台、自动合并、无人审批的生产部署。
 
-### Phase 6：组织、权限、预算与可运营性（8～10 周）
+**退出证据**：真实远程 Git、OAuth/Webhook、PR、撤销、回调重放、权限越权、预算超限和灾备恢复均有目标环境证据；至少一条真实团队旅程完成并导出可审查证据包。
 
-**目标**：让多个研发团队在同一个 AgentHub 实例中安全、可控地长期使用。
+### Phase 12：Agent 质量、上下文与成本运营（12～16 周）
 
-**必须完成**：
-
-1. 引入 Organization/Member/Role/Project Membership，明确 Owner、Admin、Developer、Reviewer、Viewer、Auditor 权限；角色矩阵覆盖 Project、Provider Secret、Workflow、Run、Artifact、Deployment、Evidence 和运维端点。
-2. 将当前应用层 owner isolation 演进为组织和项目级授权；是否需要 Schema-per-Tenant 或 Database-per-Tenant 必须由数据量、法规和威胁模型决定，不能为了“看起来企业级”提前实现。
-3. Provider 凭据采用 secretRef、轮换、最小权限、访问审计和删除后不可恢复策略；用户只能看到脱敏摘要。
-4. 实现项目/组织级 Token、并发 Run、工作区、上下文、Provider 费用和部署时长预算；预算耗尽时停止新副作用，并保留可解释的终止原因。
-5. 完善观测：Run/Step/Provider/工具/部署关联 traceId，日志结构化脱敏，指标带项目和模式标签；建立 SLO、告警、值班手册和用户可见状态页。
-6. 提供数据导出、删除、保留期、备份还原和审计查询；备份演练必须在干净环境验证，而不是只验证压缩包存在。
-
-**退出证据**：两个组织和多个角色的越权、预算、密钥、证据导出和审计场景全部通过；运维人员可以定位一次失败 Run 的完整链路；备份还原、数据删除和权限变更有演练记录。
-
-### Phase 7：可扩展运行平面与受控发布（10～14 周）
-
-**目标**：只有在 Phase 6 的单节点产品已有真实使用负载后，才引入必要的水平扩展和更强隔离。
-
-**触发条件**：连续四周观测到单节点 CPU/内存/队列/数据库或 SSE 连接成为实际瓶颈，或者出现明确的租户隔离需求。没有触发条件时继续保持模块化单体和数据库驱动 Worker。
-
-**可能工作**：
-
-- 把 Agent 执行、沙箱部署、事件广播和 Web/API 进程拆成最少的 Worker 角色；每次拆分都先定义消息、幂等、重试、租约和回滚契约。
-- 需要跨节点实时广播时引入 Redis Stream 或同等方案；数据库仍是 Run/Step/Event 的权威来源，消息系统不能成为第二套状态机。
-- 工作区和 Artifact 迁移到 S3/MinIO 等对象存储时，先完成 checksum、版本、生命周期、权限和迁移回滚；不直接把本地路径替换成一个未经验证的 URL。
-- 对公网不可信代码执行有真实需求时，再评估独立 Sandbox Worker、网络隔离、只读镜像、资源配额、Kubernetes、gVisor/Kata/Firecracker 等方案；在此之前明确产品只适用于受控团队。
-- 用真实负载测试确定数据库索引、连接池、队列、SSE 回放和 Provider 限流参数；不引用本地 50 线程测试作为集群 SLO。
-
-**退出证据**：多实例部署下 Run/Step 状态、事件序列、审批、取消和证据包一致；Worker 故障可以接管且不重复外部副作用；对象存储、网络和沙箱故障有明确恢复策略；发布可灰度、可回滚并有版本兼容矩阵。
-
-### Phase 8：稳定版发布与生态边界（持续 8～12 周后进入维护）
-
-**目标**：形成可以被团队长期安装、升级、审计和扩展的产品发行版。
+**目标**：把 Agent 从适配器集合变成可版本化、可评测、可定价的工作单元。
 
 **必须完成**：
 
-- 发布稳定 API/CLI/配置版本，提供从当前 v2.x 到稳定版的迁移工具和回滚说明。
-- 提供一个最小 SDK 或 Webhook 合同，只暴露已稳定的 Project、Run、Artifact、Approval 和 Deployment 能力；不把内部 Entity 直接变成公共接口。
-- 建立 Provider、AgentDefinition、WorkflowTemplate、Tool 和 Deployment Template 的扩展合同；第三方扩展必须有权限、版本、测试和撤销机制。
-- 提供安装包、Compose、升级、备份、卸载、数据导出和故障诊断文档；所有文档从干净环境重新验证。
-- 以真实用户旅程、脱敏证据包、测试报告、负载报告和已知边界作为版本发布物；简历只使用这些证据中的指标。
+1. 建立 AgentDefinition、Prompt、Tool、Context Source、质量门禁、停止条件和重试策略的版本注册和快照；
+2. 建立离线评测集、对抗输入集、真实脱敏回放集和版本回归报告，区分计划质量、代码质量、测试质量、风险误报和成本；
+3. 将 Context Assembly 与 AOCI Whole-Index、受影响文件、运行事件和错误证据绑定，记录 token 预算、截断理由和来源；
+4. 完善 Provider 路由、缓存、超时、熔断、重试和预算预估，提供按项目、模板、Agent 和 Provider 的实际成本报表；
+5. 让用户能比较不同 Agent/Provider 版本的成功率、人工干预率、耗时和成本，但不把离线分数写成生产承诺。
 
-**暂缓的生态方向**：公开 Agent 市场、按量计费、移动端、跨公司公共执行平台和任意代码云沙箱。它们只有在稳定版有明确用户需求、威胁模型和运营能力后才另立计划。
+**退出证据**：每次 LIVE Run 都有可重放的策略快照；评测结果能阻止明显回归；预算阻断无绕过路径；上下文过期、证据缺失和 AOCI 未对齐会显示为风险或阻塞；成本统计与 Provider 账单抽样一致。
 
-## 7. 每阶段固定的工程交付门禁
+### Phase 13：受控执行平面与规模化可靠性（14～20 周）
 
-以下门禁对 Phase 0～8 都适用：
+**目标**：在证据证明需要时，把单节点执行演进为可恢复的 Worker 平面。
 
-1. **需求门禁**：阶段开始前写清用户动作、后端事实、权限、失败状态、成本、可观测字段和删除对象；不接受只有 UI 截图的需求。
-2. **架构门禁**：涉及模块边界、状态机、数据库、公共接口或数据保留的变更，先写 ADR，并更新词汇表、AOCI 条目和影响矩阵。
-3. **实现门禁**：Controller 不直接持久化/调度；前端不写业务状态；Provider、工具、沙箱和部署均通过明确 seam；旧路径不能产生新数据。
-4. **测试门禁**：单元测试只证明局部逻辑；真实 MySQL/Flyway 证明 Schema 和事务；黑盒 API 证明权限和契约；浏览器证明用户旅程；目标环境证明容器、网络、Provider 和部署行为。报告中分别标记四类证据。
-5. **认知门禁**：AOCI `verify/check` 对齐；发生已知上下文压缩时重新读取系统认知和任务快照；索引漂移、缺少 Receipt 或未接受 Evidence 时停止高风险修改。
-6. **Git/CI 门禁**：每个阶段至多一个普通提交和一个加固提交；阶段代码、测试、迁移、配置和计划验收记录必须在同一次提交中完成；提交前执行后端 `mvn clean test`、前端 `npm run build` 以及涉及的 Compose/镜像/真实 MySQL 门禁，并按项目要求同步到 `origin/main`。
-7. **发布门禁**：发布前重新读取改动和 diff，生成变更清单、回滚方式、已验证环境和未验证限制；没有目标环境证据时只能称为“代码/自动化测试完成”。
+**必须先证明**：Phase 11/12 的真实运行量、队列等待、SSE 连接数、JGit IO、内存、数据库锁和 Provider 延迟已经超过单节点可接受边界。没有数据就不拆服务。
 
-## 8. 长期风险与停止规则
+**必须完成**：
 
-| 风险 | 触发信号 | 处理 | 停止扩展的条件 |
-| --- | --- | --- | --- |
-| AI 生成错误或越权修改 | 高风险文件命中、工具参数异常、审查退回率上升 | 计划确认、工具 allowlist、质量门禁、人工审批、回滚 | 不能说明文件来源和影响时禁止执行 |
-| 重试导致重复花费或重复写入 | Provider 账单重复、同一 Step 多副作用 | 幂等键、attempt、外部 requestId、补偿 | 无法证明幂等时禁止自动重试 |
-| 上下文漂移 | AOCI stale、摘要缺原文范围、换 Agent 后结论冲突 | 刷新 Whole-Index、补 Evidence、重新确认 | 认知未 aligned 时禁止高影响变更 |
-| 代码继续膨胀 | 新增平行接口、适配器无使用者、大类继续变长 | 删除预算、模块深度评审、冻结新功能 | 未完成 Phase 0/1 的瘦身不得扩展生态 |
-| 沙箱越界或敏感信息泄露 | 路径/命令/网络探针异常、日志出现密钥 | 默认拒绝、环境清洗、隔离 Worker、审计和轮换 | 未达到威胁模型要求时禁止公网不可信执行 |
-| Provider 依赖和成本失控 | P95 延迟、429、成本预算超限 | 路由策略、熔断、预算、人工暂停 | 没有成本和降级证据时不增加 Provider |
-| 运维不可恢复 | 备份不能还原、事件与状态不一致、Worker 无法接管 | 故障演练、Outbox、租约、版本兼容 | 恢复演练失败时不做发布或扩容 |
+1. 优先在模块化单体内形成可独立调度的 Worker/Executor 进程，复用已有数据库租约、Outbox、幂等和状态图；
+2. 实现多实例 SSE 回放/广播、任务公平性、租约接管、取消传播、背压、项目级并发和资源配额；
+3. 评估对象存储或外部 Artifact 存储，仅在容量和备份证据证明本地文件不足时接入；
+4. 将 Sandbox 的网络、文件、进程和清理策略做成可验证的运行配置，明确哪些仍是自托管信任边界；
+5. 用故障注入验证断电、进程崩溃、网络抖动、数据库锁、Provider 超时、Worker 重启和重复 Webhook。
 
-## 9. 阶段验收记录模板
+**禁止**：为了“看起来云原生”引入空壳消息队列、服务注册中心或没有独立伸缩需求的微服务。
 
-每个阶段完成时，在本文件对应阶段末尾或单独的验收记录中填写：
+**退出证据**：目标负载下有并发、P95/P99、恢复时间、队列等待、内存和数据库指标；故障注入后无重复副作用、数据丢失或错误成功；部署和回滚手册可由另一名开发者执行。
+
+### Phase 14：生产运营、数据治理与发布工程（10～14 周）
+
+**目标**：让团队可以持续运行、升级和恢复，而不是只能完成一次演示。
+
+**必须完成**：
+
+1. 固化 SLO、告警、值班、关联 ID、审计检索、数据保留、归档和删除审批；
+2. 在真实 MySQL 8、Docker、TLS、反向代理和外部 Provider 下完成安装升级、回滚、备份校验、异地恢复和容量测试；
+3. 建立依赖升级、漏洞扫描、SBOM、镜像签名/校验、密钥轮换和 Webhook 重放防护流程；
+4. 让 Release Manifest、API 兼容策略、数据库迁移、SDK/SPI 版本和弃用窗口进入发布门禁；
+5. 把“代码完成、自动化测试通过、目标环境验证通过、生产观察期通过”拆成四种状态。
+
+**退出证据**：至少两次从干净环境安装和升级成功；一次有记录的灾备恢复成功；告警能定位到 Run/Step/Provider/Artifact；发布失败可回滚；数据保留和删除不会破坏审计链。
+
+### Phase 15：受控 Beta、生态边界与维护期（持续 12 个月）
+
+**目标**：以少量真实用户验证产品价值，控制生态扩张速度。
+
+**必须完成**：
+
+1. 选择 3～5 个真实团队或项目进行受控 Beta，定义纳入、退出、数据隔离和支持边界；
+2. 只开放已验证的模板、Provider、Git 集成、部署模板和 SDK；每个扩展有契约测试、版本兼容、权限、成本和撤销机制；
+3. 建立用户反馈、故障复盘、变更审批、指标周报和月度删除预算；低使用率或高维护成本功能进入退役流程；
+4. 维护 README、API、能力边界、E2E、Ops、ADR 和 AOCI 认知资产的单一事实关系，删除过期的 Beta 说明；
+5. 每季度只做一次路线复盘：根据真实使用数据调整模板、资源边界和可靠性目标，不因单个演示需求改写长期方向。
+
+**退出证据**：真实用户完成端到端变更交付并愿意重复使用；失败和恢复数据可解释；扩展没有破坏核心不变量；产品可以在没有原作者口头讲解的情况下被安装、使用、审查和恢复。
+
+## 7. 每轮和每阶段的执行合同
+
+每一轮工作都按以下顺序闭环：
+
+1. 读取 `AGENTS.md`、本文、当前阶段验收记录、源码、测试、配置、迁移和 `git status`；
+2. 给出本轮一个最小可验证目标，先调查引用和影响，再写 ADR（仅在不可逆、意外且有取舍时）；
+3. 实施源码、测试、迁移、配置和文档同步；删除动作先验证绝对路径、调用证据、替代路径和回滚方式；
+4. 运行最窄验证，再运行阶段门禁；报告代码完成、自动化测试、目标环境和未验证项四种状态；
+5. 重新读取 diff，更新 AOCI 受影响 Entry 和阶段证据；没有 aligned、测试或目标环境证据时不得宣称阶段完成；
+6. 每阶段最多一个主交付提交和一个加固提交，提交前遵循仓库 Git 规约。
+
+阶段不能因为“功能已经很多”自动通过，也不能通过新增功能绕开未完成的瘦身、安全、恢复、AOCI 或目标环境门禁。遇到真实外部阻塞时，记录阻塞、影响和不依赖它的低风险工作；不要伪造结果。
+
+## 8. 指标和停止规则
+
+Phase 9 先建立真实基线，Phase 11 以后再设产品目标。至少持续记录：
+
+- 交付成功率、人工干预率、从需求到可审查 Diff 的端到端时间；
+- LIVE 与 DEMO 的比例、Provider 失败/重试/熔断、单位 Run 成本；
+- 进程重启、租约过期、SSE 断线、Webhook 重放和灾备恢复的成功率；
+- P95/P99 API、队列等待、SSE 回放、JGit IO、数据库锁、内存和 Workspace 容量；
+- 无证据成功、越权拒绝、过期上下文、未对齐 AOCI、未清理测试数据和未关联 Artifact 的次数。
+
+出现以下任一情况时暂停新增功能，回到 Phase 9/10 的收敛工作：
+
+1. LIVE 运行仍能静默落到 Mock，或前端能制造后端没有的成功状态；
+2. 生产主链路继续新增平行接口、重复状态机、固定主体或未使用适配器；
+3. AOCI、数据库迁移、备份、审计或证据链无法证明当前事实；
+4. 测试出现跨类污染、后台线程泄漏、随机顺序依赖或真实 MySQL 行为差异；
+5. 目标环境未验证却准备对外宣称上线、稳定版或团队可用；
+6. 文档新增速度超过事实收敛速度，或同一事实出现多个权威版本。
+
+## 9. 历史基线（Phase 0～Phase 8）
+
+上一份计划的阶段结果只作为历史证据，不再作为未来任务清单：
+
+| 阶段 | 已记录的核心结果 | 当前仍需复核的边界 |
+| --- | --- | --- |
+| Phase 0 | 产品边界、瘦身清单、债务冻结、默认值守卫 | AOCI 正式 Baseline 尚未完成 |
+| Phase 1 | 模块收敛、API v1、归属校验、幂等和分页契约 | 兼容入口仍需退场 |
+| Phase 2 | 项目接入向导、受控 Workspace、Context Source | 真实 Git 远端和目标环境仍需验证 |
+| Phase 3 | AgentDefinition、Workflow Template、DAG、Orchestrator 计划和工具门禁 | 生产评测和成本闭环仍需深化 |
+| Phase 4 | 统一状态图、Outbox、上下文记忆、Artifact 血缘和回滚 | 长期运行与多实例证据不足 |
+| Phase 5 | 质量门禁、Diff 审查、步骤重做、PR 草稿和证据包 | 外部交付仍主要是草稿 |
+| Phase 6 | RBAC、审计、备份恢复、SLO 控制台 | 真实团队试用和异地恢复不足 |
+| Phase 7 | 真实 Provider、模式隔离、预算和熔断 | 商业 Provider 长周期压测不足 |
+| Phase 8 | E2E、性能基准、Webhook、Release Manifest、SDK/SPI | Linux/MySQL/Docker、千级 SSE 和真实发布尚未充分验证 |
+
+## 10. 阶段证据模板
+
+每个阶段完成后只在本文追加以下记录，不创建新的长期计划文件：
 
 ```text
 阶段：Phase X
+目标：
 范围：
-代码完成：是/否，变更提交：
-自动化测试：后端 __ tests；前端 build；MySQL/Flyway；浏览器/E2E；镜像/Compose
-目标环境验证：环境、日期、运行方式、结果
-AOCI：Baseline/Receipt、verify/check 结果
-删除或合并的旧路径：
-未验证项：
-已知风险与回滚方式：
-普通提交 Subject：
-加固提交 Subject（如有）：
+代码完成：是/否，关键模块与删除项：
+自动化测试：命令、环境、类数/用例数、失败与重试：
+目标环境验证：环境、数据、结果；未验证项：
+AOCI：版本、Managed Scope、Baseline、Receipt/Evidence、verify/check：
+瘦身结果：删除/合并的代码、接口、脚本、Markdown 及引用检查：
+指标证据：
+已知风险和回滚方式：
+阶段退出条件：是/否，原因：
+下一阶段唯一入口：
 ```
 
-没有目标环境证据的阶段，必须明确写“目标环境验证：未完成”，不能用 CI 绿灯替代。没有完成退出条件的阶段不得进入下一阶段，也不得通过新增功能来规避未解决的收敛、瘦身、安全和恢复问题。
-
----
-
-### 9.1 Phase 0 Product Brief 正式基线
-
-| 维度 | 正式基线定义 |
-| --- | --- |
-| **目标用户** | 3～10 人、已有 Git 仓库与代码评审习惯、需要交付内部系统或业务服务的研发团队。 |
-| **首个项目模板** | 受控 Spring Boot 3.x / Next.js 代码仓库变更模板。首批支持两个研发变更模板：`修复一个带测试的后端缺陷`、`为现有 Spring Boot 服务新增一个小接口并更新测试`；受控预览模板支持 `STATIC_WEB_TEMPLATE` 与 `JAVA_SPRING_TEMPLATE`。 |
-| **核心用户旅程** | `登录鉴权 -> 接入 Project -> 创建受控 Workspace -> 选择 Workflow Template -> Orchestrator 生成并解释计划 -> 用户确认 -> Agent 在受控工作区执行 -> Diff/测试/风险审查 -> Approval 审批决定 -> 受控预览或交付物 -> 导出脱敏 Run Evidence Bundle`。 |
-| **明确不做的能力** | 不承诺公网不可信代码执行、任意 Shell 平台、通用 Agent 市场、物理分库多租户（Schema/DB-per-Tenant）、移动端和无限制 Provider 矩阵；IM/群聊仅作为协作扩展，不作为产品主线。 |
-| **三种运行模式** | `DEMO_SIMULATED`（无密钥体验、CI 确定性回归，强制标记 `simulated=true`）、`LIVE_SELF_HOSTED`（个人或小团队自托管，已配置真实 Provider + 受控模板，默认单节点）、`LIVE_TEAM`（受控研发团队长期使用，需 Phase 6 组织/角色/预算/审计/备份/SLO 完成后启用）。 |
-| **数据保留策略** | 1) `workflow_runs`、`step_runs`、`run_events`、`approvals`、`artifacts`、`token_usages`、`auth_audit_logs` 默认持久化于 MySQL 8.0 数据卷；<br>2) 工作区目录仅在关联项目 `projects.status = 'ARCHIVED'`、无活跃 `WorkflowRun` 且无活跃 `workspace_locks` 租约时，经 `DisasterRecoveryBackupService.cleanupArchivedWorkspacesWithDbReconciliation` 对账清理；<br>3) 冷备归档（`backup-prod.sh` / `backup-prod.ps1`）含 `SHA256SUMS` 与可选 AES-256 加密，默认保留 14 天；<br>4) `invalidated_tokens` 保留至 `expires_at` 过期；SSE `stream-ticket` 内存 TTL 60 秒且单次消费即焚。 |
-| **安全边界** | 1) 生产环境（`prod` profile）强制外部注入 `AGENTHUB_AUTH_SECRET`（>=32 字符）和 `ACTUATOR_PROMETHEUS_TOKEN`，禁用 `dev-token-*`、`X-User-Id` 伪造头、`user-1`/`system` 超级用户旁路及 `/api/workspace/*` 旧接口；<br>2) LLM 凭据仅存 `secretRef`（如 `env:DEEPSEEK_API_KEY`），经 `SecretMasker` 全链路脱敏；<br>3) Workspace 仅接受服务端 `workspaceId` 与受检相对路径，拦截绝对路径、`../`、符号链接逃逸、保留设备名、NTFS 8.3 短名及 `.git` 直接写入（单文件写上限 10MB / 预览 2MB）；<br>4) 沙箱部署仅允许 `ACCEPTED` 产物与白名单命令，容器以非 root 运行（backend `10001`、frontend `1001`、sandbox `1000:1000`）。 |
-
-### 9.2 Phase 0 瘦身与收敛清单 (Slimming & Convergence Inventory)
-
-> 资源和事件词汇表、数据库表矩阵见 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)；API 与前端调用矩阵见 [`docs/API.md`](API.md)；Provider/Runtime/Sandbox 能力矩阵见 [`docs/CURRENT_CAPABILITY_BOUNDARIES.md`](CURRENT_CAPABILITY_BOUNDARIES.md)。
-
-| 类别 | 目标对象（精确路径 / 符号） | 当前调用证据 | 替代路径 | 迁移窗口 | 负责人 | 当前状态 |
-| --- | --- | --- | --- | --- | --- | --- |
-| **旧认知与旧计划文档** | `ARCHITECTURE_INDEX.md`、`docs/AGENTHUB_LONG_TERM_PLAN.md`、`docs/AGENTHUB_NEXT_LONG_TERM_PLAN.md` | 全仓 `grep` 引用已清零 | `docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md`、`docs/ARCHITECTURE.md` 及 AOCI 资产 | **Phase 0（已删除）** | Architecture Owner | **已删除**（由 `Phase0BaselineAndDebtFreezeGuardTest` 防复活） |
-| **前端 localhost 与裸路径直连** | `agenthub-frontend/src/components/WorkflowCanvas.tsx` (`http://localhost:8080/api/workspace/workflow/execute`、`d:/work/agenthub/...`)、`services/api.ts` (`MOCK_DEPLOYMENT.url`) | `WorkflowCanvas.tsx` 无外部页面引用；`api.ts` 已改为 `DEFAULT_PREVIEW_URL` | `apiClient.startRun` (`/api/executions/runs`) 与相对路径 `API_BASE` | **Phase 0（已清理）** | Frontend Owner | **已清理**（前端源码 `localhost:8080` 与 `/api/workspace/` 清零） |
-| **旧包 (`domain.*` / `application.*` / `adapter.web.*`)** | `com.agenthub.domain.*`、`com.agenthub.application.service.IMCollaborationService`、`com.agenthub.adapter.web.*` | `SystemHealthController` 已迁入 `com.agenthub.ops.api`，`AgentRegistryController` 已迁入 `com.agenthub.agent.api`；重复 `WorkspaceLockManager` 与 `ErrorCode` 已物理删除；其余旧包零新增调用 | 八大生产上下文（`identity`、`project`、`orchestration`、`execution`、`agent`、`audit`、`sandbox`、`ops`） | **Phase 1（已收敛）** | Backend Owner | **已收敛**（由 `ArchUnitArchitectureTest` 与 `Phase1ModuleConvergenceAndContractTest` 守护） |
-| **旧 Controller 与重复路由** | `WorkflowAndDiffController` (`/api/workspace/*`)、`IMController` (`/api/im/conversations*`)、`RunAliasController` (`/api/runs*`)、`SandboxController` (`/api/sandbox/*`) | 前端对 `/api/workspace/*`、`/api/im/*`、`/api/runs*`、`/api/sandbox/*` 调用已全部清零；四个旧 Controller 均标记 `@Deprecated` + `@Profile("!prod")` + `LegacyEndpointMigrationFilter` (RFC 8594 `Deprecation`/`Sunset`/`Link` 头与 `agenthub_legacy_endpoint_calls_total` 指标) | `WorkspaceController` (`/api/workspaces/{workspaceId}/*`)、`ConversationController` (`/api/conversations*`)、`ExecutionController` (`/api/executions/runs*`)、`DeploymentController` (`/api/deployments*`) | **Phase 1（已阻断/下线）** | Backend & Frontend Owner | **已完成**（`prod` 环境全部禁用，前端零调用，由 `Phase1ModuleConvergenceAndContractTest` 验证） |
-| **默认种子与隐式默认值** | Flyway `V2`/`V6`/`V7` 中的历史种子；13 个后端 Java 类中的 `"user-1"` / `"proj-default"` / `"run-default"` 兜底常量与 3 个前端文件中的 `"proj-default"` | 前后端生产源码中 `"user-1"`、`"proj-default"`、`"run-default"` 兜底已 100% 清零；`agenthub.demo.seed-enabled` 默认 `false`，仅在 `application-demo.yml` (`demo` profile) 显式开启 | 显式从 `RequestContext`、Project/Workspace/Run 上下文提取，由 `ResourceOwnershipVerifier` 统一校验资源归属 | **Phase 1（已清零）** | Backend & Frontend Owner | **已清零**（`Phase0BaselineAndDebtFreezeGuardTest` 冻结上限已收紧为 `Map.of()` 零容忍） |
-| **兼容 DTO 与重复模型** | `com.agenthub.domain.workflow.model.WorkflowModels` vs `com.agenthub.orchestration.domain.dsl.WorkflowDsl`；重复 `ErrorCode` 与 `WorkspaceLockManager` | `infrastructure.common.exception.ErrorCode` 与 `infrastructure.jgit.WorkspaceLockManager` 已物理删除；`WorkspaceController` 已彻底解耦 `WorkflowEngineService` 与底层 `Path`/`JGitWorkspaceManager` | 统一使用 `com.agenthub.orchestration.domain.dsl.WorkflowDsl`、`com.agenthub.shared.exception.ErrorCode` 与 `com.agenthub.infrastructure.concurrency.WorkspaceLockManager` | **Phase 1（已收敛）** | Backend Owner | **已收敛**（重复类已物理删除，Controller 层零底层实现依赖） |
-| **重复状态机与调度器** | `WorkflowEngineService`（阶段 1 内存原型）、`ExecutionScheduler`（阶段 3 线性调度器）vs `DagExecutionEngine`（生产内核） | 两者均已标记 `@Deprecated` 且由 ArchUnit 禁止任何新调用；生产 Run 执行唯一由 `DagExecutionEngine` 及其 5 个内部模块承载 | 唯一生产执行内核 `DagExecutionEngine` | **Phase 1（已隔离）** | Execution Owner | **已隔离**（由 `ArchUnitArchitectureTest` 冻结禁止新增调用） |
-| **未使用或原型 Provider/Adapter** | `com.agenthub.infrastructure.adapter.*`（`CliProcessAdapter`、`CodexCliAdapter`、`OpenClawCliAdapter`、`SpringAiApiAdapter`）及 `AgentAdapterFactory` / `UnifiedAgentAdapter` | 主链路 DAG 使用 `AgentRuntimeRegistry` + `LlmProvider`；原型 Adapter 已由 ArchUnit 冻结禁止新依赖 | `ProviderDrivenAgentRuntime` + `LlmProvider` SPI | **Phase 1（已隔离）** | Agent Runtime Owner | **已隔离**（由 `ArchUnitArchitectureTest` 冻结禁止新增调用） |
-| **过大后端与前端模块** | 后端：`ExecutionApplicationService` (947->151 行)、`DagExecutionEngine` (918->452 行)；<br>前端：`services/api.ts` (845->98 行)、`app/page.tsx` (677->402 行) | `ExecutionApplicationService` 拆分为 `RunCommandModule`/`RunQueryModule`/`RunEventStreamModule`/`RunEvidenceModule`；`DagExecutionEngine` 拆分为 `DagTopologyPlanner`/`DagLeaseExecutor`/`DagStateTransitioner`/`DagAgentInvoker`/`DagEventRecorder`；前端 `api.ts` 拆分为 `services/api/*` 10 个模块，`page.tsx` 拆分为 4 个工作台壳组件 | 后端深模块门面 + 内部职责模块；前端按资源模块与工作台壳组件拆分 | **Phase 1（已完成）** | Full-Stack Owner | **已完成**（由 `Phase1ModuleConvergenceAndContractTest` 强制校验行数上限与模块结构） |
-
-### 9.3 Phase 0 AOCI-CODE 认知治理基线与阻塞记录
-
-- **Managed Scope（受管范围定义）**：
-  - 包含：`agenthub-backend/src/main/java`、`agenthub-backend/src/main/resources/db/migration`（`V1`～`V12`）、`agenthub-frontend/src`、`docs/`、`README.md`。
-  - 排除：`**/target/**`、`**/node_modules/**`、`/**/.next/**`、`data/workspaces/**`、`data/backups/**`、`.env*`、凭据与临时日志。
-- **八个高价值深模块 FRAS 规划范围**：
-  1. `identity`（认证、令牌吊销、流式票据、`ResourceAccessGuard`）
-  2. `project`（`Project`、`Workspace`、`DefaultWorkspaceResolver`、`WorkspaceLockManager`）
-  3. `orchestration`（`WorkflowDefinition`、Kahn 拓扑校验、`SafeExpressionEvaluator`、`Approval`）
-  4. `execution`（`WorkflowRun`、`StepRun`、`RunEvent`、`DagExecutionEngine`、`PersistentExecutionRecoveryRunner`）
-  5. `agent` / `runtime`（`LlmProvider`、`DynamicProviderRouter`、`CircuitBreaker`、`SecretMasker`、`TokenUsage`）
-  6. `conversation` / `team`（`Team`、`Conversation`、`Message`、分段锁单调序号、`LoopDetector`）
-  7. `audit`（`Artifact`、`JGitWorkspaceManager` 结构化 Diff 与非破坏性 Revert、`RunEvidenceBundleView`）
-  8. `sandbox` / `ops`（`DeploymentLifecycleWorker`、`LocalProcessSandbox`、`DockerSandbox`、`HealthCheckProbeService`、`DisasterRecoveryBackupService`）及前端 API 契约（`services/api.ts`）
-- **当前环境阻塞与合规处理（遵循 `AGENTS.md` §4 与本文 §5.1.7）**：
-  - 经在当前工作环境执行 `Get-Command aoci*, *aoci*` 与 `where.exe aoci aoci-code` 核查，本地环境与 CI Runner 尚未安装 `aoci-code` 官方可执行文件或 MCP 服务。
-  - 严格遵守 `AGENTS.md` §4 铁律（“不能复制 AOCI 内部状态机，也不能伪造 AOCI 结果。AOCI 不可用时如实记录阻塞，继续执行不依赖 AOCI 的低风险工作”），本阶段**绝不手工伪造 `.aoci` 目录、Ledger、Receipt 或 `aligned` 输出**。
-  - 同时按本文 §5.1.7 要求，在 `Phase0BaselineAndDebtFreezeGuardTest` 与 `.github/workflows/ci.yml` 中落地了确定性基线校验门禁：自动校验受管目录结构、Flyway `V1`～`V12` 迁移脚本集合与固定 SHA-256 指纹基线、22 张数据库表 Schema 对齐、18 个 `@RestController` 全景登记、废弃索引/旧计划文件零残留、前端零 `localhost` 直连及前后端默认 ID 冻结白名单。
-
-### 9.4 Phase 0 阶段验收记录
+### Phase 9 阶段验收记录 (2026-10-17，2026-10-24 更新)
 
 ```text
-阶段：Phase 0
-范围：产品边界（Product Brief）、核心资源与事件词汇表、API/数据库表/前端调用/Provider-Runtime-Sandbox 能力矩阵、瘦身与收敛清单、文档事实校准、前端 localhost/裸路径与静默 Mock 回退清理、新债务自动阻断门禁（ArchUnit + JUnit + CI）
-代码完成：是，变更包含 WorkflowCanvas.tsx、services/api.ts、ArchUnitArchitectureTest.java、Phase0BaselineAndDebtFreezeGuardTest.java、FullLifecycleEndToEndIntegrationTest.java、.github/workflows/ci.yml 及全套治理文档
-自动化测试：后端 53 test classes / 310 tests 通过（mvn clean test）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验（docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet）通过
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 锁定受管范围与 Flyway V1-V12 SHA-256 指纹基线）
-删除或合并的旧路径：已删除 ARCHITECTURE_INDEX.md、docs/AGENTHUB_LONG_TERM_PLAN.md、docs/AGENTHUB_NEXT_LONG_TERM_PLAN.md；已清除 WorkflowCanvas.tsx 对 http://localhost:8080/api/workspace/workflow/execute、d:/work/agenthub/data/workspaces/default 的硬编码直连、非演示模式下的静默 Mock 回退与伪造完成提示，以及 services/api.ts 中的 localhost:8080 硬编码
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实外部商业 LLM API Key 在生产多机环境下的长周期账单压测
-已知风险与回滚方式：若后续需要回退 Phase 0 治理门禁或文档收敛，可通过 git revert 对应 Phase 0 提交恢复；所有业务数据库表结构（V1-V12）在 Phase 0 未发生破坏性变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-0): establish product baseline, capability matrices, frontend path cleanup, and debt-freeze guards
-加固提交 Subject（如有）：无
+阶段：Phase 9：可信基线、AOCI 接入与瘦身冻结
+目标：让团队和 Agent 看到同一份当前事实，停止继续膨胀。
+范围：基线验证、AOCI 诚实记录与虚假逻辑修复、全量只读治理 Inventory 盘点、删除候选清单与退场规约制定、AOCI 官方 CLI 接入与认知条目首批创作。
+代码完成：是。修复 RunQueryModule.java 与 ContextSourceApplicationService.java 中无凭据默认 ALIGNED 的占位逻辑；在 ContextMemoryCompressor 增加 determineAociCognitionStatus 与 hasOfficialAociReceipt；新增 AociCognitionVerificationTest 自动化校验。2026-10-24：官方 AOCI CLI 物理供给已就绪并完成 init/scan/Baseline；Phase9BaselineAndGovernanceGuardTest 的 AOCI 断言从"未接入不得存在"改为"官方资产必须随仓库存在"；ci.yml 同步口径；新增 .mcp.json（AOCI MCP 宿主接入）与 docs/AOCI_COGNITION.md（AOCI 资产、版本、接入与恢复唯一权威运维文档）。
+自动化测试：
+  - 后端：mvn clean test，Windows 11，62 个测试类/387 个用例全部通过，0 失败，0 错误，0 跳过（2026-10-24 守卫断言调整后全量重跑确认，耗时 1m31s）。当日首轮曾出现一次 FullLifecycleEndToEndIntegrationTest @TempDir 清理 IOException（Windows 下 JGit 文件句柄释放时序抖动），单类重跑与全量重跑均通过，已如实记录；
+  - 架构与基线守卫：ArchUnitArchitectureTest（10 规则通过），Phase9BaselineAndGovernanceGuardTest（守护通过）；
+  - 前端：npm ci（128 包），npx tsc --noEmit（0 错误），npm run build（Next.js 14.2.13 构建通过，静态路由生成）；
+  - 编排：docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet（校验成功）。
+目标环境验证：自动化结果属于本地 Windows 11 + H2 证据；GitHub Actions 的 Linux (ubuntu-latest) 与真实 MySQL 8.0 容器结果尚未提供，不能等同于目标环境通过。未验证项：非本地环境的真实容器运行时。
+AOCI：官方 aoci CLI v0.1.0-rc21（commit cfa8e93，2026-10-14 构建）已安装于 C:\tools\aoci\0.1.0-rc21\aoci.exe 并记入 docs/AOCI_COGNITION.md。已按官方流程完成 init、scan（Baseline 590 文件）与 verify（Volumes v1 候选结构有效）。代码认知条目创作进行中：2026-10-24 由宿主模型基于逐文件真实证据经官方 update-entry 管线完成 80 条（根配置、CI、Docker、脚本、Flyway V1-V12、应用配置、docs 全部 29 个 Markdown、前端构建配置），S 覆盖 100%；aoci check 当前判定 blocked，剩余约 510 条 code_missing 集中在 400 个后端生产 Java、62 个测试 Java 与 42 个前端 src 文件。Whole-Index 完整交付、Attestation 与治理对齐尚未发生；严禁伪造。
+瘦身结果：完成 18 个 Controller、路由族、DTO、5 个 Provider、4 个 Runtime、3 个 Sandbox、22 张数据库表、10 个脚本、23 个 Markdown 文档的全量只读治理盘点（Inventory）；排定 4 个删除候选 Controller（IMController, RunAliasController, SandboxController, WorkflowAndDiffController）及其对应 DTO、早期原型适配器的退场清单、Owner、0 前端调用证据、替代路径与原子回滚顺序；Phase 9 冻结物理删除，退场操作移交 Phase 10 执行。
+指标证据：后端 400 个生产 Java 类、62 个测试类、387 个测试用例；前端 39 个 TS/TSX 组件；数据库 22 张 Flyway 表；AOCI 受管基线 590 文件、80 条认知条目。
+已知风险和回滚方式：剩余约 510 条 AOCI 认知条目待逐文件创作是 Phase 9 当前唯一硬阻塞；条目必须由宿主模型基于真实证据创作，不得用路径名或模板批量编造。E 规模档位告警（56/80）为建议项，后续维护时顺手校准。回滚方式：AOCI 资产由官方 CLI 管理，回滚走官方 Baseline 治理流程，不手改 aoci.txt；业务代码回滚依赖 Git 提交粒度。
+阶段退出条件：否。原因：AOCI Whole-Index、Attestation 与 verify/check 治理对齐未完成（约 510 条认知条目待创作）；远端 Linux + MySQL 目标环境证据仍缺。严禁在上述门禁未闭环前宣称退出 Phase 9 或进入 Phase 10。
+下一阶段唯一入口：完成全部受管文件认知条目创作并通过官方 verify/check 治理对齐，且远端目标环境门禁通过后，方可退出 Phase 9 进入 Phase 10。
 ```
-
-### 9.5 Phase 1 阶段验收记录
-
-```text
-阶段：Phase 1
-范围：八大限界上下文收敛（identity/project/orchestration/execution/agent/audit/sandbox/ops）、跨上下文 Command/Query/DomainEvent 契约、深模块内部解耦（ExecutionApplicationService 拆分为 4 个子模块、DagExecutionEngine 拆分为 5 个子模块、WorkspaceController 下沉至 WorkspaceApplication）、API v1 契约规范（OpenAPI 3.0.3、X-API-Version/X-Correlation-Id/X-Execution-Mode、PageRequestQuery/PageResultView、RFC 8594 废弃响应头与观测指标）、全链路显式所有权校验（ResourceOwnershipVerifier，前后端 "user-1"/"proj-default"/"run-default" 生产兜底 100% 清零）、前端 API 与工作台页面模块化拆分
-代码完成：是，变更包含 com.agenthub.shared.contract.*、com.agenthub.shared.filter.*、com.agenthub.ops.*、com.agenthub.execution.application.* (RunCommandModule/RunQueryModule/RunEventStreamModule/RunEvidenceModule)、com.agenthub.orchestration.scheduler.* (DagTopologyPlanner/DagLeaseExecutor/DagStateTransitioner/DagAgentInvoker/DagEventRecorder)、ResourceOwnershipVerifier、WorkspaceController/WorkspaceApplicationService、application-demo.yml、ArchUnitArchitectureTest（10 条规则）、Phase0BaselineAndDebtFreezeGuardTest（零容忍默认 ID）、Phase1ModuleConvergenceAndContractTest、前端 services/api/*（10 个子模块）与 components/dashboard/*（4 个壳组件）、docs/openapi-v1.json、docs/adr/ADR-006-context-convergence-and-api-contract-v1.md 及配套文档
-自动化测试：后端 54 test classes / 317 tests 通过（mvn clean test）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验（docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet）通过
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase1ModuleConvergenceAndContractTest 锁定受管范围、OpenAPI v1 契约与 Flyway V1-V12 SHA-256 指纹基线）
-删除或合并的旧路径：已物理删除重复类 com.agenthub.infrastructure.jgit.WorkspaceLockManager 与 com.agenthub.infrastructure.common.exception.ErrorCode；已将 adapter.web.SystemHealthController 迁入 com.agenthub.ops.api.SystemHealthController、adapter.web.AgentRegistryController 迁入 com.agenthub.agent.api.AgentRegistryController；前端已彻底移除对 /api/im/*、/api/runs*、/api/sandbox/* 的兼容回退调用；四个旧兼容 Controller（WorkflowAndDiffController、IMController、RunAliasController、SandboxController）已全部标记 @Deprecated + @Profile("!prod") 并接入 LegacyEndpointMigrationFilter
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实外部商业 LLM API Key 在多机环境下的长周期账单压测
-已知风险与回滚方式：若后续需要回退 Phase 1 模块收敛或契约变更，可通过 git revert 对应 Phase 1 提交恢复；Flyway V1-V12 迁移脚本未做任何修改，数据库 Schema 100% 兼容，回滚零数据丢失风险
-普通提交 Subject：feat(phase-1): converge bounded contexts, decompose deep modules, and establish API contract v1
-加固提交 Subject（如有）：fix(phase-1): harden ownership verifier wiring, legacy telemetry metrics, openapi parity, and live team state
-```
-
-### 9.6 Phase 2 阶段验收记录
-
-```text
-阶段：Phase 2
-范围：受控项目接入向导（7 步 Wizard：CONNECT_SOURCE、VERIFY_PERMISSIONS、SELECT_DEFAULT_BRANCH、CREATE_WORKSPACE、SCAN_ENVIRONMENT、GENERATE_PROJECT_RULES、CREATE_INITIAL_BASELINE）、代码源与凭据安全策略（GitSourceConfig 宿主绝对路径与路径穿越拦截、secretRef 禁用明文 Token、SecretMasker PAT 脱敏）、受控工作区安全配额守卫（WorkspaceQuotaGuard：单文件写 10MB/预览 2MB、总容量 500MB、文件数 5000、执行 3600s、网络策略熔断 BLOCKED_POLICY）、版本化上下文源（ContextSourceView：AOCI_COGNITION、PROJECT_RULES、BUILD_CONFIG、TEST_CONVENTIONS 带 SHA-256 指纹与 Commit 强绑定）、受控工作区生命周期运维（resyncWorkspace、changeBaseline、discardWorkspace、restoreSnapshot、getWorkspaceQuota 强制确认与审计）、前端 7 步交互式接入向导（ProjectOnboardingModal）、CreateProjectModal 向导引流、WorkspaceExplorer 工作区生命周期与配额监控
-代码完成：是，变更包含 GitSourceConfig、GitSourceType、WorkspaceQuotaPolicy、WorkspaceQuotaUsage、WorkspaceQuotaGuard、ContextSourceType、SecurityLevel、ContextSourceView、RegisterContextSourceCommand、ContextSourceApplication/ContextSourceApplicationService、OnboardingStep/OnboardingSessionStatus/OnboardingStepStatus、StartOnboardingCommand/ExecuteStepCommand/EnvironmentScanResultView/OnboardingStepRecordView/OnboardingSessionView、ProjectOnboardingApplication/ProjectOnboardingApplicationService、JGitWorkspaceManager 扩展、WorkspaceApplication/WorkspaceApplicationService 扩展、ProjectController/WorkspaceController 扩展、Phase2ControlledWorkspaceAndOnboardingTest、前端 ProjectOnboardingModal.tsx、CreateProjectModal.tsx、WorkspaceExplorer.tsx、types/index.ts、services/api/projects.ts、services/api/workspaces.ts、docs/adr/ADR-007、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/openapi-v1.json
-自动化测试：后端 55 test classes / 325 tests 通过（mvn clean test，含 Phase2ControlledWorkspaceAndOnboardingTest 7 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase2ControlledWorkspaceAndOnboardingTest 锁定受管范围与版本化 Context Source 指纹基线）
-删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实远程 GitHub 私有仓库在生产网络环境下的 Webhook 自动触发演练
-已知风险与回滚方式：若后续需要回退 Phase 2 功能，可通过 git revert 对应 Phase 2 提交恢复；底层表结构零变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-2): productize project onboarding wizard, controlled workspace policies, and versioned context sources
-加固提交 Subject（如有）：fix(phase-2): harden onboarding error recovery, context source idempotency, workspaceId mapping, and Jackson contract compatibility
-```
-
-### 9.7 Phase 3 阶段验收记录
-
-```text
-阶段：Phase 3
-范围：版本化 AgentDefinition 产品化（4 大规范研发角色 backend-architect、backend-developer、qa-tester、security-reviewer，工具白名单、JSON Schema 参数校验、ProviderPolicy、AgentBudget 预算上限、安全级别与停止条件）；7 核心 Agent 工具定义（ToolRegistry）与输出防爆配额保护（guardOutputSize）；Kahn DAG 增强校验（WorkflowDslValidator：自环、环路、孤岛节点拦截，阶段级并行执行批次 executionStages 计算，审批节点 requiresApproval 校验）；版本化 WorkflowTemplate 产品化（BUG_FIX_WITH_TESTS 7 阶段含审批门禁，NEW_FEATURE_ENDPOINT 7 阶段 DDD 端点交付）与动态实例化（instantiateTemplate）；Orchestrator 结构化 Plan 生成（OrchestrationPlanApplication：影响文件、子任务拆解、预算配额、质量门禁、工具权限清单）与高影响工具门禁（enforceHighImpactToolAuthorization 未确认前阻断 4003 FORBIDDEN，确认后放行）；6 层分层上下文组装引擎（ContextAssemblyEngine：系统规约、AOCI 认知、受影响文件、对话历史、工具输出、用户输入，按 Token 预算截断与来源追溯）；真实活体 Provider 路由保护（ChatRequest.requireLive=true 拒绝 Mock 兜底，抛出 NoAvailableProviderException）；离线自动化评测基准（OfflineEvaluationApplication 覆盖新端点、缺陷修复、重构、测试补齐、对抗注入防御 5 大任务）；前端 OrchestratorPlanModal 模板选择、计划审查、预算监视与高影响工具确权门禁模态框；ADR-008 与文档契约对齐
-代码完成：是，变更包含 AgentToolCategory、AgentToolDefinition、ToolRegistry、ProviderPolicy、AgentBudget、AgentDefinitionManifest、ContextLayerType、ContextTruncationStrategy、ContextLayer、AssembledContext、ContextAssemblyEngine、WorkflowTemplateType、WorkflowTemplateView、WorkflowTemplateRegistry、TopologicalSortResult、WorkflowDslValidator 扩展、ToolPermissionRequest、EstimatedBudget、OrchestrationPlanStatus、OrchestrationPlan、OrchestratorPlanApplication/OrchestratorPlanApplicationService、DagAgentInvoker 门禁接入、EvaluationTaskCategory、EvaluationTaskResult、EvaluationReportView、OfflineEvaluationApplication/OfflineEvaluationApplicationService、ChatRequest.requireLive、DynamicProviderRouter 路由守卫、WorkflowDefinitionController 扩展、AgentRegistryController 扩展、Phase3WorkflowTemplatesAndOrchestratorPlanTest、前端 OrchestratorPlanModal.tsx、app/page.tsx、types/index.ts、services/api/workflows.ts、docs/adr/ADR-008、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/openapi-v1.json
-自动化测试：后端 56 test classes / 332 tests 通过（mvn clean test，含 Phase3WorkflowTemplatesAndOrchestratorPlanTest 7 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase3WorkflowTemplatesAndOrchestratorPlanTest 锁定受管范围、OpenAPI v1 契约与 Flyway V1-V12 SHA-256 指纹基线）
-删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实生产多并发负载下的大规模 LLM 流式 Token 压测
-已知风险与回滚方式：若后续需要回退 Phase 3 功能，可通过 git revert 对应 Phase 3 提交恢复；底层表结构零变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-3): productize workflow templates, kahn dag parallel stages, orchestrator plan, and tool authorization guards
-加固提交 Subject（如有）：fix(phase-3): harden tool permission enforcement, fix outputRef varchar overflow, align openapi and frontend contracts, and verify instantiated e2e execution
-```
-
-### 9.8 Phase 4 阶段验收记录
-
-```text
-阶段：Phase 4
-范围：单一统一状态图（UnifiedExecutionStateGraph）与跨实体一致性校验、合法状态跃迁防循环盲退；At-Least-Once 执行语义、幂等防重入与三级异常归因（ExecutionErrorClassifier：RETRYABLE_TRANSIENT / APPROVAL_REQUIRED / FATAL_NON_RETRYABLE）；事务性发件箱（Transactional Outbox）与严格单调序列（RunEventBroadcaster afterCommit 延期广播与 Last-Event-ID 重放）；三层拓扑分层上下文记忆（HierarchicalContextMemory）与不变量保留压缩（ContextMemoryCompressor：绝对保留项目规则、人工审批、错误堆栈与文件收据）；产物全生命周期血缘图谱（ArtifactLineageView：Run -> StepRun -> Artifact -> JGit Commit -> Checksums -> Approvals）；JGit 结构化 Diff 行级审查（StructuredDiff / FileDiffEntry）与非破坏性精准回滚（revertArtifact 保留工作区独立文件，记录 ARTIFACT_REVERTED 审计事件）；运行运维控制台端点（GET /api/executions/runs/{runId}/operations 与 GET /api/audit/artifacts/lineage/{runId}）；前端运行运维控制台（RunOperationsPanel.tsx）与结构化代码审查模态框（StructuredDiffReviewModal.tsx）；ADR-009 与文档契约对齐
-代码完成：是，变更包含 com.agenthub.execution.domain.state.UnifiedExecutionStateGraph、com.agenthub.execution.domain.retry.RetryCategory、com.agenthub.execution.domain.retry.ExecutionErrorClassifier、com.agenthub.execution.domain.memory.HierarchicalContextMemory、com.agenthub.execution.domain.memory.ContextMemoryCompressor、com.agenthub.execution.dto.* (RunOperationsView/PendingDecisionItem/ToolSideEffectView/HierarchicalMemorySummary/LeaseStatusView)、com.agenthub.audit.dto.* (ArtifactLineageView/StepLineageNode)、RunEventBroadcaster (Transactional Outbox afterCommit 广播)、ExecutionApplication/ExecutionApplicationService/RunQueryModule (getRunOperations)、ArtifactApplication/ArtifactApplicationService (getArtifactLineageByRunId/getArtifactDiff)、ExecutionController/ArtifactController 扩展、Phase4RunOperationsAndArtifactLineageTest、前端 RunOperationsPanel.tsx、StructuredDiffReviewModal.tsx、ProjectShell.tsx (运维决策与血缘 Tab)、app/page.tsx、types/index.ts、services/api/runs.ts、services/api/artifacts.ts、docs/adr/ADR-009、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/openapi-v1.json
-自动化测试：后端 57 test classes / 339 tests 通过（mvn clean test，含 Phase4RunOperationsAndArtifactLineageTest 7 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet）
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase4RunOperationsAndArtifactLineageTest 锁定受管范围、OpenAPI v1 契约与认知收据校验）
-删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实远程网络长时间断线重连（>30分钟）下的超长 SSE 流重放
-已知风险与回滚方式：若后续需要回退 Phase 4 功能，可通过 git revert 对应 Phase 4 提交恢复；底层表结构零变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-4): productize run operations, transactional outbox, hierarchical memory, artifact lineage, and structured diff review
-加固提交 Subject（如有）：无
-```
-
-### 9.9 Phase 5 阶段验收记录
-
-```text
-阶段：Phase 5
-范围：质量门禁策略引擎（QualityGateEngine：5 大核心防御维度 BUILD_VERIFICATION、UNIT_TEST_REGRESSION、STATIC_ANALYSIS_GUARD、SECRET_LEAK_SCAN、DIFF_BUDGET_GUARD，加权评分 0-100，不可伪造 SHA-256 签名，GATE_FAILED 拦截阻断）；JGit 单文件非破坏性精准回滚（revertSingleFile：基于 JGit checkout 指定文件恢复至 baseline commit，新增文件彻底清理，工作区其他修改完好不受影响，发布 FILE_REVERTED 审计事件）；细粒度审查干预（reworkStep：步骤重做，注入审查指导 feedback，Step 状态重置为 PENDING 重新调度；rejectRun：全盘驳回，工作区严格重置至 baseline commit，状态收敛为 REJECTED）；受控沙箱准入门禁与主动探针（DeploymentApplicationService 严格校验准入，阻断 GATE_FAILED/REJECTED 产物进入部署；probeDeployment 发起真实 HTTP 健康探测并测量往返延迟 ms）；标准化外部交付与离线证据包（PullRequestDraftView 导出符合 GitHub/GitLab 规范 PR 草稿；exportRunEvidenceBundle 导出带完整 SHA-256 Checksum 的运行凭证包）；前端 UI 全面产品化（DiffArtifactReviewer 5 维度门禁抽屉/单文件回滚/PR 草稿、StructuredDiffReviewModal 门禁徽章与单文件回滚、RunOperationsPanel 全盘驳回与步骤重做意见反馈模态框、SandboxPreviewPanel 主动健康探针）；ADR-010 与 OpenAPI/文档契约对齐
-代码完成：是，变更包含 com.agenthub.audit.domain.quality.* (QualityGateRuleType/QualityGateStatus/QualityGateCheckItem/QualityGateReport/QualityGateEngine)、com.agenthub.audit.dto.PullRequestDraftView、JGitWorkspaceManager (revertSingleFile)、ArtifactApplication/ArtifactApplicationService (revertSingleFile/getQualityGateReport/evaluateQualityGate/generatePullRequestDraft)、ArtifactController (4 个端点)、RunCommandModule/ExecutionApplication/ExecutionApplicationService (reworkStep/rejectRun)、ExecutionController (rework/reject/evidence/export)、DeploymentApplication/DeploymentApplicationService (probeDeployment 与 GATE_FAILED 部署准入门禁)、DeploymentController (probe)、Phase5QualityGateAndDeliveryTest (8 用例)、前端 types/index.ts、services/api/* (artifacts.ts/runs.ts/deployments.ts)、DiffArtifactReviewer.tsx、StructuredDiffReviewModal.tsx、ReviewSidebar.tsx、RunOperationsPanel.tsx、SandboxPreviewPanel.tsx、app/page.tsx、docs/adr/ADR-010、docs/API.md、docs/ARCHITECTURE.md、docs/openapi-v1.json、OpsApplicationService.java
-自动化测试：后端 58 test classes / 352 tests 通过（mvn clean test，含 Phase5QualityGateAndDeliveryTest 13 用例、Phase1ModuleConvergenceAndContractTest 6 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet）
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase5QualityGateAndDeliveryTest 锁定受管范围、OpenAPI v1 契约与质量门禁策略防篡改指纹）
-删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实远程 GitHub/GitLab 生产 OAuth 凭据下的 PR 自动推送与 Webhook 回调
-已知风险与回滚方式：若后续需要回退 Phase 5 功能，可通过 git revert 对应 Phase 5 提交恢复；底层表结构零变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-5): productize quality gates engine, single-file revert, step rework, and delivery review
-加固提交 Subject（如有）：fix(phase-5): harden single-file revert workspace isolation, run rejection baseline reset, quality gate contract parity, and scannable file boundaries
-```
-
-### 9.10 Phase 6 阶段验收记录
-
-```text
-阶段：Phase 6
-范围：细粒度团队协作与项目 RBAC 权限矩阵（ProjectRbacRole：OWNER/ADMIN/MAINTAINER/DEVELOPER/VIEWER/AUDITOR 与 10 大权限动作 ProjectPermission，ResourceOwnershipVerifier 防御性防越权拦截 verifyWorkspaceWriteAccess/verifyRunExecuteAccess/verifyApprovalAccess/verifyDeploymentAccess，无破坏性复用既有 teams 与 team_members 表，TeamApplication/TeamController 提供 getCurrentUserRole/listProjectMembers/addProjectMember/updateMemberRole/removeProjectMember 端点并限制唯一 OWNER 保护）；不可篡改安全审计流水（auth_audit_logs 表，AuthAuditLogRepository/AuthAuditService 提供 findAllByOrderByCreatedAtDesc/queryAuditLogs，SystemHealthController/OpsApplication 提供 GET /api/system/audit-logs 多维分页检索）；长期灾备快照与幂等还原体系（BackupManifest/BackupTriggerCommand/BackupVerifyCommand/BackupRestoreCommand/RestoreVerificationReport，OpsApplication/SystemHealthController 提供 POST /api/system/backup、POST /api/system/backup/verify、POST /api/system/backup/restore，具备 SHA-256 Checksum 防篡改校验与幂等事务基线数据自愈）；系统可观测性与 SLO 健康度评测（OpsMetricsSummaryView，AgentHubMetricsCollector 统一聚合工作流吞吐量、失败率、P95/P99 耗时、活动沙箱部署、工作区容量、JVM 堆内存与 GC 状态，自动评测 SLO HEALTHY/DEGRADED/UNHEALTHY 评级）；前端团队协作与运维灾备控制台（TeamRbacPanel.tsx 成员管理与角色变更卡片、OperationsConsolePanel.tsx SLO 指标透视/灾备快照触发与还原/分页不可篡改审计日志、ProjectShell.tsx 导航扩充、page.tsx 安全受控挂载严格 <420 行）；ADR-011 与 OpenAPI/文档契约严格对齐
-代码完成：是，变更包含 com.agenthub.team.domain.rbac.* (ProjectRbacRole/ProjectPermission)、com.agenthub.team.domain.model.TeamRole 扩展、com.agenthub.team.dto.* (ProjectMemberView/AddProjectMemberCommand/UpdateMemberRoleCommand/ProjectUserRoleView)、ResourceOwnershipVerifier 扩展 (RBAC 角色解析与 4 大权限校验方法)、TeamApplication/TeamApplicationService/TeamController (5 个成员管理端点)、com.agenthub.identity.dto.AuthAuditLogView、AuthAuditLogRepository/AuthAuditService (审计流水查询)、com.agenthub.ops.dto.* (BackupTriggerCommand/BackupVerifyCommand/BackupRestoreCommand/OpsMetricsSummaryView)、AgentHubMetricsCollector 扩展、OpsApplication/OpsApplicationService/SystemHealthController (审计日志/运维指标/灾备触发/校验/还原 5 个端点)、docs/openapi-v1.json (新增 8 路径)、Phase6TeamRbacAndOperationsTest (6 用例)、前端 types/index.ts、services/api/projects.ts、services/api/deployments.ts (opsApi)、services/api.ts (收敛 <120 行)、TeamRbacPanel.tsx、OperationsConsolePanel.tsx、ProjectShell.tsx、app/page.tsx (收敛 <420 行)、docs/adr/ADR-011、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md
-自动化测试：后端 59 test classes / 361 tests 通过（mvn clean test，含 Phase6TeamRbacAndOperationsTest 9 用例、Phase5QualityGateAndDeliveryTest 13 用例、Phase1ModuleConvergenceAndContractTest 6 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet）
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase6TeamRbacAndOperationsTest 锁定受管范围、OpenAPI v1 契约、RBAC 权限矩阵与灾备防篡改指纹）
-删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 跨多组织租户大规模并发下的灾备还原耗时基准
-已知风险与回滚方式：若后续需要回退 Phase 6 功能，可通过 git revert 对应 Phase 6 提交恢复；底层表结构零变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-6): productize team rbac, immutable audit logs, disaster recovery snapshots, and ops metrics console
-加固提交 Subject（如有）：fix(phase-6): harden application service rbac enforcement, owner immutability, ops authentication, and test cascading isolation
-```
-
-### 9.11 Phase 7 阶段验收记录
-
-```text
-阶段：Phase 7
-范围：真实 Provider 客户端适配与标准化工具调用协议（OpenAI, DeepSeek, Anthropic, Gemini 标准请求构建、响应解析、SSE 流式增量 delta tool_calls 与指数退避重试）；运行模式强隔离（ProviderExecutionMode：DEMO_SIMULATED / LIVE_SELF_HOSTED / LIVE_TEAM，生产模式严格拦截静默 Mock 降级，抛出 5009 NO_AVAILABLE_PROVIDER）；精细化模型牌价字典与 Prompt Cache 折扣核算（ModelPricing：calculateCostWithCache）；调用前硬预算看门狗拦截（BudgetGovernanceGuard：挂载于 ProviderDrivenAgentRuntime 与 DagAgentInvoker，默认 $50.00 硬限额，80% 警戒水位，超额触发 5010 BUDGET_EXCEEDED 阻断）；Provider 主动延迟探针（POST /api/providers/{id}/probe）与三态熔断器动态运维（GET/POST /api/providers/{id}/circuit-breaker 获取与 CLOSED 重置）；Token 消耗治理大盘（GET /api/token-usages/governance 与 POST /api/token-usages/budget/check）；前端 Bento Grid Provider 成本大盘（ProviderCostDashboard.tsx 模式徽章、硬预算进度条、主动探针按钮、熔断器重置与模型明细下钻）；生产部署与 CI 验证配置（.env.production.ci, .env.production.example, 非 root 用户规范）；ADR-012 与 OpenAPI/文档契约严格对齐
-代码完成：是，变更包含 ToolDefinition、ToolCall、ProviderExecutionMode、CircuitStatus、ChatRequest/ChatResponse/ChatChunk/ModelPricing 扩展、ProviderProbeResultView/CircuitBreakerView/ProviderHealthView/ModelCostSummaryView/ProviderCostSummaryView/TokenGovernanceView/BudgetCheckCommand/BudgetCheckResultView、ErrorCode (BUDGET_EXCEEDED 5010, CIRCUIT_BREAKER_OPEN 5011)、AbstractHttpLlmProvider 扩展、OpenAiCompatibleProvider/AnthropicProvider/GeminiProvider/OllamaProvider/MockLlmProvider 扩展、DynamicProviderRouter 扩展、BudgetGovernanceGuard、ProviderDrivenAgentRuntime/DagAgentInvoker 门禁接入、ProviderController/TokenUsageController 扩展、TokenUsageAuditRepository 聚合查询、OpsApplicationService/docs/openapi-v1.json (新增 6 路径)、Phase7LiveProvidersAndBudgetGovernanceTest (14 用例)、ProviderFaultToleranceAndFallbackTest (9 用例)、前端 types/index.ts、services/api/workflows.ts、ProviderCostDashboard.tsx、.env.production.ci、.env.production.example、docker-compose.prod.yml、docs/adr/ADR-012、docs/API.md、docs/ARCHITECTURE.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md
-自动化测试：后端 60 test classes / 377 tests 通过（mvn clean test，含 Phase7LiveProvidersAndBudgetGovernanceTest 14 用例、ProviderFaultToleranceAndFallbackTest 9 用例、Phase6TeamRbacAndOperationsTest 9 用例、Phase5QualityGateAndDeliveryTest 13 用例、Phase1ModuleConvergenceAndContractTest 6 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.ci -f docker-compose.prod.yml config --quiet 与 .env.production.example 校验通过）
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase7LiveProvidersAndBudgetGovernanceTest 锁定受管范围、OpenAPI v1 契约、预算硬限额与模式隔离策略防篡改指纹）
-删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实商业外部大模型在极端公网抖动与网络断连下的长周期退避压测
-已知风险与回滚方式：若后续需要回退 Phase 7 功能，可通过 git revert 对应 Phase 7 提交恢复；底层表结构零变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-7): productize live providers, mode segregation, and budget governance
-加固提交 Subject（如有）：fix(phase-7): harden circuit breaker state recovery, live ollama mode segregation, and dashboard probe contracts
-```
-
-### 9.12 Phase 8 阶段验收记录
-
-```text
-阶段：Phase 8
-范围：端到端验收、性能基准与开源/交付就绪（10 阶段全流程自动化闭环验证：Project Onboarding -> Workspace JGit Baseline -> WorkflowTemplate -> Orchestrator Plan & Confirmation -> Agent Invocation -> Quality Gate Verification -> Pull Request Draft -> Controlled Deployment Admission & Active Health Probe -> Audit Log & Lineage -> Evidence Bundle Export；多线程并发吞吐与 P95/P99 延迟分布压测、SSE 事件流广播延迟与 Last-Event-ID 单调增量回放基准、高负载内存稳定性与堆增量 <100MB 防御性门禁；22 种标准化 Webhook 事件枚举 WebhookEventType、WebhookPayload、HMAC-SHA256 签名规约 X-AgentHub-Signature 与防重放时间戳校验器 WebhookSignatureVerifier；1.0.0-RELEASE 发行版本清单 AgentHubReleaseManifest、5 大核心客户端 SDK 接口契约 AgentHubProjectClient / AgentHubRunClient / AgentHubArtifactClient / AgentHubApprovalClient / AgentHubDeploymentClient 与 5 大扩展 SPI 契约 Provider / Tool / AgentDefinition / WorkflowTemplate / DeploymentTemplate，经 GET /api/system/contracts/v1 统一暴露；部署准入防御性拦截未通过质量门禁 GATE_FAILED 或被驳回 REJECTED 的产物；前端 TypeScript Webhook/ReleaseManifest 类型定义扩展保持严格 39 文件冻结；ADR-013 与全量文档严格对齐）
-代码完成：是，变更包含 com.agenthub.shared.contract.webhook.WebhookEventType、com.agenthub.shared.contract.webhook.WebhookPayload、com.agenthub.shared.contract.webhook.WebhookSignatureVerifier、com.agenthub.shared.contract.sdk.AgentHubReleaseManifest、com.agenthub.shared.contract.sdk.AgentHubProjectClient、com.agenthub.shared.contract.sdk.AgentHubRunClient、com.agenthub.shared.contract.sdk.AgentHubArtifactClient、com.agenthub.shared.contract.sdk.AgentHubApprovalClient、com.agenthub.shared.contract.sdk.AgentHubDeploymentClient、com.agenthub.shared.contract.extension.ProviderExtensionContract、com.agenthub.shared.contract.extension.ToolExtensionContract、com.agenthub.shared.contract.extension.AgentDefinitionExtensionContract、com.agenthub.shared.contract.extension.WorkflowTemplateExtensionContract、com.agenthub.shared.contract.extension.DeploymentTemplateExtensionContract、OpsApplicationService 扩展、Phase8PerformanceBenchmarkAndE2ETest (7 用例)、前端 types/index.ts (扩展 Webhook/SDK/ReleaseManifest 类型，严格保持 39 个源码文件)、docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md、docs/E2E_DEMO_GUIDE.md、docs/ARCHITECTURE.md、docs/API.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md、docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md
-自动化测试：后端 61 test classes / 384 tests 通过（mvn clean test，含 Phase8PerformanceBenchmarkAndE2ETest 7 用例、Phase7LiveProvidersAndBudgetGovernanceTest 14 用例、Phase6TeamRbacAndOperationsTest 9 用例、Phase5QualityGateAndDeliveryTest 13 用例、Phase1ModuleConvergenceAndContractTest 6 用例、Phase0BaselineAndDebtFreezeGuardTest 5 用例、ArchUnitArchitectureTest 10 用例）；前端 npx tsc --noEmit 与 npm run build 通过；Compose 配置校验通过（docker compose --env-file .env.production.ci -f docker-compose.prod.yml config --quiet 与 .env.production.example 校验通过）
-目标环境验证：未完成（本地完成 H2 MySQL Mode 全量测试、前端生产构建与 Compose 语法校验；真实 Linux + MySQL 8.0 + Docker 镜像与灾备演练由 GitHub Actions CI 流水线执行）
-AOCI：阻塞（当前环境未安装官方 aoci-code CLI/MCP 可执行文件；按 AGENTS.md 规范不伪造 AOCI Receipt/Baseline，已通过 Phase0BaselineAndDebtFreezeGuardTest 与 Phase8PerformanceBenchmarkAndE2ETest 锁定受管范围、OpenAPI v1 契约、Release Manifest 与 Webhook 签名防篡改指纹）
-删除或合并的旧路径：无（严格在现有 18 个 Controller、12 个 Flyway 迁移、22 张表范围内扩展，零架构破坏与零新表新增）
-未验证项：1) 官方 aoci-code CLI init/scan/verify/check 待环境安装官方二进制后补齐；2) 真实跨机网络环境下的千级并发 SSE 广播长连接保活
-已知风险与回滚方式：若后续需要回退 Phase 8 功能，可通过 git revert 对应 Phase 8 提交恢复；底层表结构零变更，回滚零数据丢失风险
-普通提交 Subject：feat(phase-8): productize e2e verification, benchmarks, webhook contracts, and release readiness
-加固提交 Subject（如有）：fix(phase-8): harden webhook signature verification, eliminate jgit double-close, calibrate benchmark latency gates, and sync release milestone matrix
-```
-
-### 9.13 长期路线各阶段里程碑执行状态盘点
-
-| 阶段 | 核心交付范围 | 提交 Subject / Commit | 自动化测试门禁 | 验收状态 |
-| --- | --- | --- | --- | --- |
-| **Phase 0** | 产品边界基线、收敛清单、前端 localhost 清理与新债务冻结守卫 | `feat(phase-0)` (`91d9f8e`) | 53 test classes / 310 tests | 验收通过 |
-| **Phase 1** | 八大上下文收敛、深模块解耦、API v1 OpenAPI 契约与所有权校验 | `feat(phase-1)` (`4765d7e`), `fix(phase-1)` (`3c74996`) | 54 test classes / 317 tests | 验收通过 |
-| **Phase 2** | 受控项目接入 7 步向导、受控工作区配额守卫与版本化上下文源 | `feat(phase-2)` (`6ee7510`), `fix(phase-2)` (`0b01625`) | 55 test classes / 325 tests | 验收通过 |
-| **Phase 3** | 版本化 AgentDefinition、DAG 校验、Orchestrator 计划生成与工具门禁 | `feat(phase-3)` (`f9cbde5`), `fix(phase-3)` (`4310d6e`) | 56 test classes / 332 tests | 验收通过 |
-| **Phase 4** | 统一状态图、Transactional Outbox、三层分层记忆与代码 Diff 审查 | `feat(phase-4)` (`d4c1cfc`) | 57 test classes / 339 tests | 验收通过 |
-| **Phase 5** | 质量门禁引擎（5 维度）、单文件精准回滚、步骤重做与 PR 草稿交付 | `feat(phase-5)` (`fe2be18`), `fix(phase-5)` (`a087114`) | 58 test classes / 352 tests | 验收通过 |
-| **Phase 6** | 6 级 RBAC 矩阵、不可篡改审计流水、灾备快照还原与 SLO 评测控制台 | `feat(phase-6)` (`835a64b`), `fix(phase-6)` (`ec6060c`) | 59 test classes / 361 tests | 验收通过 |
-| **Phase 7** | 真实 Provider 客户端接入、模式强隔离、硬预算看门狗与成本大盘 | `feat(phase-7)` (`b278800`), `fix(phase-7)` (`e78d745`) | 60 test classes / 377 tests | 验收通过 |
-| **Phase 8** | 10 阶段端到端全流程验证、并发/SSE/内存基准压测、Webhook 签名与 Release Manifest | `feat(phase-8)` (`c158977`), `fix(phase-8)` (本轮加固) | 61 test classes / 384 tests | 验收通过 |

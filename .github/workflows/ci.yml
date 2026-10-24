@@ -47,8 +47,10 @@ jobs:
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: root_ci_password_2026
           SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQLDialect
+        # AOCI official cognition assets (aoci.txt / .aoci) are committed and enforced unconditionally
+        # by Phase9BaselineAndGovernanceGuardTest; entry authoring progress is tracked by official aoci verify/check.
         run: |
-          mvn test -Duser.timezone=UTC -Dtest="FlywayMigrationAndSchemaTest,ArchUnitArchitectureTest,Phase0BaselineAndDebtFreezeGuardTest,PersistentExecutionRecoveryAndLeaseTest,ConversationMonotonicSequenceAndConcurrencyTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest,PhaseFProductQualityAndEvidenceBundleIntegrationTest,FullLifecycleEndToEndIntegrationTest"
+          mvn test -Duser.timezone=UTC -Dtest="FlywayMigrationAndSchemaTest,ArchUnitArchitectureTest,Phase9BaselineAndGovernanceGuardTest,PersistentExecutionRecoveryAndLeaseTest,ConversationMonotonicSequenceAndConcurrencyTest,PhaseEProductionOpsAndDisasterRecoveryIntegrationTest,PhaseFProductQualityAndEvidenceBundleIntegrationTest,FullLifecycleEndToEndIntegrationTest"
         working-directory: agenthub-backend
 
       - name: Output Test Failure Diagnostics

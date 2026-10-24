@@ -54,4 +54,4 @@ RunEvent 先落库再推送，断线后按游标补回；Workspace 只接收内�
 - E2E 演练：[E2E_DEMO_GUIDE.md](E2E_DEMO_GUIDE.md)
 - 长期路线：[AGENTHUB_PRODUCT_LONG_TERM_PLAN.md](AGENTHUB_PRODUCT_LONG_TERM_PLAN.md)
 - 架构决策：[adr/](adr/)
-- 关键自动化验证入口：`PersistentExecutionRecoveryAndLeaseTest`、`HighConcurrencyStressIntegrationTest`、`PhaseFProductQualityAndEvidenceBundleIntegrationTest`、`Phase0BaselineAndDebtFreezeGuardTest`
+- 关键自动化验证入口：`PersistentExecutionRecoveryAndLeaseTest`、`HighConcurrencyStressIntegrationTest`、`PhaseFProductQualityAndEvidenceBundleIntegrationTest`、`Phase9BaselineAndGovernanceGuardTest`

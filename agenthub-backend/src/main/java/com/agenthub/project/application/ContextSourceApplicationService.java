@@ -4,6 +4,7 @@ import com.agenthub.audit.infrastructure.entity.ArtifactEntity;
 import com.agenthub.audit.infrastructure.repository.ArtifactRepository;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
+import com.agenthub.execution.domain.memory.ContextMemoryCompressor;
 import com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier;
 import com.agenthub.project.domain.context.ContextSourceType;
 import com.agenthub.project.domain.context.SecurityLevel;
@@ -272,17 +273,39 @@ public class ContextSourceApplicationService implements ContextSourceApplication
                 list.add(registerContextSource(projectId, cmd));
             }
 
-            // 3. AOCI Cognition Reference
-            String aociSnippet = String.format("AOCI Code Cognition Managed Scope aligned with commit [%s]",
-                    commitHash != null && !commitHash.isBlank() ? commitHash : "HEAD");
+            // 3. AOCI Cognition Reference (Honest verification against official receipt)
+            File wsDir = wsRoot.toFile();
+            String aociStatus = ContextMemoryCompressor.determineAociCognitionStatus(wsDir, commitHash);
+            String aociSnippet;
+            String aociScope;
+            String docPath = "docs/AOCI_COGNITION.md";
+
+            if ("ALIGNED".equals(aociStatus)) {
+                aociSnippet = String.format("AOCI Code Cognition Managed Scope aligned with commit [%s]",
+                        commitHash != null && !commitHash.isBlank() ? commitHash : "HEAD");
+                aociScope = "backend,frontend,schema";
+            } else if ("REPAIR_REQUIRED".equals(aociStatus)) {
+                aociSnippet = String.format("AOCI Code Cognition repair required: drift detected against commit [%s]",
+                        commitHash != null && !commitHash.isBlank() ? commitHash : "HEAD");
+                aociScope = "backend,frontend,schema";
+            } else if ("UNAVAILABLE".equals(aociStatus)) {
+                aociSnippet = String.format("AOCI Code Cognition unavailable: official receipt missing or unreadable for commit [%s]",
+                        commitHash != null && !commitHash.isBlank() ? commitHash : "HEAD");
+                aociScope = "none";
+            } else {
+                aociSnippet = String.format("AOCI Code Cognition not configured: official receipt is unavailable for commit [%s]",
+                        commitHash != null && !commitHash.isBlank() ? commitHash : "HEAD");
+                aociScope = "none";
+            }
+
             RegisterContextSourceCommand aociCmd = new RegisterContextSourceCommand(
                     ContextSourceType.AOCI_COGNITION,
                     "AOCI Code & Database Cognition Baseline",
-                    "docs/AOCI_COGNITION.md",
+                    docPath,
                     aociSnippet,
                     commitHash,
                     SecurityLevel.INTERNAL,
-                    Map.of("status", "aligned", "scope", "backend,frontend,schema")
+                    Map.of("status", aociStatus, "scope", aociScope)
             );
             list.add(registerContextSource(projectId, aociCmd));
 

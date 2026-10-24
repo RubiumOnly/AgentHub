@@ -1,0 +1,3610 @@
+{
+  "version": 1,
+  "created_at": "2026-10-17T04:44:54Z",
+  "updated_at": "2026-10-24T03:53:31Z",
+  "files": {
+    ".env.example": {
+      "role": "index",
+      "sha256": "4d34d765590fdefa52c2ea1de2259c7a7dc608b398bf07e5c40a48a837a82545",
+      "size": 244,
+      "normalized_sha256": "4d34d765590fdefa52c2ea1de2259c7a7dc608b398bf07e5c40a48a837a82545"
+    },
+    ".env.production.example": {
+      "role": "index",
+      "sha256": "4c6b4dc735b0e0fa5aa44edd08fcb5174767f8bf842d4cd3f76275595269ae85",
+      "size": 1965,
+      "normalized_sha256": "4c6b4dc735b0e0fa5aa44edd08fcb5174767f8bf842d4cd3f76275595269ae85"
+    },
+    ".gitattributes": {
+      "role": "index",
+      "sha256": "496152a0960fa26551b8107ed01023a4817e9e256cee0a29986137bdc9dbe66f",
+      "size": 134,
+      "normalized_sha256": "496152a0960fa26551b8107ed01023a4817e9e256cee0a29986137bdc9dbe66f"
+    },
+    ".github/workflows/ci.yml": {
+      "role": "index",
+      "sha256": "64d8391d77c2f31e11a1be51cffb52d0696b5740d5c48c6115da99fc67bd6c24",
+      "size": 8751,
+      "normalized_sha256": "64d8391d77c2f31e11a1be51cffb52d0696b5740d5c48c6115da99fc67bd6c24"
+    },
+    ".gitignore": {
+      "role": "index",
+      "sha256": "1e97b0b22100bba97b0b12a1c0f749981107f4002f83aaab96b1843de69d0197",
+      "size": 735,
+      "normalized_sha256": "1e97b0b22100bba97b0b12a1c0f749981107f4002f83aaab96b1843de69d0197"
+    },
+    ".mcp.json": {
+      "role": "index",
+      "sha256": "6124e5cbca2a69b435ae71e2778341f731f33011f95892b9ab2880e48b5d6916",
+      "size": 152,
+      "normalized_sha256": "6124e5cbca2a69b435ae71e2778341f731f33011f95892b9ab2880e48b5d6916"
+    },
+    "CHANGELOG.md": {
+      "role": "index",
+      "sha256": "02b0d4dc4af69f86938914ec2fd4b8452c16a8d1a10a8ed3836bd692e9462dd9",
+      "size": 55879,
+      "normalized_sha256": "02b0d4dc4af69f86938914ec2fd4b8452c16a8d1a10a8ed3836bd692e9462dd9"
+    },
+    "CONTRIBUTING.md": {
+      "role": "index",
+      "sha256": "20e70f98ddc1d57d684b6f0f1d9f6141212f092c7eaac6ca29545a2ce1c554f1",
+      "size": 2321,
+      "normalized_sha256": "20e70f98ddc1d57d684b6f0f1d9f6141212f092c7eaac6ca29545a2ce1c554f1"
+    },
+    "LICENSE": {
+      "role": "index",
+      "sha256": "18666b74204c546e25e0e9d508e40e589a5251e542254f92e29d6f68d83d523f",
+      "size": 1078,
+      "normalized_sha256": "18666b74204c546e25e0e9d508e40e589a5251e542254f92e29d6f68d83d523f"
+    },
+    "README.md": {
+      "role": "index",
+      "sha256": "7b380b68d901beb5b6bb8dd33e1fcf04a828034eef1920eec086ab7844b7c2fd",
+      "size": 5795,
+      "normalized_sha256": "7b380b68d901beb5b6bb8dd33e1fcf04a828034eef1920eec086ab7844b7c2fd"
+    },
+    "SECURITY.md": {
+      "role": "index",
+      "sha256": "62064ff3fe56c43a20433fb327454b5bf3544fdd4ee678c22cc54470268057fa",
+      "size": 4149,
+      "normalized_sha256": "62064ff3fe56c43a20433fb327454b5bf3544fdd4ee678c22cc54470268057fa"
+    },
+    "agenthub-backend/Dockerfile": {
+      "role": "index",
+      "sha256": "fc6da9497b97c2bf2848b8b175bec35b086503efee3fd7eed5b801842c4f8a0b",
+      "size": 1838,
+      "normalized_sha256": "fc6da9497b97c2bf2848b8b175bec35b086503efee3fd7eed5b801842c4f8a0b"
+    },
+    "agenthub-backend/pom.xml": {
+      "role": "index",
+      "sha256": "63280be5390f0a1f735209af464888a42dcb59da10b7c1f57829f420a0301abf",
+      "size": 6859,
+      "normalized_sha256": "63280be5390f0a1f735209af464888a42dcb59da10b7c1f57829f420a0301abf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/AgentHubApplication.java": {
+      "role": "index",
+      "sha256": "27f73b9e2b856904aae690f671c5bee75c46f8552fa3b78e62cb65b113f2562f",
+      "size": 480,
+      "normalized_sha256": "27f73b9e2b856904aae690f671c5bee75c46f8552fa3b78e62cb65b113f2562f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/adapter/common/BusinessException.java": {
+      "role": "index",
+      "sha256": "d78e9322917ec305963b5066aab78b32a7c9e2a49c6f28972b7b1a85f5834c7a",
+      "size": 636,
+      "normalized_sha256": "d78e9322917ec305963b5066aab78b32a7c9e2a49c6f28972b7b1a85f5834c7a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/adapter/common/ErrorCode.java": {
+      "role": "index",
+      "sha256": "550ca8ca4eb0e604c35df61b2dec7026ce419c5b22b7bac2b2047005e3ee759f",
+      "size": 3642,
+      "normalized_sha256": "550ca8ca4eb0e604c35df61b2dec7026ce419c5b22b7bac2b2047005e3ee759f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/adapter/common/GlobalExceptionHandler.java": {
+      "role": "index",
+      "sha256": "f846381ddf09eabe3b255ab3e35b26f6a10a85a06d1ad5744652900be2365fa7",
+      "size": 1973,
+      "normalized_sha256": "f846381ddf09eabe3b255ab3e35b26f6a10a85a06d1ad5744652900be2365fa7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/adapter/common/Result.java": {
+      "role": "index",
+      "sha256": "44499b84da0e270436b2875a6a12c55b8759c4a8559226ca4d983df18cd149b0",
+      "size": 2218,
+      "normalized_sha256": "44499b84da0e270436b2875a6a12c55b8759c4a8559226ca4d983df18cd149b0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/adapter/web/IMController.java": {
+      "role": "index",
+      "sha256": "d418a6feaeddce98654f66cd5602354268c4719189d1046e1ebd769094148602",
+      "size": 6353,
+      "normalized_sha256": "d418a6feaeddce98654f66cd5602354268c4719189d1046e1ebd769094148602"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/adapter/web/SandboxController.java": {
+      "role": "index",
+      "sha256": "d657c832820dd10c18f8bec28689ce914f72cd70b6eecdd1dc2f2e0b5735c31e",
+      "size": 1340,
+      "normalized_sha256": "d657c832820dd10c18f8bec28689ce914f72cd70b6eecdd1dc2f2e0b5735c31e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/adapter/web/WorkflowAndDiffController.java": {
+      "role": "index",
+      "sha256": "aec62bef9bf184dae57195c28cd8a144a10627609beb9222440d9582798c375b",
+      "size": 3853,
+      "normalized_sha256": "aec62bef9bf184dae57195c28cd8a144a10627609beb9222440d9582798c375b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/api/AgentRegistryController.java": {
+      "role": "index",
+      "sha256": "71e8436b4622fbbce85a75b3531e5a467ef729440a4ace75fe3b34492c226d78",
+      "size": 3073,
+      "normalized_sha256": "71e8436b4622fbbce85a75b3531e5a467ef729440a4ace75fe3b34492c226d78"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/api/ProviderController.java": {
+      "role": "index",
+      "sha256": "ec8c08c678eb2f1243cfda0f00d7d9c7b5249020e44b3970c5773223c8397961",
+      "size": 2725,
+      "normalized_sha256": "ec8c08c678eb2f1243cfda0f00d7d9c7b5249020e44b3970c5773223c8397961"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/api/TokenUsageController.java": {
+      "role": "index",
+      "sha256": "cf3c9f48c8b2df8b61f3e46c8f0dc9d6cabc5f49798899a451e91396557e48c9",
+      "size": 1635,
+      "normalized_sha256": "cf3c9f48c8b2df8b61f3e46c8f0dc9d6cabc5f49798899a451e91396557e48c9"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/AgentApplication.java": {
+      "role": "index",
+      "sha256": "c7525fde1f16003b419976a07a00f216e88361a070d3f042839735a027a2ca1d",
+      "size": 1094,
+      "normalized_sha256": "c7525fde1f16003b419976a07a00f216e88361a070d3f042839735a027a2ca1d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/AgentApplicationService.java": {
+      "role": "index",
+      "sha256": "2321bd7bc3231c86b56f9c3ec0d422d563d254e0ea7fe9c056e9bb3ec8610282",
+      "size": 11689,
+      "normalized_sha256": "2321bd7bc3231c86b56f9c3ec0d422d563d254e0ea7fe9c056e9bb3ec8610282"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/BudgetGovernanceGuard.java": {
+      "role": "index",
+      "sha256": "5941ec848090f71f5af6fb814e0dc1ddd5746cacc06dd629145dfa252d742ae7",
+      "size": 7983,
+      "normalized_sha256": "5941ec848090f71f5af6fb814e0dc1ddd5746cacc06dd629145dfa252d742ae7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/OfflineEvaluationApplication.java": {
+      "role": "index",
+      "sha256": "123f5170993a47e2aa0399d9d03d61f460f31612e5974a77570698ba1ed17ecc",
+      "size": 271,
+      "normalized_sha256": "123f5170993a47e2aa0399d9d03d61f460f31612e5974a77570698ba1ed17ecc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/OfflineEvaluationApplicationService.java": {
+      "role": "index",
+      "sha256": "eb5ded03472e9b1b67082981301c2bef2d7bdfe7b285782e273828b230322bdf",
+      "size": 6109,
+      "normalized_sha256": "eb5ded03472e9b1b67082981301c2bef2d7bdfe7b285782e273828b230322bdf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/ProviderApplication.java": {
+      "role": "index",
+      "sha256": "ecefbf30bbf77f3a143413a1a70e38035f22484b87c8ea8c7cc8dc8b55e3f21d",
+      "size": 793,
+      "normalized_sha256": "ecefbf30bbf77f3a143413a1a70e38035f22484b87c8ea8c7cc8dc8b55e3f21d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/ProviderApplicationService.java": {
+      "role": "index",
+      "sha256": "3af5b553f0df49e6224768292a324eb0a4f23a734b2d5a3bb031f0c89f4e0dd2",
+      "size": 10517,
+      "normalized_sha256": "3af5b553f0df49e6224768292a324eb0a4f23a734b2d5a3bb031f0c89f4e0dd2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/TokenUsageApplication.java": {
+      "role": "index",
+      "sha256": "0e137bb08fd3934b0bb9cff568d8d21ea54686b43c0d0cb35d716b76bf0dd127",
+      "size": 1134,
+      "normalized_sha256": "0e137bb08fd3934b0bb9cff568d8d21ea54686b43c0d0cb35d716b76bf0dd127"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/application/TokenUsageApplicationService.java": {
+      "role": "index",
+      "sha256": "399b86a55233a5c0567a85d0f692f7a0b6b2387786c805012b6937c223f24fcc",
+      "size": 5313,
+      "normalized_sha256": "399b86a55233a5c0567a85d0f692f7a0b6b2387786c805012b6937c223f24fcc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/context/AssembledContext.java": {
+      "role": "index",
+      "sha256": "a8c2864599b88e327cad42c977bf7e0a7af7dbb7c2fcbdadd47319022bf0d9e5",
+      "size": 1514,
+      "normalized_sha256": "a8c2864599b88e327cad42c977bf7e0a7af7dbb7c2fcbdadd47319022bf0d9e5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/context/ContextAssemblyEngine.java": {
+      "role": "index",
+      "sha256": "dcceed9bc0c64dd3a5a7207f7afcbc9e1926f74e25f414601e3b74cfcbaf558b",
+      "size": 5398,
+      "normalized_sha256": "dcceed9bc0c64dd3a5a7207f7afcbc9e1926f74e25f414601e3b74cfcbaf558b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/context/ContextLayer.java": {
+      "role": "index",
+      "sha256": "4f3de44a937d66b92ebaee3d7667982ef3a68544f6724d3d921a300601ad048e",
+      "size": 2393,
+      "normalized_sha256": "4f3de44a937d66b92ebaee3d7667982ef3a68544f6724d3d921a300601ad048e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/context/ContextLayerType.java": {
+      "role": "index",
+      "sha256": "374fa1f99be6e7324c544b5b46bf41907588a693725d66a209eb3e793b863be2",
+      "size": 672,
+      "normalized_sha256": "374fa1f99be6e7324c544b5b46bf41907588a693725d66a209eb3e793b863be2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/context/ContextTruncationStrategy.java": {
+      "role": "index",
+      "sha256": "9f6918a59c2bb13b262373ded97fc6b88695381e8ea6f2d54e1a6b17cf3ddc83",
+      "size": 148,
+      "normalized_sha256": "9f6918a59c2bb13b262373ded97fc6b88695381e8ea6f2d54e1a6b17cf3ddc83"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/definition/AgentBudget.java": {
+      "role": "index",
+      "sha256": "b2b7da1826645fb821f18e7036998f1a37dfa689c897da6fecfbec498a61ec7f",
+      "size": 628,
+      "normalized_sha256": "b2b7da1826645fb821f18e7036998f1a37dfa689c897da6fecfbec498a61ec7f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/definition/AgentDefinitionManifest.java": {
+      "role": "index",
+      "sha256": "b370db210970b0c094869f342b75fab5fba18a861726ef68888edb2451dd4cf7",
+      "size": 3230,
+      "normalized_sha256": "b370db210970b0c094869f342b75fab5fba18a861726ef68888edb2451dd4cf7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/definition/AgentToolCategory.java": {
+      "role": "index",
+      "sha256": "878bb32a29ce3da3d5ca4c727bc74149c0730df9ad695e41b42d2d8a3608c923",
+      "size": 897,
+      "normalized_sha256": "878bb32a29ce3da3d5ca4c727bc74149c0730df9ad695e41b42d2d8a3608c923"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/definition/AgentToolDefinition.java": {
+      "role": "index",
+      "sha256": "2ba2cee136a5e07f1bc1d27b334ae4a66601acfca57bb8568ca313616ed2267d",
+      "size": 1825,
+      "normalized_sha256": "2ba2cee136a5e07f1bc1d27b334ae4a66601acfca57bb8568ca313616ed2267d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/definition/ProviderPolicy.java": {
+      "role": "index",
+      "sha256": "25e81a47eb49f0ff5d8b6b2c9f912aee092207fb73236b070dafd2ce20c4d67d",
+      "size": 2036,
+      "normalized_sha256": "25e81a47eb49f0ff5d8b6b2c9f912aee092207fb73236b070dafd2ce20c4d67d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/definition/ToolRegistry.java": {
+      "role": "index",
+      "sha256": "df95de29bb29665ba6dda036a77333421535b7b9159b72fdbe02800e27709566",
+      "size": 5470,
+      "normalized_sha256": "df95de29bb29665ba6dda036a77333421535b7b9159b72fdbe02800e27709566"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/evaluation/EvaluationReportView.java": {
+      "role": "index",
+      "sha256": "42e31041682a5b54f466b21886e50c8a6cea26a5f49dc34aa76ddedf616c1342",
+      "size": 3186,
+      "normalized_sha256": "42e31041682a5b54f466b21886e50c8a6cea26a5f49dc34aa76ddedf616c1342"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/evaluation/EvaluationTaskCategory.java": {
+      "role": "index",
+      "sha256": "acbf4ce56b54942ad56ca05252130fd6086cae0d9896fb662aec21246e05b7ca",
+      "size": 591,
+      "normalized_sha256": "acbf4ce56b54942ad56ca05252130fd6086cae0d9896fb662aec21246e05b7ca"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/evaluation/EvaluationTaskResult.java": {
+      "role": "index",
+      "sha256": "a58983a9d114fb356645e8c20f10c603e1fe27557f2701219ba8739055e1e7fc",
+      "size": 2508,
+      "normalized_sha256": "a58983a9d114fb356645e8c20f10c603e1fe27557f2701219ba8739055e1e7fc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/exception/NoAvailableProviderException.java": {
+      "role": "index",
+      "sha256": "4925a95df068d417a0dcca97f43cc101d207546be7c7ce5a445bed828a52b8c0",
+      "size": 353,
+      "normalized_sha256": "4925a95df068d417a0dcca97f43cc101d207546be7c7ce5a445bed828a52b8c0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/exception/ProviderRateLimitException.java": {
+      "role": "index",
+      "sha256": "862d044f949c85df7bac7cf21e599bc522e007e299653042219101ae901403ab",
+      "size": 621,
+      "normalized_sha256": "862d044f949c85df7bac7cf21e599bc522e007e299653042219101ae901403ab"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/exception/ProviderServerException.java": {
+      "role": "index",
+      "sha256": "9c60003b9425aabb19849a7fd475f033443190117c3e2855617daf4a9f1d401b",
+      "size": 637,
+      "normalized_sha256": "9c60003b9425aabb19849a7fd475f033443190117c3e2855617daf4a9f1d401b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/exception/ProviderUnavailableException.java": {
+      "role": "index",
+      "sha256": "4fc2c8f586fbbfcd247bd5930721d549e617cf7160dab69a4723e241941cbe5b",
+      "size": 505,
+      "normalized_sha256": "4fc2c8f586fbbfcd247bd5930721d549e617cf7160dab69a4723e241941cbe5b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ChatChunk.java": {
+      "role": "index",
+      "sha256": "d185af52631fecc2c4423c2ee20f8f095269b40c3a5055049e4ef7436dbe31cb",
+      "size": 2105,
+      "normalized_sha256": "d185af52631fecc2c4423c2ee20f8f095269b40c3a5055049e4ef7436dbe31cb"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ChatMessage.java": {
+      "role": "index",
+      "sha256": "1e075332f1f39c0766d7da8db281f6bf3dc6b5a66193aecb0d18d61746137ba6",
+      "size": 2118,
+      "normalized_sha256": "1e075332f1f39c0766d7da8db281f6bf3dc6b5a66193aecb0d18d61746137ba6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ChatRequest.java": {
+      "role": "index",
+      "sha256": "34172dacd025031a5193cedcf1979eec0a315af777e8bfc8a38eb5427c37f2c5",
+      "size": 4162,
+      "normalized_sha256": "34172dacd025031a5193cedcf1979eec0a315af777e8bfc8a38eb5427c37f2c5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ChatResponse.java": {
+      "role": "index",
+      "sha256": "f483db0a0a9f4fecc3b47a4d2065328472af647d1ac0206f31f1585424d87697",
+      "size": 3487,
+      "normalized_sha256": "f483db0a0a9f4fecc3b47a4d2065328472af647d1ac0206f31f1585424d87697"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/CircuitBreaker.java": {
+      "role": "index",
+      "sha256": "69108bced18bf4f60762ec8326826037f66327907d6cbda0cdc317ee119ae353",
+      "size": 5626,
+      "normalized_sha256": "69108bced18bf4f60762ec8326826037f66327907d6cbda0cdc317ee119ae353"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/CircuitStatus.java": {
+      "role": "index",
+      "sha256": "0a32e55a6abdae485a513f5662884004712ebe97645e340fe84feb29c140da46",
+      "size": 117,
+      "normalized_sha256": "0a32e55a6abdae485a513f5662884004712ebe97645e340fe84feb29c140da46"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/FallbackEvent.java": {
+      "role": "index",
+      "sha256": "f1bd0cf7d9509032defd13893d2f4ae6e34f63b6e9842316fe1f57cee72b341e",
+      "size": 2255,
+      "normalized_sha256": "f1bd0cf7d9509032defd13893d2f4ae6e34f63b6e9842316fe1f57cee72b341e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ModelPricing.java": {
+      "role": "index",
+      "sha256": "1d7313f429f3a3a9a26bc45a3c233371144e48d94dedd2a92cafb72d94f75c79",
+      "size": 5987,
+      "normalized_sha256": "1d7313f429f3a3a9a26bc45a3c233371144e48d94dedd2a92cafb72d94f75c79"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ProviderExecutionMode.java": {
+      "role": "index",
+      "sha256": "1569b2b1575ae9e3fada25f6a32273be62b874b6807ac1132186daca67d7dec6",
+      "size": 1427,
+      "normalized_sha256": "1569b2b1575ae9e3fada25f6a32273be62b874b6807ac1132186daca67d7dec6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ProviderHealth.java": {
+      "role": "index",
+      "sha256": "e7dcef9e8f6f48e4d032898eadaf079807abf36c1eed1abaf7e499750fa30a23",
+      "size": 1377,
+      "normalized_sha256": "e7dcef9e8f6f48e4d032898eadaf079807abf36c1eed1abaf7e499750fa30a23"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/TokenUsage.java": {
+      "role": "index",
+      "sha256": "13d55058ea18c5721966da4ea4b457e6e5802cbebeb9235630815876c8c73027",
+      "size": 2111,
+      "normalized_sha256": "13d55058ea18c5721966da4ea4b457e6e5802cbebeb9235630815876c8c73027"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ToolCall.java": {
+      "role": "index",
+      "sha256": "a16b6c0581e44478ab9dd1f5942094977f7553273c191930416c6cadfcc1671c",
+      "size": 1313,
+      "normalized_sha256": "a16b6c0581e44478ab9dd1f5942094977f7553273c191930416c6cadfcc1671c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/ToolDefinition.java": {
+      "role": "index",
+      "sha256": "707bbb9dd9a25d1bee1dbd2f55a24ba099f4f236de96822557ac74b7cafc9eaf",
+      "size": 1733,
+      "normalized_sha256": "707bbb9dd9a25d1bee1dbd2f55a24ba099f4f236de96822557ac74b7cafc9eaf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/router/DynamicProviderRouter.java": {
+      "role": "index",
+      "sha256": "78f85bf843ba24d7afcbe4906812e442667e7fa11546409bb69a2612fc2879bb",
+      "size": 26920,
+      "normalized_sha256": "78f85bf843ba24d7afcbe4906812e442667e7fa11546409bb69a2612fc2879bb"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/router/ProviderRouter.java": {
+      "role": "index",
+      "sha256": "0defe49262ba873be1c3ef68c0e648507d022e7ec8c5c0ea1a66920ed91dc6fe",
+      "size": 1262,
+      "normalized_sha256": "0defe49262ba873be1c3ef68c0e648507d022e7ec8c5c0ea1a66920ed91dc6fe"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/spi/LlmProvider.java": {
+      "role": "index",
+      "sha256": "c66c31316285beec2c704c9d8a0f7ade98ee6520d7a05ec369633cf5b647c928",
+      "size": 964,
+      "normalized_sha256": "c66c31316285beec2c704c9d8a0f7ade98ee6520d7a05ec369633cf5b647c928"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/AgentDefinitionView.java": {
+      "role": "index",
+      "sha256": "6de227955922ab26f24698345f8d63d91bd2be25b237ffbbdf66606789c3f723",
+      "size": 1505,
+      "normalized_sha256": "6de227955922ab26f24698345f8d63d91bd2be25b237ffbbdf66606789c3f723"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/AgentInstanceView.java": {
+      "role": "index",
+      "sha256": "58776eb2bbc30448927189aed38698ed3cbaa03eb7f62a2a8ce630736627b12f",
+      "size": 1887,
+      "normalized_sha256": "58776eb2bbc30448927189aed38698ed3cbaa03eb7f62a2a8ce630736627b12f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/BudgetCheckCommand.java": {
+      "role": "index",
+      "sha256": "797413f5e50d2772f09400efcbf1756455d830763ded9e23ef2f5568c28da3e8",
+      "size": 1433,
+      "normalized_sha256": "797413f5e50d2772f09400efcbf1756455d830763ded9e23ef2f5568c28da3e8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/BudgetCheckResultView.java": {
+      "role": "index",
+      "sha256": "4793e7f88dd3d204e603275373b39874c40bdc376184fb34949bbe14b61b1293",
+      "size": 2617,
+      "normalized_sha256": "4793e7f88dd3d204e603275373b39874c40bdc376184fb34949bbe14b61b1293"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/CircuitBreakerView.java": {
+      "role": "index",
+      "sha256": "691dd23dd3b97504e5cb66a0f882fc8b3482424e9ad9eb5646ed27862fed6771",
+      "size": 2613,
+      "normalized_sha256": "691dd23dd3b97504e5cb66a0f882fc8b3482424e9ad9eb5646ed27862fed6771"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/CreateAgentInstanceCommand.java": {
+      "role": "index",
+      "sha256": "0a2b136f65207be2dcf8ed6cf8066510583e3fdace6c70bdc3178448191ac00d",
+      "size": 1101,
+      "normalized_sha256": "0a2b136f65207be2dcf8ed6cf8066510583e3fdace6c70bdc3178448191ac00d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ModelCostSummaryView.java": {
+      "role": "index",
+      "sha256": "db4ac4bc91e6ff46df4c9e4e2099692d5020c62a95e36369f96e41970f343c52",
+      "size": 1782,
+      "normalized_sha256": "db4ac4bc91e6ff46df4c9e4e2099692d5020c62a95e36369f96e41970f343c52"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ProviderCostSummaryView.java": {
+      "role": "index",
+      "sha256": "f334e0d1e8f08709e1bd48a9e6aab1581b62f9e55ca1d7338564bf3cd72ee56e",
+      "size": 1824,
+      "normalized_sha256": "f334e0d1e8f08709e1bd48a9e6aab1581b62f9e55ca1d7338564bf3cd72ee56e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ProviderCreateCommand.java": {
+      "role": "index",
+      "sha256": "9160c418bce578c98032a50bab80a4990b80e5aca85b0303881190882a02e2e4",
+      "size": 1957,
+      "normalized_sha256": "9160c418bce578c98032a50bab80a4990b80e5aca85b0303881190882a02e2e4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ProviderHealthView.java": {
+      "role": "index",
+      "sha256": "616cf50cbd2725d018f60e0dcd6260c964babdcb0eb59c4ad5dc44e18b123a31",
+      "size": 2398,
+      "normalized_sha256": "616cf50cbd2725d018f60e0dcd6260c964babdcb0eb59c4ad5dc44e18b123a31"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ProviderProbeResultView.java": {
+      "role": "index",
+      "sha256": "7a30ef47d555233b466f0298c56e316b9d288fce2e53dec61dcfde49fc43b275",
+      "size": 2743,
+      "normalized_sha256": "7a30ef47d555233b466f0298c56e316b9d288fce2e53dec61dcfde49fc43b275"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ProviderTestResultView.java": {
+      "role": "index",
+      "sha256": "bd6b4dc60594c1211938dd7785daed770b3c322ff87e720afa5dfbfd037fd248",
+      "size": 1100,
+      "normalized_sha256": "bd6b4dc60594c1211938dd7785daed770b3c322ff87e720afa5dfbfd037fd248"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ProviderUpdateCommand.java": {
+      "role": "index",
+      "sha256": "c5d0cabf4fbf7a27fecc77dce7e89b6260abb65b9b39d908ad8e04427fbaa32e",
+      "size": 1671,
+      "normalized_sha256": "c5d0cabf4fbf7a27fecc77dce7e89b6260abb65b9b39d908ad8e04427fbaa32e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/ProviderView.java": {
+      "role": "index",
+      "sha256": "c2e8a304433c78fa2af173e14317564403b514cfe14ae0ffa2b525e031bc7618",
+      "size": 4347,
+      "normalized_sha256": "c2e8a304433c78fa2af173e14317564403b514cfe14ae0ffa2b525e031bc7618"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/RouteDecisionView.java": {
+      "role": "index",
+      "sha256": "5592c14de09004a0e0089ab750844a297a34ef5ed95b3ffee315340dd378ec8b",
+      "size": 1916,
+      "normalized_sha256": "5592c14de09004a0e0089ab750844a297a34ef5ed95b3ffee315340dd378ec8b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/TokenGovernanceView.java": {
+      "role": "index",
+      "sha256": "588a6be6d5dbf13efcf8ae10667604bc87663bf634bd9015dcb706234f81a643",
+      "size": 5207,
+      "normalized_sha256": "588a6be6d5dbf13efcf8ae10667604bc87663bf634bd9015dcb706234f81a643"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/TokenSummaryView.java": {
+      "role": "index",
+      "sha256": "e1e830fe1422efc30ee50d529715eaa59cae65145db9f7f14b6d7065315770c2",
+      "size": 1038,
+      "normalized_sha256": "e1e830fe1422efc30ee50d529715eaa59cae65145db9f7f14b6d7065315770c2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/dto/TokenUsageAuditView.java": {
+      "role": "index",
+      "sha256": "2bccde64c92bfccc25c32142fa59576321ef8ca6d4e3a6d7baebc0cee3e5f34f",
+      "size": 2535,
+      "normalized_sha256": "2bccde64c92bfccc25c32142fa59576321ef8ca6d4e3a6d7baebc0cee3e5f34f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/entity/AgentDefinitionEntity.java": {
+      "role": "index",
+      "sha256": "0aaa7d9336742aeb2cdf1064bd4daff8792dfabec89d095568ee80f4b2185a41",
+      "size": 3484,
+      "normalized_sha256": "0aaa7d9336742aeb2cdf1064bd4daff8792dfabec89d095568ee80f4b2185a41"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/entity/AgentInstanceEntity.java": {
+      "role": "index",
+      "sha256": "a527ee6c6b36c246f5d9dadb75d378fa4e3e2fb3acaa4c63dd4d524fe62d24f8",
+      "size": 2701,
+      "normalized_sha256": "a527ee6c6b36c246f5d9dadb75d378fa4e3e2fb3acaa4c63dd4d524fe62d24f8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/entity/ProviderEntity.java": {
+      "role": "index",
+      "sha256": "6d295ef8794e2d6ad5376d258b19087c8699a6979444c40db7284991cda17b5d",
+      "size": 5244,
+      "normalized_sha256": "6d295ef8794e2d6ad5376d258b19087c8699a6979444c40db7284991cda17b5d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/entity/TokenUsageAuditEntity.java": {
+      "role": "index",
+      "sha256": "dd60cdb17eb3f010633c84841e1f671c5b8c51ea92a20fe84cc7d2f7428f53e5",
+      "size": 4692,
+      "normalized_sha256": "dd60cdb17eb3f010633c84841e1f671c5b8c51ea92a20fe84cc7d2f7428f53e5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/provider/AbstractHttpLlmProvider.java": {
+      "role": "index",
+      "sha256": "f68d9453522317b831a0f127a1649178b67222ae622a6b891c46274017591009",
+      "size": 11212,
+      "normalized_sha256": "f68d9453522317b831a0f127a1649178b67222ae622a6b891c46274017591009"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/provider/AnthropicProvider.java": {
+      "role": "index",
+      "sha256": "38345d8a561652ad67f076c0bed7348f03bb6acff2adebc31be042502ddf8e8d",
+      "size": 16349,
+      "normalized_sha256": "38345d8a561652ad67f076c0bed7348f03bb6acff2adebc31be042502ddf8e8d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/provider/GeminiProvider.java": {
+      "role": "index",
+      "sha256": "d21aa99a840402047a97ffe1b126494c27b30a81c265ae630c0a2117f1f7f83e",
+      "size": 17364,
+      "normalized_sha256": "d21aa99a840402047a97ffe1b126494c27b30a81c265ae630c0a2117f1f7f83e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/provider/MockLlmProvider.java": {
+      "role": "index",
+      "sha256": "5980e46251158636d6a71a5efe56ade3949da5810df757cf3dc2a6a1ed3aac6c",
+      "size": 7965,
+      "normalized_sha256": "5980e46251158636d6a71a5efe56ade3949da5810df757cf3dc2a6a1ed3aac6c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/provider/OllamaProvider.java": {
+      "role": "index",
+      "sha256": "0e83226f37b55c1a480187b8999b42728649a6cb2abc6f3bae2c34dc637398c5",
+      "size": 11481,
+      "normalized_sha256": "0e83226f37b55c1a480187b8999b42728649a6cb2abc6f3bae2c34dc637398c5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/provider/OpenAiCompatibleProvider.java": {
+      "role": "index",
+      "sha256": "d6ef17274ad14f0794bf11f7622a41135a00648ac0fbe9af63b4d3c5609b69c7",
+      "size": 17101,
+      "normalized_sha256": "d6ef17274ad14f0794bf11f7622a41135a00648ac0fbe9af63b4d3c5609b69c7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/repository/AgentDefinitionRepository.java": {
+      "role": "index",
+      "sha256": "82be04029f2429a81ae9101b2c028b3c5e93e2e4f165d40f5cbfa1133609bc4b",
+      "size": 444,
+      "normalized_sha256": "82be04029f2429a81ae9101b2c028b3c5e93e2e4f165d40f5cbfa1133609bc4b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/repository/AgentInstanceRepository.java": {
+      "role": "index",
+      "sha256": "af83b4c39eb6f2d8c0d53ba3bb16e4cb16ab8cd52f92a211d9d9d3f0a6167837",
+      "size": 495,
+      "normalized_sha256": "af83b4c39eb6f2d8c0d53ba3bb16e4cb16ab8cd52f92a211d9d9d3f0a6167837"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/repository/ProviderRepository.java": {
+      "role": "index",
+      "sha256": "9e79565b79571004f715871ec1c12fa5fc8fd6eab165fc082786f1f4be983327",
+      "size": 639,
+      "normalized_sha256": "9e79565b79571004f715871ec1c12fa5fc8fd6eab165fc082786f1f4be983327"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/repository/TokenUsageAuditRepository.java": {
+      "role": "index",
+      "sha256": "791c2529c1f452c5142c7b351847acf009426c1031620979c75d250cef6d3532",
+      "size": 1585,
+      "normalized_sha256": "791c2529c1f452c5142c7b351847acf009426c1031620979c75d250cef6d3532"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/security/SecretMasker.java": {
+      "role": "index",
+      "sha256": "bbfe22333efdf3be3cb989c5204a8daf868ae9aad17cc476e598490f60e8645a",
+      "size": 8465,
+      "normalized_sha256": "bbfe22333efdf3be3cb989c5204a8daf868ae9aad17cc476e598490f60e8645a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/application/service/IMCollaborationService.java": {
+      "role": "index",
+      "sha256": "82d5d5e13003ca64efea558f92afc40f4349f8ef022797928fc20bf97331dc13",
+      "size": 5463,
+      "normalized_sha256": "82d5d5e13003ca64efea558f92afc40f4349f8ef022797928fc20bf97331dc13"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/api/ArtifactController.java": {
+      "role": "index",
+      "sha256": "5346dccf1d416a16de78ae23d61b55b04a85fe8fe1353cdd2e6a3b83d614bb7b",
+      "size": 4750,
+      "normalized_sha256": "5346dccf1d416a16de78ae23d61b55b04a85fe8fe1353cdd2e6a3b83d614bb7b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/application/ArtifactApplication.java": {
+      "role": "index",
+      "sha256": "e147c54ebf79691e5fd27bac78bcf41792b0c912272782ac805fbe81be7b596e",
+      "size": 1519,
+      "normalized_sha256": "e147c54ebf79691e5fd27bac78bcf41792b0c912272782ac805fbe81be7b596e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/application/ArtifactApplicationService.java": {
+      "role": "index",
+      "sha256": "ef66381eeb3395b24e4f404a9a9b26a1dfb184cc38eca1fe53ee0e348d1d9a2d",
+      "size": 42457,
+      "normalized_sha256": "ef66381eeb3395b24e4f404a9a9b26a1dfb184cc38eca1fe53ee0e348d1d9a2d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/QualityGateCheckItem.java": {
+      "role": "index",
+      "sha256": "4f9848a832e6fec08d16e36fac21ea9b03b78f078e3752444c3ad0939380785a",
+      "size": 1559,
+      "normalized_sha256": "4f9848a832e6fec08d16e36fac21ea9b03b78f078e3752444c3ad0939380785a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/QualityGateEngine.java": {
+      "role": "index",
+      "sha256": "9cda4c0ff3f7ac33f2e9329dde0d2c7da45d366ae46f85b425cdc7857cada5d4",
+      "size": 16662,
+      "normalized_sha256": "9cda4c0ff3f7ac33f2e9329dde0d2c7da45d366ae46f85b425cdc7857cada5d4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/QualityGateReport.java": {
+      "role": "index",
+      "sha256": "85f43a383960ef661e8c98e4fae16c5fb346c5143761cf61dedd760a9827f98b",
+      "size": 2696,
+      "normalized_sha256": "85f43a383960ef661e8c98e4fae16c5fb346c5143761cf61dedd760a9827f98b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/QualityGateRuleType.java": {
+      "role": "index",
+      "sha256": "46efd45bfe6f47cad870683e8bda748af320bae8b69c376562ee603153133a13",
+      "size": 725,
+      "normalized_sha256": "46efd45bfe6f47cad870683e8bda748af320bae8b69c376562ee603153133a13"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/QualityGateStatus.java": {
+      "role": "index",
+      "sha256": "c3feb148efd8b4f91df02b791b324c82609466ea85f63a5ef6e2b4a331c3c595",
+      "size": 157,
+      "normalized_sha256": "c3feb148efd8b4f91df02b791b324c82609466ea85f63a5ef6e2b4a331c3c595"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/dto/ArtifactLineageView.java": {
+      "role": "index",
+      "sha256": "a63748f406cdceb5317fc2ba9986f3ef31fe56fe5c859d68c47f3cb9b0c2deab",
+      "size": 3175,
+      "normalized_sha256": "a63748f406cdceb5317fc2ba9986f3ef31fe56fe5c859d68c47f3cb9b0c2deab"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/dto/ArtifactView.java": {
+      "role": "index",
+      "sha256": "3f6ee6a71e0ab57e0487b58e3faedc5ed7e3b76996b3294eac0e93d1d83e20c1",
+      "size": 2934,
+      "normalized_sha256": "3f6ee6a71e0ab57e0487b58e3faedc5ed7e3b76996b3294eac0e93d1d83e20c1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/dto/PullRequestDraftView.java": {
+      "role": "index",
+      "sha256": "454c111f07566737fd3f24f8cba40aa4f1ef7a3c67179b70ef60f5fa6b9b251f",
+      "size": 5158,
+      "normalized_sha256": "454c111f07566737fd3f24f8cba40aa4f1ef7a3c67179b70ef60f5fa6b9b251f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/dto/StepLineageNode.java": {
+      "role": "index",
+      "sha256": "d4e6b811b301736b1c0e97c53d74e05c62937d12f5ce1aff75d7e4b252b45db9",
+      "size": 3569,
+      "normalized_sha256": "d4e6b811b301736b1c0e97c53d74e05c62937d12f5ce1aff75d7e4b252b45db9"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/infrastructure/entity/ArtifactEntity.java": {
+      "role": "index",
+      "sha256": "3e5c212b2ebe45ccb6da2a1518473f06f1786946177781c1d6f1bf7e1a5ea63a",
+      "size": 3360,
+      "normalized_sha256": "3e5c212b2ebe45ccb6da2a1518473f06f1786946177781c1d6f1bf7e1a5ea63a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/infrastructure/repository/ArtifactRepository.java": {
+      "role": "index",
+      "sha256": "e2d10d80986175661d80e78c21ad6031d73ad515d93e4a7e48cab31df9ced09f",
+      "size": 739,
+      "normalized_sha256": "e2d10d80986175661d80e78c21ad6031d73ad515d93e4a7e48cab31df9ced09f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/api/ConversationController.java": {
+      "role": "index",
+      "sha256": "755f545179ef8217a2e958fd03840f9e52c624c5de1840485e3b2ce23367aa17",
+      "size": 7312,
+      "normalized_sha256": "755f545179ef8217a2e958fd03840f9e52c624c5de1840485e3b2ce23367aa17"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/application/ConversationApplication.java": {
+      "role": "index",
+      "sha256": "4a2be550df937f528df6052285a4f5e861f4079114d8bbfa37519cfc25a736ad",
+      "size": 1144,
+      "normalized_sha256": "4a2be550df937f528df6052285a4f5e861f4079114d8bbfa37519cfc25a736ad"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/application/ConversationApplicationService.java": {
+      "role": "index",
+      "sha256": "a0ef2230a983b507c7737d662eef478fcc2b45f9935e8bbdeb202b602d4c37ba",
+      "size": 34515,
+      "normalized_sha256": "a0ef2230a983b507c7737d662eef478fcc2b45f9935e8bbdeb202b602d4c37ba"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/ContextWindow.java": {
+      "role": "index",
+      "sha256": "0663effe0779acffd37f1343d52cecddd3c79eb54bad5245519ab9404e43bfd9",
+      "size": 1495,
+      "normalized_sha256": "0663effe0779acffd37f1343d52cecddd3c79eb54bad5245519ab9404e43bfd9"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/ConversationEvent.java": {
+      "role": "index",
+      "sha256": "0b4560ce626465a34c4ea2173c28a6aed1af4dae7f59f7f4b5f10815d40614f1",
+      "size": 1646,
+      "normalized_sha256": "0b4560ce626465a34c4ea2173c28a6aed1af4dae7f59f7f4b5f10815d40614f1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/ConversationEventType.java": {
+      "role": "index",
+      "sha256": "b16cf66e968c01081d208db8bdd4547480ace5ed71ac52a85d5a5c9da7a03320",
+      "size": 292,
+      "normalized_sha256": "b16cf66e968c01081d208db8bdd4547480ace5ed71ac52a85d5a5c9da7a03320"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/ConversationStatus.java": {
+      "role": "index",
+      "sha256": "b8aae6fa525d4f2322c55326089bc93a24fa7de25aa770d36938559c648b22d7",
+      "size": 184,
+      "normalized_sha256": "b8aae6fa525d4f2322c55326089bc93a24fa7de25aa770d36938559c648b22d7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/LoopDetectionResult.java": {
+      "role": "index",
+      "sha256": "f7ba7874d64e61a084684770e72feed1850aee4f2db905bded61c8e9b3722281",
+      "size": 3122,
+      "normalized_sha256": "f7ba7874d64e61a084684770e72feed1850aee4f2db905bded61c8e9b3722281"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/MessageProtocolType.java": {
+      "role": "index",
+      "sha256": "d7528d7f21d40f1d43eae709376b903e334fd176aee667d0c27ffe4c2a4e40bf",
+      "size": 561,
+      "normalized_sha256": "d7528d7f21d40f1d43eae709376b903e334fd176aee667d0c27ffe4c2a4e40bf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/model/MessageType.java": {
+      "role": "index",
+      "sha256": "925e569951bbbb40162aadf3053d893fcb1629b80d3695f888a1c30fd32d90ef",
+      "size": 471,
+      "normalized_sha256": "925e569951bbbb40162aadf3053d893fcb1629b80d3695f888a1c30fd32d90ef"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/service/ConversationSequenceManager.java": {
+      "role": "index",
+      "sha256": "fbc7986bc02cc4c83c052ca241c015153bfdc3bf29724452a9bcf8c6210162a8",
+      "size": 4369,
+      "normalized_sha256": "fbc7986bc02cc4c83c052ca241c015153bfdc3bf29724452a9bcf8c6210162a8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/service/LoopDetector.java": {
+      "role": "index",
+      "sha256": "e15af90d35a04533fdd7aba1b55f2871f2cc61cba207256c64869838bf834907",
+      "size": 8039,
+      "normalized_sha256": "e15af90d35a04533fdd7aba1b55f2871f2cc61cba207256c64869838bf834907"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/service/MessageVisibilityFilter.java": {
+      "role": "index",
+      "sha256": "de54582846e75588e9c3c79d1626ec0f66d3837885492e16a3fb7663676f97af",
+      "size": 2207,
+      "normalized_sha256": "de54582846e75588e9c3c79d1626ec0f66d3837885492e16a3fb7663676f97af"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/service/RollingSummaryService.java": {
+      "role": "index",
+      "sha256": "8961a1a24adbb5d994e57e3834f12d87a29dadfbbb45e4e16f3842f34b009875",
+      "size": 2085,
+      "normalized_sha256": "8961a1a24adbb5d994e57e3834f12d87a29dadfbbb45e4e16f3842f34b009875"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/service/SlidingWindowContextTrimmer.java": {
+      "role": "index",
+      "sha256": "8bd40a0a2d1abb0d75d232feb0b839edc33cb0c95d142e4a855fe3c9e9166bb2",
+      "size": 1882,
+      "normalized_sha256": "8bd40a0a2d1abb0d75d232feb0b839edc33cb0c95d142e4a855fe3c9e9166bb2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/service/TokenBudgetContextManager.java": {
+      "role": "index",
+      "sha256": "92c1cb36770abf14c85c17a2b2ac8d49098a5610046794b934eebd65bba0fb9a",
+      "size": 2836,
+      "normalized_sha256": "92c1cb36770abf14c85c17a2b2ac8d49098a5610046794b934eebd65bba0fb9a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/domain/sse/ConversationEventBroadcaster.java": {
+      "role": "index",
+      "sha256": "2aa2153a9d256e7346995028e6ce53f7bf8bcf3930fcb90b5924faec56a59057",
+      "size": 7807,
+      "normalized_sha256": "2aa2153a9d256e7346995028e6ce53f7bf8bcf3930fcb90b5924faec56a59057"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/dto/ContextWindowView.java": {
+      "role": "index",
+      "sha256": "b751425513d0a6e7d538f224be07d52a038978a4ca95357de55a4aeecc3dd1b0",
+      "size": 1743,
+      "normalized_sha256": "b751425513d0a6e7d538f224be07d52a038978a4ca95357de55a4aeecc3dd1b0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/dto/ConversationSummaryView.java": {
+      "role": "index",
+      "sha256": "6a793ed816b674f6bf1f7d1ba6dfc94ba36505a013ad55e1424b3fdbc3ab5849",
+      "size": 1085,
+      "normalized_sha256": "6a793ed816b674f6bf1f7d1ba6dfc94ba36505a013ad55e1424b3fdbc3ab5849"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/dto/ConversationView.java": {
+      "role": "index",
+      "sha256": "3ec2c5f487c5eb516688555cadbc41079a536e936615922d754edff531a34f61",
+      "size": 4185,
+      "normalized_sha256": "3ec2c5f487c5eb516688555cadbc41079a536e936615922d754edff531a34f61"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/dto/CreateConversationCommand.java": {
+      "role": "index",
+      "sha256": "483f92f7fb98508202c2c85e64652939828ec83d862d8a7bb61d797c7e7e8e93",
+      "size": 1534,
+      "normalized_sha256": "483f92f7fb98508202c2c85e64652939828ec83d862d8a7bb61d797c7e7e8e93"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/dto/MessageView.java": {
+      "role": "index",
+      "sha256": "05d8a698460199399e5c940777b21a442d3a6aba76f9f54b68937a81a45da53d",
+      "size": 4899,
+      "normalized_sha256": "05d8a698460199399e5c940777b21a442d3a6aba76f9f54b68937a81a45da53d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/dto/SendMessageCommand.java": {
+      "role": "index",
+      "sha256": "ddd0bc280982fa96f6a3f14e01f52a877c6014336bcbe38dd39d66dfa07e93c1",
+      "size": 2484,
+      "normalized_sha256": "ddd0bc280982fa96f6a3f14e01f52a877c6014336bcbe38dd39d66dfa07e93c1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/infrastructure/entity/ConversationParticipantEntity.java": {
+      "role": "index",
+      "sha256": "68324ad330b221fecd822e56a7d910bc636cd643c4124c798eb407212e0ef687",
+      "size": 1372,
+      "normalized_sha256": "68324ad330b221fecd822e56a7d910bc636cd643c4124c798eb407212e0ef687"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/conversation/infrastructure/repository/ConversationParticipantRepository.java": {
+      "role": "index",
+      "sha256": "2351f5a76448725ab998ff11c12c61e61aa22d5e33b3824ae3c3008cef5967a4",
+      "size": 554,
+      "normalized_sha256": "2351f5a76448725ab998ff11c12c61e61aa22d5e33b3824ae3c3008cef5967a4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/agent/model/AgentCapability.java": {
+      "role": "index",
+      "sha256": "f39e3c2195344e5ec8c44dbbdcb6a2fddbf062507f5c47f69d28db67ea8761b0",
+      "size": 179,
+      "normalized_sha256": "f39e3c2195344e5ec8c44dbbdcb6a2fddbf062507f5c47f69d28db67ea8761b0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/agent/model/AgentExecutionRequest.java": {
+      "role": "index",
+      "sha256": "28511d4f503106b5aff29cae1bf547db686570eac79d6ff2e122e28a65d686a1",
+      "size": 2580,
+      "normalized_sha256": "28511d4f503106b5aff29cae1bf547db686570eac79d6ff2e122e28a65d686a1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/agent/model/AgentExecutionResult.java": {
+      "role": "index",
+      "sha256": "f8a462d8d679f2039ab407bd9fdb1e37eea517a7dd8d27aa23ce832bcc9bf719",
+      "size": 3637,
+      "normalized_sha256": "f8a462d8d679f2039ab407bd9fdb1e37eea517a7dd8d27aa23ce832bcc9bf719"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/agent/model/AgentPlatformType.java": {
+      "role": "index",
+      "sha256": "c9a378368a6cc931c1a0f576fe81f6bce3469fc27b57a70eb71aae39a7174a2b",
+      "size": 1338,
+      "normalized_sha256": "c9a378368a6cc931c1a0f576fe81f6bce3469fc27b57a70eb71aae39a7174a2b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/agent/service/AgentAdapterFactory.java": {
+      "role": "index",
+      "sha256": "8e9df0c2b14f571b550c33e2dad8efae94d44997c01b505192340f457f7bc0ed",
+      "size": 1319,
+      "normalized_sha256": "8e9df0c2b14f571b550c33e2dad8efae94d44997c01b505192340f457f7bc0ed"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/agent/spi/UnifiedAgentAdapter.java": {
+      "role": "index",
+      "sha256": "e4155b8c99b3fef233434c55214255502c9182131a58f900330ae45dd1ff307e",
+      "size": 988,
+      "normalized_sha256": "e4155b8c99b3fef233434c55214255502c9182131a58f900330ae45dd1ff307e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/conversation/model/ConversationType.java": {
+      "role": "index",
+      "sha256": "a1aa939619b258b5b43e3094dc2d672a3a9558c5463d292978e20905bd7b4370",
+      "size": 123,
+      "normalized_sha256": "a1aa939619b258b5b43e3094dc2d672a3a9558c5463d292978e20905bd7b4370"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/conversation/model/InteractiveCard.java": {
+      "role": "index",
+      "sha256": "72d5ec9c44f2d57e1fe032a1e12c2181376c16102c85d6a9c3cea80342e35f56",
+      "size": 2736,
+      "normalized_sha256": "72d5ec9c44f2d57e1fe032a1e12c2181376c16102c85d6a9c3cea80342e35f56"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/conversation/model/SenderType.java": {
+      "role": "index",
+      "sha256": "6a93feec4390c4b3c62f60f014cee91222ac5e1dc51582e890f98f8c5d4d6dfb",
+      "size": 126,
+      "normalized_sha256": "6a93feec4390c4b3c62f60f014cee91222ac5e1dc51582e890f98f8c5d4d6dfb"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/conversation/service/MentionParser.java": {
+      "role": "index",
+      "sha256": "ec53e15b76e1e5e7c2f646c6d4c2429f781683b4156851e6cf4960b838bf4a8e",
+      "size": 1222,
+      "normalized_sha256": "ec53e15b76e1e5e7c2f646c6d4c2429f781683b4156851e6cf4960b838bf4a8e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/conversation/service/OrchestratorTaskDecomposer.java": {
+      "role": "index",
+      "sha256": "7b697af1740bdf90f11e069f623987a0f8300623c83440b31d1f030e7d070e61",
+      "size": 1727,
+      "normalized_sha256": "7b697af1740bdf90f11e069f623987a0f8300623c83440b31d1f030e7d070e61"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/sandbox/model/DeploymentManifest.java": {
+      "role": "index",
+      "sha256": "f6f5a79e44ad8248ada7a0136c3dc2239adcdc16e96348f0ec7ce8fac7de36cf",
+      "size": 1734,
+      "normalized_sha256": "f6f5a79e44ad8248ada7a0136c3dc2239adcdc16e96348f0ec7ce8fac7de36cf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/sandbox/service/PreviewSandboxService.java": {
+      "role": "index",
+      "sha256": "bc5be561fe5d72c5d7a444a1d51ee7107dbce53278ff268ed4ae054597f112a1",
+      "size": 7472,
+      "normalized_sha256": "bc5be561fe5d72c5d7a444a1d51ee7107dbce53278ff268ed4ae054597f112a1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workflow/model/WorkflowModels.java": {
+      "role": "index",
+      "sha256": "0aa1fa9ed270411c82819d47796b4cf27f5d989b514bb5d8bd162575242626ca",
+      "size": 4761,
+      "normalized_sha256": "0aa1fa9ed270411c82819d47796b4cf27f5d989b514bb5d8bd162575242626ca"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workflow/service/WorkflowEngineService.java": {
+      "role": "index",
+      "sha256": "899f54d6dfb9063ad553332ffadaf2487feabf503c9633527695dbc7b60fbd75",
+      "size": 6126,
+      "normalized_sha256": "899f54d6dfb9063ad553332ffadaf2487feabf503c9633527695dbc7b60fbd75"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/model/FileDiffEntry.java": {
+      "role": "index",
+      "sha256": "d2f4fc02eff480ccfd9fefab8e26dbad21d84819cd042c129c00a2f8b00bf6a6",
+      "size": 3556,
+      "normalized_sha256": "d2f4fc02eff480ccfd9fefab8e26dbad21d84819cd042c129c00a2f8b00bf6a6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/model/StructuredDiff.java": {
+      "role": "index",
+      "sha256": "91ed772edd2831ef3d8bace3917e1fea12c545a16edc82e576d3a2edfdab4c6c",
+      "size": 2305,
+      "normalized_sha256": "91ed772edd2831ef3d8bace3917e1fea12c545a16edc82e576d3a2edfdab4c6c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/DefaultWorkspaceResolver.java": {
+      "role": "index",
+      "sha256": "8101e1b8d89b053319e0c71d0e9fa280aa64893e4b1f284172d6f8cc64713a45",
+      "size": 13143,
+      "normalized_sha256": "8101e1b8d89b053319e0c71d0e9fa280aa64893e4b1f284172d6f8cc64713a45"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/JGitWorkspaceManager.java": {
+      "role": "index",
+      "sha256": "b2ccb109021408908c5b4ede6dd049289af647e7014959fcfb6029d2be48914d",
+      "size": 43613,
+      "normalized_sha256": "b2ccb109021408908c5b4ede6dd049289af647e7014959fcfb6029d2be48914d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/WorkspaceResolver.java": {
+      "role": "index",
+      "sha256": "6fd7f096fa156340e456889e780fb4525315582bb73cf19e479d80c7f0b18ac2",
+      "size": 1113,
+      "normalized_sha256": "6fd7f096fa156340e456889e780fb4525315582bb73cf19e479d80c7f0b18ac2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/api/ExecutionController.java": {
+      "role": "index",
+      "sha256": "684defd4934443419906e7af92e856bc227d404e32bc307fa3f550bb3f182e6f",
+      "size": 13921,
+      "normalized_sha256": "684defd4934443419906e7af92e856bc227d404e32bc307fa3f550bb3f182e6f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/api/RunAliasController.java": {
+      "role": "index",
+      "sha256": "51b43977548f807267fad284f11d833430771f24a3812db6e7ea75bd48b52dbe",
+      "size": 4391,
+      "normalized_sha256": "51b43977548f807267fad284f11d833430771f24a3812db6e7ea75bd48b52dbe"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/ExecutionApplication.java": {
+      "role": "index",
+      "sha256": "ceaa3e5c434ab25d9ab731de128ccab1dcf4d5ebbe92c20ce4a98a2fe9120e1a",
+      "size": 1635,
+      "normalized_sha256": "ceaa3e5c434ab25d9ab731de128ccab1dcf4d5ebbe92c20ce4a98a2fe9120e1a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/ExecutionApplicationService.java": {
+      "role": "index",
+      "sha256": "e46b45026daf74ce230c18d8736d88504168188f335845a1bc1029cf627a4465",
+      "size": 7200,
+      "normalized_sha256": "e46b45026daf74ce230c18d8736d88504168188f335845a1bc1029cf627a4465"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/RunCommandModule.java": {
+      "role": "index",
+      "sha256": "de4e6487e5e4dcf0912d460b3e07da69866c203b86317ac1a12fee9f8d29e404",
+      "size": 18629,
+      "normalized_sha256": "de4e6487e5e4dcf0912d460b3e07da69866c203b86317ac1a12fee9f8d29e404"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/RunEventStreamModule.java": {
+      "role": "index",
+      "sha256": "1a331aea9893849922ee7e6c82cd4ac57670146ab117ba0c7505a48e8e9ed1e6",
+      "size": 4084,
+      "normalized_sha256": "1a331aea9893849922ee7e6c82cd4ac57670146ab117ba0c7505a48e8e9ed1e6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/RunEvidenceModule.java": {
+      "role": "index",
+      "sha256": "ac7d7d06283499e3030748f2a297029f9e3faeecfe2824174dc207acdef48c32",
+      "size": 32457,
+      "normalized_sha256": "ac7d7d06283499e3030748f2a297029f9e3faeecfe2824174dc207acdef48c32"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/RunQueryModule.java": {
+      "role": "index",
+      "sha256": "5220b653b1b1b5895379ee060cc2b5e37290cdf4a5812a9a0ea4c88028e1ec9c",
+      "size": 18557,
+      "normalized_sha256": "5220b653b1b1b5895379ee060cc2b5e37290cdf4a5812a9a0ea4c88028e1ec9c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/memory/ContextMemoryCompressor.java": {
+      "role": "index",
+      "sha256": "1a787b17ab4d1a09a25d31b6e7e96ba5ec656fc9da2a16a58d31119359ecab3a",
+      "size": 10115,
+      "normalized_sha256": "1a787b17ab4d1a09a25d31b6e7e96ba5ec656fc9da2a16a58d31119359ecab3a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/memory/HierarchicalContextMemory.java": {
+      "role": "index",
+      "sha256": "e8619912c522ac6f94a79c5a075523da77790f69a020bc67d51a389962e592af",
+      "size": 7755,
+      "normalized_sha256": "e8619912c522ac6f94a79c5a075523da77790f69a020bc67d51a389962e592af"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/model/CancelToken.java": {
+      "role": "index",
+      "sha256": "2fe420e5dce6b143ae9abbd84c36270f9958d259d093b84300f3654d2fba5af8",
+      "size": 5279,
+      "normalized_sha256": "2fe420e5dce6b143ae9abbd84c36270f9958d259d093b84300f3654d2fba5af8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/model/CancelTokenRegistry.java": {
+      "role": "index",
+      "sha256": "a4c655c38cef2e4373dc3f18b98faf0666cd4fe4258ef30a54f3e4c2fe4f30be",
+      "size": 1578,
+      "normalized_sha256": "a4c655c38cef2e4373dc3f18b98faf0666cd4fe4258ef30a54f3e4c2fe4f30be"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/model/RunCancelledException.java": {
+      "role": "index",
+      "sha256": "0d63273bc3c4e76ff74f3361ce2d508cabfb64fb88d189fcf5c3fc7621c1bae2",
+      "size": 399,
+      "normalized_sha256": "0d63273bc3c4e76ff74f3361ce2d508cabfb64fb88d189fcf5c3fc7621c1bae2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/model/StepRunStatus.java": {
+      "role": "index",
+      "sha256": "f7e4ae8148fd707f440e51f098d2e9d5f9664d1473f08015e81a3da53c391ce8",
+      "size": 2184,
+      "normalized_sha256": "f7e4ae8148fd707f440e51f098d2e9d5f9664d1473f08015e81a3da53c391ce8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/model/WorkflowRunStatus.java": {
+      "role": "index",
+      "sha256": "24a8bdd0b96b12370cf1f549552346d4fbf71e60deef7be443e897c81a410e14",
+      "size": 2247,
+      "normalized_sha256": "24a8bdd0b96b12370cf1f549552346d4fbf71e60deef7be443e897c81a410e14"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/retry/ExecutionErrorClassifier.java": {
+      "role": "index",
+      "sha256": "8cc673f1562af568ac21df82a6110225a99feeef035c50b25556fe337a06d983",
+      "size": 2818,
+      "normalized_sha256": "8cc673f1562af568ac21df82a6110225a99feeef035c50b25556fe337a06d983"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/retry/RetryCategory.java": {
+      "role": "index",
+      "sha256": "16b76d72c47785c084732b1dac811a4367303304dabbacc554bdb0fd4dbdfb3e",
+      "size": 158,
+      "normalized_sha256": "16b76d72c47785c084732b1dac811a4367303304dabbacc554bdb0fd4dbdfb3e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/domain/state/UnifiedExecutionStateGraph.java": {
+      "role": "index",
+      "sha256": "69f881fb9e17d5ad00d8e6cb9699e0de5fb1bccca297ac18fac761f4c4008ab6",
+      "size": 12268,
+      "normalized_sha256": "69f881fb9e17d5ad00d8e6cb9699e0de5fb1bccca297ac18fac761f4c4008ab6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/HierarchicalMemorySummary.java": {
+      "role": "index",
+      "sha256": "2d294980e69f3bbf44c905b056937d65237a2b38c289c93b84e4374b996ed446",
+      "size": 2581,
+      "normalized_sha256": "2d294980e69f3bbf44c905b056937d65237a2b38c289c93b84e4374b996ed446"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/LeaseStatusView.java": {
+      "role": "index",
+      "sha256": "941896b8b64266ac8994a8463034bb3c9d58694493a6e2454e064f3dcf76de9f",
+      "size": 1134,
+      "normalized_sha256": "941896b8b64266ac8994a8463034bb3c9d58694493a6e2454e064f3dcf76de9f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/PendingDecisionItem.java": {
+      "role": "index",
+      "sha256": "5fd26667537bf48a305510045ab8e368708b35051d2400a5a680f4ffd399b101",
+      "size": 1917,
+      "normalized_sha256": "5fd26667537bf48a305510045ab8e368708b35051d2400a5a680f4ffd399b101"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/RunEventView.java": {
+      "role": "index",
+      "sha256": "7ac1fef25b8190aa8adbb7235623334afb44304162b800185650ced8d5c04d64",
+      "size": 1939,
+      "normalized_sha256": "7ac1fef25b8190aa8adbb7235623334afb44304162b800185650ced8d5c04d64"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/RunEvidenceBundleView.java": {
+      "role": "index",
+      "sha256": "0ebd640e4c3ed78dc3414e9126dde7d19a4bf4d3d01844ed9503abf481f18893",
+      "size": 14113,
+      "normalized_sha256": "0ebd640e4c3ed78dc3414e9126dde7d19a4bf4d3d01844ed9503abf481f18893"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/RunOperationsView.java": {
+      "role": "index",
+      "sha256": "c4c886e8d03dfffd03473bcca5a4304b1421cd535628a150edafcdc64da46636",
+      "size": 4509,
+      "normalized_sha256": "c4c886e8d03dfffd03473bcca5a4304b1421cd535628a150edafcdc64da46636"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/StartRunCommand.java": {
+      "role": "index",
+      "sha256": "5d1e54bb7900e36890e1d49a601900e24c0d7e4fb75e52def98e144070cdddcf",
+      "size": 1913,
+      "normalized_sha256": "5d1e54bb7900e36890e1d49a601900e24c0d7e4fb75e52def98e144070cdddcf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/StepRunView.java": {
+      "role": "index",
+      "sha256": "31242bd49490da45e004cac7b875e4236688782d2145eb59be8631c6e3ce095c",
+      "size": 3552,
+      "normalized_sha256": "31242bd49490da45e004cac7b875e4236688782d2145eb59be8631c6e3ce095c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/ToolSideEffectView.java": {
+      "role": "index",
+      "sha256": "9ba26814d91517fdb1c02678058384dc26b0ee29185dae94b173287fbe70c605",
+      "size": 1325,
+      "normalized_sha256": "9ba26814d91517fdb1c02678058384dc26b0ee29185dae94b173287fbe70c605"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/dto/WorkflowRunView.java": {
+      "role": "index",
+      "sha256": "fa360be967fe838c105d281a8c5aa7c110572dc480223aaa81bcb32ebf2e86f3",
+      "size": 3364,
+      "normalized_sha256": "fa360be967fe838c105d281a8c5aa7c110572dc480223aaa81bcb32ebf2e86f3"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/infrastructure/entity/RunEventEntity.java": {
+      "role": "index",
+      "sha256": "68e927e7052f722a611826f96a51caeeccc12e747588f2af4ab322fdccbe32fa",
+      "size": 1781,
+      "normalized_sha256": "68e927e7052f722a611826f96a51caeeccc12e747588f2af4ab322fdccbe32fa"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/infrastructure/entity/StepRunEntity.java": {
+      "role": "index",
+      "sha256": "6c506f84f31d6783a2b507ae577fac7edcfe5270e110b94d01c26d948625ad6d",
+      "size": 4932,
+      "normalized_sha256": "6c506f84f31d6783a2b507ae577fac7edcfe5270e110b94d01c26d948625ad6d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/infrastructure/entity/WorkflowRunEntity.java": {
+      "role": "index",
+      "sha256": "97e8b8795fc56a1c863b458892fba4a807d90adb6645bf76e2f179359b72e25e",
+      "size": 4747,
+      "normalized_sha256": "97e8b8795fc56a1c863b458892fba4a807d90adb6645bf76e2f179359b72e25e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/infrastructure/repository/RunEventRepository.java": {
+      "role": "index",
+      "sha256": "460fe961c31623f37081ea48e33b4edacb3b5a9f399fe3846c62dd62d5d09324",
+      "size": 1106,
+      "normalized_sha256": "460fe961c31623f37081ea48e33b4edacb3b5a9f399fe3846c62dd62d5d09324"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/infrastructure/repository/StepRunRepository.java": {
+      "role": "index",
+      "sha256": "419111e54517e3e7882b0a417587a3f99ff62a500ec26ef93bcf497e8ddd3835",
+      "size": 2126,
+      "normalized_sha256": "419111e54517e3e7882b0a417587a3f99ff62a500ec26ef93bcf497e8ddd3835"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/infrastructure/repository/WorkflowRunRepository.java": {
+      "role": "index",
+      "sha256": "522ab642a552d6dc8db87064840ef07d209c6979e088c6258643882a3e846a78",
+      "size": 2264,
+      "normalized_sha256": "522ab642a552d6dc8db87064840ef07d209c6979e088c6258643882a3e846a78"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/scheduler/ExecutionScheduler.java": {
+      "role": "index",
+      "sha256": "2a7063ca319be9ec016989b01bfdd0685d29250962ab8e9ebda8f0cd63e27e80",
+      "size": 15942,
+      "normalized_sha256": "2a7063ca319be9ec016989b01bfdd0685d29250962ab8e9ebda8f0cd63e27e80"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/scheduler/PersistentExecutionRecoveryRunner.java": {
+      "role": "index",
+      "sha256": "7182785319ca816ce5a24cd4d9addd816f6ad731a90f4262041290974d3c9808",
+      "size": 7550,
+      "normalized_sha256": "7182785319ca816ce5a24cd4d9addd816f6ad731a90f4262041290974d3c9808"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/service/ExecutionStateMachine.java": {
+      "role": "index",
+      "sha256": "60c037e3914f54b82292f94579289ce1f3985ba3748f1bcba59e41c6635bcfea",
+      "size": 11781,
+      "normalized_sha256": "60c037e3914f54b82292f94579289ce1f3985ba3748f1bcba59e41c6635bcfea"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/service/RunEventBroadcaster.java": {
+      "role": "index",
+      "sha256": "0d971338bd36225adc8a5755aa684d55999fe9c2e29b2edb563d00ede7ada6a5",
+      "size": 8957,
+      "normalized_sha256": "0d971338bd36225adc8a5755aa684d55999fe9c2e29b2edb563d00ede7ada6a5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/api/AuthController.java": {
+      "role": "index",
+      "sha256": "d5151c29bbf2342f37f64a53873db16230410ede8ca1f93fe9f646168dbc45cd",
+      "size": 3323,
+      "normalized_sha256": "d5151c29bbf2342f37f64a53873db16230410ede8ca1f93fe9f646168dbc45cd"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/application/AuthApplication.java": {
+      "role": "index",
+      "sha256": "59729a181b57b82356d9979c8783304217d6b42f25007902eb16acdcd32df340",
+      "size": 574,
+      "normalized_sha256": "59729a181b57b82356d9979c8783304217d6b42f25007902eb16acdcd32df340"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/application/AuthApplicationService.java": {
+      "role": "index",
+      "sha256": "30167e379765fb731b9259bdf44f922c9f1e28a346c78b80da9ed846232830bf",
+      "size": 7852,
+      "normalized_sha256": "30167e379765fb731b9259bdf44f922c9f1e28a346c78b80da9ed846232830bf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/dto/AuthAuditLogView.java": {
+      "role": "index",
+      "sha256": "a8e3f6fd08012063a8722bd859e7a1a3e241b6bf4761555afe231812aeb9e6c8",
+      "size": 1646,
+      "normalized_sha256": "a8e3f6fd08012063a8722bd859e7a1a3e241b6bf4761555afe231812aeb9e6c8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/dto/AuthTokenView.java": {
+      "role": "index",
+      "sha256": "ba448d9a3b92192939e8c72cb1567290f473551dd0492969b012aa1fe3ba7b11",
+      "size": 915,
+      "normalized_sha256": "ba448d9a3b92192939e8c72cb1567290f473551dd0492969b012aa1fe3ba7b11"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/dto/LoginCommand.java": {
+      "role": "index",
+      "sha256": "ef7975686535b5f3050710e908fa4686311fbde8d3f34a8bf146bec0e3e1da7b",
+      "size": 753,
+      "normalized_sha256": "ef7975686535b5f3050710e908fa4686311fbde8d3f34a8bf146bec0e3e1da7b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/dto/RegisterCommand.java": {
+      "role": "index",
+      "sha256": "ba7c2e8ecc62501bf29e1380b34f80f93c839d47832c9e4652c9c2c05e7965f4",
+      "size": 1000,
+      "normalized_sha256": "ba7c2e8ecc62501bf29e1380b34f80f93c839d47832c9e4652c9c2c05e7965f4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/dto/UserView.java": {
+      "role": "index",
+      "sha256": "621d2087846172d53604676d339f3c3c3c1d73c7582bfc1444235a8230704be8",
+      "size": 1149,
+      "normalized_sha256": "621d2087846172d53604676d339f3c3c3c1d73c7582bfc1444235a8230704be8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/entity/AuthAuditLogEntity.java": {
+      "role": "index",
+      "sha256": "b6b7c23872f749fd153f2d07c2016b75a01b38f061675490d1a1bdebc35ab68a",
+      "size": 1951,
+      "normalized_sha256": "b6b7c23872f749fd153f2d07c2016b75a01b38f061675490d1a1bdebc35ab68a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/entity/InvalidatedTokenEntity.java": {
+      "role": "index",
+      "sha256": "8b3ce91466f7e1db92803bb9ab17824bccbb360a9ef6b1ecdc3b4ec116d58c22",
+      "size": 1353,
+      "normalized_sha256": "8b3ce91466f7e1db92803bb9ab17824bccbb360a9ef6b1ecdc3b4ec116d58c22"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/entity/UserEntity.java": {
+      "role": "index",
+      "sha256": "eba8568d77edabb9d859035c05adb48146d71388354c2c6e4a6a1d59b05f5790",
+      "size": 2093,
+      "normalized_sha256": "eba8568d77edabb9d859035c05adb48146d71388354c2c6e4a6a1d59b05f5790"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/repository/AuthAuditLogRepository.java": {
+      "role": "index",
+      "sha256": "15b29e7ed820aaf5d7e2c6526948614839121e4a0362785e33c57deaad2688da",
+      "size": 708,
+      "normalized_sha256": "15b29e7ed820aaf5d7e2c6526948614839121e4a0362785e33c57deaad2688da"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/repository/InvalidatedTokenRepository.java": {
+      "role": "index",
+      "sha256": "5c4b491c1c355a26f58fea33b80f1951623623ab24ee53621f21977f4a411663",
+      "size": 814,
+      "normalized_sha256": "5c4b491c1c355a26f58fea33b80f1951623623ab24ee53621f21977f4a411663"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/repository/UserRepository.java": {
+      "role": "index",
+      "sha256": "6b388405517ac48d0f450eaca7f4f243805d4e9d3921745384aaffa03624192d",
+      "size": 445,
+      "normalized_sha256": "6b388405517ac48d0f450eaca7f4f243805d4e9d3921745384aaffa03624192d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/ActuatorSecurityFilter.java": {
+      "role": "index",
+      "sha256": "6e4b5ed5793a17dbe7468e58c1dc5f9f5da027f9a4faee11f80920cd9ccb2e8f",
+      "size": 7797,
+      "normalized_sha256": "6e4b5ed5793a17dbe7468e58c1dc5f9f5da027f9a4faee11f80920cd9ccb2e8f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/AuthAuditService.java": {
+      "role": "index",
+      "sha256": "4753176ab5542e4811c3c9aa581081829cf8e6761fef81f35154c2a83866b69e",
+      "size": 3383,
+      "normalized_sha256": "4753176ab5542e4811c3c9aa581081829cf8e6761fef81f35154c2a83866b69e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/AuthFilter.java": {
+      "role": "index",
+      "sha256": "e54814c98db1876a7f5ecc7dbdf3f0c3accc36ac0c1ef44357bfd6c0d48c0f46",
+      "size": 4338,
+      "normalized_sha256": "e54814c98db1876a7f5ecc7dbdf3f0c3accc36ac0c1ef44357bfd6c0d48c0f46"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/AuthRateLimiter.java": {
+      "role": "index",
+      "sha256": "5723e3d4c9cbbc6956dc12ca20cd50c28fbf6d01d59fb4859e409a150efc93f8",
+      "size": 1561,
+      "normalized_sha256": "5723e3d4c9cbbc6956dc12ca20cd50c28fbf6d01d59fb4859e409a150efc93f8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/ResourceAccessGuard.java": {
+      "role": "index",
+      "sha256": "62d7d16534202a6d60e581744a1f537b1e67507678df966e33d9c694804426d0",
+      "size": 3271,
+      "normalized_sha256": "62d7d16534202a6d60e581744a1f537b1e67507678df966e33d9c694804426d0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/ResourceOwnershipVerifier.java": {
+      "role": "index",
+      "sha256": "57d4881c215c90a6677ffcddfc9f89ae046b463f9d31bb6a240fd3f3bf17af7c",
+      "size": 17350,
+      "normalized_sha256": "57d4881c215c90a6677ffcddfc9f89ae046b463f9d31bb6a240fd3f3bf17af7c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/SecurityConfig.java": {
+      "role": "index",
+      "sha256": "3e8d7075c772bc61f2d796ef66a66c66b6f9865227e66a63e46853ed05feb74e",
+      "size": 467,
+      "normalized_sha256": "3e8d7075c772bc61f2d796ef66a66c66b6f9865227e66a63e46853ed05feb74e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/TokenProvider.java": {
+      "role": "index",
+      "sha256": "069f2e9d3ec1f8def98fafb8ae95342063bdfafe61356cb802344bfcb1f03a20",
+      "size": 13055,
+      "normalized_sha256": "069f2e9d3ec1f8def98fafb8ae95342063bdfafe61356cb802344bfcb1f03a20"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/adapter/CliProcessAdapter.java": {
+      "role": "index",
+      "sha256": "feb0067d8c5c37b2d1c0fbad792bd43ee5b3f5f5d56ed0d995985686617cb8ed",
+      "size": 7415,
+      "normalized_sha256": "feb0067d8c5c37b2d1c0fbad792bd43ee5b3f5f5d56ed0d995985686617cb8ed"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/adapter/CodexCliAdapter.java": {
+      "role": "index",
+      "sha256": "5f7aba32fa6e00d72f67d3cf0dc9555e9eb38de01172ab466df21cf9919486f9",
+      "size": 500,
+      "normalized_sha256": "5f7aba32fa6e00d72f67d3cf0dc9555e9eb38de01172ab466df21cf9919486f9"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/adapter/OpenClawCliAdapter.java": {
+      "role": "index",
+      "sha256": "421da7354f104f8b65130de5ca0564436cf08b179be0f8438f0363fd3b1d594d",
+      "size": 512,
+      "normalized_sha256": "421da7354f104f8b65130de5ca0564436cf08b179be0f8438f0363fd3b1d594d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/adapter/SpringAiApiAdapter.java": {
+      "role": "index",
+      "sha256": "1ba4aca5a52e42cd775e5b5d3e8b1a7dabdf3caa70a079b988b1946d3176cff0",
+      "size": 10318,
+      "normalized_sha256": "1ba4aca5a52e42cd775e5b5d3e8b1a7dabdf3caa70a079b988b1946d3176cff0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/concurrency/WorkspaceLockManager.java": {
+      "role": "index",
+      "sha256": "8ead561b6ef10cea714e4de93e195f539ef3e59e89b9d61207745831f14b146b",
+      "size": 19504,
+      "normalized_sha256": "8ead561b6ef10cea714e4de93e195f539ef3e59e89b9d61207745831f14b146b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/config/CorsConfig.java": {
+      "role": "index",
+      "sha256": "19837723b34bb922686afdddb0cc846dfe88e14a61fd124fb5933d0909732ebd",
+      "size": 673,
+      "normalized_sha256": "19837723b34bb922686afdddb0cc846dfe88e14a61fd124fb5933d0909732ebd"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/metrics/AgentHubMetricsCollector.java": {
+      "role": "index",
+      "sha256": "724428965618fecaf76e15ada9c4fdc874d74f5d763a34ac05acbc64c12029ae",
+      "size": 12156,
+      "normalized_sha256": "724428965618fecaf76e15ada9c4fdc874d74f5d763a34ac05acbc64c12029ae"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/ops/DisasterRecoveryBackupService.java": {
+      "role": "index",
+      "sha256": "2aa7a7e72ad7b2ad16c0beda0877784c3503685f4a4a9df94d39f4e4e8f1ece6",
+      "size": 32280,
+      "normalized_sha256": "2aa7a7e72ad7b2ad16c0beda0877784c3503685f4a4a9df94d39f4e4e8f1ece6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/ops/ProductionEnvironmentValidator.java": {
+      "role": "index",
+      "sha256": "2d65564e8554c4a53aef488eaf1a105785d16011ce4012fe4902df8c0a125a92",
+      "size": 14416,
+      "normalized_sha256": "2d65564e8554c4a53aef488eaf1a105785d16011ce4012fe4902df8c0a125a92"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/ops/PrometheusAlertEvaluator.java": {
+      "role": "index",
+      "sha256": "ff9329bc003de03987e50bf68eb82f8b34bccf4a56c98fa96e1e40733daa0c37",
+      "size": 14619,
+      "normalized_sha256": "ff9329bc003de03987e50bf68eb82f8b34bccf4a56c98fa96e1e40733daa0c37"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/repository/ConversationRepository.java": {
+      "role": "index",
+      "sha256": "e67802b34673ea92e178d20eebdd51d8c31e9ddc9fc94c3bbf9ddbf1d11d7edd",
+      "size": 2201,
+      "normalized_sha256": "e67802b34673ea92e178d20eebdd51d8c31e9ddc9fc94c3bbf9ddbf1d11d7edd"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/repository/MessageRepository.java": {
+      "role": "index",
+      "sha256": "cb817790d06aa6a41727f09b2fafa3f25702eb6956b360ffc71b2e4b3add6cbb",
+      "size": 841,
+      "normalized_sha256": "cb817790d06aa6a41727f09b2fafa3f25702eb6956b360ffc71b2e4b3add6cbb"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/repository/entity/ConversationEntity.java": {
+      "role": "index",
+      "sha256": "0b066fe9b30602af605b7be1bf25477a1667a470208dda35ae4e6b4cf8da19d7",
+      "size": 4717,
+      "normalized_sha256": "0b066fe9b30602af605b7be1bf25477a1667a470208dda35ae4e6b4cf8da19d7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/infrastructure/repository/entity/MessageEntity.java": {
+      "role": "index",
+      "sha256": "d3f20ef70743f91fe849984e09e5a501a23ffadccd0cb62051849ec26ccf29a1",
+      "size": 6392,
+      "normalized_sha256": "d3f20ef70743f91fe849984e09e5a501a23ffadccd0cb62051849ec26ccf29a1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/ops/api/SystemHealthController.java": {
+      "role": "index",
+      "sha256": "f5f81df5e3c656ae978a360d632771ee01bdbf123d2d2c000683923322716509",
+      "size": 4864,
+      "normalized_sha256": "f5f81df5e3c656ae978a360d632771ee01bdbf123d2d2c000683923322716509"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/ops/application/OpsApplication.java": {
+      "role": "index",
+      "sha256": "8b730411234c3d8bd81e7241dd947195f3960722adb0cfc9db71d232665b1964",
+      "size": 1177,
+      "normalized_sha256": "8b730411234c3d8bd81e7241dd947195f3960722adb0cfc9db71d232665b1964"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/ops/application/OpsApplicationService.java": {
+      "role": "index",
+      "sha256": "bb121f0123c7bb9a98ca9054c671995027aa084481a1d89960a03e64b3cb6399",
+      "size": 29404,
+      "normalized_sha256": "bb121f0123c7bb9a98ca9054c671995027aa084481a1d89960a03e64b3cb6399"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/ops/dto/BackupRestoreCommand.java": {
+      "role": "index",
+      "sha256": "13c58ede32c319f8470da664f3b55a03278bd77c8e9e50ba7398041e1c4116e3",
+      "size": 1353,
+      "normalized_sha256": "13c58ede32c319f8470da664f3b55a03278bd77c8e9e50ba7398041e1c4116e3"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/ops/dto/BackupTriggerCommand.java": {
+      "role": "index",
+      "sha256": "9c62c814e90c37f5cd145e3401f44cbad4a915a01a7680dc9d6172c8ceabb839",
+      "size": 1021,
+      "normalized_sha256": "9c62c814e90c37f5cd145e3401f44cbad4a915a01a7680dc9d6172c8ceabb839"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/ops/dto/BackupVerifyCommand.java": {
+      "role": "index",
+      "sha256": "49c3a574a4ec1eb08e6f835892b7b7d9532749c9e9d1fb17e310b3b9cd48f4ab",
+      "size": 1029,
+      "normalized_sha256": "49c3a574a4ec1eb08e6f835892b7b7d9532749c9e9d1fb17e310b3b9cd48f4ab"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/ops/dto/OpsMetricsSummaryView.java": {
+      "role": "index",
+      "sha256": "e31ae5246daa795fd78033a51b7bc4f4cc11e7cbaea7157aa916b9836818efb2",
+      "size": 3905,
+      "normalized_sha256": "e31ae5246daa795fd78033a51b7bc4f4cc11e7cbaea7157aa916b9836818efb2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/api/ApprovalController.java": {
+      "role": "index",
+      "sha256": "c863a1c9315f1d6362fec0734d151d8cfde3e82dcab1c8a4a96c1c9474b1b69f",
+      "size": 3116,
+      "normalized_sha256": "c863a1c9315f1d6362fec0734d151d8cfde3e82dcab1c8a4a96c1c9474b1b69f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/api/WorkflowDefinitionController.java": {
+      "role": "index",
+      "sha256": "3a4e06b2ebec1b1fa0362678ef37faa43052604dcf533ad18f5f329d0072f15d",
+      "size": 5881,
+      "normalized_sha256": "3a4e06b2ebec1b1fa0362678ef37faa43052604dcf533ad18f5f329d0072f15d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/application/ApprovalApplication.java": {
+      "role": "index",
+      "sha256": "668e720d4a96935309e7f55111cbbca8f179853b77f668bed90dc28890c293ff",
+      "size": 526,
+      "normalized_sha256": "668e720d4a96935309e7f55111cbbca8f179853b77f668bed90dc28890c293ff"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/application/ApprovalApplicationService.java": {
+      "role": "index",
+      "sha256": "2481956f65f98704558cb5fdc8023f3cf367661461618fce000e2f61135c0dc1",
+      "size": 9159,
+      "normalized_sha256": "2481956f65f98704558cb5fdc8023f3cf367661461618fce000e2f61135c0dc1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/application/OrchestratorPlanApplication.java": {
+      "role": "index",
+      "sha256": "e769b0c0d012a35d15604d09baeaabf61365c94bfdea66c22a0cd05028e46aa4",
+      "size": 715,
+      "normalized_sha256": "e769b0c0d012a35d15604d09baeaabf61365c94bfdea66c22a0cd05028e46aa4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/application/OrchestratorPlanApplicationService.java": {
+      "role": "index",
+      "sha256": "5b0026578d4903df2e1c1b12bde3c0eac32006e0827a467ae7fe5921e19589b2",
+      "size": 11791,
+      "normalized_sha256": "5b0026578d4903df2e1c1b12bde3c0eac32006e0827a467ae7fe5921e19589b2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/application/WorkflowOrchestrationApplication.java": {
+      "role": "index",
+      "sha256": "26b57b9f8267e93794c85f3cce674377b5739aea37080afb7e08e600814d3838",
+      "size": 981,
+      "normalized_sha256": "26b57b9f8267e93794c85f3cce674377b5739aea37080afb7e08e600814d3838"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/application/WorkflowOrchestrationApplicationService.java": {
+      "role": "index",
+      "sha256": "bcb953f722da26f8f00f62aa3faf9891df0ae78469c71a6ca5697679e1ec41a4",
+      "size": 9072,
+      "normalized_sha256": "bcb953f722da26f8f00f62aa3faf9891df0ae78469c71a6ca5697679e1ec41a4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/approval/ApprovalDecision.java": {
+      "role": "index",
+      "sha256": "39aa02e292e19462e220ab03b987d7bb1511d5798adba0c971ad25d5a7acdd7b",
+      "size": 370,
+      "normalized_sha256": "39aa02e292e19462e220ab03b987d7bb1511d5798adba0c971ad25d5a7acdd7b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/approval/ApprovalDecisionResult.java": {
+      "role": "index",
+      "sha256": "d200b54daabef5e8e677303a798020c9b9d32a879c230efac0961b849c7848da",
+      "size": 572,
+      "normalized_sha256": "d200b54daabef5e8e677303a798020c9b9d32a879c230efac0961b849c7848da"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/approval/ApprovalSignalRegistry.java": {
+      "role": "index",
+      "sha256": "77d7700d48854d2f4a2e632d8906f61a25d4075516151d00fc574124ef00cdde",
+      "size": 1049,
+      "normalized_sha256": "77d7700d48854d2f4a2e632d8906f61a25d4075516151d00fc574124ef00cdde"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/dsl/RetryPolicyDsl.java": {
+      "role": "index",
+      "sha256": "ddac48b5fc9a78894c5b7a60322acc6da058910520d2dbda75cc3aadf5380ed7",
+      "size": 639,
+      "normalized_sha256": "ddac48b5fc9a78894c5b7a60322acc6da058910520d2dbda75cc3aadf5380ed7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/dsl/TopologicalSortResult.java": {
+      "role": "index",
+      "sha256": "fa611ba53dd2bde22d7e3da48011bcb47fa3db76ec3d15d5aae423f9690ef686",
+      "size": 1687,
+      "normalized_sha256": "fa611ba53dd2bde22d7e3da48011bcb47fa3db76ec3d15d5aae423f9690ef686"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/dsl/WorkflowDsl.java": {
+      "role": "index",
+      "sha256": "02847eb76c5fd3175ce457d1b715824caea588d47901486a3a46970aca71fa91",
+      "size": 2240,
+      "normalized_sha256": "02847eb76c5fd3175ce457d1b715824caea588d47901486a3a46970aca71fa91"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/dsl/WorkflowDslValidator.java": {
+      "role": "index",
+      "sha256": "93457b7e39769878b4567dfb5f3bd42dd591737bcdd338a6e5a09f09fb61b306",
+      "size": 7464,
+      "normalized_sha256": "93457b7e39769878b4567dfb5f3bd42dd591737bcdd338a6e5a09f09fb61b306"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/dsl/WorkflowEdgeDsl.java": {
+      "role": "index",
+      "sha256": "e00fc64647092b29c39e57a04698729a07c16df03b51cb029345c537a8cbdd58",
+      "size": 1199,
+      "normalized_sha256": "e00fc64647092b29c39e57a04698729a07c16df03b51cb029345c537a8cbdd58"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/dsl/WorkflowNodeDsl.java": {
+      "role": "index",
+      "sha256": "98b8cb490cc262b176b1f99832a275f0fb512100900c62a128ddb2322667691c",
+      "size": 3912,
+      "normalized_sha256": "98b8cb490cc262b176b1f99832a275f0fb512100900c62a128ddb2322667691c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/evaluation/SafeExpressionEvaluator.java": {
+      "role": "index",
+      "sha256": "64dabb16bdd4012c0219a22a9145b69394785b079a5973aca3f98eff8a6b608d",
+      "size": 12976,
+      "normalized_sha256": "64dabb16bdd4012c0219a22a9145b69394785b079a5973aca3f98eff8a6b608d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/evaluation/WorkflowExecutionContext.java": {
+      "role": "index",
+      "sha256": "213561249dca58595020bdff4710c4aee783f40610dd5483eea1f391d6a63ea4",
+      "size": 6713,
+      "normalized_sha256": "213561249dca58595020bdff4710c4aee783f40610dd5483eea1f391d6a63ea4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/plan/EstimatedBudget.java": {
+      "role": "index",
+      "sha256": "3a36d602b7582056fb7a67246163e3677b39f14187f435456221517003b2340d",
+      "size": 967,
+      "normalized_sha256": "3a36d602b7582056fb7a67246163e3677b39f14187f435456221517003b2340d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/plan/OrchestrationPlan.java": {
+      "role": "index",
+      "sha256": "c086f9a95b1ec4466f1bb91b8f6b6bea068e6d324b778cf5d9c30a3636558703",
+      "size": 4265,
+      "normalized_sha256": "c086f9a95b1ec4466f1bb91b8f6b6bea068e6d324b778cf5d9c30a3636558703"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/plan/OrchestrationPlanStatus.java": {
+      "role": "index",
+      "sha256": "9bdd13963a232eeed5767897ba2dae0a7a6f1009b3b99b1f58a19344c39e9c7e",
+      "size": 162,
+      "normalized_sha256": "9bdd13963a232eeed5767897ba2dae0a7a6f1009b3b99b1f58a19344c39e9c7e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/plan/ToolPermissionRequest.java": {
+      "role": "index",
+      "sha256": "bb55faa9c56209b3faa6ff0d23437510f304c8a84dfd27c5786964bde6abbac0",
+      "size": 1345,
+      "normalized_sha256": "bb55faa9c56209b3faa6ff0d23437510f304c8a84dfd27c5786964bde6abbac0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/template/WorkflowTemplateRegistry.java": {
+      "role": "index",
+      "sha256": "e3d740932b6cb1c04a7ea57f28e14ff260fddfea3675705beac66a963c180056",
+      "size": 11275,
+      "normalized_sha256": "e3d740932b6cb1c04a7ea57f28e14ff260fddfea3675705beac66a963c180056"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/template/WorkflowTemplateType.java": {
+      "role": "index",
+      "sha256": "0e3a7ee4ae05e7897f7ebb0a06c450dca2f59344601e17bf735e528a91f4695d",
+      "size": 738,
+      "normalized_sha256": "0e3a7ee4ae05e7897f7ebb0a06c450dca2f59344601e17bf735e528a91f4695d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/domain/template/WorkflowTemplateView.java": {
+      "role": "index",
+      "sha256": "c5647ed445fddf1c04fefa76364dea015886d294c268033f97af90352eacaae7",
+      "size": 2107,
+      "normalized_sha256": "c5647ed445fddf1c04fefa76364dea015886d294c268033f97af90352eacaae7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/ApprovalDecisionCommand.java": {
+      "role": "index",
+      "sha256": "7bcd651fe21a252bab3dad9b41c4af2c97dd58d3c75054274ae9c1b7c9e30dbe",
+      "size": 1019,
+      "normalized_sha256": "7bcd651fe21a252bab3dad9b41c4af2c97dd58d3c75054274ae9c1b7c9e30dbe"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/ApprovalView.java": {
+      "role": "index",
+      "sha256": "b46b16468c3b8c5c5582a3ef3a940783cd9319f0756b3b120a8e6e4081f67d5e",
+      "size": 2870,
+      "normalized_sha256": "b46b16468c3b8c5c5582a3ef3a940783cd9319f0756b3b120a8e6e4081f67d5e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/ConfirmPlanCommand.java": {
+      "role": "index",
+      "sha256": "6727bbf955717ad123b772af09f038224a6fc9f9f5f6539f6d780da54fd04a3c",
+      "size": 1076,
+      "normalized_sha256": "6727bbf955717ad123b772af09f038224a6fc9f9f5f6539f6d780da54fd04a3c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/CreateWorkflowDefinitionCommand.java": {
+      "role": "index",
+      "sha256": "f9de4514bdb2809d052652f75db455bebd1a0082a92dd52dfa25373a2d836b83",
+      "size": 1626,
+      "normalized_sha256": "f9de4514bdb2809d052652f75db455bebd1a0082a92dd52dfa25373a2d836b83"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/GeneratePlanCommand.java": {
+      "role": "index",
+      "sha256": "3a5b83b3f4b8d122d8d6513b30eb1485cce9dcbfe45feab3e191f0028c0a7725",
+      "size": 1440,
+      "normalized_sha256": "3a5b83b3f4b8d122d8d6513b30eb1485cce9dcbfe45feab3e191f0028c0a7725"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/OrchestrationPlanView.java": {
+      "role": "index",
+      "sha256": "a5749ef31975e28816c356bf32c6ef0601bce4a4182321ffec73a6cf387ca4f6",
+      "size": 6712,
+      "normalized_sha256": "a5749ef31975e28816c356bf32c6ef0601bce4a4182321ffec73a6cf387ca4f6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/ValidateDslResultView.java": {
+      "role": "index",
+      "sha256": "38b3ea704e082894738ae3b7e3f3f182fe10a30f0e6f17c06cfed8cff649a062",
+      "size": 1636,
+      "normalized_sha256": "38b3ea704e082894738ae3b7e3f3f182fe10a30f0e6f17c06cfed8cff649a062"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/dto/WorkflowDefinitionView.java": {
+      "role": "index",
+      "sha256": "dcc6acd82735d2b8c28bb768dfe7e394d4dbfa90bf12ec05a5ad27278d71170d",
+      "size": 2411,
+      "normalized_sha256": "dcc6acd82735d2b8c28bb768dfe7e394d4dbfa90bf12ec05a5ad27278d71170d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/infrastructure/entity/ApprovalEntity.java": {
+      "role": "index",
+      "sha256": "420712680763affaa4c1edeed5a60ff6bb34d974dea895ad3c39fd317233dc72",
+      "size": 3123,
+      "normalized_sha256": "420712680763affaa4c1edeed5a60ff6bb34d974dea895ad3c39fd317233dc72"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/infrastructure/entity/WorkflowDefinitionEntity.java": {
+      "role": "index",
+      "sha256": "be8a3bec8e0c29afe39cae161b6365e660bae8aa97a51309a8a0ae232a383e88",
+      "size": 3067,
+      "normalized_sha256": "be8a3bec8e0c29afe39cae161b6365e660bae8aa97a51309a8a0ae232a383e88"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/infrastructure/repository/ApprovalRepository.java": {
+      "role": "index",
+      "sha256": "d17f8c68cb54f56a1828cf22481751ed52838f5d8031c0964aa6c7e11caef24b",
+      "size": 653,
+      "normalized_sha256": "d17f8c68cb54f56a1828cf22481751ed52838f5d8031c0964aa6c7e11caef24b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/infrastructure/repository/WorkflowDefinitionRepository.java": {
+      "role": "index",
+      "sha256": "20807b1f6bb411f00d8a89500bea83e0a004a876428014b4819ac9b1510c1c44",
+      "size": 476,
+      "normalized_sha256": "20807b1f6bb411f00d8a89500bea83e0a004a876428014b4819ac9b1510c1c44"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/scheduler/DagAgentInvoker.java": {
+      "role": "index",
+      "sha256": "8cdfee0bdf4d3a5fe1c2bef472b97e3421f2742e4e3eb02ee7d9afcf5f0b5879",
+      "size": 10168,
+      "normalized_sha256": "8cdfee0bdf4d3a5fe1c2bef472b97e3421f2742e4e3eb02ee7d9afcf5f0b5879"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/scheduler/DagEventRecorder.java": {
+      "role": "index",
+      "sha256": "844f261b074966dc71e6670f4a5c0fd9996efaad74a3984ec22d9d9010573ac3",
+      "size": 6022,
+      "normalized_sha256": "844f261b074966dc71e6670f4a5c0fd9996efaad74a3984ec22d9d9010573ac3"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/scheduler/DagExecutionEngine.java": {
+      "role": "index",
+      "sha256": "3d5a3fa6fc71cb5c8bf65b0968569362ecd44cb8b181376aac8c1f88aa7888c4",
+      "size": 25313,
+      "normalized_sha256": "3d5a3fa6fc71cb5c8bf65b0968569362ecd44cb8b181376aac8c1f88aa7888c4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/scheduler/DagLeaseExecutor.java": {
+      "role": "index",
+      "sha256": "7ac4d3f2b1e16693f93a9393243d47ddd86ceeacd778e2fda267fadee9853bfb",
+      "size": 7315,
+      "normalized_sha256": "7ac4d3f2b1e16693f93a9393243d47ddd86ceeacd778e2fda267fadee9853bfb"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/scheduler/DagStateTransitioner.java": {
+      "role": "index",
+      "sha256": "2929814fd51dea0fb77fd695909e1bad304f92200ef560a0f79bd011fafccadc",
+      "size": 11623,
+      "normalized_sha256": "2929814fd51dea0fb77fd695909e1bad304f92200ef560a0f79bd011fafccadc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/orchestration/scheduler/DagTopologyPlanner.java": {
+      "role": "index",
+      "sha256": "7e06ea69eee12933805cc0e7d2b1849d1cce982c091b8720d60c9d41115ae581",
+      "size": 10017,
+      "normalized_sha256": "7e06ea69eee12933805cc0e7d2b1849d1cce982c091b8720d60c9d41115ae581"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/api/ProjectController.java": {
+      "role": "index",
+      "sha256": "998e4d1620b005a580676712c027b67ad5779951c63a786a836929653332fc25",
+      "size": 10550,
+      "normalized_sha256": "998e4d1620b005a580676712c027b67ad5779951c63a786a836929653332fc25"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/api/WorkspaceController.java": {
+      "role": "index",
+      "sha256": "de904e27c179b44258e5cb3a241081b61990a7a54cd645c78b8730471ac43dac",
+      "size": 9978,
+      "normalized_sha256": "de904e27c179b44258e5cb3a241081b61990a7a54cd645c78b8730471ac43dac"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/ContextSourceApplication.java": {
+      "role": "index",
+      "sha256": "051f93c77fbc96931b1cdc4f4b119e37cc5cdc8e9da1a7063277f6ae4e9b47f2",
+      "size": 657,
+      "normalized_sha256": "051f93c77fbc96931b1cdc4f4b119e37cc5cdc8e9da1a7063277f6ae4e9b47f2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/ContextSourceApplicationService.java": {
+      "role": "index",
+      "sha256": "06c2e4ba0ac8a0a9b54505e92dc195977c223c39a4c777b329b6c23c4528fc83",
+      "size": 16391,
+      "normalized_sha256": "06c2e4ba0ac8a0a9b54505e92dc195977c223c39a4c777b329b6c23c4528fc83"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/ProjectApplication.java": {
+      "role": "index",
+      "sha256": "5d3113cd8d838b90bc268331e061a55f2d5c453d0e8c05f39fe3d0a8737aa4b2",
+      "size": 526,
+      "normalized_sha256": "5d3113cd8d838b90bc268331e061a55f2d5c453d0e8c05f39fe3d0a8737aa4b2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/ProjectApplicationService.java": {
+      "role": "index",
+      "sha256": "3d92d064f4b2dc3ce2dafb272a742b9a544b721819528f589f3174ebbeecb207",
+      "size": 5884,
+      "normalized_sha256": "3d92d064f4b2dc3ce2dafb272a742b9a544b721819528f589f3174ebbeecb207"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/ProjectOnboardingApplication.java": {
+      "role": "index",
+      "sha256": "c4c37509d30c09061aafd3d5130bd59d7d665458469372a8db3e52706c32c40f",
+      "size": 874,
+      "normalized_sha256": "c4c37509d30c09061aafd3d5130bd59d7d665458469372a8db3e52706c32c40f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/ProjectOnboardingApplicationService.java": {
+      "role": "index",
+      "sha256": "5b28ab9715b1d80ba1683a6e7e86d140df406be122b8b1d222a2c54bec93c2e6",
+      "size": 24760,
+      "normalized_sha256": "5b28ab9715b1d80ba1683a6e7e86d140df406be122b8b1d222a2c54bec93c2e6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/WorkspaceApplication.java": {
+      "role": "index",
+      "sha256": "959f3e101b458e4f53e730ad718ec7d41467db0913c1ae745d95bb91e3fab5d5",
+      "size": 3111,
+      "normalized_sha256": "959f3e101b458e4f53e730ad718ec7d41467db0913c1ae745d95bb91e3fab5d5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/WorkspaceApplicationService.java": {
+      "role": "index",
+      "sha256": "6c860eeeb52484ea51a29edadd628e6fc993990895fcc166973ceb81fc92fe93",
+      "size": 33088,
+      "normalized_sha256": "6c860eeeb52484ea51a29edadd628e6fc993990895fcc166973ceb81fc92fe93"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/application/WorkspaceQuotaGuard.java": {
+      "role": "index",
+      "sha256": "ada1299a3d53d1130ea8d2dc92cf426d626469875817401be0b376132f6e449e",
+      "size": 6503,
+      "normalized_sha256": "ada1299a3d53d1130ea8d2dc92cf426d626469875817401be0b376132f6e449e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/context/ContextSourceType.java": {
+      "role": "index",
+      "sha256": "d9886202e61d3b2e9e1f9e89f1d8f986e9fe75895b4002053e447fb2901ecec0",
+      "size": 228,
+      "normalized_sha256": "d9886202e61d3b2e9e1f9e89f1d8f986e9fe75895b4002053e447fb2901ecec0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/context/SecurityLevel.java": {
+      "role": "index",
+      "sha256": "e760d9ca18f04f5607316b6834bf993783b9fb7a725fcce7b4048315c863f859",
+      "size": 179,
+      "normalized_sha256": "e760d9ca18f04f5607316b6834bf993783b9fb7a725fcce7b4048315c863f859"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/onboarding/OnboardingSessionStatus.java": {
+      "role": "index",
+      "sha256": "dad3ff5fd2b444a2105e0db1573b5f7dd409ea12bdc643fd452626f8a9b1d1c2",
+      "size": 198,
+      "normalized_sha256": "dad3ff5fd2b444a2105e0db1573b5f7dd409ea12bdc643fd452626f8a9b1d1c2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/onboarding/OnboardingStep.java": {
+      "role": "index",
+      "sha256": "6f02964a3f969e6dc0955447f4951968e275a6d91565acccdaae43cb54f9411f",
+      "size": 1259,
+      "normalized_sha256": "6f02964a3f969e6dc0955447f4951968e275a6d91565acccdaae43cb54f9411f"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/onboarding/OnboardingStepStatus.java": {
+      "role": "index",
+      "sha256": "0d41cc22907883ae3609bdfce6a19df34c7cfc669f06afc81fd062a4ce1b8e1b",
+      "size": 201,
+      "normalized_sha256": "0d41cc22907883ae3609bdfce6a19df34c7cfc669f06afc81fd062a4ce1b8e1b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/quota/WorkspaceQuotaPolicy.java": {
+      "role": "index",
+      "sha256": "94fd31277ce7f52c3bf2aa5b8d08d09d73446cc58016860b4611a093e8425a5d",
+      "size": 3247,
+      "normalized_sha256": "94fd31277ce7f52c3bf2aa5b8d08d09d73446cc58016860b4611a093e8425a5d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/quota/WorkspaceQuotaUsage.java": {
+      "role": "index",
+      "sha256": "fd437e7db52ead192c8a88f9b461b92636faf20f76f4115609cbaa1beec5fba8",
+      "size": 3663,
+      "normalized_sha256": "fd437e7db52ead192c8a88f9b461b92636faf20f76f4115609cbaa1beec5fba8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/source/GitSourceConfig.java": {
+      "role": "index",
+      "sha256": "efce020d827d91bd660ddba0f8f8693c3e6de8ff1543328f9c2d01f529b2b242",
+      "size": 4643,
+      "normalized_sha256": "efce020d827d91bd660ddba0f8f8693c3e6de8ff1543328f9c2d01f529b2b242"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/domain/source/GitSourceType.java": {
+      "role": "index",
+      "sha256": "6663ff073dc86770af599c1942538975c61057d24d2bcbdc90c5d0940a615565",
+      "size": 167,
+      "normalized_sha256": "6663ff073dc86770af599c1942538975c61057d24d2bcbdc90c5d0940a615565"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/CreateProjectCommand.java": {
+      "role": "index",
+      "sha256": "d56bc0e3a025651b252fd299b27f225e16295197ce4ef783866795a34f6a0747",
+      "size": 1043,
+      "normalized_sha256": "d56bc0e3a025651b252fd299b27f225e16295197ce4ef783866795a34f6a0747"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/ProjectView.java": {
+      "role": "index",
+      "sha256": "c6caa71e3e975b80f347157802de055e744db4b824166dfd8e6735b065d56ac3",
+      "size": 1829,
+      "normalized_sha256": "c6caa71e3e975b80f347157802de055e744db4b824166dfd8e6735b065d56ac3"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/WorkspaceFileDetailView.java": {
+      "role": "index",
+      "sha256": "b400241f208149ebf884c79d0c33c838bc49b53c33d7aed06bda5deeedf6bd94",
+      "size": 1623,
+      "normalized_sha256": "b400241f208149ebf884c79d0c33c838bc49b53c33d7aed06bda5deeedf6bd94"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/WorkspaceFileNode.java": {
+      "role": "index",
+      "sha256": "5b8ede655d9dad844dcacb31fa707b7f795ba8d5161ea238bfb25fe98c93d21c",
+      "size": 1702,
+      "normalized_sha256": "5b8ede655d9dad844dcacb31fa707b7f795ba8d5161ea238bfb25fe98c93d21c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/WorkspaceLockStatusView.java": {
+      "role": "index",
+      "sha256": "1b8480f7736e414c417f0bcda527995064d3dd275ad7fe0b32d927be8a2c6eec",
+      "size": 1817,
+      "normalized_sha256": "1b8480f7736e414c417f0bcda527995064d3dd275ad7fe0b32d927be8a2c6eec"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/WorkspaceView.java": {
+      "role": "index",
+      "sha256": "704b5a32d415084239c9aa03d81b16084607409debb068a36a46fbfbcef7b6f5",
+      "size": 1569,
+      "normalized_sha256": "704b5a32d415084239c9aa03d81b16084607409debb068a36a46fbfbcef7b6f5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/context/ContextSourceView.java": {
+      "role": "index",
+      "sha256": "636138812523ea81aa9e8e8040302289e48b7839c8def55e872d6dd99a704d3b",
+      "size": 3635,
+      "normalized_sha256": "636138812523ea81aa9e8e8040302289e48b7839c8def55e872d6dd99a704d3b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/context/RegisterContextSourceCommand.java": {
+      "role": "index",
+      "sha256": "be15659b85291543f73c179d5bec080bdafeb54d783c3d84ac044cddfe6c5b3a",
+      "size": 2214,
+      "normalized_sha256": "be15659b85291543f73c179d5bec080bdafeb54d783c3d84ac044cddfe6c5b3a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/onboarding/EnvironmentScanResultView.java": {
+      "role": "index",
+      "sha256": "92de9d4870a15f881a0f9ecb7abe891f2bf0f771bfc502023e33847a13cda6ce",
+      "size": 3386,
+      "normalized_sha256": "92de9d4870a15f881a0f9ecb7abe891f2bf0f771bfc502023e33847a13cda6ce"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/onboarding/ExecuteStepCommand.java": {
+      "role": "index",
+      "sha256": "d24adfcf9537283074420833756707b703667468ae4e3a090af3af7043e01701",
+      "size": 1004,
+      "normalized_sha256": "d24adfcf9537283074420833756707b703667468ae4e3a090af3af7043e01701"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/onboarding/OnboardingSessionView.java": {
+      "role": "index",
+      "sha256": "b6b4bcafb30975b9651cb245d9a82055707e6c825fda8dac8615109d02d49178",
+      "size": 5472,
+      "normalized_sha256": "b6b4bcafb30975b9651cb245d9a82055707e6c825fda8dac8615109d02d49178"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/onboarding/OnboardingStepRecordView.java": {
+      "role": "index",
+      "sha256": "0a9254840ab75a2694e5a18a4a25279b93f9c0bffd5755f332f162f9243d1257",
+      "size": 2077,
+      "normalized_sha256": "0a9254840ab75a2694e5a18a4a25279b93f9c0bffd5755f332f162f9243d1257"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/dto/onboarding/StartOnboardingCommand.java": {
+      "role": "index",
+      "sha256": "9fb20409647552071b3f357489944ab72c9d64f41653e10ad66063e673ee7bc1",
+      "size": 1062,
+      "normalized_sha256": "9fb20409647552071b3f357489944ab72c9d64f41653e10ad66063e673ee7bc1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/infrastructure/entity/ProjectEntity.java": {
+      "role": "index",
+      "sha256": "38dc5f6754441f402f2686ed8ac9ccad59476a10d4ef30b2163dfceb9476ba74",
+      "size": 2288,
+      "normalized_sha256": "38dc5f6754441f402f2686ed8ac9ccad59476a10d4ef30b2163dfceb9476ba74"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/infrastructure/entity/WorkspaceEntity.java": {
+      "role": "index",
+      "sha256": "d91bdbb417300624b7447abcd22ef85af9d8e64156e5aa3eeee008d24e391661",
+      "size": 1962,
+      "normalized_sha256": "d91bdbb417300624b7447abcd22ef85af9d8e64156e5aa3eeee008d24e391661"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/infrastructure/repository/ProjectRepository.java": {
+      "role": "index",
+      "sha256": "4e9ff62634289fc8fb723c55bd25a6156d6361b53bc3dcf1c0c2fe2a2a7feb85",
+      "size": 430,
+      "normalized_sha256": "4e9ff62634289fc8fb723c55bd25a6156d6361b53bc3dcf1c0c2fe2a2a7feb85"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/project/infrastructure/repository/WorkspaceRepository.java": {
+      "role": "index",
+      "sha256": "0adb07cd5e55de8423e8e2dca8f95be2bc526824979761889789894baaba7648",
+      "size": 430,
+      "normalized_sha256": "0adb07cd5e55de8423e8e2dca8f95be2bc526824979761889789894baaba7648"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/AgentRuntimeRegistry.java": {
+      "role": "index",
+      "sha256": "e5f647ef93b8d4f7d6dcfb9e952b860c0d1bc59fdefa2dca95342f7c8323e9a0",
+      "size": 2835,
+      "normalized_sha256": "e5f647ef93b8d4f7d6dcfb9e952b860c0d1bc59fdefa2dca95342f7c8323e9a0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/cli/CliAgentRuntime.java": {
+      "role": "index",
+      "sha256": "6336fb8f25c55f396d87802a7a8b7dd2d5826d29ca673ddc10de8733609c33e8",
+      "size": 7070,
+      "normalized_sha256": "6336fb8f25c55f396d87802a7a8b7dd2d5826d29ca673ddc10de8733609c33e8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/mock/MockAgentRuntime.java": {
+      "role": "index",
+      "sha256": "af1ab5f693989c458634ea62e8d4f792ccc22a4fbcb231e42e1a03b39a1cfe89",
+      "size": 5593,
+      "normalized_sha256": "af1ab5f693989c458634ea62e8d4f792ccc22a4fbcb231e42e1a03b39a1cfe89"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/openai/OpenAiCompatibleRuntime.java": {
+      "role": "index",
+      "sha256": "8ab5d14f4bed18dbf5e36d46ff0b5f1876cdc3f290b1bcdcffc434e5501dc3bc",
+      "size": 9335,
+      "normalized_sha256": "8ab5d14f4bed18dbf5e36d46ff0b5f1876cdc3f290b1bcdcffc434e5501dc3bc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/port/AgentRuntime.java": {
+      "role": "index",
+      "sha256": "11e901b3ca515a5a8584df75c2118e27c4d62683a1f86641c3246ca574d10db1",
+      "size": 561,
+      "normalized_sha256": "11e901b3ca515a5a8584df75c2118e27c4d62683a1f86641c3246ca574d10db1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/port/ExecutionHandle.java": {
+      "role": "index",
+      "sha256": "54b2a6a24c972139a347aa57cbafaad55faea7a7c12e467712ddb8a0fd6bee24",
+      "size": 1111,
+      "normalized_sha256": "54b2a6a24c972139a347aa57cbafaad55faea7a7c12e467712ddb8a0fd6bee24"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/port/RuntimeDescriptor.java": {
+      "role": "index",
+      "sha256": "f4ebc375aa799d6b38c898c9ff50921535936246daef094323ccc6030cd33cfe",
+      "size": 1101,
+      "normalized_sha256": "f4ebc375aa799d6b38c898c9ff50921535936246daef094323ccc6030cd33cfe"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/port/RuntimeEventSink.java": {
+      "role": "index",
+      "sha256": "81ad0dfd0301605e8c315a7f0849526a822a268a4df74ddd37338989e6cc3964",
+      "size": 825,
+      "normalized_sha256": "81ad0dfd0301605e8c315a7f0849526a822a268a4df74ddd37338989e6cc3964"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/port/RuntimeHealth.java": {
+      "role": "index",
+      "sha256": "f91761914db8189640eb1c5b467fb3ff11aa4f2e4474bffb3e1c9123216c7afc",
+      "size": 1025,
+      "normalized_sha256": "f91761914db8189640eb1c5b467fb3ff11aa4f2e4474bffb3e1c9123216c7afc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/runtime/provider/ProviderDrivenAgentRuntime.java": {
+      "role": "index",
+      "sha256": "628bc98edd7f80965c7f2e0295fd2deb82f577a1f995d681fc4680178736fc7c",
+      "size": 10730,
+      "normalized_sha256": "628bc98edd7f80965c7f2e0295fd2deb82f577a1f995d681fc4680178736fc7c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/api/DeploymentController.java": {
+      "role": "index",
+      "sha256": "731bf7f9a0859719aecd6eb0e55b97d9ff6e3a9257fff0e54a8b0ae7989864de",
+      "size": 2556,
+      "normalized_sha256": "731bf7f9a0859719aecd6eb0e55b97d9ff6e3a9257fff0e54a8b0ae7989864de"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/api/dto/CreateDeploymentRequest.java": {
+      "role": "index",
+      "sha256": "49a60562bad3ca0fa8decfb3d84c5efba2f813df8ae24aaa72ab17134f514114",
+      "size": 2837,
+      "normalized_sha256": "49a60562bad3ca0fa8decfb3d84c5efba2f813df8ae24aaa72ab17134f514114"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/api/dto/DeploymentResponse.java": {
+      "role": "index",
+      "sha256": "df87d7308edf20902e1df71012a0126f8da69716b1f1ddc963e98b8ee435f5fc",
+      "size": 4429,
+      "normalized_sha256": "df87d7308edf20902e1df71012a0126f8da69716b1f1ddc963e98b8ee435f5fc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/application/DeploymentApplication.java": {
+      "role": "index",
+      "sha256": "281df87e71dc346d4a0582e1b0809a97cfe0cc497a12d4a29e99c3bfa6b9e8f5",
+      "size": 905,
+      "normalized_sha256": "281df87e71dc346d4a0582e1b0809a97cfe0cc497a12d4a29e99c3bfa6b9e8f5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/application/DeploymentApplicationService.java": {
+      "role": "index",
+      "sha256": "b35cdc4fbe60e8ff19ad5134dd6f5cd93ceb0d3ad4f2accb7dbfa092835f21fd",
+      "size": 40893,
+      "normalized_sha256": "b35cdc4fbe60e8ff19ad5134dd6f5cd93ceb0d3ad4f2accb7dbfa092835f21fd"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/application/SandboxApplication.java": {
+      "role": "index",
+      "sha256": "d6e884faac1b61345ac89ce7441a36625dc75ede310c390f945593d8ea772c34",
+      "size": 249,
+      "normalized_sha256": "d6e884faac1b61345ac89ce7441a36625dc75ede310c390f945593d8ea772c34"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/DeploymentSpec.java": {
+      "role": "index",
+      "sha256": "4b3baefdd891378962c55c17fd5945576aa41756b843e9ea31c67754e1cf081b",
+      "size": 2534,
+      "normalized_sha256": "4b3baefdd891378962c55c17fd5945576aa41756b843e9ea31c67754e1cf081b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/DeploymentStatus.java": {
+      "role": "index",
+      "sha256": "fdf1333fa8eb5a167847a76b35f623dec0cf0615becdd3e903d542336a617405",
+      "size": 268,
+      "normalized_sha256": "fdf1333fa8eb5a167847a76b35f623dec0cf0615becdd3e903d542336a617405"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/DeploymentTarget.java": {
+      "role": "index",
+      "sha256": "40c26af3b891f555629d78bfb94f7c3e061f59e9202a46230d55844537fc44d8",
+      "size": 210,
+      "normalized_sha256": "40c26af3b891f555629d78bfb94f7c3e061f59e9202a46230d55844537fc44d8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/DeploymentTemplateType.java": {
+      "role": "index",
+      "sha256": "9850d4a8c9a0170ba8253c86bae3e3ca7025a6658b989818a2e5ece682a05ac5",
+      "size": 921,
+      "normalized_sha256": "9850d4a8c9a0170ba8253c86bae3e3ca7025a6658b989818a2e5ece682a05ac5"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/SandboxExecutionRequest.java": {
+      "role": "index",
+      "sha256": "cd04bead330668696d25fc7ac68571db9d6664665ff20ba8f63e12b24ad9b209",
+      "size": 4454,
+      "normalized_sha256": "cd04bead330668696d25fc7ac68571db9d6664665ff20ba8f63e12b24ad9b209"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/SandboxExecutionResult.java": {
+      "role": "index",
+      "sha256": "c972f4fdbba9c58413efd1b30b8471873f71e81ba40783b64c8458e132435097",
+      "size": 3800,
+      "normalized_sha256": "c972f4fdbba9c58413efd1b30b8471873f71e81ba40783b64c8458e132435097"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/SandboxResourceQuota.java": {
+      "role": "index",
+      "sha256": "7c311b61b94c4b60e67289ac90b8f3a130e42364778bada18593357412181a87",
+      "size": 2565,
+      "normalized_sha256": "7c311b61b94c4b60e67289ac90b8f3a130e42364778bada18593357412181a87"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/SandboxType.java": {
+      "role": "index",
+      "sha256": "df65f377fa80c0dcca9e711e55b4a9b3d47001c565b86f884fbbb3aea46ea16c",
+      "size": 152,
+      "normalized_sha256": "df65f377fa80c0dcca9e711e55b4a9b3d47001c565b86f884fbbb3aea46ea16c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/provider/DockerSandbox.java": {
+      "role": "index",
+      "sha256": "7a9929dbf7b63e9e01ec8091955876ebfdc5a0f4efc409210e86f40cceb1545b",
+      "size": 20017,
+      "normalized_sha256": "7a9929dbf7b63e9e01ec8091955876ebfdc5a0f4efc409210e86f40cceb1545b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/provider/LocalProcessSandbox.java": {
+      "role": "index",
+      "sha256": "289c51bb70e4e0642c92508657e9c9efb1ccb04e574d62383554744983ccf09c",
+      "size": 17044,
+      "normalized_sha256": "289c51bb70e4e0642c92508657e9c9efb1ccb04e574d62383554744983ccf09c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/provider/SandboxProvider.java": {
+      "role": "index",
+      "sha256": "f427ac1d7263bf7f29cd471f7512605297d49787f11a526581f8375cc0b11867",
+      "size": 831,
+      "normalized_sha256": "f427ac1d7263bf7f29cd471f7512605297d49787f11a526581f8375cc0b11867"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/provider/SandboxProviderFactory.java": {
+      "role": "index",
+      "sha256": "d5cab0883ca84b614f692946b3b9ee6534aa0de10eccd9f1df7e0f3c8fb8fb92",
+      "size": 2929,
+      "normalized_sha256": "d5cab0883ca84b614f692946b3b9ee6534aa0de10eccd9f1df7e0f3c8fb8fb92"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/security/CommandSecurityGuard.java": {
+      "role": "index",
+      "sha256": "033e3f65acd7fd0549cfb38af246f2366ee26e14e3a306cfe18524822d0b0455",
+      "size": 8496,
+      "normalized_sha256": "033e3f65acd7fd0549cfb38af246f2366ee26e14e3a306cfe18524822d0b0455"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/security/EnvironmentSanitizer.java": {
+      "role": "index",
+      "sha256": "a9012a920bbc8b66ed14c012ec3edd8f6e355a7673329a10b237ec44feea77b2",
+      "size": 3925,
+      "normalized_sha256": "a9012a920bbc8b66ed14c012ec3edd8f6e355a7673329a10b237ec44feea77b2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/service/DeploymentLifecycleWorker.java": {
+      "role": "index",
+      "sha256": "a3cfb16d444e53cf2777e9f3af04708bddb42b4e966a956e7aa49c658edd394c",
+      "size": 25088,
+      "normalized_sha256": "a3cfb16d444e53cf2777e9f3af04708bddb42b4e966a956e7aa49c658edd394c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/service/HealthCheckProbeService.java": {
+      "role": "index",
+      "sha256": "0b90f7edecc3cce58a8463fc4d1c7350a7e5167d65748bb0bfcbf132ce06b5ef",
+      "size": 2934,
+      "normalized_sha256": "0b90f7edecc3cce58a8463fc4d1c7350a7e5167d65748bb0bfcbf132ce06b5ef"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/service/PortAllocationService.java": {
+      "role": "index",
+      "sha256": "eb8eedf89339214d114cb2b227f8dc7d64e9483f6d0890fd68660c4cbcb06c74",
+      "size": 7431,
+      "normalized_sha256": "eb8eedf89339214d114cb2b227f8dc7d64e9483f6d0890fd68660c4cbcb06c74"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/infrastructure/entity/DeploymentEntity.java": {
+      "role": "index",
+      "sha256": "2f566175ab0e2f8e8bc13902c899730ba10057521f1f01e2bd5d1ee48a1cbe0a",
+      "size": 6414,
+      "normalized_sha256": "2f566175ab0e2f8e8bc13902c899730ba10057521f1f01e2bd5d1ee48a1cbe0a"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/infrastructure/repository/DeploymentRepository.java": {
+      "role": "index",
+      "sha256": "fa6fabd3d10c44d84552a2e75850da2922fb714156e5cc7a0207611e556e2405",
+      "size": 711,
+      "normalized_sha256": "fa6fabd3d10c44d84552a2e75850da2922fb714156e5cc7a0207611e556e2405"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/context/RequestContext.java": {
+      "role": "index",
+      "sha256": "2c150124ffeb8004cdf145a2df645770e9dd60b0c468a51dc5ede53256d7560b",
+      "size": 2118,
+      "normalized_sha256": "2c150124ffeb8004cdf145a2df645770e9dd60b0c468a51dc5ede53256d7560b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/ApiContractHeaders.java": {
+      "role": "index",
+      "sha256": "e14bafbe46cfdf3e427febb959af9337c7b8d8652068a55ccece1ce4f1a7f3dd",
+      "size": 2862,
+      "normalized_sha256": "e14bafbe46cfdf3e427febb959af9337c7b8d8652068a55ccece1ce4f1a7f3dd"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/BoundedContext.java": {
+      "role": "index",
+      "sha256": "22ca52e1242ffdcff8ca32719a15eb50a120f1119d326c9c3c70aa79ab3e6488",
+      "size": 4307,
+      "normalized_sha256": "22ca52e1242ffdcff8ca32719a15eb50a120f1119d326c9c3c70aa79ab3e6488"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/ContextCommand.java": {
+      "role": "index",
+      "sha256": "44f8e75720d19b3fda9223e93aca7820b2bbc5d1bceab868b9ddfbf99844433b",
+      "size": 192,
+      "normalized_sha256": "44f8e75720d19b3fda9223e93aca7820b2bbc5d1bceab868b9ddfbf99844433b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/ContextDomainEvent.java": {
+      "role": "index",
+      "sha256": "373ef093e3b319a23fe921cffe2b4dfa519df30afb6af00ab15217ba56e1016d",
+      "size": 271,
+      "normalized_sha256": "373ef093e3b319a23fe921cffe2b4dfa519df30afb6af00ab15217ba56e1016d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/ContextQuery.java": {
+      "role": "index",
+      "sha256": "4665f6194e6cb32359f904d65390df507ebac753f5278d0501e1edffde0aebc3",
+      "size": 184,
+      "normalized_sha256": "4665f6194e6cb32359f904d65390df507ebac753f5278d0501e1edffde0aebc3"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/PageRequestQuery.java": {
+      "role": "index",
+      "sha256": "94fa2f5850653a0b6e9963bdfdab14fee404a698ac4a66ca3ef9a540c7a53a15",
+      "size": 4083,
+      "normalized_sha256": "94fa2f5850653a0b6e9963bdfdab14fee404a698ac4a66ca3ef9a540c7a53a15"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/PageResultView.java": {
+      "role": "index",
+      "sha256": "6aa9a7ee0584e0f875fbc326803dd60c8a3f1eb0fe79bf08792df8dd5295c65b",
+      "size": 2916,
+      "normalized_sha256": "6aa9a7ee0584e0f875fbc326803dd60c8a3f1eb0fe79bf08792df8dd5295c65b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/extension/AgentDefinitionExtensionContract.java": {
+      "role": "index",
+      "sha256": "d49e473d7681302dea066eb5b3822675dd4c9aa7502e11e076cb97d5da2d592b",
+      "size": 519,
+      "normalized_sha256": "d49e473d7681302dea066eb5b3822675dd4c9aa7502e11e076cb97d5da2d592b"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/extension/DeploymentTemplateExtensionContract.java": {
+      "role": "index",
+      "sha256": "eec66be20e695f0cbdd3e335415994f0db48c2ecf5d0cce3110017203b95bcfe",
+      "size": 661,
+      "normalized_sha256": "eec66be20e695f0cbdd3e335415994f0db48c2ecf5d0cce3110017203b95bcfe"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/extension/ProviderExtensionContract.java": {
+      "role": "index",
+      "sha256": "764e12ae852ab7d37ca78441066f4ca7264a55ad9a6dd9382af6e196f94aa2c4",
+      "size": 793,
+      "normalized_sha256": "764e12ae852ab7d37ca78441066f4ca7264a55ad9a6dd9382af6e196f94aa2c4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/extension/ToolExtensionContract.java": {
+      "role": "index",
+      "sha256": "573207bc60eb80d557eb8c43477c3f2588d2ffcaf863abb43eabedc5c20016a4",
+      "size": 663,
+      "normalized_sha256": "573207bc60eb80d557eb8c43477c3f2588d2ffcaf863abb43eabedc5c20016a4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/extension/WorkflowTemplateExtensionContract.java": {
+      "role": "index",
+      "sha256": "8a57444cef3dd87ef3ef8e62e8742febbc0bb9655219764e38f9cff0bc71e399",
+      "size": 582,
+      "normalized_sha256": "8a57444cef3dd87ef3ef8e62e8742febbc0bb9655219764e38f9cff0bc71e399"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/sdk/AgentHubApprovalClient.java": {
+      "role": "index",
+      "sha256": "1ca16a788a9febaeb10376b1182daa79f54b3366d5b78b9da155e999315987f1",
+      "size": 481,
+      "normalized_sha256": "1ca16a788a9febaeb10376b1182daa79f54b3366d5b78b9da155e999315987f1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/sdk/AgentHubArtifactClient.java": {
+      "role": "index",
+      "sha256": "f622b5723953d7628fd8ba44c3921b36d9a8b3757af1633dbdd587a950a16304",
+      "size": 985,
+      "normalized_sha256": "f622b5723953d7628fd8ba44c3921b36d9a8b3757af1633dbdd587a950a16304"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/sdk/AgentHubDeploymentClient.java": {
+      "role": "index",
+      "sha256": "780b6df5c87cebe40cda17d57f6f012c9150634f1bf648a243fc1d532072bd27",
+      "size": 687,
+      "normalized_sha256": "780b6df5c87cebe40cda17d57f6f012c9150634f1bf648a243fc1d532072bd27"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/sdk/AgentHubProjectClient.java": {
+      "role": "index",
+      "sha256": "1bde2b1225492f064e66ed6f48205b684858e1203ded764f3a9b55d6a3faa60d",
+      "size": 632,
+      "normalized_sha256": "1bde2b1225492f064e66ed6f48205b684858e1203ded764f3a9b55d6a3faa60d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/sdk/AgentHubReleaseManifest.java": {
+      "role": "index",
+      "sha256": "29f5db1d588e6d756b701f0fd0db976238da0a23b8bbf1818b21e491659e7c49",
+      "size": 3106,
+      "normalized_sha256": "29f5db1d588e6d756b701f0fd0db976238da0a23b8bbf1818b21e491659e7c49"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/sdk/AgentHubRunClient.java": {
+      "role": "index",
+      "sha256": "1d1b57ca57d4943ec0099fce4e4a8cc81ecfc5bfaa85a95e74e242090843dbdd",
+      "size": 928,
+      "normalized_sha256": "1d1b57ca57d4943ec0099fce4e4a8cc81ecfc5bfaa85a95e74e242090843dbdd"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/webhook/WebhookEventType.java": {
+      "role": "index",
+      "sha256": "5ca2e60703169a28d238116e9d0de391d93eca8d825711d62c468af8772666ed",
+      "size": 2132,
+      "normalized_sha256": "5ca2e60703169a28d238116e9d0de391d93eca8d825711d62c468af8772666ed"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/webhook/WebhookPayload.java": {
+      "role": "index",
+      "sha256": "5907cab4ed048c091eabc93e08bcfe703799f74525a199877fd212245de60e17",
+      "size": 3158,
+      "normalized_sha256": "5907cab4ed048c091eabc93e08bcfe703799f74525a199877fd212245de60e17"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/contract/webhook/WebhookSignatureVerifier.java": {
+      "role": "index",
+      "sha256": "303421ef5e33f5624f116c375c5215aba06e680c3dd5898ca0479eba9b3a8090",
+      "size": 5113,
+      "normalized_sha256": "303421ef5e33f5624f116c375c5215aba06e680c3dd5898ca0479eba9b3a8090"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/exception/BusinessException.java": {
+      "role": "index",
+      "sha256": "511fe4186cd04b45883419ccc9eb8aa9ad7a98479cd52bd614c22a75c94ed3a2",
+      "size": 737,
+      "normalized_sha256": "511fe4186cd04b45883419ccc9eb8aa9ad7a98479cd52bd614c22a75c94ed3a2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/exception/ErrorCode.java": {
+      "role": "index",
+      "sha256": "3390d29a1ae33d59749c00784adc60bed2a9728751b474513f83a603766b4193",
+      "size": 5439,
+      "normalized_sha256": "3390d29a1ae33d59749c00784adc60bed2a9728751b474513f83a603766b4193"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/filter/LegacyEndpointCallTracker.java": {
+      "role": "index",
+      "sha256": "0efeeef09e15c1ff76d2c85b7d738fe543f8943c9786174ba4b05b9a74469e55",
+      "size": 5827,
+      "normalized_sha256": "0efeeef09e15c1ff76d2c85b7d738fe543f8943c9786174ba4b05b9a74469e55"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/filter/LegacyEndpointMigrationFilter.java": {
+      "role": "index",
+      "sha256": "e96d2166dd77047cbd7c13324dc154e11a7c80a52f014f938c303fcb6834c6dc",
+      "size": 4802,
+      "normalized_sha256": "e96d2166dd77047cbd7c13324dc154e11a7c80a52f014f938c303fcb6834c6dc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/filter/RequestCorrelationFilter.java": {
+      "role": "index",
+      "sha256": "3ddd73d2b8d510f8f2309125de2bae713a1cfd31436d402161bdbbc8c85d6ce8",
+      "size": 2693,
+      "normalized_sha256": "3ddd73d2b8d510f8f2309125de2bae713a1cfd31436d402161bdbbc8c85d6ce8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/shared/response/Result.java": {
+      "role": "index",
+      "sha256": "8dea2812a594fe11153542db7ac46d98b197fcc88bf59ecc06abfa421f35d425",
+      "size": 2567,
+      "normalized_sha256": "8dea2812a594fe11153542db7ac46d98b197fcc88bf59ecc06abfa421f35d425"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/api/TeamController.java": {
+      "role": "index",
+      "sha256": "43271d97607be1d26866228991e3c816b4987ba1a6a271643cbdec4293de5e16",
+      "size": 3209,
+      "normalized_sha256": "43271d97607be1d26866228991e3c816b4987ba1a6a271643cbdec4293de5e16"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/application/TeamApplication.java": {
+      "role": "index",
+      "sha256": "7919fd0187aeeebf620e4cf5864a5d8d2821b9a764f65b023a97ef86f79d14c7",
+      "size": 881,
+      "normalized_sha256": "7919fd0187aeeebf620e4cf5864a5d8d2821b9a764f65b023a97ef86f79d14c7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/application/TeamApplicationService.java": {
+      "role": "index",
+      "sha256": "d2ee588098d139f7a238a4be4d033dde9d5297319313bc38a49087490fdde62e",
+      "size": 24103,
+      "normalized_sha256": "d2ee588098d139f7a238a4be4d033dde9d5297319313bc38a49087490fdde62e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/model/NextSpeakerDecision.java": {
+      "role": "index",
+      "sha256": "1f9a02cbb5edbd272ee3a48ffd3ec024fea95d142362484f827b5c800213dad6",
+      "size": 2392,
+      "normalized_sha256": "1f9a02cbb5edbd272ee3a48ffd3ec024fea95d142362484f827b5c800213dad6"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/model/TeamCoordinationContext.java": {
+      "role": "index",
+      "sha256": "274d67ae370bc513f8e0fcd9146f6d55d69b5e4f43deddbdf329a469563eac82",
+      "size": 2523,
+      "normalized_sha256": "274d67ae370bc513f8e0fcd9146f6d55d69b5e4f43deddbdf329a469563eac82"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/model/TeamRole.java": {
+      "role": "index",
+      "sha256": "785ec18659cf7c178814da9cc28073a2bcdba9d77de8a68cddeb5141d473b4e2",
+      "size": 1266,
+      "normalized_sha256": "785ec18659cf7c178814da9cc28073a2bcdba9d77de8a68cddeb5141d473b4e2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/model/TeamTopology.java": {
+      "role": "index",
+      "sha256": "ea68d3d7df681b0c824ffbd49d662d8ec6af47fdf1623a163175d87dd261bf1d",
+      "size": 687,
+      "normalized_sha256": "ea68d3d7df681b0c824ffbd49d662d8ec6af47fdf1623a163175d87dd261bf1d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/rbac/ProjectPermission.java": {
+      "role": "index",
+      "sha256": "c35e6dc6d1b35fdd66fcc759ec60eae65baa185e8325451f49ba0d993f97b3f4",
+      "size": 1252,
+      "normalized_sha256": "c35e6dc6d1b35fdd66fcc759ec60eae65baa185e8325451f49ba0d993f97b3f4"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/rbac/ProjectRbacRole.java": {
+      "role": "index",
+      "sha256": "5401b73eb1ce6d220f01017acd11da434adf2486737a63a9b242ad6f27a4a00e",
+      "size": 3729,
+      "normalized_sha256": "5401b73eb1ce6d220f01017acd11da434adf2486737a63a9b242ad6f27a4a00e"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/strategy/HierarchicalTopologyCoordinator.java": {
+      "role": "index",
+      "sha256": "1ab63d915dfc500a355ab63b47df1fd17ce902b722dc22ac570610fa952a871d",
+      "size": 6744,
+      "normalized_sha256": "1ab63d915dfc500a355ab63b47df1fd17ce902b722dc22ac570610fa952a871d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/strategy/PeerToPeerTopologyCoordinator.java": {
+      "role": "index",
+      "sha256": "e9f1e7c2b289ccf626730e0c5c54340819ccbc1c0374b25ba5465390c892e4ba",
+      "size": 4931,
+      "normalized_sha256": "e9f1e7c2b289ccf626730e0c5c54340819ccbc1c0374b25ba5465390c892e4ba"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/strategy/RoundRobinTopologyCoordinator.java": {
+      "role": "index",
+      "sha256": "ab9645effcbb5860515a5c89b07dd2c18e51bf728b1cde0a037f3bff5c6cac45",
+      "size": 2775,
+      "normalized_sha256": "ab9645effcbb5860515a5c89b07dd2c18e51bf728b1cde0a037f3bff5c6cac45"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/strategy/TeamTopologyStrategy.java": {
+      "role": "index",
+      "sha256": "0a2e888ed948e1c6a85bf7a0386a0f7cc63a6b1c905c09ebaba9179531ddd25c",
+      "size": 664,
+      "normalized_sha256": "0a2e888ed948e1c6a85bf7a0386a0f7cc63a6b1c905c09ebaba9179531ddd25c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/domain/strategy/TeamTopologyStrategyFactory.java": {
+      "role": "index",
+      "sha256": "34e4fbe18baf1fafa429c46dda24ca2b01769046e3f48f8c870f2db67ff1a012",
+      "size": 948,
+      "normalized_sha256": "34e4fbe18baf1fafa429c46dda24ca2b01769046e3f48f8c870f2db67ff1a012"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/AddProjectMemberCommand.java": {
+      "role": "index",
+      "sha256": "4bc828c5a3c666cc45e28f6e2b28d110a57a872618f9c5447107b001f4b4cd06",
+      "size": 1878,
+      "normalized_sha256": "4bc828c5a3c666cc45e28f6e2b28d110a57a872618f9c5447107b001f4b4cd06"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/AddTeamMemberCommand.java": {
+      "role": "index",
+      "sha256": "200a15f1824eb67f9040805766348c66d38078f68678373284a7eef7f9f9b045",
+      "size": 2005,
+      "normalized_sha256": "200a15f1824eb67f9040805766348c66d38078f68678373284a7eef7f9f9b045"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/CreateTeamCommand.java": {
+      "role": "index",
+      "sha256": "65e3857b7231a2414137001fea8f30c9691b2dd98043d86001602368857287b1",
+      "size": 2178,
+      "normalized_sha256": "65e3857b7231a2414137001fea8f30c9691b2dd98043d86001602368857287b1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/ProjectMemberView.java": {
+      "role": "index",
+      "sha256": "41446c458e090a3e571e4e8007ce028481c5cc76ad0c0c52646a0fa678aeb26d",
+      "size": 2836,
+      "normalized_sha256": "41446c458e090a3e571e4e8007ce028481c5cc76ad0c0c52646a0fa678aeb26d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/ProjectUserRoleView.java": {
+      "role": "index",
+      "sha256": "3413cbd2bd08b41e384434ce427331e757d59becc6732780f8b7d2e935d626bf",
+      "size": 1493,
+      "normalized_sha256": "3413cbd2bd08b41e384434ce427331e757d59becc6732780f8b7d2e935d626bf"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/TeamCoordinateCommand.java": {
+      "role": "index",
+      "sha256": "1d083696a7a425323f197fc8eb3d36f54f6c3670c5a915f6fa4a10fbed0cddd0",
+      "size": 2108,
+      "normalized_sha256": "1d083696a7a425323f197fc8eb3d36f54f6c3670c5a915f6fa4a10fbed0cddd0"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/TeamCoordinateResultView.java": {
+      "role": "index",
+      "sha256": "7a8985fda8e2978dc7b1a2894470d4c53a45b8b36db922d8a10963ee52401be7",
+      "size": 1882,
+      "normalized_sha256": "7a8985fda8e2978dc7b1a2894470d4c53a45b8b36db922d8a10963ee52401be7"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/TeamMemberView.java": {
+      "role": "index",
+      "sha256": "149d2bad815a975267e206a99b888b3feb213485fcc9ed7049a8f9aec519fc9d",
+      "size": 2311,
+      "normalized_sha256": "149d2bad815a975267e206a99b888b3feb213485fcc9ed7049a8f9aec519fc9d"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/TeamView.java": {
+      "role": "index",
+      "sha256": "b1f1f4b3eada82924e91f9d8fc87e1eb58e4299fc0808cf4a96f1b8706f9ee8c",
+      "size": 3046,
+      "normalized_sha256": "b1f1f4b3eada82924e91f9d8fc87e1eb58e4299fc0808cf4a96f1b8706f9ee8c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/dto/UpdateMemberRoleCommand.java": {
+      "role": "index",
+      "sha256": "a796eced96753805d7e1351df8ad179e210c85b903a700db1ac5a85eed6e36fc",
+      "size": 1263,
+      "normalized_sha256": "a796eced96753805d7e1351df8ad179e210c85b903a700db1ac5a85eed6e36fc"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/infrastructure/entity/TeamEntity.java": {
+      "role": "index",
+      "sha256": "3572a42f84c7b8c3a91fab03ba7144f278b366fda2c42858117bff9562a2aee1",
+      "size": 3355,
+      "normalized_sha256": "3572a42f84c7b8c3a91fab03ba7144f278b366fda2c42858117bff9562a2aee1"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/infrastructure/entity/TeamMemberEntity.java": {
+      "role": "index",
+      "sha256": "18d60dba31c74f9e7628cccda3a32446947d57fe0995595db7a5e807cc457f89",
+      "size": 3077,
+      "normalized_sha256": "18d60dba31c74f9e7628cccda3a32446947d57fe0995595db7a5e807cc457f89"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/infrastructure/repository/TeamMemberRepository.java": {
+      "role": "index",
+      "sha256": "f423eabbb1fba29ad24be8186a89079fffa2488ee6f056bbe5ac89b9c8aae982",
+      "size": 473,
+      "normalized_sha256": "f423eabbb1fba29ad24be8186a89079fffa2488ee6f056bbe5ac89b9c8aae982"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/team/infrastructure/repository/TeamRepository.java": {
+      "role": "index",
+      "sha256": "df02bdbe68e9d8cbc1079bd7a39574e94be434cf90c0bf0179a831cc43897c4c",
+      "size": 526,
+      "normalized_sha256": "df02bdbe68e9d8cbc1079bd7a39574e94be434cf90c0bf0179a831cc43897c4c"
+    },
+    "agenthub-backend/src/main/resources/application-demo.yml": {
+      "role": "index",
+      "sha256": "34c47a18b18acb14ad625ede021752a393e87ec3321927677a212add084c43bd",
+      "size": 286,
+      "normalized_sha256": "34c47a18b18acb14ad625ede021752a393e87ec3321927677a212add084c43bd"
+    },
+    "agenthub-backend/src/main/resources/application-dev.yml": {
+      "role": "index",
+      "sha256": "069b0f7a28168c08c7cab04ef511b75a40ddf4b1813c74991b057f1ddade41ff",
+      "size": 762,
+      "normalized_sha256": "069b0f7a28168c08c7cab04ef511b75a40ddf4b1813c74991b057f1ddade41ff"
+    },
+    "agenthub-backend/src/main/resources/application-local.yml.example": {
+      "role": "index",
+      "sha256": "a92dd2431456a5dddc8f90a7fd0a424b15e1f00b2476075a2f2c7676f4931b40",
+      "size": 899,
+      "normalized_sha256": "a92dd2431456a5dddc8f90a7fd0a424b15e1f00b2476075a2f2c7676f4931b40"
+    },
+    "agenthub-backend/src/main/resources/application-prod.yml": {
+      "role": "index",
+      "sha256": "77cff59b9be3a636d1dc5890d45fc578caf49957acf7952cb4c57637a060a64b",
+      "size": 2142,
+      "normalized_sha256": "77cff59b9be3a636d1dc5890d45fc578caf49957acf7952cb4c57637a060a64b"
+    },
+    "agenthub-backend/src/main/resources/application-test.yml": {
+      "role": "index",
+      "sha256": "be93d7e58f3d59f4528d93536ba1041fef56311fb6184146fb58718621499d43",
+      "size": 1348,
+      "normalized_sha256": "be93d7e58f3d59f4528d93536ba1041fef56311fb6184146fb58718621499d43"
+    },
+    "agenthub-backend/src/main/resources/application.yml": {
+      "role": "index",
+      "sha256": "053eb156831b846d0710131bca716c648498cc6717f5899353dde5d8adfce0f2",
+      "size": 1899,
+      "normalized_sha256": "053eb156831b846d0710131bca716c648498cc6717f5899353dde5d8adfce0f2"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V10__phase_c_scheduling_leases_and_recovery.sql": {
+      "role": "index",
+      "sha256": "20a083d3abe365adc9f0169c01f02b7e926354b5f6885c3c7e865e8f0b5a4a79",
+      "size": 2920,
+      "normalized_sha256": "20a083d3abe365adc9f0169c01f02b7e926354b5f6885c3c7e865e8f0b5a4a79"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V11__phase_d_sandbox_lifecycle_and_isolation.sql": {
+      "role": "index",
+      "sha256": "44ee1c979be0786055a0d098af33e989deda448e4a6530df1354a780de0968df",
+      "size": 867,
+      "normalized_sha256": "44ee1c979be0786055a0d098af33e989deda448e4a6530df1354a780de0968df"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V12__phase_e_production_ops_and_lock_precision.sql": {
+      "role": "index",
+      "sha256": "fe48a123e581a88ef2fb50e276bd77f8286f6a81ed000fb0fb6f2236a4bf209b",
+      "size": 541,
+      "normalized_sha256": "fe48a123e581a88ef2fb50e276bd77f8286f6a81ed000fb0fb6f2236a4bf209b"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V1__init_schema.sql": {
+      "role": "index",
+      "sha256": "4494f50553cc572083af09345b1a4abab7a099f287c0e41aaa6b9ac8535f18aa",
+      "size": 7281,
+      "normalized_sha256": "4494f50553cc572083af09345b1a4abab7a099f287c0e41aaa6b9ac8535f18aa"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V2__seed_system_baseline.sql": {
+      "role": "index",
+      "sha256": "41815733fe55e4226e6af3b6d46f988cd672785894732c7bebb2b76aafd620b6",
+      "size": 2101,
+      "normalized_sha256": "41815733fe55e4226e6af3b6d46f988cd672785894732c7bebb2b76aafd620b6"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V3__phase2_workspace_audit_artifacts.sql": {
+      "role": "index",
+      "sha256": "90aa1236f311fb2add5a36864c589ff8e80e9fddc8aea3e559c904a4cbc30db0",
+      "size": 981,
+      "normalized_sha256": "90aa1236f311fb2add5a36864c589ff8e80e9fddc8aea3e559c904a4cbc30db0"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V4__phase3_execution_kernel_and_state_machine.sql": {
+      "role": "index",
+      "sha256": "117417311b8059624a8c4cbee3dee640ca3eee9981a0e6eede3f6e8e41f340c5",
+      "size": 977,
+      "normalized_sha256": "117417311b8059624a8c4cbee3dee640ca3eee9981a0e6eede3f6e8e41f340c5"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V5__phase4_workflow_dag_and_orchestration.sql": {
+      "role": "index",
+      "sha256": "973f0ee63cc1d584697654e4f4aee38b4a4537dc9c640ce7dd0e15e89b7c65b4",
+      "size": 1408,
+      "normalized_sha256": "973f0ee63cc1d584697654e4f4aee38b4a4537dc9c640ce7dd0e15e89b7c65b4"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V6__phase5_agent_providers_and_routing.sql": {
+      "role": "index",
+      "sha256": "6f47d9d8d6d376432c4d2cff8d8657b92e20bc63c73e25fc11658cee74fb3c54",
+      "size": 4252,
+      "normalized_sha256": "6f47d9d8d6d376432c4d2cff8d8657b92e20bc63c73e25fc11658cee74fb3c54"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V7__phase6_multi_agent_teams_and_message_bus.sql": {
+      "role": "index",
+      "sha256": "65e445b0c9dc7762f026159f18f5c041b7e04384308c00f49c22e192fdc28499",
+      "size": 3520,
+      "normalized_sha256": "65e445b0c9dc7762f026159f18f5c041b7e04384308c00f49c22e192fdc28499"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V8__phase7_sandbox_and_deployments.sql": {
+      "role": "index",
+      "sha256": "5d38aacf60cd1140b3e541fec26ded5af5a9ead8725515d4d4cc5a7aa60a72b6",
+      "size": 1336,
+      "normalized_sha256": "5d38aacf60cd1140b3e541fec26ded5af5a9ead8725515d4d4cc5a7aa60a72b6"
+    },
+    "agenthub-backend/src/main/resources/db/migration/V9__phase_a_security_revocation_and_audit.sql": {
+      "role": "index",
+      "sha256": "bc45b7615671e4e96b8446691cea2b91280e404971be1f88353aaa1fc37f51b0",
+      "size": 952,
+      "normalized_sha256": "bc45b7615671e4e96b8446691cea2b91280e404971be1f88353aaa1fc37f51b0"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ActuatorAndMetricsIntegrationTest.java": {
+      "role": "index",
+      "sha256": "d1f4f19f31557cadc8fb25f490a23a84867088a1274a1be9805bb3be0eb6ae81",
+      "size": 3964,
+      "normalized_sha256": "d1f4f19f31557cadc8fb25f490a23a84867088a1274a1be9805bb3be0eb6ae81"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/AgentAdapterTest.java": {
+      "role": "index",
+      "sha256": "26da2cfc333ffb450c18cff50345093a5964b69e1c0091add88d82713093d83b",
+      "size": 4366,
+      "normalized_sha256": "26da2cfc333ffb450c18cff50345093a5964b69e1c0091add88d82713093d83b"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/AociCognitionVerificationTest.java": {
+      "role": "index",
+      "sha256": "785dfbeb0b095a7622957e45df72b3a89bbdaa8274ff0ee552b21f9ea13f0be2",
+      "size": 14489,
+      "normalized_sha256": "785dfbeb0b095a7622957e45df72b3a89bbdaa8274ff0ee552b21f9ea13f0be2"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ArchUnitArchitectureTest.java": {
+      "role": "index",
+      "sha256": "f3f283099c55ec2928fb42bfd5d86c0e51dded52d723a213ebf23bf610001b6c",
+      "size": 11062,
+      "normalized_sha256": "f3f283099c55ec2928fb42bfd5d86c0e51dded52d723a213ebf23bf610001b6c"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/AuthenticationAndResourceGuardTest.java": {
+      "role": "index",
+      "sha256": "9a3c15efd30ed2f6273f5bc7dd56b0a534f55f6ccab4d03daa6a35477b101a96",
+      "size": 8454,
+      "normalized_sha256": "9a3c15efd30ed2f6273f5bc7dd56b0a534f55f6ccab4d03daa6a35477b101a96"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ContextWindowAndRollingSummaryTest.java": {
+      "role": "index",
+      "sha256": "439e7be0b35433aa201227cec70bd87bdeb57460ad188a745b282bcf13d796c3",
+      "size": 5717,
+      "normalized_sha256": "439e7be0b35433aa201227cec70bd87bdeb57460ad188a745b282bcf13d796c3"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ConversationEntityRelationAndMessageSchemaTest.java": {
+      "role": "index",
+      "sha256": "522c7617a217147dddce6958caef85cc33ceb4b17dff2ef98887da2f1f497d67",
+      "size": 4394,
+      "normalized_sha256": "522c7617a217147dddce6958caef85cc33ceb4b17dff2ef98887da2f1f497d67"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ConversationMonotonicSequenceAndConcurrencyTest.java": {
+      "role": "index",
+      "sha256": "4d691dbfd11ca49a0d54652fe8497e3b59a53863deee41ad4e462ec78407bebc",
+      "size": 11112,
+      "normalized_sha256": "4d691dbfd11ca49a0d54652fe8497e3b59a53863deee41ad4e462ec78407bebc"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ConversationSseStreamAndReconnectionTest.java": {
+      "role": "index",
+      "sha256": "1160c87b99c250e597b07f8e7cb94f4f683ae3cbb40feab99d89e88c1ccaaecb",
+      "size": 2895,
+      "normalized_sha256": "1160c87b99c250e597b07f8e7cb94f4f683ae3cbb40feab99d89e88c1ccaaecb"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/CrossAgentProtocolAndLoopDetectionTest.java": {
+      "role": "index",
+      "sha256": "1d591908671b9de092e4aa697cd11844f22d69b0c211b6a91a9cd62e39ce7f4e",
+      "size": 10827,
+      "normalized_sha256": "1d591908671b9de092e4aa697cd11844f22d69b0c211b6a91a9cd62e39ce7f4e"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/DeploymentLifecycleAndControllerIntegrationTest.java": {
+      "role": "index",
+      "sha256": "eafcf0c558de6f73b88943f05a242ccfa968ed13f6d6209a47ed8a1c94de9eea",
+      "size": 5788,
+      "normalized_sha256": "eafcf0c558de6f73b88943f05a242ccfa968ed13f6d6209a47ed8a1c94de9eea"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/DynamicProviderRouterAndRoutingPolicyTest.java": {
+      "role": "index",
+      "sha256": "8727f75f50c14294c01c78d3de91fb7d4dbedd988fb22ad96487634a5e2f8c86",
+      "size": 6335,
+      "normalized_sha256": "8727f75f50c14294c01c78d3de91fb7d4dbedd988fb22ad96487634a5e2f8c86"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ExecutionEnginePersistenceAndReplayTest.java": {
+      "role": "index",
+      "sha256": "ff588d644df4257d3597d85f013282dd95c11a6e1572a903e760fd4431d92284",
+      "size": 3583,
+      "normalized_sha256": "ff588d644df4257d3597d85f013282dd95c11a6e1572a903e760fd4431d92284"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ExecutionSchedulerAndRuntimeIntegrationTest.java": {
+      "role": "index",
+      "sha256": "a34ceeb4d2eefa14dfbbfba7765442eefa549c90d38aad662e1ba898d3f6319c",
+      "size": 6058,
+      "normalized_sha256": "a34ceeb4d2eefa14dfbbfba7765442eefa549c90d38aad662e1ba898d3f6319c"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ExecutionSseStreamAndReconnectionTest.java": {
+      "role": "index",
+      "sha256": "6d84ccd74ed51b85308567908e67215ced0c4768e9820980d6890fdf45c4b8e0",
+      "size": 8499,
+      "normalized_sha256": "6d84ccd74ed51b85308567908e67215ced0c4768e9820980d6890fdf45c4b8e0"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ExecutionStateMachineAndConcurrencyTest.java": {
+      "role": "index",
+      "sha256": "d763ba85d78acdbab1e048375a45902d6c65ab039b21dfec1e0b84cba00e653a",
+      "size": 15767,
+      "normalized_sha256": "d763ba85d78acdbab1e048375a45902d6c65ab039b21dfec1e0b84cba00e653a"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/FlywayMigrationAndSchemaTest.java": {
+      "role": "index",
+      "sha256": "b938824236a19168b28901b6daa82f19d98ac291dfc9179b6f756631b34281b8",
+      "size": 4929,
+      "normalized_sha256": "b938824236a19168b28901b6daa82f19d98ac291dfc9179b6f756631b34281b8"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/FullLifecycleEndToEndIntegrationTest.java": {
+      "role": "index",
+      "sha256": "2b261d488908db3e0bdd5eb239e87d3ad88ad7e93dfe025a8e14edef0ab9d9f5",
+      "size": 13806,
+      "normalized_sha256": "2b261d488908db3e0bdd5eb239e87d3ad88ad7e93dfe025a8e14edef0ab9d9f5"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/HighConcurrencyStressIntegrationTest.java": {
+      "role": "index",
+      "sha256": "78e60e8712f5699062dc97c36ba841a42c41d5b4edae727c6847cc4293a1ca93",
+      "size": 11209,
+      "normalized_sha256": "78e60e8712f5699062dc97c36ba841a42c41d5b4edae727c6847cc4293a1ca93"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/HumanInTheLoopApprovalIntegrationTest.java": {
+      "role": "index",
+      "sha256": "6a0708f886b7876e66bd07a9bdfcf51d6e0c6cf93a2f40d2e6f9969df9ebff10",
+      "size": 9862,
+      "normalized_sha256": "6a0708f886b7876e66bd07a9bdfcf51d6e0c6cf93a2f40d2e6f9969df9ebff10"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/IMCollaborationTest.java": {
+      "role": "index",
+      "sha256": "4b780600efd7814f26a1c8a3bcf4be81c266c17391af6d56a6f372c37fc2a7a1",
+      "size": 3717,
+      "normalized_sha256": "4b780600efd7814f26a1c8a3bcf4be81c266c17391af6d56a6f372c37fc2a7a1"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/MessageRoutingAndVisibilityIsolationTest.java": {
+      "role": "index",
+      "sha256": "6341386ff3f97fb735f7c1aa28d2fbb11a9f03b8445964fc4d1331a5dd0bc359",
+      "size": 6079,
+      "normalized_sha256": "6341386ff3f97fb735f7c1aa28d2fbb11a9f03b8445964fc4d1331a5dd0bc359"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/OpenInViewTransactionBoundaryTest.java": {
+      "role": "index",
+      "sha256": "16558c18a08512016e5fa69484eac97419f917acf182aeff43cafe86062a9de9",
+      "size": 2301,
+      "normalized_sha256": "16558c18a08512016e5fa69484eac97419f917acf182aeff43cafe86062a9de9"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/PersistentExecutionRecoveryAndLeaseTest.java": {
+      "role": "index",
+      "sha256": "549b6f8283229e076dd2cc3fe0c31d932eef9d4d753cb765b6d522906a32dd90",
+      "size": 12434,
+      "normalized_sha256": "549b6f8283229e076dd2cc3fe0c31d932eef9d4d753cb765b6d522906a32dd90"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase1ModuleConvergenceAndContractTest.java": {
+      "role": "index",
+      "sha256": "aa331bac6694ad01bf20900c0097bc53c30ac31a1af711d5930e4810864fa4c5",
+      "size": 37528,
+      "normalized_sha256": "aa331bac6694ad01bf20900c0097bc53c30ac31a1af711d5930e4810864fa4c5"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase2ControlledWorkspaceAndOnboardingTest.java": {
+      "role": "index",
+      "sha256": "d6b4d35dcdf5b79bd0e9f31182447249bd077ccbf48fda79a3d7b01693311f4c",
+      "size": 38110,
+      "normalized_sha256": "d6b4d35dcdf5b79bd0e9f31182447249bd077ccbf48fda79a3d7b01693311f4c"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase3WorkflowTemplatesAndOrchestratorPlanTest.java": {
+      "role": "index",
+      "sha256": "0bcffaf3d373faa2ae81ea443ec2e178c1ab1d4ce0c54fdc0015c962b392829b",
+      "size": 29660,
+      "normalized_sha256": "0bcffaf3d373faa2ae81ea443ec2e178c1ab1d4ce0c54fdc0015c962b392829b"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase4RunOperationsAndArtifactLineageTest.java": {
+      "role": "index",
+      "sha256": "ec9b4dfc5034e6d8e991608d2c91f63235c65c4ae9a3df62259ad31f8951d0b9",
+      "size": 34638,
+      "normalized_sha256": "ec9b4dfc5034e6d8e991608d2c91f63235c65c4ae9a3df62259ad31f8951d0b9"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase5QualityGateAndDeliveryTest.java": {
+      "role": "index",
+      "sha256": "5fd1775b5f9d507885d329e6e56245437f752c6d962e48a2649c8b0e63e88585",
+      "size": 35361,
+      "normalized_sha256": "5fd1775b5f9d507885d329e6e56245437f752c6d962e48a2649c8b0e63e88585"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase6TeamRbacAndOperationsTest.java": {
+      "role": "index",
+      "sha256": "dbb0ef2675af7d0ca391c2695c8b1045847ba13cffddc5948885da179ac9bba1",
+      "size": 27263,
+      "normalized_sha256": "dbb0ef2675af7d0ca391c2695c8b1045847ba13cffddc5948885da179ac9bba1"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase7LiveProvidersAndBudgetGovernanceTest.java": {
+      "role": "index",
+      "sha256": "9448e046b2da70c03f02f2a3df20fd4709879bafebcbc5dd823450de0616512b",
+      "size": 32735,
+      "normalized_sha256": "9448e046b2da70c03f02f2a3df20fd4709879bafebcbc5dd823450de0616512b"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase8PerformanceBenchmarkAndE2ETest.java": {
+      "role": "index",
+      "sha256": "4fa1b38a14eeeff15069f50807f566ef93d4702641eb88c2beea6e0eb8be6b72",
+      "size": 41939,
+      "normalized_sha256": "4fa1b38a14eeeff15069f50807f566ef93d4702641eb88c2beea6e0eb8be6b72"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/Phase9BaselineAndGovernanceGuardTest.java": {
+      "role": "index",
+      "sha256": "477887e435c9ea6298f92cf52a6160d4e1e0389e51ac516729730c7ec90f28c0",
+      "size": 28062,
+      "normalized_sha256": "477887e435c9ea6298f92cf52a6160d4e1e0389e51ac516729730c7ec90f28c0"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/PhaseASecurityAndResourceBoundaryIntegrationTest.java": {
+      "role": "index",
+      "sha256": "c9ad12b4f202c98691b51d0834ee8ca42138d1b64041230e1843a7bede9d8e47",
+      "size": 20640,
+      "normalized_sha256": "c9ad12b4f202c98691b51d0834ee8ca42138d1b64041230e1843a7bede9d8e47"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java": {
+      "role": "index",
+      "sha256": "9467a1feba63f1627488c01dc3e1d560b240aacccca61e5fdf6e355781f1571e",
+      "size": 31553,
+      "normalized_sha256": "9467a1feba63f1627488c01dc3e1d560b240aacccca61e5fdf6e355781f1571e"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java": {
+      "role": "index",
+      "sha256": "f5b4b8afe8681d163b9b7f83f9d3a99af0f424e872c26973ea41fe1ba33ea9ae",
+      "size": 41897,
+      "normalized_sha256": "f5b4b8afe8681d163b9b7f83f9d3a99af0f424e872c26973ea41fe1ba33ea9ae"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/PhaseFProductQualityAndEvidenceBundleIntegrationTest.java": {
+      "role": "index",
+      "sha256": "3a3de2fcc57826cce90a47ecbac0471afbafca895c5f1b55ec1327789e17c2da",
+      "size": 58800,
+      "normalized_sha256": "3a3de2fcc57826cce90a47ecbac0471afbafca895c5f1b55ec1327789e17c2da"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/PortAllocationAndHealthCheckTest.java": {
+      "role": "index",
+      "sha256": "e06a23f39f32fbe43a5ffaa10dbc7fd6a42ebe102f7344d7e70cb4f591ce15e7",
+      "size": 4793,
+      "normalized_sha256": "e06a23f39f32fbe43a5ffaa10dbc7fd6a42ebe102f7344d7e70cb4f591ce15e7"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ProfileIsolationTest.java": {
+      "role": "index",
+      "sha256": "86b2ca58cb97b02826714e846d6f4d3c82508dca8f59bb164a931fe78ca4111e",
+      "size": 9109,
+      "normalized_sha256": "86b2ca58cb97b02826714e846d6f4d3c82508dca8f59bb164a931fe78ca4111e"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ProviderAndTokenUsageControllerIntegrationTest.java": {
+      "role": "index",
+      "sha256": "1466bd45b94b2d15550730fc36d1425a29171087324146bce16fd3726521c0fb",
+      "size": 5297,
+      "normalized_sha256": "1466bd45b94b2d15550730fc36d1425a29171087324146bce16fd3726521c0fb"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ProviderDrivenAgentRuntimeIntegrationTest.java": {
+      "role": "index",
+      "sha256": "0a967955d33098d378cc507eef3252d0290f0511fc0cebe320f22e087bec3469",
+      "size": 6457,
+      "normalized_sha256": "0a967955d33098d378cc507eef3252d0290f0511fc0cebe320f22e087bec3469"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ProviderFaultToleranceAndFallbackTest.java": {
+      "role": "index",
+      "sha256": "2e6712e1d443640d2c1ede3db3bd992302fe1ddee33b871339ca539ca0933c06",
+      "size": 11658,
+      "normalized_sha256": "2e6712e1d443640d2c1ede3db3bd992302fe1ddee33b871339ca539ca0933c06"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/ProviderSpiAndPolymorphismContractTest.java": {
+      "role": "index",
+      "sha256": "7ec1995f19334fe5106c94e222fd9f2133fb956ff56b2f448393344087357289",
+      "size": 7987,
+      "normalized_sha256": "7ec1995f19334fe5106c94e222fd9f2133fb956ff56b2f448393344087357289"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/RestApiSecurityAndMultiTenancyIntegrationTest.java": {
+      "role": "index",
+      "sha256": "96c7c53b82a2f002b10be2bc1f66ad6973c528f9765c5b9e1d8aa1fef5128fa2",
+      "size": 17214,
+      "normalized_sha256": "96c7c53b82a2f002b10be2bc1f66ad6973c528f9765c5b9e1d8aa1fef5128fa2"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/SafeExpressionEvaluatorAndDataFlowTest.java": {
+      "role": "index",
+      "sha256": "ce77753dd8dda918d6588dc88c448973935e8324d4f35f6ba287a2eef8362529",
+      "size": 7146,
+      "normalized_sha256": "ce77753dd8dda918d6588dc88c448973935e8324d4f35f6ba287a2eef8362529"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/SandboxAndDeployTest.java": {
+      "role": "index",
+      "sha256": "4158afe7d122514851591b938f1d9daebd5888a55964ff961573e1d464c373aa",
+      "size": 1989,
+      "normalized_sha256": "4158afe7d122514851591b938f1d9daebd5888a55964ff961573e1d464c373aa"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/SandboxProviderAndExecutionTest.java": {
+      "role": "index",
+      "sha256": "61c6dd85c2aa028f7f3caa4da897fe97a917c131f93c6345fb300592179cac54",
+      "size": 7319,
+      "normalized_sha256": "61c6dd85c2aa028f7f3caa4da897fe97a917c131f93c6345fb300592179cac54"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/SandboxSecurityGuardAndFirewallTest.java": {
+      "role": "index",
+      "sha256": "aafb8c16a7eb2102d3ae41be7700b129e7bac7b0a538fbb9e32b098d313bb5fd",
+      "size": 9326,
+      "normalized_sha256": "aafb8c16a7eb2102d3ae41be7700b129e7bac7b0a538fbb9e32b098d313bb5fd"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/SecretMaskingAndCredentialSecurityTest.java": {
+      "role": "index",
+      "sha256": "b31a570fd3aad464e716b1325e72788aeade9b7bddab6e69d33cebaba2df6094",
+      "size": 3883,
+      "normalized_sha256": "b31a570fd3aad464e716b1325e72788aeade9b7bddab6e69d33cebaba2df6094"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/SystemHealthTest.java": {
+      "role": "index",
+      "sha256": "88ac8d80e67782764967fd23d3fcda602838b3ff0b04b1d01af3c92404885360",
+      "size": 1345,
+      "normalized_sha256": "88ac8d80e67782764967fd23d3fcda602838b3ff0b04b1d01af3c92404885360"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/TeamAndConversationControllerIntegrationTest.java": {
+      "role": "index",
+      "sha256": "f8b60826a24dfd9619ee311353eab7dad5764d2a0d22446ef92a81ae04d9ae10",
+      "size": 8946,
+      "normalized_sha256": "f8b60826a24dfd9619ee311353eab7dad5764d2a0d22446ef92a81ae04d9ae10"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/TeamTopologyAndCoordinationTest.java": {
+      "role": "index",
+      "sha256": "cab1fa5f43df30f51070f6d72df47b949398dff4f20aa70e30f17f5860186f14",
+      "size": 10728,
+      "normalized_sha256": "cab1fa5f43df30f51070f6d72df47b949398dff4f20aa70e30f17f5860186f14"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/TokenCostAccountingAndAuditingTest.java": {
+      "role": "index",
+      "sha256": "3e4adbdc61bb9b071675715c20b4a17081b9176c3db17f5260ef0b06f7aa588e",
+      "size": 4532,
+      "normalized_sha256": "3e4adbdc61bb9b071675715c20b4a17081b9176c3db17f5260ef0b06f7aa588e"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkflowAndJGitTest.java": {
+      "role": "index",
+      "sha256": "2ea1d2b1fc828768e3e4700a67f03e583ff08cad317e8b16336c2a1cb09f5b4c",
+      "size": 4793,
+      "normalized_sha256": "2ea1d2b1fc828768e3e4700a67f03e583ff08cad317e8b16336c2a1cb09f5b4c"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkflowBranchingAndSkipPruningTest.java": {
+      "role": "index",
+      "sha256": "f8bfdea14282c5d2d827e912714b28de61bf986e3ef0a60f32d799d7a50a9053",
+      "size": 7485,
+      "normalized_sha256": "f8bfdea14282c5d2d827e912714b28de61bf986e3ef0a60f32d799d7a50a9053"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkflowCancellationAndTimeoutTest.java": {
+      "role": "index",
+      "sha256": "2673cb7f1f3b5e15f074e1a9e7c21c4092555c1c9d85f4098faed88a4099f7e9",
+      "size": 7361,
+      "normalized_sha256": "2673cb7f1f3b5e15f074e1a9e7c21c4092555c1c9d85f4098faed88a4099f7e9"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkflowDagSchedulingAndParallelExecutionTest.java": {
+      "role": "index",
+      "sha256": "b38af3237e4fcfb1d09229e21ae05b07dd448fe2975a7bc578758d89d03e6685",
+      "size": 9746,
+      "normalized_sha256": "b38af3237e4fcfb1d09229e21ae05b07dd448fe2975a7bc578758d89d03e6685"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkflowDefinitionAndApprovalControllerIntegrationTest.java": {
+      "role": "index",
+      "sha256": "86c4aacb0032bc372a99563971aadaf10f4a20d7a5e3105665bb8765b6a921eb",
+      "size": 8355,
+      "normalized_sha256": "86c4aacb0032bc372a99563971aadaf10f4a20d7a5e3105665bb8765b6a921eb"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkflowDslValidationAndCycleDetectionTest.java": {
+      "role": "index",
+      "sha256": "7849733df68ceafdb9d573ab835f36dddf659e00e93c5b887e501308855dc3f4",
+      "size": 10698,
+      "normalized_sha256": "7849733df68ceafdb9d573ab835f36dddf659e00e93c5b887e501308855dc3f4"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkspaceAdversarialChallengeTest.java": {
+      "role": "index",
+      "sha256": "f8885a1df5af519f4349767bfbfc616cbcc278d7168e4581dbaab13bad700c33",
+      "size": 10698,
+      "normalized_sha256": "f8885a1df5af519f4349767bfbfc616cbcc278d7168e4581dbaab13bad700c33"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkspacePathGuardTest.java": {
+      "role": "index",
+      "sha256": "45669598687c6c5605d7b8a238afbbc6610759662476f47b0b6088c580fb913b",
+      "size": 12326,
+      "normalized_sha256": "45669598687c6c5605d7b8a238afbbc6610759662476f47b0b6088c580fb913b"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/WorkspaceSecurityAndJGitAuditIntegrationTest.java": {
+      "role": "index",
+      "sha256": "106e0c1ea8bd1fd1cf87c81c3543e6123ff926505e86f913fba4e5a647873cb5",
+      "size": 34424,
+      "normalized_sha256": "106e0c1ea8bd1fd1cf87c81c3543e6123ff926505e86f913fba4e5a647873cb5"
+    },
+    "agenthub-frontend/Dockerfile": {
+      "role": "index",
+      "sha256": "f647a428be96a494fff1ee34dc6db0ba7d9ab025e6f56fc31c317798bbd14986",
+      "size": 1399,
+      "normalized_sha256": "f647a428be96a494fff1ee34dc6db0ba7d9ab025e6f56fc31c317798bbd14986"
+    },
+    "agenthub-frontend/next-env.d.ts": {
+      "role": "index",
+      "sha256": "e462a655754db9df18b4a657454a7b6a88717ffded4e89403b2b3a47c6603fc3",
+      "size": 233,
+      "normalized_sha256": "9dd9d642cdb87d4d5b3173217e0c45429b3e47a6f5cf5fb0ead6c644ec5fed01"
+    },
+    "agenthub-frontend/next.config.mjs": {
+      "role": "index",
+      "sha256": "026765ae9740a10a31de265ebc609ac6555675a724f9d18ed3669fdb5c62c2b7",
+      "size": 511,
+      "normalized_sha256": "026765ae9740a10a31de265ebc609ac6555675a724f9d18ed3669fdb5c62c2b7"
+    },
+    "agenthub-frontend/package-lock.json": {
+      "role": "index",
+      "sha256": "256e1962bc8f8d220b7511ec953d81be15cce82aa081aae4d6d6233d3298dfc6",
+      "size": 65246,
+      "normalized_sha256": "256e1962bc8f8d220b7511ec953d81be15cce82aa081aae4d6d6233d3298dfc6"
+    },
+    "agenthub-frontend/package.json": {
+      "role": "index",
+      "sha256": "181fc548e540eff97cf056deee27e6600c3eddbfb24b23a874684a2fdbdedf9b",
+      "size": 644,
+      "normalized_sha256": "181fc548e540eff97cf056deee27e6600c3eddbfb24b23a874684a2fdbdedf9b"
+    },
+    "agenthub-frontend/postcss.config.js": {
+      "role": "index",
+      "sha256": "fa650b380adfabb151a0b352f7135e107e6352345f899060f1c5c231228f94bf",
+      "size": 83,
+      "normalized_sha256": "fa650b380adfabb151a0b352f7135e107e6352345f899060f1c5c231228f94bf"
+    },
+    "agenthub-frontend/public/robots.txt": {
+      "role": "index",
+      "sha256": "16ceb5ee3e0dc13aa9adf31a3ebbe45a1d965b8c2b9f72eaf84e5911e140ed95",
+      "size": 23,
+      "normalized_sha256": "16ceb5ee3e0dc13aa9adf31a3ebbe45a1d965b8c2b9f72eaf84e5911e140ed95"
+    },
+    "agenthub-frontend/src/app/globals.css": {
+      "role": "index",
+      "sha256": "f660d2e4281b5136b1a6af1828b279fd8c6cd2fd1a256cc1f8ce84349219d31c",
+      "size": 782,
+      "normalized_sha256": "f660d2e4281b5136b1a6af1828b279fd8c6cd2fd1a256cc1f8ce84349219d31c"
+    },
+    "agenthub-frontend/src/app/layout.tsx": {
+      "role": "index",
+      "sha256": "13564d0f5ec3da5d2a3fbcf7149f1ccd1c35731962782adc48f59d775a4793a0",
+      "size": 561,
+      "normalized_sha256": "13564d0f5ec3da5d2a3fbcf7149f1ccd1c35731962782adc48f59d775a4793a0"
+    },
+    "agenthub-frontend/src/app/page.tsx": {
+      "role": "index",
+      "sha256": "03046117721d94c562e20a0701efb83fd388d8eab97e99a0403428dcced6f2db",
+      "size": 14861,
+      "normalized_sha256": "03046117721d94c562e20a0701efb83fd388d8eab97e99a0403428dcced6f2db"
+    },
+    "agenthub-frontend/src/components/WorkflowCanvas.tsx": {
+      "role": "index",
+      "sha256": "fd1c70e1a7f7c8e8d9bd8d2b277c7c06da68ad827a5617e9dd2d15ffd1c1c5f7",
+      "size": 8343,
+      "normalized_sha256": "fd1c70e1a7f7c8e8d9bd8d2b277c7c06da68ad827a5617e9dd2d15ffd1c1c5f7"
+    },
+    "agenthub-frontend/src/components/WorkspaceExplorer.tsx": {
+      "role": "index",
+      "sha256": "21229ed0c1a1340e4c62baf7098f5bbe8870442a303031561d4c28159f5ad48b",
+      "size": 15759,
+      "normalized_sha256": "21229ed0c1a1340e4c62baf7098f5bbe8870442a303031561d4c28159f5ad48b"
+    },
+    "agenthub-frontend/src/components/auth/AuthModal.tsx": {
+      "role": "index",
+      "sha256": "f7d22524e08144c8095d0f47a0c068bbd9ef777e29e6f92793763049932c4926",
+      "size": 7845,
+      "normalized_sha256": "f7d22524e08144c8095d0f47a0c068bbd9ef777e29e6f92793763049932c4926"
+    },
+    "agenthub-frontend/src/components/common/BentoCard.tsx": {
+      "role": "index",
+      "sha256": "cd6c1a4cdccf67cdd8fd19e50df701cdd74efa88bfb34c58fcb936f0212ed8a8",
+      "size": 2360,
+      "normalized_sha256": "cd6c1a4cdccf67cdd8fd19e50df701cdd74efa88bfb34c58fcb936f0212ed8a8"
+    },
+    "agenthub-frontend/src/components/common/MetricCard.tsx": {
+      "role": "index",
+      "sha256": "3cf5cde6808c559b90d92a15b75ac965bdbd4c6415f15f2316108acaebf79c01",
+      "size": 2643,
+      "normalized_sha256": "3cf5cde6808c559b90d92a15b75ac965bdbd4c6415f15f2316108acaebf79c01"
+    },
+    "agenthub-frontend/src/components/common/StatusBadge.tsx": {
+      "role": "index",
+      "sha256": "6bc82bfd97942cb0b35dd36c86d3ee2b2f0612bcbf6b285b32c72537edf84681",
+      "size": 2421,
+      "normalized_sha256": "6bc82bfd97942cb0b35dd36c86d3ee2b2f0612bcbf6b285b32c72537edf84681"
+    },
+    "agenthub-frontend/src/components/dashboard/ApprovalActionCard.tsx": {
+      "role": "index",
+      "sha256": "4ceeb03277b3a3f3ca48a667604ac6981749c12ca402cb10bb6cc0856d158e00",
+      "size": 7057,
+      "normalized_sha256": "4ceeb03277b3a3f3ca48a667604ac6981749c12ca402cb10bb6cc0856d158e00"
+    },
+    "agenthub-frontend/src/components/dashboard/DagTopologyVisualizer.tsx": {
+      "role": "index",
+      "sha256": "3f56b5c706f9b72439ee4aea07b6165820b34ea152566147be2321b0e4c26b30",
+      "size": 18867,
+      "normalized_sha256": "3f56b5c706f9b72439ee4aea07b6165820b34ea152566147be2321b0e4c26b30"
+    },
+    "agenthub-frontend/src/components/dashboard/DeploymentPanel.tsx": {
+      "role": "index",
+      "sha256": "fd5441d348bfb7630a5ee1bd4c1a5ddccbeee39e7bfe288d0eaaac500fb1956c",
+      "size": 1705,
+      "normalized_sha256": "fd5441d348bfb7630a5ee1bd4c1a5ddccbeee39e7bfe288d0eaaac500fb1956c"
+    },
+    "agenthub-frontend/src/components/dashboard/DiffArtifactReviewer.tsx": {
+      "role": "index",
+      "sha256": "60b81995c0e7d9476513f0f031c2f1daad61800e99783cfdf3550d6a7a532f6a",
+      "size": 32013,
+      "normalized_sha256": "60b81995c0e7d9476513f0f031c2f1daad61800e99783cfdf3550d6a7a532f6a"
+    },
+    "agenthub-frontend/src/components/dashboard/HeaderNav.tsx": {
+      "role": "index",
+      "sha256": "27181c7b4ca9972a2d2746ff1e9fc26ddb94e60eb02ba5e7630f6ddcb6ee9ce7",
+      "size": 9147,
+      "normalized_sha256": "27181c7b4ca9972a2d2746ff1e9fc26ddb94e60eb02ba5e7630f6ddcb6ee9ce7"
+    },
+    "agenthub-frontend/src/components/dashboard/LiveExecutionTerminal.tsx": {
+      "role": "index",
+      "sha256": "6aeff5df148fcd720e935f8988acfeb1d2b2cc6b692c17168a75441de35d49d8",
+      "size": 15533,
+      "normalized_sha256": "6aeff5df148fcd720e935f8988acfeb1d2b2cc6b692c17168a75441de35d49d8"
+    },
+    "agenthub-frontend/src/components/dashboard/MetricBentoGrid.tsx": {
+      "role": "index",
+      "sha256": "6792c42af1f0d28355e1d836b8a23a690a393afde3d4dc8617f3381c5151c5f9",
+      "size": 4457,
+      "normalized_sha256": "6792c42af1f0d28355e1d836b8a23a690a393afde3d4dc8617f3381c5151c5f9"
+    },
+    "agenthub-frontend/src/components/dashboard/MultiAgentSwarmChat.tsx": {
+      "role": "index",
+      "sha256": "9b5619bbeb52bd0cefc56f6c1ee78b9e2959e2e7a4c11544f32e0ebb797dd905",
+      "size": 17652,
+      "normalized_sha256": "9b5619bbeb52bd0cefc56f6c1ee78b9e2959e2e7a4c11544f32e0ebb797dd905"
+    },
+    "agenthub-frontend/src/components/dashboard/OperationsConsolePanel.tsx": {
+      "role": "index",
+      "sha256": "58fb2deed03a82544af4a251dcc60b805601ed9a488883174fc12dac8440747f",
+      "size": 24443,
+      "normalized_sha256": "58fb2deed03a82544af4a251dcc60b805601ed9a488883174fc12dac8440747f"
+    },
+    "agenthub-frontend/src/components/dashboard/ProjectShell.tsx": {
+      "role": "index",
+      "sha256": "1daf7985f4e34a1a551324071f0edcfbb4ee1d9e86b24f3cda25f81776d5f73d",
+      "size": 9603,
+      "normalized_sha256": "1daf7985f4e34a1a551324071f0edcfbb4ee1d9e86b24f3cda25f81776d5f73d"
+    },
+    "agenthub-frontend/src/components/dashboard/ProviderCostDashboard.tsx": {
+      "role": "index",
+      "sha256": "e5c96b4fb03c5166ae2ba4d05e0c377a1b27a80fcf0c8e0e4da7e91c2be2c7d3",
+      "size": 21024,
+      "normalized_sha256": "e5c96b4fb03c5166ae2ba4d05e0c377a1b27a80fcf0c8e0e4da7e91c2be2c7d3"
+    },
+    "agenthub-frontend/src/components/dashboard/ReviewSidebar.tsx": {
+      "role": "index",
+      "sha256": "ee52260f7f38109148e406c46fc7fbf523688de4d43835d514db7f55300321e8",
+      "size": 1466,
+      "normalized_sha256": "ee52260f7f38109148e406c46fc7fbf523688de4d43835d514db7f55300321e8"
+    },
+    "agenthub-frontend/src/components/dashboard/RunOperationsPanel.tsx": {
+      "role": "index",
+      "sha256": "ebf829b51c9f8fefba5eba8236c8c0f3536fa6addc5673d8dbc86dc8176cd526",
+      "size": 37864,
+      "normalized_sha256": "ebf829b51c9f8fefba5eba8236c8c0f3536fa6addc5673d8dbc86dc8176cd526"
+    },
+    "agenthub-frontend/src/components/dashboard/RunWorkspacePanel.tsx": {
+      "role": "index",
+      "sha256": "7b8b734e9f9b1a059b2a726924482cb851881c3ace7fe0dd418ce5a844a34833",
+      "size": 2205,
+      "normalized_sha256": "7b8b734e9f9b1a059b2a726924482cb851881c3ace7fe0dd418ce5a844a34833"
+    },
+    "agenthub-frontend/src/components/dashboard/SandboxPreviewPanel.tsx": {
+      "role": "index",
+      "sha256": "68a7c7375438bef9ce51810976b9803be3daad805dc5d9ae9f9d88fee629b197",
+      "size": 17074,
+      "normalized_sha256": "68a7c7375438bef9ce51810976b9803be3daad805dc5d9ae9f9d88fee629b197"
+    },
+    "agenthub-frontend/src/components/dashboard/StructuredDiffReviewModal.tsx": {
+      "role": "index",
+      "sha256": "3ce443a4851a80542af026ef68261afc55a32c006001d77e99df1ce414570d5d",
+      "size": 22930,
+      "normalized_sha256": "3ce443a4851a80542af026ef68261afc55a32c006001d77e99df1ce414570d5d"
+    },
+    "agenthub-frontend/src/components/dashboard/TeamRbacPanel.tsx": {
+      "role": "index",
+      "sha256": "7ba64de288d01cf4f1729d87f2b190aed0f941b6588b01c24281ef172a2a6ced",
+      "size": 21473,
+      "normalized_sha256": "7ba64de288d01cf4f1729d87f2b190aed0f941b6588b01c24281ef172a2a6ced"
+    },
+    "agenthub-frontend/src/components/project/CreateProjectModal.tsx": {
+      "role": "index",
+      "sha256": "9debb38f3ce99b4e7c73250f34f52bebf87f3c9f3e44156884cf297f736b5c90",
+      "size": 34367,
+      "normalized_sha256": "9debb38f3ce99b4e7c73250f34f52bebf87f3c9f3e44156884cf297f736b5c90"
+    },
+    "agenthub-frontend/src/components/workflow/OrchestratorPlanModal.tsx": {
+      "role": "index",
+      "sha256": "3b1d20a763020b3566af760aa6b2d897d9c597fdd013dd83babc31bf86d83a63",
+      "size": 24664,
+      "normalized_sha256": "3b1d20a763020b3566af760aa6b2d897d9c597fdd013dd83babc31bf86d83a63"
+    },
+    "agenthub-frontend/src/services/api.ts": {
+      "role": "index",
+      "sha256": "e7a0449f1e8fe2a4d0b2732b7fc6191944de1345a42481ede53a7d6eaf8a6c08",
+      "size": 2132,
+      "normalized_sha256": "e7a0449f1e8fe2a4d0b2732b7fc6191944de1345a42481ede53a7d6eaf8a6c08"
+    },
+    "agenthub-frontend/src/services/api/approvals.ts": {
+      "role": "index",
+      "sha256": "bef3ea18f4e70a3df43be1ea7455e39d9f1f914195eb5757f8904559d2ca6c30",
+      "size": 1240,
+      "normalized_sha256": "bef3ea18f4e70a3df43be1ea7455e39d9f1f914195eb5757f8904559d2ca6c30"
+    },
+    "agenthub-frontend/src/services/api/artifacts.ts": {
+      "role": "index",
+      "sha256": "85e1b080d14632fa7433432c8bbe182473fd534477780aa5f9a474aa89aac1cb",
+      "size": 6346,
+      "normalized_sha256": "85e1b080d14632fa7433432c8bbe182473fd534477780aa5f9a474aa89aac1cb"
+    },
+    "agenthub-frontend/src/services/api/auth.ts": {
+      "role": "index",
+      "sha256": "3c4315e4f4adb88541fd3c7b55d6215ed5b49fad55747d2829ab594c9d5bae75",
+      "size": 3409,
+      "normalized_sha256": "3c4315e4f4adb88541fd3c7b55d6215ed5b49fad55747d2829ab594c9d5bae75"
+    },
+    "agenthub-frontend/src/services/api/deployments.ts": {
+      "role": "index",
+      "sha256": "57658b13bbb641132762c9c78d986c1fff695395560810c6470c2a8194a7deca",
+      "size": 4173,
+      "normalized_sha256": "57658b13bbb641132762c9c78d986c1fff695395560810c6470c2a8194a7deca"
+    },
+    "agenthub-frontend/src/services/api/errors.ts": {
+      "role": "index",
+      "sha256": "cf7a4ae396af59e5712b4d62718f0feafb166bea557e9ab762b69cfd593996ea",
+      "size": 4986,
+      "normalized_sha256": "cf7a4ae396af59e5712b4d62718f0feafb166bea557e9ab762b69cfd593996ea"
+    },
+    "agenthub-frontend/src/services/api/projects.ts": {
+      "role": "index",
+      "sha256": "4cc5e457b9f02d3d7f2e27b9897974df8cd25b9d41c33e90ef4aea1a2e54fb28",
+      "size": 5597,
+      "normalized_sha256": "4cc5e457b9f02d3d7f2e27b9897974df8cd25b9d41c33e90ef4aea1a2e54fb28"
+    },
+    "agenthub-frontend/src/services/api/runs.ts": {
+      "role": "index",
+      "sha256": "b2da2648a2549ef27ccc6988480f1e54660159db656dd4e1178f720b912861c7",
+      "size": 18865,
+      "normalized_sha256": "b2da2648a2549ef27ccc6988480f1e54660159db656dd4e1178f720b912861c7"
+    },
+    "agenthub-frontend/src/services/api/stream.ts": {
+      "role": "index",
+      "sha256": "b39f0b42852f3d6352a2776c9eb6c366c9593652105eef791e5a617c5c3fccab",
+      "size": 1443,
+      "normalized_sha256": "b39f0b42852f3d6352a2776c9eb6c366c9593652105eef791e5a617c5c3fccab"
+    },
+    "agenthub-frontend/src/services/api/workflows.ts": {
+      "role": "index",
+      "sha256": "50ed7afa8143289e357109cf1b5232f7dd33268ec2ee781133c0f27ff278d59c",
+      "size": 6260,
+      "normalized_sha256": "50ed7afa8143289e357109cf1b5232f7dd33268ec2ee781133c0f27ff278d59c"
+    },
+    "agenthub-frontend/src/services/api/workspaces.ts": {
+      "role": "index",
+      "sha256": "8bb5f687622b4ac77229558e451d1962e8a43fc7c11fcc1f37993cddbb74c564",
+      "size": 3827,
+      "normalized_sha256": "8bb5f687622b4ac77229558e451d1962e8a43fc7c11fcc1f37993cddbb74c564"
+    },
+    "agenthub-frontend/src/types/index.ts": {
+      "role": "index",
+      "sha256": "ee86ce45851d66cb70145a4619ed76841b3a372e2634a18d30e06a781f00caa9",
+      "size": 26510,
+      "normalized_sha256": "ee86ce45851d66cb70145a4619ed76841b3a372e2634a18d30e06a781f00caa9"
+    },
+    "agenthub-frontend/tailwind.config.ts": {
+      "role": "index",
+      "sha256": "8e0999e3825a0cd5edb9c2e7a377652d4516c08800032e1c110a6c571f62c376",
+      "size": 438,
+      "normalized_sha256": "8e0999e3825a0cd5edb9c2e7a377652d4516c08800032e1c110a6c571f62c376"
+    },
+    "agenthub-frontend/tsconfig.json": {
+      "role": "index",
+      "sha256": "83d292a6930a317ea31ef48e220097d2ca10c6c505f41d5954795acef48ca3b9",
+      "size": 602,
+      "normalized_sha256": "83d292a6930a317ea31ef48e220097d2ca10c6c505f41d5954795acef48ca3b9"
+    },
+    "aoci.code.txt": {
+      "role": "index",
+      "sha256": "e46b198df902514e95b601757d42d6d8b2a2f3f254773d184398c921e5655cc1",
+      "size": 14378,
+      "normalized_sha256": "e46b198df902514e95b601757d42d6d8b2a2f3f254773d184398c921e5655cc1"
+    },
+    "aoci.meta.txt": {
+      "role": "index",
+      "sha256": "fbc304fa05182547e96f1f8404c7c30ad6c366bba9589523f1019c2c1da0427c",
+      "size": 1989,
+      "normalized_sha256": "fbc304fa05182547e96f1f8404c7c30ad6c366bba9589523f1019c2c1da0427c"
+    },
+    "aoci.txt": {
+      "role": "index",
+      "sha256": "a444b5ae511065cc8ed9276e3ab1f9b0f5c6476e9601b17470eae4aa517fc70d",
+      "size": 297,
+      "normalized_sha256": "a444b5ae511065cc8ed9276e3ab1f9b0f5c6476e9601b17470eae4aa517fc70d"
+    },
+    "docker-compose.prod.yml": {
+      "role": "index",
+      "sha256": "63818b5e6d520c373b3a246ef54d212391744df443cae1ea759bedd8c39395fd",
+      "size": 6872,
+      "normalized_sha256": "63818b5e6d520c373b3a246ef54d212391744df443cae1ea759bedd8c39395fd"
+    },
+    "docker-compose.yml": {
+      "role": "index",
+      "sha256": "28ec32b7027fc3580c88a7fca0360ef7444efe2d29de8d9dd8b3b4d0c1858132",
+      "size": 850,
+      "normalized_sha256": "28ec32b7027fc3580c88a7fca0360ef7444efe2d29de8d9dd8b3b4d0c1858132"
+    },
+    "docker/nginx/agenthub-tls.conf": {
+      "role": "index",
+      "sha256": "4c3f0047af86c9c70adc86e3b9d85d386dbfc0ae2a49de5aad97036335956b3c",
+      "size": 5314,
+      "normalized_sha256": "4c3f0047af86c9c70adc86e3b9d85d386dbfc0ae2a49de5aad97036335956b3c"
+    },
+    "docker/nginx/agenthub.conf": {
+      "role": "index",
+      "sha256": "b87dbf5763071f58ff2cd80ad1bbc54804d88c471f8c8a1af6a61bf76dbd4812",
+      "size": 5330,
+      "normalized_sha256": "b87dbf5763071f58ff2cd80ad1bbc54804d88c471f8c8a1af6a61bf76dbd4812"
+    },
+    "docker/prometheus/agenthub-alerts.yml": {
+      "role": "index",
+      "sha256": "3e2865607ae36c39b32175b7349068d3995a0e48b132aafec09d68ed2748bb28",
+      "size": 4791,
+      "normalized_sha256": "3e2865607ae36c39b32175b7349068d3995a0e48b132aafec09d68ed2748bb28"
+    },
+    "docker/prometheus/prometheus.yml": {
+      "role": "index",
+      "sha256": "af2bc037ab236e8c3304f84e871755998543f1dc327525f94faeaecdb4602cc4",
+      "size": 463,
+      "normalized_sha256": "af2bc037ab236e8c3304f84e871755998543f1dc327525f94faeaecdb4602cc4"
+    },
+    "docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md": {
+      "role": "index",
+      "sha256": "4fb012795a01fdce37965704070464fa426392d277ac327c3acf77b5c0019cb4",
+      "size": 27005,
+      "normalized_sha256": "4fb012795a01fdce37965704070464fa426392d277ac327c3acf77b5c0019cb4"
+    },
+    "docs/AOCI_COGNITION.md": {
+      "role": "index",
+      "sha256": "d3fa32b09e19773799a46576097d2e177d5759efbaf58f91eb4ca297a456f52b",
+      "size": 3903,
+      "normalized_sha256": "d3fa32b09e19773799a46576097d2e177d5759efbaf58f91eb4ca297a456f52b"
+    },
+    "docs/API.md": {
+      "role": "index",
+      "sha256": "650b1b5151bb2151b531b48bdb52348d5226a488ef427de4f1dd03650c4a74be",
+      "size": 52064,
+      "normalized_sha256": "650b1b5151bb2151b531b48bdb52348d5226a488ef427de4f1dd03650c4a74be"
+    },
+    "docs/ARCHITECTURE.md": {
+      "role": "index",
+      "sha256": "bac577ebfd0f46ce0077e177e6e66ada4887637aa12c9ff61bcb85ea6e3827d2",
+      "size": 38147,
+      "normalized_sha256": "20d90c7d27d83ea7d8d7950bc6a269b0a24b22ef5254c059ea3d9d400f12cc5b"
+    },
+    "docs/CURRENT_CAPABILITY_BOUNDARIES.md": {
+      "role": "index",
+      "sha256": "faab332d9302f38d8c1976d31f3264b10ef65a658567632d1346c462bae3b04d",
+      "size": 24007,
+      "normalized_sha256": "faab332d9302f38d8c1976d31f3264b10ef65a658567632d1346c462bae3b04d"
+    },
+    "docs/E2E_DEMO_GUIDE.md": {
+      "role": "index",
+      "sha256": "fe38bd13eaa0d9ce7e3ae016a3a71f3034aa3ae5166476e8e505086618348227",
+      "size": 19511,
+      "normalized_sha256": "fe38bd13eaa0d9ce7e3ae016a3a71f3034aa3ae5166476e8e505086618348227"
+    },
+    "docs/TECH_WHITEPAPER_AND_DEFENSE.md": {
+      "role": "index",
+      "sha256": "5b63977aa150c07fe8c11452459a14ccd88464a70a983de55cac2337326e45de",
+      "size": 3896,
+      "normalized_sha256": "5b63977aa150c07fe8c11452459a14ccd88464a70a983de55cac2337326e45de"
+    },
+    "docs/adr/ADR-001-modular-monolith-architecture.md": {
+      "role": "index",
+      "sha256": "d78bf128cbba9564cf1ace4e990bdd1816ad0ea07192956c4f94a13e651c98c2",
+      "size": 7387,
+      "normalized_sha256": "d78bf128cbba9564cf1ace4e990bdd1816ad0ea07192956c4f94a13e651c98c2"
+    },
+    "docs/adr/ADR-002-sse-and-persistent-event-stream.md": {
+      "role": "index",
+      "sha256": "226a02615ed871a964a714763abfb1ed585ae77e6f45e04500717a5871b266c2",
+      "size": 8145,
+      "normalized_sha256": "226a02615ed871a964a714763abfb1ed585ae77e6f45e04500717a5871b266c2"
+    },
+    "docs/adr/ADR-003-workspace-distrusts-client-paths.md": {
+      "role": "index",
+      "sha256": "c89afe9f7cf3aa7e5d21cac8566271e87cb7cf2ec80caca7ca6afbb0a6f127f8",
+      "size": 8199,
+      "normalized_sha256": "c89afe9f7cf3aa7e5d21cac8566271e87cb7cf2ec80caca7ca6afbb0a6f127f8"
+    },
+    "docs/adr/ADR-004-mock-runtime-for-test-and-degraded-demo.md": {
+      "role": "index",
+      "sha256": "3d997449f8b59a280cde3747cf5dd8e0b3f1c9ce9ce6b83b831483cccea56363",
+      "size": 7754,
+      "normalized_sha256": "3d997449f8b59a280cde3747cf5dd8e0b3f1c9ce9ce6b83b831483cccea56363"
+    },
+    "docs/adr/ADR-005-database-driven-lease-and-crash-recovery.md": {
+      "role": "index",
+      "sha256": "51231bc0864c920cf15a099ecff6f6c75eb0f34f57356468121cfed667531a0b",
+      "size": 7036,
+      "normalized_sha256": "51231bc0864c920cf15a099ecff6f6c75eb0f34f57356468121cfed667531a0b"
+    },
+    "docs/adr/ADR-006-context-convergence-and-api-contract-v1.md": {
+      "role": "index",
+      "sha256": "fbc9a60eb990ed31870316045faa49312be67edf8f9b12f4ae6ec96976b4d67b",
+      "size": 8255,
+      "normalized_sha256": "fbc9a60eb990ed31870316045faa49312be67edf8f9b12f4ae6ec96976b4d67b"
+    },
+    "docs/adr/ADR-007-project-onboarding-and-controlled-workspace-policy.md": {
+      "role": "index",
+      "sha256": "cb3e0482c15302aaabeb22c57fdca95f736c7d5a5bd8cdeb63ed16d60471b5cc",
+      "size": 6077,
+      "normalized_sha256": "cb3e0482c15302aaabeb22c57fdca95f736c7d5a5bd8cdeb63ed16d60471b5cc"
+    },
+    "docs/adr/ADR-008-workflow-templates-kahn-dag-and-orchestrator-plan.md": {
+      "role": "index",
+      "sha256": "54a47da4c0e667c7ea7814b8607c74c3bc6f6b3b68c82454f81bb0ea9b8f11ca",
+      "size": 9054,
+      "normalized_sha256": "54a47da4c0e667c7ea7814b8607c74c3bc6f6b3b68c82454f81bb0ea9b8f11ca"
+    },
+    "docs/adr/ADR-009-run-operations-and-artifact-lineage.md": {
+      "role": "index",
+      "sha256": "033919dd5f8d7d471baa23653070619a4d2a8e7d5cf53f83e76af37731ffdf36",
+      "size": 8539,
+      "normalized_sha256": "033919dd5f8d7d471baa23653070619a4d2a8e7d5cf53f83e76af37731ffdf36"
+    },
+    "docs/adr/ADR-010-quality-gates-review-and-controlled-delivery.md": {
+      "role": "index",
+      "sha256": "004822d2a16353c156eeb3604b1a2b50f7cb0f5100998ca65788550f3202ba18",
+      "size": 8681,
+      "normalized_sha256": "004822d2a16353c156eeb3604b1a2b50f7cb0f5100998ca65788550f3202ba18"
+    },
+    "docs/adr/ADR-011-team-collaboration-rbac-and-operations-productization.md": {
+      "role": "index",
+      "sha256": "3233808e2dc8b6f4da8a39b5c54f620c7e1c1705e0714a5cdcf182791b950479",
+      "size": 7735,
+      "normalized_sha256": "3233808e2dc8b6f4da8a39b5c54f620c7e1c1705e0714a5cdcf182791b950479"
+    },
+    "docs/adr/ADR-012-live-providers-and-budget-governance.md": {
+      "role": "index",
+      "sha256": "e1fdce28765e733c9af047e4e92459ae47167caadabd7f1847f4774b6133bbdb",
+      "size": 6893,
+      "normalized_sha256": "e1fdce28765e733c9af047e4e92459ae47167caadabd7f1847f4774b6133bbdb"
+    },
+    "docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md": {
+      "role": "index",
+      "sha256": "24036bf09af47b0dc1c83cb66c3e39877bd234121f82d33c73162c4e50d3f0a0",
+      "size": 8686,
+      "normalized_sha256": "24036bf09af47b0dc1c83cb66c3e39877bd234121f82d33c73162c4e50d3f0a0"
+    },
+    "docs/evidence/sample-run-evidence-bundle.json": {
+      "role": "index",
+      "sha256": "17518bd2c339b90bfdbef6324a60328f38ca33de390168f978d5547d16e97bf2",
+      "size": 10306,
+      "normalized_sha256": "17518bd2c339b90bfdbef6324a60328f38ca33de390168f978d5547d16e97bf2"
+    },
+    "docs/images/01-orchestrator-collaboration-stream.png": {
+      "role": "index",
+      "sha256": "f0d952a56a0a836276ac125d2def250677abd02ac958a94c4a459ac3040deac4",
+      "size": 388152
+    },
+    "docs/images/02-jgit-diff-audit.png": {
+      "role": "index",
+      "sha256": "bc53431811d5e6f3facac21faf3f485d7a57b3e9fad74a2016b3b95427c863fe",
+      "size": 388221
+    },
+    "docs/images/03-workflow-dag-canvas.png": {
+      "role": "index",
+      "sha256": "c7a33bc1d2519f4e35c7a556b96ea35fe4dba6b21d66288703b2b401561bca51",
+      "size": 325877
+    },
+    "docs/images/04-workspace-file-explorer.png": {
+      "role": "index",
+      "sha256": "c9cace9cff277d07839ff84a3ed70152fa76eb2b6143d019dda6b1630b5044f2",
+      "size": 324432
+    },
+    "docs/images/05-sandbox-preview.png": {
+      "role": "index",
+      "sha256": "123bef748dd77c981b05d6f4a786fb752a48ee0fa4a4367c1f2c02532746204c",
+      "size": 326782
+    },
+    "docs/openapi-v1.json": {
+      "role": "index",
+      "sha256": "5eaaf1b42581f634a805b34f055348f5e8bce346e89096cb3182aff889eb5c00",
+      "size": 22759,
+      "normalized_sha256": "5eaaf1b42581f634a805b34f055348f5e8bce346e89096cb3182aff889eb5c00"
+    },
+    "docs/ops/ALERTING_RULES.md": {
+      "role": "index",
+      "sha256": "0224e677cb825f66acee714855d39c014051da043c6d2d008ec97d58a7ff7c65",
+      "size": 6183,
+      "normalized_sha256": "0224e677cb825f66acee714855d39c014051da043c6d2d008ec97d58a7ff7c65"
+    },
+    "docs/ops/DISASTER_RECOVERY_RUNBOOK.md": {
+      "role": "index",
+      "sha256": "48678ecb6285c395167891189137466712a600678206a81f4427df01bd832e6d",
+      "size": 11095,
+      "normalized_sha256": "48678ecb6285c395167891189137466712a600678206a81f4427df01bd832e6d"
+    },
+    "scripts/backup-prod.ps1": {
+      "role": "index",
+      "sha256": "3f34ded396c9658697452537828bc3107d5c3af4bac7d2cc7c55d33e95f67d53",
+      "size": 1984,
+      "normalized_sha256": "3f34ded396c9658697452537828bc3107d5c3af4bac7d2cc7c55d33e95f67d53"
+    },
+    "scripts/backup-prod.sh": {
+      "role": "index",
+      "sha256": "d58ed12bf34ae397fec4b119515ac27cfd102fcd9fdab0d5bddc06a7a189ba61",
+      "size": 4351,
+      "normalized_sha256": "d58ed12bf34ae397fec4b119515ac27cfd102fcd9fdab0d5bddc06a7a189ba61"
+    },
+    "scripts/deploy-prod.ps1": {
+      "role": "index",
+      "sha256": "9d49951f3af288b59e13dd0707b4eea1a42fa5298da461e1ff253d5b242315fa",
+      "size": 7174,
+      "normalized_sha256": "9d49951f3af288b59e13dd0707b4eea1a42fa5298da461e1ff253d5b242315fa"
+    },
+    "scripts/deploy-prod.sh": {
+      "role": "index",
+      "sha256": "be060a2230ef9ee206b0fb0c39252bb5431c2adfbf6281e71b4104d48f50f13a",
+      "size": 7099,
+      "normalized_sha256": "be060a2230ef9ee206b0fb0c39252bb5431c2adfbf6281e71b4104d48f50f13a"
+    },
+    "scripts/restore-prod.ps1": {
+      "role": "index",
+      "sha256": "0e207b419382a77ed6a23a956ecd787178a49262ac26c8e2c1978403e9b32d7f",
+      "size": 1693,
+      "normalized_sha256": "0e207b419382a77ed6a23a956ecd787178a49262ac26c8e2c1978403e9b32d7f"
+    },
+    "scripts/restore-prod.sh": {
+      "role": "index",
+      "sha256": "d63bf90aaa4fae93e93726b1ec16657229d9ab9be7927cca1e23a1d1950d13fe",
+      "size": 3274,
+      "normalized_sha256": "d63bf90aaa4fae93e93726b1ec16657229d9ab9be7927cca1e23a1d1950d13fe"
+    },
+    "scripts/run-e2e-demo.ps1": {
+      "role": "index",
+      "sha256": "cba08a1a48dc53c8b12f89d9d19e7a2fb8564093203a5834e7d72f778b0105fc",
+      "size": 10068,
+      "normalized_sha256": "cba08a1a48dc53c8b12f89d9d19e7a2fb8564093203a5834e7d72f778b0105fc"
+    },
+    "scripts/run-e2e-demo.sh": {
+      "role": "index",
+      "sha256": "6f0796ff73cf7ff718013081174a6393e14dd30f350131aa8e7d33c5039217ab",
+      "size": 9811,
+      "normalized_sha256": "6f0796ff73cf7ff718013081174a6393e14dd30f350131aa8e7d33c5039217ab"
+    },
+    "scripts/test-ci-local.ps1": {
+      "role": "index",
+      "sha256": "d96a24c8d344706d54c9b81978f9e426d87693233da9906dfdbb044a4e4f35ab",
+      "size": 6899,
+      "normalized_sha256": "d96a24c8d344706d54c9b81978f9e426d87693233da9906dfdbb044a4e4f35ab"
+    },
+    "scripts/test-ci-local.sh": {
+      "role": "index",
+      "sha256": "59d75607f9be2944134b3fac691a73a1a88a6c068b962dea6f580234b871597e",
+      "size": 4022,
+      "normalized_sha256": "59d75607f9be2944134b3fac691a73a1a88a6c068b962dea6f580234b871597e"
+    }
+  },
+  "managed_scope": {
+    "version": "managed-scope-baseline/v1",
+    "policy_identity": "3b029307ca9a998f7863146b9aae29089dbd7d695d8e543a5334a9ba32f41394",
+    "observe_change_policy": "review_required",
+    "budget_policy_identity": "15e9b37a6c57e9bf03c9df3d0d049eb5b9a7f5540f9d34960408114e2538a32d",
+    "budget_policy": {
+      "version": "cognition-budget-policy/v1",
+      "mode": "enforce",
+      "whole_index": {
+        "target_tokens": 200000,
+        "warning_tokens": 300000,
+        "max_tokens": 400000
+      },
+      "r": [
+        {
+          "min_c": 1,
+          "max_c": 4,
+          "target_tokens": 25,
+          "max_tokens": 50
+        },
+        {
+          "min_c": 5,
+          "max_c": 7,
+          "target_tokens": 45,
+          "max_tokens": 90
+        },
+        {
+          "min_c": 8,
+          "max_c": 8,
+          "target_tokens": 70,
+          "max_tokens": 140
+        },
+        {
+          "min_c": 9,
+          "max_c": 9,
+          "target_tokens": 90,
+          "max_tokens": 180
+        }
+      ],
+      "s": [
+        {
+          "min_c": 1,
+          "max_c": 4,
+          "target_tokens": 20,
+          "max_tokens": 40
+        },
+        {
+          "min_c": 5,
+          "max_c": 7,
+          "target_tokens": 40,
+          "max_tokens": 80
+        },
+        {
+          "min_c": 8,
+          "max_c": 8,
+          "target_tokens": 70,
+          "max_tokens": 140
+        },
+        {
+          "min_c": 9,
+          "max_c": 9,
+          "target_tokens": 100,
+          "max_tokens": 200
+        }
+      ]
+    },
+    "apply_authorization_mode": "auto"
+  }
+}

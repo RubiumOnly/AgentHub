@@ -69,7 +69,7 @@
   - 彻底终结非受控工作区随意挂载宿主敏感目录的安全隐患；
   - 接入过程结构化、可视化、可重试、可审计；
   - 上下文源版本化为后续 Agent 提供不可篡改的代码与架构基准；
-  - 严格遵守 `Phase0BaselineAndDebtFreezeGuardTest`：控制器数保持 18 个，Flyway 保持 12 个迁移，表数量保持 22 张。
+  - 严格遵守 `Phase9BaselineAndGovernanceGuardTest`：控制器数保持 18 个，Flyway 保持 12 个迁移，表数量保持 22 张。
 - **限制与后续工作**：
   - 远端 Git clone 在无网络或 Mock 环境下优雅回退至本地模板初始化；
   - Phase 3 将基于已版本化的 Context Source 接入 Orchestrator 计划生成与用户审查确认。

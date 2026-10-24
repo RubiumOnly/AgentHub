@@ -111,5 +111,5 @@
 ## 4. 验证与记录
 
 - `mvn test "-Dtest=Phase3WorkflowTemplatesAndOrchestratorPlanTest"`：5/5 全绿通过；
-- `mvn test "-Dtest=Phase0BaselineAndDebtFreezeGuardTest,ArchUnitArchitectureTest"`：15/15 全绿通过；
+- `mvn test "-Dtest=Phase9BaselineAndGovernanceGuardTest,ArchUnitArchitectureTest"`：15/15 全绿通过；
 - 前端 `npx tsc --noEmit` 与 `npm run build`：0 错误，静态构建完成。
