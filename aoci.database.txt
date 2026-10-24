@@ -1,0 +1,26 @@
+#AOCI-DATABASE-VOLUME: 1
+
+===agenthub-mysql-evidence/agenthub/database://agenthub-mysql-evidence/agenthub/===
+agent_definitions[BE6S]: F:存储版本化Agent定义清单 | R:code:agent/application/AgentApplicationService.java | A:定义注册与实例创建 | S:def_key有数据库级唯一约束，同名定义迭代必须走version列而非新行
+agent_instances[RE5T]: F:登记Agent运行实例 | R:code:agent/infrastructure/entity/AgentInstanceEntity.java | A:AgentRegistryController | S:实例经FK绑定定义主键而非def_key，定义更新不传导到既有实例
+approvals[TE6S]: F:持久化人工审批事实 | R:code:orchestration/infrastructure/entity/ApprovalEntity.java | A:ApprovalApplicationService | S:决定与审批人可空且无防重复决定的DB约束，幂等由应用层保证
+artifacts[TE6S]: F:登记Run产物与评审状态 | R:code:audit/application/ArtifactApplicationService.java | A:ArtifactController | S:run_id无数据库级外键，删除Run不级联清理产物；部署门禁只接受ACCEPTED评审
+auth_audit_logs[LL5T]: F:追加认证生命周期审计 | R:code:identity/infrastructure/security/AuthAuditService.java | A:认证链路 | S:与users无外键，用户删除不级联清理审计，审计事实独立留存
+conversation_participants[RE4T]: F:登记会话参与者 | R:code:conversation/infrastructure/entity/ConversationParticipantEntity.java | A:ConversationApplicationService | S:(conversation_id,agent_id)无唯一约束，重复加入由应用层防重
+conversations[EE6S]: F:存储协作会话主体 | R:code:conversation/application/ConversationApplicationService.java | A:ConversationController | S:last_sequence_num只是冗余投影，消息定序权威在messages行，两者失配时以messages为准
+deployments[TE8S]: F:登记预览部署全生命周期 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:DeploymentApplicationService | S:artifact_id与port均无DB唯一/外键约束，产物门禁与端口防冲突完全由应用层执行
+flyway_schema_history[HL6T]: F:记录Flyway迁移账本 | R:code:agenthub-backend/src/main/resources/db/migration/V1__init_schema.sql | A:Flyway | S:checksum列绑定迁移脚本内容，手改本表或脚本即破坏迁移链完整性
+invalidated_tokens[SI5T]: F:持久化吊销令牌 | R:code:identity/infrastructure/security/TokenProvider.java | A:认证校验 | S:吊销跨服务重启生效依赖启动时全量装载本表进内存，删除旧行会使已吊销令牌复活
+messages[ME7S]: F:存储会话消息序列 | R:code:conversation/domain/service/ConversationSequenceManager.java | A:会话消息链路 | S:(conversation_id,sequence_num)只是普通索引，序列唯一与无空洞由序列管理器行锁保证，直写本表可造出重复序列
+projects[EE6T]: F:存储项目主体与归属 | R:code:project/application/ProjectApplicationService.java | A:ProjectController | S:owner_id外键绑定users，归属链的根；ARCHIVED语义由应用层解释，DB不拦截活跃项目删除
+providers[EC7S]: F:存储Provider配置与熔断状态 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:路由矩阵 | S:凭据只存secret_ref引用无明文列；circuit_status与失败计数持久化，重启后熔断状态据此恢复
+run_events[QN8S]: F:持久化Run事件流 | R:code:execution/service/RunEventBroadcaster.java | A:SSE回放 | S:(run_id,sequence_num)为数据库级唯一键，重复序列写入直接冲突，回放语义靠此约束兜底
+step_runs[TE7S]: F:存储步骤执行与租约 | R:code:orchestration/scheduler/DagLeaseExecutor.java | A:DAG执行 | S:(status,lease_until)复合索引专为恢复扫描过期租约而建，改动索引需同步恢复Runner语义
+team_members[RE4T]: F:登记团队成员与角色 | R:code:team/infrastructure/entity/TeamMemberEntity.java | A:TeamApplicationService | S:system_prompt_override仅覆盖团队内提示词，出团队即失效，不落定义表
+teams[EE5S]: F:存储多Agent团队配置 | R:code:team/application/TeamApplicationService.java | A:TeamController | S:leader_agent_id无外键约束，悬空引用需应用层容错
+token_usages[TL6S]: F:审计Token消耗与成本 | R:code:agent/application/TokenUsageApplicationService.java | A:成本报表 | S:estimated_cost是定价表估算值非账单，与Provider账单核对才可信
+users[EI8S]: F:存储用户账户主档 | R:code:identity/application/AuthApplicationService.java | A:认证链路 | S:email为数据库级唯一键，注册唯一性最终防线在DB层，应用层预检只是体验优化
+workflow_definitions[EE7S]: F:存储版本化工作流DSL | R:code:orchestration/application/WorkflowOrchestrationApplicationService.java | A:WorkflowDefinitionController | S:checksum绑定DSL内容，Run的dsl_snapshot与本表独立，改定义不影响已冻结Run
+workflow_runs[TE9S]: F:存储Run执行与调度状态 | R:code:execution/application/RunCommandModule.java | A:执行域 | S:idempotency_key仅普通索引，幂等去重由应用层事务保证而非DB唯一键；dsl_snapshot在Run创建后冻结
+workspace_locks[KE7S]: F:登记工作区排他锁 | R:code:infrastructure/concurrency/WorkspaceLockManager.java | A:并发写入 | S:主键workspace_key一锁一行，锁互斥由DB主键最终兜底；expires_at_epoch_ms毫秒精度用于看门狗清理
+workspaces[EE6S]: F:登记项目受控工作区 | R:code:project/application/WorkspaceApplicationService.java | A:WorkspaceController | S:git_baseline_commit是Run冻结基线的锚点，改写它将破坏JGit快照与Diff的可追溯性

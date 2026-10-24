@@ -30,18 +30,20 @@
 - 内置 observe 规则针对 vendored 静态资源（`*.min.js`、fonts 等）；本仓库无该类路径，保留规则不生效。
 - `reference-shrimp-crab/` 为被 Git 忽略的参考仓库，不在受管范围内，不得据此复制功能。
 
-## 4. 当前治理状态（2026-10-24 实测）
+## 4. 当前治理状态（2026-10-24 实测，Database Cognition 完成后）
 
-- `aoci scan` 基线：588 个受管文件（2026-10-17 建立）。
-- 认知条目：0 条；`aoci check` 判定 `authoring_required`，584 项 `code_missing` finding。
-- `aoci verify`：Volumes v1 候选结构有效（root/meta SHA-256 与 composite identity 已固化在 `.aoci/verify_history/`）。
-- 治理对齐：未达成。条目创作必须由宿主模型基于真实证据逐条完成（F/R/A/S），经官方 `update-entry` 或 MCP `aoci_update_entry` 管线写入；禁止依据路径名、模板或规则引擎批量编造。
+- Code Cognition：586 条条目全量覆盖受管 Code 对象（400 后端生产 Java、62 测试 Java、前端、docs、CI、Docker、配置），S 覆盖 100%，E 规模档位不符 0/586。
+- Database Cognition：数据源 `agenthub-mysql-evidence`（MySQL，元数据只读，`business_data_read=false`）；Evidence Baseline 23 张表（22 业务表 + flyway_schema_history），`source_snapshot_sha256=61ca4caf...78bb0d`；23 条表级 Database Entry 已全部入库（aoci.database.txt）。
+- 治理判定：`aoci check` 五净（findings=0、governance_aligned=true、structure_valid=true）；`aoci verify` 结构有效。
+- 模型认知：Whole-Index 全量交付（6 块、约 40430 tokens）已完成，Attestation 通过（Challenge 10/10，cognition_verified）。Database Volume 在 Attestation 之后建立，认知收据将在下一次 Overview 刷新时升级为 governed（常规刷新，非阻塞项）。
+- 治理对齐历史：observe_change_policy 已由仓库所有者亲自批准（preview→approve→apply，事务 00a8b24b）切换为 informational，解除观察文件指纹死锁。
 
 ## 5. MCP 宿主接入
 
 - 项目级 `.mcp.json` 已配置 `aoci` MCP stdio server（`aoci --repo <仓库根> mcp`），支持的宿主在会话中提供 `aoci_rules`、`aoci_overview`、`aoci_maintain`、`aoci_update_entry` 等工具。
-- MCP 工具未加载的会话应使用 CLI 只读命令（`status`、`verify`、`check`、`doctor`）获取状态；正式写入走 `update-entry`（需绑定 `aoci_maintain` 语义的源码 SHA-256）。
-- 恢复顺序：`aoci doctor` 诊断环境 → `aoci status` 速览 → `aoci verify` 结构校验 → `aoci check` 漂移与治理判定。基线损坏时用 `aoci scan` 重建指纹，再走官方 Baseline 治理流程；不得手改 `baseline.json` 或 `aoci.txt` 正文。
+- MCP 工具未加载的会话可按 `.mcp.json` 的 command 以 stdio JSON-RPC 直连官方 server 驱动同一次调用（initialize → tools/call），合同与分块语义与 MCP 工具完全一致。
+- Database Cognition 数据源：source_id `agenthub-mysql-evidence`，凭证经环境变量 `AGENTHUB_AOCI_DB_URL`（Go DSN 形式 `root:<密码>@tcp(<主机>:<端口>)/agenthub`）注入，不出现在任何入库文件。本地证据容器为 docker MySQL 8.4（与 CI 的 8.0 存在小版本差异，已如实记录）；执行 `aoci database snapshot/verify` 前需启动该容器。
+- 恢复顺序：`aoci doctor` 诊断环境 → `aoci status` 速览 → `aoci verify` 结构校验 → `aoci check` 漂移与治理判定。基线损坏时用 `aoci scan` 重建指纹，再走官方 Baseline 治理流程；不得手改 `baseline.json`、`aoci.txt` 或 `aoci.database.txt` 正文。
 
 ## 6. 使用铁律
 

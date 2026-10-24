@@ -199,6 +199,20 @@
   "automation": {
     "mode": "auto"
   },
+  "database_sources": [
+    {
+      "source_id": "agenthub-mysql-evidence",
+      "engine": "mysql",
+      "database": "agenthub",
+      "namespaces": [
+        "agenthub"
+      ],
+      "credential_env": "AGENTHUB_AOCI_DB_URL",
+      "connect_timeout_seconds": 10,
+      "query_timeout_seconds": 30,
+      "enabled": true
+    }
+  ],
   "ai": {
     "enabled": false,
     "provider": "openai-compatible",

@@ -1,0 +1,324 @@
+{
+  "version": "database-evidence-baseline/v1",
+  "sources": [
+    {
+      "source_id": "agenthub-mysql-evidence",
+      "engine": "mysql",
+      "database": "agenthub",
+      "namespaces": [
+        "agenthub"
+      ],
+      "include_namespaces": [],
+      "exclude_namespaces": [],
+      "include_tables": [],
+      "exclude_tables": [],
+      "case_semantics": {
+        "identifier_case": "server_lower_case_table_names",
+        "lower_case_table_names": 0
+      },
+      "evidence_version": "database-evidence/v1",
+      "source_snapshot_sha256": "61ca4caf4540e9aa80e7824b8a4ecad2ecca9cb06d22b9fbf54005f96778bb0d",
+      "tables": [
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/agent_definitions",
+          "table_evidence_sha256": "d6deac30aa1f4f5448de34a830e9f75bef43e8eba09f52ac05dcfbd471eae4d1",
+          "component_hashes": {
+            "columns": "e6f009c1a55cb4465ff407d135eacf312174ff30211ba264ccdd1ac113a58984",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "19ebd8b87ddf9e4f7020fba8e8285ed4ad012a54697bead278d7af9dd6066458",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "805a033566953006cea845280ed86e12e1a7fda1e8656e1e06b338e15ff77be9",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/agent_instances",
+          "table_evidence_sha256": "c869edb91d298203a509cbb372a4bcd8fd21a527b1c8f02513391104e8878943",
+          "component_hashes": {
+            "columns": "2f3308c686f5b15e7d12bd50bb7dcd69a1d557a72b858cc612628212d85c1c16",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "c51307e4c35689336a0461330dab7b0d06293776731a20b30ae2dac1226b744a",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "e7631e11259b6d26d1e57ae9de8d565c450cac737352177a27dbb99d8b544fbe",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/approvals",
+          "table_evidence_sha256": "c3fcb342e766d798cc6d56b2f9eb8ae8825af3f75a1473d3ac938d92da34dc7b",
+          "component_hashes": {
+            "columns": "97af88cdfb6dd52e342bbae6d59c7f21e1d51954eca24a6b13733c5376bc7aa2",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "4ffb2221689c016ed61b4fd2c68c4cfe708ba7a32beb5a918846334e0e86f099",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/artifacts",
+          "table_evidence_sha256": "fc4a6c1ecd123d466e936deb532fdd24d8bc479f7735ae2309ec601348c6c700",
+          "component_hashes": {
+            "columns": "7d456db8f2f5471c62918acdc7d2ddf8d323886199584eee3287dd6d5bc68a51",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "fa7c7c46f60c8017fff8e76274460af3ed070226fc2f9568d7059147e25c4e79",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/auth_audit_logs",
+          "table_evidence_sha256": "f1e00ace4b2e0931f431e872f06d7b7004a9341325b29049599aa72422f4a113",
+          "component_hashes": {
+            "columns": "b655284d37207743126fa80df4c36b3b0e259caf869aed83722614d57e7c2c0f",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "2aa109cb85caa49b17de2f6e0d660f1d40f5064ac075052a0214beefbcdafcbc",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/conversation_participants",
+          "table_evidence_sha256": "30324fcd5e587462c81f6423120073ae93f314eadcec4268e5326534d0ec48f1",
+          "component_hashes": {
+            "columns": "d681ac47fc87b328d5e1eefd2dc6a2085f0ed9d475f8578e9e25268c329a504e",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "cac6a7eee2399fa2030a395444733914cbaed8f1adc533bd3b83eb7540a8958b",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "cc6699788b8810d6178164b940969ce4c67b8975a5fcd0c67e0f829b07d8cf0e",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/conversations",
+          "table_evidence_sha256": "798fe5d11de48cee34d49a9537114cf4c433be043c739e1a65beb6a22a7ceb0a",
+          "component_hashes": {
+            "columns": "ba95d1ca0faefbabf05cc472f4ec9caad5be9e20b11072e7af80ef291a89fd4c",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "4f6ac0026a8ebcba9c09c5404829ee32b5b7241b80af59f80cba2380e68fa7fc",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/deployments",
+          "table_evidence_sha256": "dfbdb71cbdc198918fcf357c245313a3a9f08310dc741d4e6b40ed6add5d1f4b",
+          "component_hashes": {
+            "columns": "f647f04a4f9c0c80a726dc8a99a91334155bdb118026eab5e274b0202fa962b0",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "fb3ceafbb133eda6a1a65cafc8bae98358ff9af487719b6009fcd9d50db1d08d",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/flyway_schema_history",
+          "table_evidence_sha256": "0ba9ce03a4f3aaf8e80ae3da1a86933fe769ada80a0be755b46ed4296dc4d94c",
+          "component_hashes": {
+            "columns": "9c03d3b24f750fe51727a38de843008d24c824fc87c43ecc2cd9ec10cdea3bc1",
+            "primary_key": "0637f11fc12a9aea8012cf20472bdf2af4339dd77db003030e66e1a8f1e2f374",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "2f749d252234e64510c79d7d5abe6af3d8025c4c07ec66113b921874ae938e8e",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/invalidated_tokens",
+          "table_evidence_sha256": "ee14541149b52f9b5ec5913b10b03158d81e6417c7634abf0d5e9a963285b521",
+          "component_hashes": {
+            "columns": "9d1171a8217d188381b65105ea1d76219709415ee2d0da9a0373614364d1e1df",
+            "primary_key": "eb54a290752d49c2e39bf9d2d7306a99a7d27c479edb3fa7671fa9502eda13aa",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "c56f37ada84b651f80e2bbcad74ec26b1c6c863382d0818bf954ead8fdd0128f",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/messages",
+          "table_evidence_sha256": "6acb5335356022041c463a8f7bb5415611007daabdbef52eb5669a9ce7d32fdc",
+          "component_hashes": {
+            "columns": "4284cae4243ba42b2479529723f24bec7d9c1fa15ecc9a45cc2dd872ddbebb73",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "1aafff183c21f8d04cd594b02f4497fd67176b2ca9f17a51bfff33661a787fb5",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "5c6490958f019b77888bb4a659bc52e8a3606362f3c06b0a20ed57542b971ccd",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/projects",
+          "table_evidence_sha256": "ac175661b3022b2d30e5ff0a41a743914683e731c43b9ddbb65b3161d3f8fe0c",
+          "component_hashes": {
+            "columns": "ec674bdf0b3c5ac5262a51ce79b85a3ec18758a3dfebfdcfcc8e28cbda9eb093",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "531879105cf9f9c364bfd5a20cf90c8ffc7597369b4d0dedcc2cc346ce324ffb",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "ae23e85e8afa7d582611a51a79687f051ce57c12ecc3620ddbf9e752b95b0b91",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/providers",
+          "table_evidence_sha256": "8650e007b4497cf92bc2f6b7eae19276deb672390bd2b25830697e82cbf230de",
+          "component_hashes": {
+            "columns": "9b1c9d08a3f35db4a1a00db6b639fad157f5188b7d2b76eb6d0848dedd034b30",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "0c4a59d8081e46ffca700bd0630691173e349ed500da03106df0f8b8ec504063",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "b10a5452482cde896c26ace0db19f94b6f29a818111a0a6f8bbbff85a52db2ea",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/run_events",
+          "table_evidence_sha256": "61a4823de687a323a0042332b9230fcebabe86db0db6e2e2efa4da2bbeda997e",
+          "component_hashes": {
+            "columns": "419b80ce8fbb5e64dc135edef0c2ccb4358326a9d81182a783040f7abfb2b890",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "150df91ee133c6b6278ca7557b145b8d1b9cf466c2bd44c602d2e27709a11916",
+            "foreign_keys": "979d1d5f058d6ec88aa7259d0e1c9364b001ac5a86034f5b8c3b1323262c1332",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "eaaad5dc96afff07270724a505a134c44bf254f844817aa6c5f6943ef3091157",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/step_runs",
+          "table_evidence_sha256": "0475cf722b2d8f16afe510f3a0d30545271ec786d51d9056480c655f52816b56",
+          "component_hashes": {
+            "columns": "3fedea08d617ab6dea700c6a3feecf2dd2f9a491c0a6236c0cb3a15ffe4254b7",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "4e4e5efa8e1860bd468d3d76be892c07ac4ce8388cab02c723ed1ac12467bc40",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "f698eeb952bd13ae5d7c35da4a8981dbb13761e45e231ea78ab9e5c66b8f86dc",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/team_members",
+          "table_evidence_sha256": "e35d34a198e5156ac78ea7b72be0eb679c6a70ca17360683915a2b660312d9b1",
+          "component_hashes": {
+            "columns": "8db8dbbfa8a605f1880feb02a448edf90550b449149082556dce240853e6db38",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "7420bd4495572e8654ef7c17f3237a13454475d76bf613762c916a84d140bb5f",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "944597edf16b70e894bc992745a097eb6527a6e780d04ef27f494691a0b6e3fe",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/teams",
+          "table_evidence_sha256": "9f8756435b5c61ce9fbfc71489a9d7cb544e4c6a8721e8fefec74ed32bda6201",
+          "component_hashes": {
+            "columns": "d0a9b287588a6eaa51a514796f8aac086f5549e63af36fc0835ceee810c4169e",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "df68f68034cffe2bb161455cc0f2f538edead3535bc63404723fdfd152efec8c",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/token_usages",
+          "table_evidence_sha256": "8dab7250b84ba5439b08aec3c348838ae1ad7be9df3645d4d5f1eea859c1e1a8",
+          "component_hashes": {
+            "columns": "61369c8f7e65418512d4dd5ed348b52c2b8c715e4b74bdd7cc7a3e49ccc79175",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "fca2800a8ffd93658dc65c6f5804a28bf59d9506c2357abf5738b1fd9e54da17",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "969b2bd094ff6a4be9e927ae995d375d99a1442d38dcd11748ccb156754c5f91",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/users",
+          "table_evidence_sha256": "db30b94907a7254bc2a8087fd127330e62e1cbdef93214a9afa4e6908f1dcb37",
+          "component_hashes": {
+            "columns": "a7554cd9c2d55a4a536cc3fb54070648c609a8e7765c704ac4860ad911e91366",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "2b2cd10c71ac5c16bdc5d6938b8856526e333348cf722949258a94502119d686",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "76db42bb72da9390ab3bdc18fe877e821b33149f13d19e65855cfc69dff16d6f",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/workflow_definitions",
+          "table_evidence_sha256": "0324888d45a83b4025524015c52bfb93bdb4263890f1ae5ce38fbdae96287b26",
+          "component_hashes": {
+            "columns": "e9bc97177fa6579447eca64d40e57013fd4e3ec5d0d1b06ffb59d14bed988687",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "3d8099a61fc8b2cc0d52735bec24e73086a3376ed7438b10b158c366c434763a",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/workflow_runs",
+          "table_evidence_sha256": "ca170345095cd16308b9faf305a3bce0e985e6787f4507b6f52180735aca49f2",
+          "component_hashes": {
+            "columns": "b6d4808599f4b477e5201b31a27fb334e04f9ff8e8bcfe05b98c221f3bb20e56",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "b387a963bdb19c2245f96302b740c074e1aed1de540a57e78916808897da904d",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/workspace_locks",
+          "table_evidence_sha256": "1d3158c94ec16756bfdaec88828f4ae850aa45807467a1f0f410661753611839",
+          "component_hashes": {
+            "columns": "722800e8722def11b0aa6350add912bf1830dadd3e3b658308cc7e3fe5bef7f7",
+            "primary_key": "14d88797a11647d12ca7f25f7a9e990bcc328508aa4c77287646437bdd28b2ce",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "0eed6c1b8ee84132a685224245722f88be236f97733e170ce5c9e47aa93cfd8c",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        },
+        {
+          "object_ref": "database://agenthub-mysql-evidence/agenthub/workspaces",
+          "table_evidence_sha256": "535b6dfab37d0ccfddf689b77e988a2b996d05f63ee396ca7969720a3976684b",
+          "component_hashes": {
+            "columns": "ed27f657063e848b4288b35105b7f2d6af9aecf3d4248fbe5c6f87783903212c",
+            "primary_key": "a407ef26b2af65b8b6886f127b983f29bd30b8c145a372e68592e1b5211c64eb",
+            "unique_constraints": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "foreign_keys": "8b90a48e8a620bb4a144fdcda585eb0ebd8f67d779ecbacda0fc894de7383866",
+            "checks": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "indexes": "4d0b78621ddc9fbe43b7fcd73a816d108f759a9cde2f0d5807982d50c9b60fb2",
+            "partition": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T04:44:29Z",
+  "updated_at": "2026-10-24T05:34:32Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -3261,6 +3261,12 @@
       "size": 119004,
       "normalized_sha256": "9cda8824e67862f252677deecc86f329a48ef58bf8f1e6a8de22fe7a686b7183"
     },
+    "aoci.database.txt": {
+      "role": "index",
+      "sha256": "516759720bb779de9e05695521b21cbcb7e148906eb971afd1f34f86d563475b",
+      "size": 5598,
+      "normalized_sha256": "516759720bb779de9e05695521b21cbcb7e148906eb971afd1f34f86d563475b"
+    },
     "aoci.meta.txt": {
       "role": "index",
       "sha256": "fbc304fa05182547e96f1f8404c7c30ad6c366bba9589523f1019c2c1da0427c",
@@ -3269,9 +3275,9 @@
     },
     "aoci.txt": {
       "role": "index",
-      "sha256": "a444b5ae511065cc8ed9276e3ab1f9b0f5c6476e9601b17470eae4aa517fc70d",
-      "size": 297,
-      "normalized_sha256": "a444b5ae511065cc8ed9276e3ab1f9b0f5c6476e9601b17470eae4aa517fc70d"
+      "sha256": "dad6ec44a4558edf05537f2f5d2287f22afeb15a4e8e05236dcfa67e4e0cf1a2",
+      "size": 403,
+      "normalized_sha256": "dad6ec44a4558edf05537f2f5d2287f22afeb15a4e8e05236dcfa67e4e0cf1a2"
     },
     "docker-compose.prod.yml": {
       "role": "index",
@@ -3311,9 +3317,9 @@
     },
     "docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md": {
       "role": "index",
-      "sha256": "d0db1511a365d047173bdaedebb9314ba659272f3b7bbb94c2369d4b731b4de3",
-      "size": 28533,
-      "normalized_sha256": "d0db1511a365d047173bdaedebb9314ba659272f3b7bbb94c2369d4b731b4de3"
+      "sha256": "67d999637ac533eed0f4de1a03d0c50489b211ef2d3b418bd8a384c00f6c9a12",
+      "size": 28286,
+      "normalized_sha256": "67d999637ac533eed0f4de1a03d0c50489b211ef2d3b418bd8a384c00f6c9a12"
     },
     "docs/AOCI_COGNITION.md": {
       "role": "index",
@@ -3606,5 +3612,171 @@
       ]
     },
     "apply_authorization_mode": "auto"
+  },
+  "database_cognition": {
+    "version": "database-cognition-binding/v1",
+    "entries": [
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/agent_definitions",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "d6deac30aa1f4f5448de34a830e9f75bef43e8eba09f52ac05dcfbd471eae4d1",
+        "entry_sha256": "0929e8ad0c21314565f0c9b744407f3f81c5dce607c676bb8a8ae921da2c5366"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/agent_instances",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "c869edb91d298203a509cbb372a4bcd8fd21a527b1c8f02513391104e8878943",
+        "entry_sha256": "c3a22da97952d862eb1c61b4d22a167f7720602fc359224af9a07ddefd6e2406"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/approvals",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "c3fcb342e766d798cc6d56b2f9eb8ae8825af3f75a1473d3ac938d92da34dc7b",
+        "entry_sha256": "60bfd0e6a0211c06200d924810cba262618b9abc4445eeb8113ee9f51575fa3d"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/artifacts",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "fc4a6c1ecd123d466e936deb532fdd24d8bc479f7735ae2309ec601348c6c700",
+        "entry_sha256": "82a3a2b65215a2260684560f78a2575f84faf99a6e9ba81f29a357dc0858de76"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/auth_audit_logs",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "f1e00ace4b2e0931f431e872f06d7b7004a9341325b29049599aa72422f4a113",
+        "entry_sha256": "c1586208f28053a0a27be88bcc376059e6edbd225697aba8cb50278fdda03b7c"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/conversation_participants",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "30324fcd5e587462c81f6423120073ae93f314eadcec4268e5326534d0ec48f1",
+        "entry_sha256": "8b16a117b2dfb750bc527ee41f7101b9635116cb9690b257c689d2bc4be4abb4"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/conversations",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "798fe5d11de48cee34d49a9537114cf4c433be043c739e1a65beb6a22a7ceb0a",
+        "entry_sha256": "b5dc066b1046f0705843bcf7fbfec7f3b779b69373482a639c48abceab357afd"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/deployments",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "dfbdb71cbdc198918fcf357c245313a3a9f08310dc741d4e6b40ed6add5d1f4b",
+        "entry_sha256": "6eaa7c90f9b419a6225e112f4efd15ca2f8bb3c16ba21c7e07a0e465348eceff"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/flyway_schema_history",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "0ba9ce03a4f3aaf8e80ae3da1a86933fe769ada80a0be755b46ed4296dc4d94c",
+        "entry_sha256": "4c34dc152ee0ceb6a3935ddfdb49955709bfe701b6bcb34d87dee20c9fa0bab2"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/invalidated_tokens",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "ee14541149b52f9b5ec5913b10b03158d81e6417c7634abf0d5e9a963285b521",
+        "entry_sha256": "f9950618f47d6153be84653cae21d28a1438f722d47e5ea61daf14ccaab10f52"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/messages",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "6acb5335356022041c463a8f7bb5415611007daabdbef52eb5669a9ce7d32fdc",
+        "entry_sha256": "d2b8f4047ce2683d71263883578cc8f5e7cba6bdeb817f97061de9bfce9007ba"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/projects",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "ac175661b3022b2d30e5ff0a41a743914683e731c43b9ddbb65b3161d3f8fe0c",
+        "entry_sha256": "692a7e0c57e944bebd164a5ffe6e9958233cff574508e7d351808ca1d046f8ca"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/providers",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "8650e007b4497cf92bc2f6b7eae19276deb672390bd2b25830697e82cbf230de",
+        "entry_sha256": "7cfe35b854995adea523a0157584c6023163d2a70410edca4f46498b72b9749b"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/run_events",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "61a4823de687a323a0042332b9230fcebabe86db0db6e2e2efa4da2bbeda997e",
+        "entry_sha256": "dfa17eea42954b693a5ab5c281c8ad487a9bd4d4f987c4fb9cf7dabf035f09a6"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/step_runs",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "0475cf722b2d8f16afe510f3a0d30545271ec786d51d9056480c655f52816b56",
+        "entry_sha256": "fc2735272fe1e19619fa1694d7ac1090e1fcc002eb3c023e985bf2e7c1af7038"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/team_members",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "e35d34a198e5156ac78ea7b72be0eb679c6a70ca17360683915a2b660312d9b1",
+        "entry_sha256": "fe75b54120cc6087f67c225c4bb0d707a3319423d89169a760950a664fca7ff9"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/teams",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "9f8756435b5c61ce9fbfc71489a9d7cb544e4c6a8721e8fefec74ed32bda6201",
+        "entry_sha256": "229144eea4a8cbde98a506f5768e9e08877e64550c25acc28cc82ce03db50594"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/token_usages",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "8dab7250b84ba5439b08aec3c348838ae1ad7be9df3645d4d5f1eea859c1e1a8",
+        "entry_sha256": "8c95dec231ac2e7dd835a914a388672a04dc3a3b2f58629ee6eb2916297c51ac"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/users",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "db30b94907a7254bc2a8087fd127330e62e1cbdef93214a9afa4e6908f1dcb37",
+        "entry_sha256": "7a9006372fd76026ce2d9a6703312a4942fbca81f03fd4234c1adc1390d8b1e1"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/workflow_definitions",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "0324888d45a83b4025524015c52bfb93bdb4263890f1ae5ce38fbdae96287b26",
+        "entry_sha256": "aa24f12ea1b2859f8bfc9e78d2b8f5161afe48613689a4d0acd0e4954873485e"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/workflow_runs",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "ca170345095cd16308b9faf305a3bce0e985e6787f4507b6f52180735aca49f2",
+        "entry_sha256": "3b018f44a50a4bb85d5fc58c3e306860da6498a0d4ee110a227da7f746600804"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/workspace_locks",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "1d3158c94ec16756bfdaec88828f4ae850aa45807467a1f0f410661753611839",
+        "entry_sha256": "6f590c6bb8b91cadb0e18cdb7951394438a2ff9d23e591c062df2cf0cd216a21"
+      },
+      {
+        "object_ref": "database://agenthub-mysql-evidence/agenthub/workspaces",
+        "source_id": "agenthub-mysql-evidence",
+        "evidence_version": "database-evidence/v1",
+        "table_evidence_sha256": "535b6dfab37d0ccfddf689b77e988a2b996d05f63ee396ca7969720a3976684b",
+        "entry_sha256": "8e056e3f5c8c2c63d06e9bd25a84f07345690dd36c68adbce608c7b9af575b81"
+      }
+    ]
   }
 }
