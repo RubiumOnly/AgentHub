@@ -6,11 +6,11 @@
 .gitattributes[FC1T]: F:统一跨平台文本换行策略 | R:code:.gitignore | A:git | S:sh/sql/yml强制LF而ps1强制CRLF；改前评估双端影响
 .gitignore[FC2T]: F:声明 Git 忽略边界 | R:code:SECURITY.md | A:git | S:排除.env与AOCI运行时产物；不得掩盖应入库治理资产
 LICENSE[EZ1T]: F:声明 MIT 开源许可 | R:- | A:法律 | S:变更许可类型是不可逆法律决策，需评估贡献者授权
-README.md[EG8M]: F:项目入口与产品主线速览 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:新成员 | S:能力表述不得超前于能力边界文档
-CHANGELOG.md[SG3M]: F:按版本记录历史变更快照 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:维护者发布 | S:仅记录历史；当前能力权威在能力边界文档
-CONTRIBUTING.md[SG3M]: F:贡献流程与提交规范 | R:code:.github/workflows/ci.yml | A:外部贡献者 | S:PR前必须后端测试与前端构建全绿
-SECURITY.md[SS7M]: F:安全策略与凭证隔离规范 | R:code:docs/adr/ADR-003-workspace-distrusts-client-paths.md | A:安全评审与运维 | S:真实密钥严禁入库；prod弱密钥启动即熔断
-docker-compose.yml[OV6M]: F:本地开发容器编排 | R:code:.env.production.example | A:docker compose up | S:仅MySQL与Redis基础设施；应用服务由prod编排文件定义
+README.md[EG8T]: F:项目入口与产品主线速览 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:新成员 | S:能力表述不得超前于能力边界文档
+CHANGELOG.md[SG3L]: F:按版本记录历史变更快照 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:维护者发布 | S:仅记录历史；当前能力权威在能力边界文档
+CONTRIBUTING.md[SG3T]: F:贡献流程与提交规范 | R:code:.github/workflows/ci.yml | A:外部贡献者 | S:PR前必须后端测试与前端构建全绿
+SECURITY.md[SS7T]: F:安全策略与凭证隔离规范 | R:code:docs/adr/ADR-003-workspace-distrusts-client-paths.md | A:安全评审与运维 | S:真实密钥严禁入库；prod弱密钥启动即熔断
+docker-compose.yml[OV6T]: F:本地开发容器编排 | R:code:.env.production.example | A:docker compose up | S:仅MySQL与Redis基础设施；应用服务由prod编排文件定义
 docker-compose.prod.yml[OV7M]: F:生产容器编排与安全约束 | R:code:.env.production.example | A:scripts/deploy-prod | S:非root用户与健康探针强制；密钥全部来自env-file占位注入
 .mcp.json[CV6T]: F:声明AOCI MCP宿主接入 | R:code:docs/AOCI_COGNITION.md | A:MCP宿主加载 | S:command指向本机CLI绝对路径；跨机器需按实际安装路径调整
 
@@ -18,89 +18,89 @@ docker-compose.prod.yml[OV7M]: F:生产容器编排与安全约束 | R:code:.env
 ci.yml[OV7M]: F:远端CI门禁编排 | R:code:scripts/test-ci-local.sh | A:GitHub Actions push/PR | S:Ubuntu+真实MySQL8迁移门禁；本地单次通过不等价远端安全
 
 ===D:/work/agenthub/agenthub-backend/===
-Dockerfile[OV7S]: F:构建生产后端镜像 | R:code:docker-compose.prod.yml | A:docker build | S:非root UID10001与健康探针强制；OOM即退出
-pom.xml[FV8M]: F:Maven构建与依赖基线 | R:code:.github/workflows/ci.yml | A:mvn | S:Boot3.3.4/Java17；surefire锁alphabetical保证跨平台确定性
+Dockerfile[OV7T]: F:构建生产后端镜像 | R:code:docker-compose.prod.yml | A:docker build | S:非root UID10001与健康探针强制；OOM即退出
+pom.xml[FV8S]: F:Maven构建与依赖基线 | R:code:.github/workflows/ci.yml | A:mvn | S:Boot3.3.4/Java17；surefire锁alphabetical保证跨平台确定性
 
 ===D:/work/agenthub/agenthub-backend/src/main/resources/===
-application.yml[CV9M]: F:应用主配置与默认档 | R:code:agenthub-backend/src/main/resources/application-prod.yml | A:Spring Boot启动 | S:默认dev+H2；密钥全靠env注入，内置默认密钥仅限本地
-application-prod.yml[CV9S]: F:生产profile配置 | R:code:docker-compose.prod.yml | A:prod部署 | S:强制MySQL与ddl validate；模式默认LIVE_SELF_HOSTED
-application-dev.yml[CV4S]: F:开发profile配置 | R:code:agenthub-backend/src/main/resources/application.yml | A:本地开发 | S:H2内存库+ddl update；仅限本地，不代表生产行为
+application.yml[CV9T]: F:应用主配置与默认档 | R:code:agenthub-backend/src/main/resources/application-prod.yml | A:Spring Boot启动 | S:默认dev+H2；密钥全靠env注入，内置默认密钥仅限本地
+application-prod.yml[CV9T]: F:生产profile配置 | R:code:docker-compose.prod.yml | A:prod部署 | S:强制MySQL与ddl validate；模式默认LIVE_SELF_HOSTED
+application-dev.yml[CV4T]: F:开发profile配置 | R:code:agenthub-backend/src/main/resources/application.yml | A:本地开发 | S:H2内存库+ddl update；仅限本地，不代表生产行为
 application-demo.yml[CV3T]: F:演示profile配置 | R:code:agenthub-backend/src/main/resources/application.yml | A:demo演示 | S:显式DEMO_SIMULATED；演示主体可env覆盖；不得混入LIVE结果
-application-test.yml[CV6S]: F:测试profile配置 | R:code:agenthub-backend/src/test/java | A:mvn test | S:H2 MODE=MySQL；固定主体user-1/proj-default仅限测试夹具
+application-test.yml[CV6T]: F:测试profile配置 | R:code:agenthub-backend/src/test/java | A:mvn test | S:H2 MODE=MySQL；固定主体user-1/proj-default仅限测试夹具
 application-local.yml.example[CV2T]: F:本地私有配置模板 | R:code:.gitignore | A:cp为application-local.yml | S:重命名后即被Git排除；真实Key严禁提交
 
 ===D:/work/agenthub/agenthub-backend/src/main/resources/db/migration/===
 V1__init_schema.sql[PD9M]: F:初始22表核心Schema | R:code:docs/ARCHITECTURE.md | A:Flyway | S:结构变更需新迁移；已应用基线严禁改写
-V2__seed_system_baseline.sql[PD5S]: F:注入演示基线种子 | R:code:V1__init_schema.sql | A:Flyway | S:演示主体种子在主迁移路径；Phase10拟迁demo profile
-V3__phase2_workspace_audit_artifacts.sql[PD5S]: F:产物评审与工作区锁 | R:code:V1__init_schema.sql | A:Flyway | S:artifacts评审字段；新增workspace_locks支撑并发互斥
-V4__phase3_execution_kernel_and_state_machine.sql[PD6S]: F:执行内核状态机字段 | R:code:V1__init_schema.sql | A:Flyway | S:取消原因与correlation_id；步骤计时字段铺底
-V5__phase4_workflow_dag_and_orchestration.sql[PD6S]: F:DAG编排与上下文字段 | R:code:V1__init_schema.sql | A:Flyway | S:step_runs获得inputs/outputs JSON
-V6__phase5_agent_providers_and_routing.sql[PD6M]: F:Provider路由与成本字段 | R:code:V1__init_schema.sql | A:Flyway | S:priority/weight/熔断状态/单价进入providers表
-V7__phase6_multi_agent_teams_and_message_bus.sql[PD5M]: F:多Agent团队与消息字段 | R:code:V1__init_schema.sql | A:Flyway | S:teams拓扑/领导Agent/轮次上限与成员角色扩展
-V8__phase7_sandbox_and_deployments.sql[PD5S]: F:沙箱部署执行字段 | R:code:V1__init_schema.sql | A:Flyway | S:端口/构建/健康检查命令进入deployments表
-V9__phase_a_security_revocation_and_audit.sql[PS7S]: F:令牌吊销与认证审计表 | R:code:V1__init_schema.sql | A:Flyway | S:invalidated_tokens跨重启生效；审计落auth_audit_logs
-V10__phase_c_scheduling_leases_and_recovery.sql[PR8M]: F:租约与恢复调度字段 | R:code:V1__init_schema.sql | A:Flyway | S:lease_owner/attempt/dsl_snapshot支撑at-least-once幂等
-V11__phase_d_sandbox_lifecycle_and_isolation.sql[PD5S]: F:部署生命周期与隔离字段 | R:code:V1__init_schema.sql | A:Flyway | S:进程ID/日志游标/终止原因进入deployments表
+V2__seed_system_baseline.sql[PD5T]: F:注入演示基线种子 | R:code:V1__init_schema.sql | A:Flyway | S:演示主体种子在主迁移路径；Phase10拟迁demo profile
+V3__phase2_workspace_audit_artifacts.sql[PD5T]: F:产物评审与工作区锁 | R:code:V1__init_schema.sql | A:Flyway | S:artifacts评审字段；新增workspace_locks支撑并发互斥
+V4__phase3_execution_kernel_and_state_machine.sql[PD6T]: F:执行内核状态机字段 | R:code:V1__init_schema.sql | A:Flyway | S:取消原因与correlation_id；步骤计时字段铺底
+V5__phase4_workflow_dag_and_orchestration.sql[PD6T]: F:DAG编排与上下文字段 | R:code:V1__init_schema.sql | A:Flyway | S:step_runs获得inputs/outputs JSON
+V6__phase5_agent_providers_and_routing.sql[PD6T]: F:Provider路由与成本字段 | R:code:V1__init_schema.sql | A:Flyway | S:priority/weight/熔断状态/单价进入providers表
+V7__phase6_multi_agent_teams_and_message_bus.sql[PD5T]: F:多Agent团队与消息字段 | R:code:V1__init_schema.sql | A:Flyway | S:teams拓扑/领导Agent/轮次上限与成员角色扩展
+V8__phase7_sandbox_and_deployments.sql[PD5T]: F:沙箱部署执行字段 | R:code:V1__init_schema.sql | A:Flyway | S:端口/构建/健康检查命令进入deployments表
+V9__phase_a_security_revocation_and_audit.sql[PS7T]: F:令牌吊销与认证审计表 | R:code:V1__init_schema.sql | A:Flyway | S:invalidated_tokens跨重启生效；审计落auth_audit_logs
+V10__phase_c_scheduling_leases_and_recovery.sql[PR8T]: F:租约与恢复调度字段 | R:code:V1__init_schema.sql | A:Flyway | S:lease_owner/attempt/dsl_snapshot支撑at-least-once幂等
+V11__phase_d_sandbox_lifecycle_and_isolation.sql[PD5T]: F:部署生命周期与隔离字段 | R:code:V1__init_schema.sql | A:Flyway | S:进程ID/日志游标/终止原因进入deployments表
 V12__phase_e_production_ops_and_lock_precision.sql[PR5T]: F:工作区锁毫秒精度过期 | R:code:V1__init_schema.sql | A:Flyway | S:expires_at_epoch_ms消除秒级锁精度误差
 
 ===D:/work/agenthub/scripts/===
-backup-prod.sh[OR7M]: F:生产一致性加密备份 | R:code:scripts/restore-prod.sh | A:运维 | S:single-transaction快照+SHA256SUMS；默认保留14天最少3份
-backup-prod.ps1[OR6M]: F:Windows生产备份脚本 | R:code:scripts/backup-prod.sh | A:运维 | S:与sh版本语义对齐；跨平台需双端验证
-deploy-prod.sh[OV8M]: F:生产部署预检门禁 | R:code:docker-compose.prod.yml | A:运维 | S:ChangeMe占位校验不过即拒绝部署
-deploy-prod.ps1[OV6M]: F:Windows生产部署脚本 | R:code:scripts/deploy-prod.sh | A:运维 | S:与sh版本语义对齐
-restore-prod.sh[OR8M]: F:灾备恢复与篡改校验 | R:code:scripts/backup-prod.sh | A:运维 | S:先验SHA256拒绝篡改档；--verify-only非破坏演练
-restore-prod.ps1[OR6M]: F:Windows灾备恢复脚本 | R:code:scripts/restore-prod.sh | A:运维 | S:与sh版本语义对齐
+backup-prod.sh[OR7S]: F:生产一致性加密备份 | R:code:scripts/restore-prod.sh | A:运维 | S:single-transaction快照+SHA256SUMS；默认保留14天最少3份
+backup-prod.ps1[OR6T]: F:Windows生产备份脚本 | R:code:scripts/backup-prod.sh | A:运维 | S:与sh版本语义对齐；跨平台需双端验证
+deploy-prod.sh[OV8S]: F:生产部署预检门禁 | R:code:docker-compose.prod.yml | A:运维 | S:ChangeMe占位校验不过即拒绝部署
+deploy-prod.ps1[OV6S]: F:Windows生产部署脚本 | R:code:scripts/deploy-prod.sh | A:运维 | S:与sh版本语义对齐
+restore-prod.sh[OR8T]: F:灾备恢复与篡改校验 | R:code:scripts/backup-prod.sh | A:运维 | S:先验SHA256拒绝篡改档；--verify-only非破坏演练
+restore-prod.ps1[OR6T]: F:Windows灾备恢复脚本 | R:code:scripts/restore-prod.sh | A:运维 | S:与sh版本语义对齐
 run-e2e-demo.sh[TV6M]: F:跨平台E2E演练导证据 | R:code:docs/E2E_DEMO_GUIDE.md | A:演示与验收 | S:demo模式必须带simulated标识；live模式需真实Provider
-run-e2e-demo.ps1[TV5M]: F:Windows E2E演练脚本 | R:code:scripts/run-e2e-demo.sh | A:演示与验收 | S:与sh版本语义对齐
-test-ci-local.ps1[TV6M]: F:Windows本地门禁脚本 | R:code:scripts/test-ci-local.sh | A:提交前验证 | S:与sh版本语义对齐
+run-e2e-demo.ps1[TV5S]: F:Windows E2E演练脚本 | R:code:scripts/run-e2e-demo.sh | A:演示与验收 | S:与sh版本语义对齐
+test-ci-local.ps1[TV6S]: F:Windows本地门禁脚本 | R:code:scripts/test-ci-local.sh | A:提交前验证 | S:与sh版本语义对齐
 
 ===D:/work/agenthub/docs/===
-AGENTHUB_PRODUCT_LONG_TERM_PLAN.md[SG9L]: F:唯一长期路线与阶段验收 | R:code:docs/ARCHITECTURE.md | A:每个Run开始时读取 | S:唯一计划；阶段验收只追加本文；禁止另建平行计划
-AOCI_COGNITION.md[SO7S]: F:AOCI资产与运维唯一文档 | R:code:.mcp.json | A:运维与会话恢复 | S:版本/接入/恢复唯一权威；未对齐不得宣称aligned
+AGENTHUB_PRODUCT_LONG_TERM_PLAN.md[SG9M]: F:唯一长期路线与阶段验收 | R:code:docs/ARCHITECTURE.md | A:每个Run开始时读取 | S:唯一计划；阶段验收只追加本文；禁止另建平行计划
+AOCI_COGNITION.md[SO7T]: F:AOCI资产与运维唯一文档 | R:code:.mcp.json | A:运维与会话恢复 | S:版本/接入/恢复唯一权威；未对齐不得宣称aligned
 API.md[SN9L]: F:REST/SSE接口契约全景 | R:code:docs/openapi-v1.json | A:前后端契约对齐 | S:Controller矩阵唯一权威；新增Controller必须登记
-ARCHITECTURE.md[SA8L]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与22表矩阵是守卫测试断言来源
-CURRENT_CAPABILITY_BOUNDARIES.md[SQ8M]: F:能力真相与未实现边界 | R:code:docs/ARCHITECTURE.md | A:表述能力前必读 | S:能力矩阵唯一权威；禁止超前宣称
-TECH_WHITEPAPER_AND_DEFENSE.md[SS4S]: F:技术答辩要点 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:答辩交流 | S:非能力证明；超出证据范围不得承诺
-openapi-v1.json[SN8M]: F:OpenAPI v1静态快照 | R:code:docs/API.md | A:契约消费方 | S:与/api/v1/openapi.json对齐；漂移需重新生成
-E2E_DEMO_GUIDE.md[SQ6M]: F:E2E演练双平台步骤 | R:code:scripts/run-e2e-demo.sh | A:演练执行者 | S:接口路径与测试对齐；demo/live显式区分
+ARCHITECTURE.md[SA8M]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与22表矩阵是守卫测试断言来源
+CURRENT_CAPABILITY_BOUNDARIES.md[SQ8S]: F:能力真相与未实现边界 | R:code:docs/ARCHITECTURE.md | A:表述能力前必读 | S:能力矩阵唯一权威；禁止超前宣称
+TECH_WHITEPAPER_AND_DEFENSE.md[SS4T]: F:技术答辩要点 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:答辩交流 | S:非能力证明；超出证据范围不得承诺
+openapi-v1.json[SN8L]: F:OpenAPI v1静态快照 | R:code:docs/API.md | A:契约消费方 | S:与/api/v1/openapi.json对齐；漂移需重新生成
+E2E_DEMO_GUIDE.md[SQ6L]: F:E2E演练双平台步骤 | R:code:scripts/run-e2e-demo.sh | A:演练执行者 | S:接口路径与测试对齐；demo/live显式区分
 
 ===D:/work/agenthub/docs/adr/===
 ADR-001-modular-monolith-architecture.md[SO7S]: F:模块化单体选型决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:拆微服务前必须先有真实负载证据与ADR修订
 ADR-002-sse-and-persistent-event-stream.md[SN6S]: F:SSE与持久化事件流决策 | R:code:docs/API.md | A:架构评审 | S:事件流事实以数据库持久化为准，不引入空壳MQ
 ADR-003-workspace-distrusts-client-paths.md[SS8S]: F:受控工作区路径安全决策 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:安全评审 | S:拒止../与绝对路径逃逸；该边界不可为便利性放宽
 ADR-004-mock-runtime-for-test-and-degraded-demo.md[SQ6S]: F:Mock Runtime边界决策 | R:code:docs/E2E_DEMO_GUIDE.md | A:架构评审 | S:Mock仅限测试与显式降级演示；严禁混入LIVE成功统计
-ADR-005-database-driven-lease-and-crash-recovery.md[PR7S]: F:数据库租约与崩溃恢复决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:at-least-once+幂等；不宣称分布式exactly-once
-ADR-006-context-convergence-and-api-contract-v1.md[SN6S]: F:限界上下文与API v1决策 | R:code:docs/API.md | A:架构评审 | S:兼容接口必须有期限退场计划
-ADR-007-project-onboarding-and-controlled-workspace-policy.md[SP6S]: F:项目接入与受控工作区策略 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:接入向导与版本化上下文源不可绕过
+ADR-005-database-driven-lease-and-crash-recovery.md[PR7T]: F:数据库租约与崩溃恢复决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:at-least-once+幂等；不宣称分布式exactly-once
+ADR-006-context-convergence-and-api-contract-v1.md[SN6T]: F:限界上下文与API v1决策 | R:code:docs/API.md | A:架构评审 | S:兼容接口必须有期限退场计划
+ADR-007-project-onboarding-and-controlled-workspace-policy.md[SP6T]: F:项目接入与受控工作区策略 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:接入向导与版本化上下文源不可绕过
 ADR-008-workflow-templates-kahn-dag-and-orchestrator-plan.md[SA7S]: F:工作流模板与Orchestrator决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:Kahn拓扑校验；计划未经确认不得执行高影响工具
-ADR-009-run-operations-and-artifact-lineage.md[PD6S]: F:Run操作与产物血缘决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:产物状态跃迁必须回到统一状态图
-ADR-010-quality-gates-review-and-controlled-delivery.md[SQ7S]: F:质量门禁与受控交付决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:门禁不通过不得进入交付
-ADR-011-team-collaboration-rbac-and-operations-productization.md[SI7S]: F:RBAC与运维体系决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:资源动作统一权限矩阵；审计不可篡改
-ADR-012-live-providers-and-budget-governance.md[SC7S]: F:真实Provider与预算治理决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:LIVE与DEMO严格隔离；预算阻断无绕过路径
+ADR-009-run-operations-and-artifact-lineage.md[PD6T]: F:Run操作与产物血缘决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:产物状态跃迁必须回到统一状态图
+ADR-010-quality-gates-review-and-controlled-delivery.md[SQ7T]: F:质量门禁与受控交付决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:门禁不通过不得进入交付
+ADR-011-team-collaboration-rbac-and-operations-productization.md[SI7T]: F:RBAC与运维体系决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:资源动作统一权限矩阵；审计不可篡改
+ADR-012-live-providers-and-budget-governance.md[SC7T]: F:真实Provider与预算治理决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:LIVE与DEMO严格隔离；预算阻断无绕过路径
 ADR-013-e2e-benchmarks-and-release-readiness.md[SQ6S]: F:E2E基准与发布就绪决策 | R:code:docs/ARCHITECTURE.md | A:架构评审 | S:目标环境未验证不得宣称发布就绪
 
 ===D:/work/agenthub/docs/images/===
-01-orchestrator-collaboration-stream.png[SZ2T]: F:编排协作流UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
-02-jgit-diff-audit.png[SZ2T]: F:JGit Diff审计UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
-03-workflow-dag-canvas.png[SZ2T]: F:DAG画布UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
-04-workspace-file-explorer.png[SZ2T]: F:工作区文件浏览UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
-05-sandbox-preview.png[SZ2T]: F:沙箱预览UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+01-orchestrator-collaboration-stream.png[SZ2L]: F:编排协作流UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+02-jgit-diff-audit.png[SZ2L]: F:JGit Diff审计UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+03-workflow-dag-canvas.png[SZ2L]: F:DAG画布UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+04-workspace-file-explorer.png[SZ2L]: F:工作区文件浏览UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
+05-sandbox-preview.png[SZ2L]: F:沙箱预览UI截图 | R:code:docs/E2E_DEMO_GUIDE.md | A:文档阅读 | S:静态截图；不代表当前运行实况
 
 ===D:/work/agenthub/docs/ops/===
-ALERTING_RULES.md[SO6M]: F:Prometheus告警规则与策略 | R:code:docker/prometheus/agenthub-alerts.yml | A:值班运维 | S:机器可加载配置为准；规则变更需演练验证
-DISASTER_RECOVERY_RUNBOOK.md[SR8M]: F:灾备演练与恢复SOP | R:code:scripts/restore-prod.sh | A:值班运维 | S:严禁--volumes清理生产数据卷；演练后更新证据
+ALERTING_RULES.md[SO6S]: F:Prometheus告警规则与策略 | R:code:docker/prometheus/agenthub-alerts.yml | A:值班运维 | S:机器可加载配置为准；规则变更需演练验证
+DISASTER_RECOVERY_RUNBOOK.md[SR8S]: F:灾备演练与恢复SOP | R:code:scripts/restore-prod.sh | A:值班运维 | S:严禁--volumes清理生产数据卷；演练后更新证据
 
 ===D:/work/agenthub/docs/evidence/===
-sample-run-evidence-bundle.json[SQ4S]: F:证据包结构样例 | R:code:docs/E2E_DEMO_GUIDE.md | A:理解证据结构 | S:simulated=true样例；真实证据以导出接口为准
+sample-run-evidence-bundle.json[SQ4M]: F:证据包结构样例 | R:code:docs/E2E_DEMO_GUIDE.md | A:理解证据结构 | S:simulated=true样例；真实证据以导出接口为准
 
 ===D:/work/agenthub/agenthub-frontend/===
-tsconfig.json[CV4S]: F:TypeScript编译约束 | R:code:agenthub-frontend/package.json | A:npx tsc --noEmit | S:strict模式；@/*映射src；类型错误必须清零
-Dockerfile[OV6S]: F:构建前端生产镜像 | R:code:docker-compose.prod.yml | A:docker build | S:standalone多阶段构建+非root隔离
+tsconfig.json[CV4T]: F:TypeScript编译约束 | R:code:agenthub-frontend/package.json | A:npx tsc --noEmit | S:strict模式；@/*映射src；类型错误必须清零
+Dockerfile[OV6T]: F:构建前端生产镜像 | R:code:docker-compose.prod.yml | A:docker build | S:standalone多阶段构建+非root隔离
 postcss.config.js[CV1T]: F:PostCSS插件链 | R:code:agenthub-frontend/tailwind.config.ts | A:前端构建 | S:仅tailwindcss与autoprefixer
 next-env.d.ts[CL1T]: F:Next生成类型声明 | R:code:agenthub-frontend/tsconfig.json | A:tsc | S:Next自动生成；严禁手工编辑
 package-lock.json[CV3L]: F:锁定依赖完整依赖图 | R:code:agenthub-frontend/package.json | A:npm ci | S:与package.json同步变更；npm ci以此为准
-package.json[CV5S]: F:前端依赖与脚本基线 | R:code:agenthub-frontend/next.config.mjs | A:npm | S:Next 14.2.13/React 18；升级依赖须过tsc与build门禁
-next.config.mjs[CV6S]: F:Next配置与API代理 | R:code:agenthub-frontend/src | A:next build/dev | S:standalone输出；/api与/actuator重写到后端，禁止直连其他来源
+package.json[CV5T]: F:前端依赖与脚本基线 | R:code:agenthub-frontend/next.config.mjs | A:npm | S:Next 14.2.13/React 18；升级依赖须过tsc与build门禁
+next.config.mjs[CV6T]: F:Next配置与API代理 | R:code:agenthub-frontend/src | A:next build/dev | S:standalone输出；/api与/actuator重写到后端，禁止直连其他来源
 tailwind.config.ts[CU2T]: F:Tailwind主题与扫描范围 | R:code:agenthub-frontend/postcss.config.js | A:前端构建 | S:content仅覆盖src目录；新目录需显式登记
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/===
@@ -108,19 +108,19 @@ AgentHubApplication.java[EG8T]: F:Spring Boot启动入口 | R:code:shared/filter
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/adapter/common/===
 BusinessException.java[CG6T]: F:Web层业务异常 | R:code:adapter/common/GlobalExceptionHandler.java | A:Controller层 | S:与shared/exception同名类并存属历史分叉；Phase10收敛必须合并
-ErrorCode.java[CG6M]: F:Web层错误码枚举 | R:code:shared/exception/ErrorCode.java | A:GlobalExceptionHandler | S:与shared/exception/ErrorCode码段重叠；收敛前同一响应不得混用两套
-GlobalExceptionHandler.java[CG8S]: F:统一异常到Result转换 | R:code:adapter/common/Result.java | A:RestControllerAdvice | S:兼容两套BusinessException；兜底500不向客户端泄露堆栈
-Result.java[CG7M]: F:统一响应体包装 | R:code:shared/context/RequestContext.java | A:全部Controller | S:requestId自动取自RequestContext；前端契约以此结构为准
+ErrorCode.java[CG6T]: F:Web层错误码枚举 | R:code:shared/exception/ErrorCode.java | A:GlobalExceptionHandler | S:与shared/exception/ErrorCode码段重叠；收敛前同一响应不得混用两套
+GlobalExceptionHandler.java[CG8T]: F:统一异常到Result转换 | R:code:adapter/common/Result.java | A:RestControllerAdvice | S:兼容两套BusinessException；兜底500不向客户端泄露堆栈
+Result.java[CG7T]: F:统一响应体包装 | R:code:shared/context/RequestContext.java | A:全部Controller | S:requestId自动取自RequestContext；前端契约以此结构为准
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/exception/===
-BusinessException.java[CG7S]: F:领域与应用层标准业务异常 | R:code:shared/exception/ErrorCode.java | A:Application/Domain层 | S:仅携带ErrorCode；适配层异常不得向领域层回传
-ErrorCode.java[CG9L]: F:企业标准错误码字典 | R:code:shared/contract/BoundedContext.java | A:全后端模块 | S:码段按限界上下文划分；新增码必须落对应码段
+BusinessException.java[CG7T]: F:领域与应用层标准业务异常 | R:code:shared/exception/ErrorCode.java | A:Application/Domain层 | S:仅携带ErrorCode；适配层异常不得向领域层回传
+ErrorCode.java[CG9S]: F:企业标准错误码字典 | R:code:shared/contract/BoundedContext.java | A:全后端模块 | S:码段按限界上下文划分；新增码必须落对应码段
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/response/===
 Result.java[CG6S]: F:共享层响应包装 | R:code:adapter/common/Result.java | A:shared层 | S:与adapter/common/Result结构重复；删除前必须先证明零引用
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/context/===
-RequestContext.java[CG8S]: F:ThreadLocal请求上下文 | R:code:shared/filter/RequestCorrelationFilter.java | A:全后端 | S:get()惰性生成req-id；异步线程不自动继承需显式传递
+RequestContext.java[CG8T]: F:ThreadLocal请求上下文 | R:code:shared/filter/RequestCorrelationFilter.java | A:全后端 | S:get()惰性生成req-id；异步线程不自动继承需显式传递
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/filter/===
 RequestCorrelationFilter.java[CG8T]: F:请求ID与契约头注入 | R:code:shared/contract/ApiContractHeaders.java | A:所有HTTP请求 | S:最高优先级过滤器；建立MDC日志关联与X-API-Version头
@@ -128,7 +128,7 @@ LegacyEndpointMigrationFilter.java[CG7S]: F:旧路由迁移拦截 | R:code:share
 LegacyEndpointCallTracker.java[CO7S]: F:旧接口调用遥测计数 | R:code:shared/filter/LegacyEndpointMigrationFilter.java | A:Ops指标 | S:legacy_endpoint_calls_total是删除旧Controller的零调用证据来源
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/contract/===
-ApiContractHeaders.java[CG8S]: F:API v1契约头权威常量 | R:code:shared/contract/BoundedContext.java | A:全后端 | S:ETag/幂等键/弃用头集中定义；改常量即破坏对外契约
+ApiContractHeaders.java[CG8T]: F:API v1契约头权威常量 | R:code:shared/contract/BoundedContext.java | A:全后端 | S:ETag/幂等键/弃用头集中定义；改常量即破坏对外契约
 BoundedContext.java[CG8S]: F:限界上下文权威注册表 | R:code:shared/exception/ErrorCode.java | A:模块收敛治理 | S:核心上下文与码段映射；新增模块必须先注册上下文
 ContextCommand.java[CG4T]: F:命令契约标记接口 | R:code:shared/contract/BoundedContext.java | A:Application层 | S:仅声明boundedContext()；无行为逻辑
 ContextDomainEvent.java[CG4T]: F:领域事件契约标记 | R:code:shared/contract/BoundedContext.java | A:Domain层 | S:eventType+occurredAt是事件最小契约
@@ -137,31 +137,31 @@ PageRequestQuery.java[CG7S]: F:标准分页排序查询契约 | R:code:shared/co
 PageResultView.java[CG7S]: F:标准分页响应信封 | R:code:shared/contract/PageRequestQuery.java | A:列表接口 | S:含nextCursor；前端分页只认此结构
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/contract/extension/===
-AgentDefinitionExtensionContract.java[CE6S]: F:Agent定义扩展SPI | R:- | A:扩展插件作者 | S:版本化角色/提示词/工具allowlist/预算上限
-DeploymentTemplateExtensionContract.java[CE6S]: F:部署模板扩展SPI | R:- | A:扩展插件作者 | S:构建命令/端口/健康探针必须显式声明
-ProviderExtensionContract.java[CE6S]: F:Provider扩展SPI | R:- | A:扩展插件作者 | S:必须支持模式隔离与成本目录；无真实使用者不得新增实现
-ToolExtensionContract.java[CE6S]: F:工具扩展SPI | R:- | A:扩展插件作者 | S:高影响工具必须带schema/权限/回滚声明
-WorkflowTemplateExtensionContract.java[CE6S]: F:工作流模板扩展SPI | R:- | A:扩展插件作者 | S:DAG定义与质量门禁阈值随模板版本化
+AgentDefinitionExtensionContract.java[CE6T]: F:Agent定义扩展SPI | R:- | A:扩展插件作者 | S:版本化角色/提示词/工具allowlist/预算上限
+DeploymentTemplateExtensionContract.java[CE6T]: F:部署模板扩展SPI | R:- | A:扩展插件作者 | S:构建命令/端口/健康探针必须显式声明
+ProviderExtensionContract.java[CE6T]: F:Provider扩展SPI | R:- | A:扩展插件作者 | S:必须支持模式隔离与成本目录；无真实使用者不得新增实现
+ToolExtensionContract.java[CE6T]: F:工具扩展SPI | R:- | A:扩展插件作者 | S:高影响工具必须带schema/权限/回滚声明
+WorkflowTemplateExtensionContract.java[CE6T]: F:工作流模板扩展SPI | R:- | A:扩展插件作者 | S:DAG定义与质量门禁阈值随模板版本化
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/contract/sdk/===
-AgentHubApprovalClient.java[CN6S]: F:审批公共SDK契约 | R:- | A:SDK消费方 | S:仅暴露版本化DTO；禁止内部实体泄漏
-AgentHubArtifactClient.java[CN6S]: F:产物与质量门禁SDK契约 | R:- | A:SDK消费方 | S:血缘/门禁/PR草稿/回滚统一入口
-AgentHubDeploymentClient.java[CN6S]: F:预览部署SDK契约 | R:- | A:SDK消费方 | S:创建/探针/停止走部署状态机，不直接操作进程
-AgentHubProjectClient.java[CN6S]: F:项目与工作区SDK契约 | R:- | A:SDK消费方 | S:归属校验由服务端执行；仅版本化DTO
-AgentHubReleaseManifest.java[CN7S]: F:发布清单契约 | R:- | A:发布治理 | S:稳定契约面+迁移路径；改清单需过发布门禁
-AgentHubRunClient.java[CN6S]: F:Run生命周期SDK契约 | R:- | A:SDK消费方 | S:启动/步骤/重做/拒绝/证据包统一入口
+AgentHubApprovalClient.java[CN6T]: F:审批公共SDK契约 | R:- | A:SDK消费方 | S:仅暴露版本化DTO；禁止内部实体泄漏
+AgentHubArtifactClient.java[CN6T]: F:产物与质量门禁SDK契约 | R:- | A:SDK消费方 | S:血缘/门禁/PR草稿/回滚统一入口
+AgentHubDeploymentClient.java[CN6T]: F:预览部署SDK契约 | R:- | A:SDK消费方 | S:创建/探针/停止走部署状态机，不直接操作进程
+AgentHubProjectClient.java[CN6T]: F:项目与工作区SDK契约 | R:- | A:SDK消费方 | S:归属校验由服务端执行；仅版本化DTO
+AgentHubReleaseManifest.java[CN7T]: F:发布清单契约 | R:- | A:发布治理 | S:稳定契约面+迁移路径；改清单需过发布门禁
+AgentHubRunClient.java[CN6T]: F:Run生命周期SDK契约 | R:- | A:SDK消费方 | S:启动/步骤/重做/拒绝/证据包统一入口
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/contract/webhook/===
-WebhookEventType.java[CN6S]: F:Webhook事件类型字典 | R:code:shared/contract/webhook/WebhookPayload.java | A:外部集成 | S:覆盖Run/Step/Artifact/Approval/Deployment生命周期
+WebhookEventType.java[CN6T]: F:Webhook事件类型字典 | R:code:shared/contract/webhook/WebhookPayload.java | A:外部集成 | S:覆盖Run/Step/Artifact/Approval/Deployment生命周期
 WebhookPayload.java[CN6S]: F:Webhook投递载荷 | R:- | A:外部消费方 | S:只含版本化DTO值；严禁泄漏内部实体与服务器路径
 WebhookSignatureVerifier.java[CS8S]: F:HMAC-SHA256签名校验 | R:code:shared/contract/webhook/WebhookPayload.java | A:外部集成安全 | S:t=时间戳v1=签名格式；默认5分钟容差防重放
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/identity/api/===
-AuthController.java[EI7S]: F:认证REST入口 | R:code:identity/application/AuthApplicationService.java | A:前端与SDK | S:register/login/refresh/logout/stream-ticket；仅协议转换不做业务判断
+AuthController.java[EI7T]: F:认证REST入口 | R:code:identity/application/AuthApplicationService.java | A:前端与SDK | S:register/login/refresh/logout/stream-ticket；仅协议转换不做业务判断
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/identity/application/===
 AuthApplication.java[AI6T]: F:认证用例端口 | R:code:identity/application/AuthApplicationService.java | A:AuthController | S:用例接口；实现细节隐藏在Service
-AuthApplicationService.java[AI8M]: F:注册登录登出用例编排 | R:code:identity/infrastructure/security/TokenProvider.java | A:认证链路 | S:限流+审计+BCrypt哈希；审计失败不得阻断认证主流程
+AuthApplicationService.java[AI8S]: F:注册登录登出用例编排 | R:code:identity/infrastructure/security/TokenProvider.java | A:认证链路 | S:限流+审计+BCrypt哈希；审计失败不得阻断认证主流程
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/identity/dto/===
 UserView.java[DI4T]: F:用户视图DTO | R:code:identity/api/AuthController.java | A:前端投影 | S:不含passwordHash；只暴露安全字段
@@ -171,9 +171,9 @@ RegisterCommand.java[DI4T]: F:注册命令DTO | R:code:identity/application/Auth
 AuthAuditLogView.java[DI3T]: F:认证审计视图DTO | R:code:identity/infrastructure/security/AuthAuditService.java | A:Ops审计查询 | S:只读投影；不得用于修改审计事实
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/entity/===
-UserEntity.java[PI7S]: F:用户持久化实体 | R:code:identity/infrastructure/repository/UserRepository.java | A:JPA | S:对应users表；密码只存BCrypt哈希
-InvalidatedTokenEntity.java[PS6S]: F:吊销令牌实体 | R:code:identity/infrastructure/repository/InvalidatedTokenRepository.java | A:JPA | S:对应invalidated_tokens表；吊销跨重启持续生效
-AuthAuditLogEntity.java[PL6S]: F:认证审计日志实体 | R:code:identity/infrastructure/repository/AuthAuditLogRepository.java | A:JPA | S:对应auth_audit_logs表；追加型审计不提供更新入口
+UserEntity.java[PI7T]: F:用户持久化实体 | R:code:identity/infrastructure/repository/UserRepository.java | A:JPA | S:对应users表；密码只存BCrypt哈希
+InvalidatedTokenEntity.java[PS6T]: F:吊销令牌实体 | R:code:identity/infrastructure/repository/InvalidatedTokenRepository.java | A:JPA | S:对应invalidated_tokens表；吊销跨重启持续生效
+AuthAuditLogEntity.java[PL6T]: F:认证审计日志实体 | R:code:identity/infrastructure/repository/AuthAuditLogRepository.java | A:JPA | S:对应auth_audit_logs表；追加型审计不提供更新入口
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/repository/===
 UserRepository.java[PI4T]: F:用户数据访问 | R:code:identity/infrastructure/entity/UserEntity.java | A:AuthApplicationService | S:existsByEmail支撑注册唯一性
@@ -181,13 +181,13 @@ InvalidatedTokenRepository.java[PI4T]: F:吊销令牌数据访问 | R:code:ident
 AuthAuditLogRepository.java[PI4T]: F:审计日志数据访问 | R:code:identity/infrastructure/entity/AuthAuditLogEntity.java | A:AuthAuditService | S:独立事务REQUIRES_NEW写入防主流程回滚连带
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/identity/infrastructure/security/===
-TokenProvider.java[SI9L]: F:HMAC令牌签发与校验 | R:code:identity/infrastructure/security/AuthFilter.java | A:认证链路 | S:prod下弱密钥/默认密钥启动即熔断；stream-ticket 60秒一次性
+TokenProvider.java[SI9M]: F:HMAC令牌签发与校验 | R:code:identity/infrastructure/security/AuthFilter.java | A:认证链路 | S:prod下弱密钥/默认密钥启动即熔断；stream-ticket 60秒一次性
 AuthFilter.java[SI8S]: F:请求认证过滤器 | R:code:identity/infrastructure/security/TokenProvider.java | A:所有HTTP请求 | S:Bearer头+Cookie双通道；校验通过后填充RequestContext
 ActuatorSecurityFilter.java[SO8S]: F:观测端点访问守卫 | R:code:identity/infrastructure/security/TokenProvider.java | A:Prometheus抓取 | S:health保持开放；prometheus/metrics需令牌或可信内网；带X-Forwarded-For的请求不视为内网
-AuthAuditService.java[SO7S]: F:认证事件审计 | R:code:identity/infrastructure/repository/AuthAuditLogRepository.java | A:认证链路 | S:REQUIRES_NEW独立事务；事件含限流与失败记录
-AuthRateLimiter.java[SR6S]: F:滑动窗口限流器 | R:code:identity/application/AuthApplicationService.java | A:register/login端点 | S:内存实现单机有效；多实例部署需外置存储
-ResourceAccessGuard.java[SI7S]: F:归属校验与旁路守卫 | R:code:identity/infrastructure/security/ResourceOwnershipVerifier.java | A:Application层 | S:system上下文绕过仅限后台Worker；superuser旁路仅demo profile显式开启
-ResourceOwnershipVerifier.java[SI9L]: F:跨域资源归属权威校验 | R:code:identity/infrastructure/security/ResourceAccessGuard.java | A:全部资源型接口 | S:覆盖Project/Workspace/Run/Artifact/Deployment；RBAC角色OWNER到AUDITOR；越权拒绝计入指标
+AuthAuditService.java[SO7T]: F:认证事件审计 | R:code:identity/infrastructure/repository/AuthAuditLogRepository.java | A:认证链路 | S:REQUIRES_NEW独立事务；事件含限流与失败记录
+AuthRateLimiter.java[SR6T]: F:滑动窗口限流器 | R:code:identity/application/AuthApplicationService.java | A:register/login端点 | S:内存实现单机有效；多实例部署需外置存储
+ResourceAccessGuard.java[SI7T]: F:归属校验与旁路守卫 | R:code:identity/infrastructure/security/ResourceOwnershipVerifier.java | A:Application层 | S:system上下文绕过仅限后台Worker；superuser旁路仅demo profile显式开启
+ResourceOwnershipVerifier.java[SI9M]: F:跨域资源归属权威校验 | R:code:identity/infrastructure/security/ResourceAccessGuard.java | A:全部资源型接口 | S:覆盖Project/Workspace/Run/Artifact/Deployment；RBAC角色OWNER到AUDITOR；越权拒绝计入指标
 SecurityConfig.java[SC3T]: F:密码编码器配置 | R:code:identity/application/AuthApplicationService.java | A:Spring容器 | S:BCrypt；更换算法是安全决策需迁移存量哈希
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/api/===
@@ -197,7 +197,7 @@ WorkspaceController.java[EI8M]: F:受控工作区REST入口 | R:code:project/app
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/application/===
 ProjectApplication.java[AI5T]: F:项目用例端口 | R:code:project/application/ProjectApplicationService.java | A:ProjectController | S:创建/查询用例接口
 ProjectApplicationService.java[AI7S]: F:项目创建与查询编排 | R:code:project/infrastructure/repository/ProjectRepository.java | A:ProjectController | S:创建时初始化工作区基线；ETag乐观并发
-WorkspaceApplication.java[AI6M]: F:工作区用例端口 | R:code:project/application/WorkspaceApplicationService.java | A:WorkspaceController | S:含@Deprecated旧路径签名；新调用必须用workspaceId+相对路径
+WorkspaceApplication.java[AI6T]: F:工作区用例端口 | R:code:project/application/WorkspaceApplicationService.java | A:WorkspaceController | S:含@Deprecated旧路径签名；新调用必须用workspaceId+相对路径
 WorkspaceApplicationService.java[AI9L]: F:工作区文件Git与锁编排 | R:code:project/application/WorkspaceQuotaGuard.java | A:WorkspaceController | S:JGit快照/Diff/单文件回滚/锁租约集中地；锁属主由服务端派生不信任客户端
 ProjectOnboardingApplication.java[AI5T]: F:接入向导用例端口 | R:code:project/application/ProjectOnboardingApplicationService.java | A:ProjectController | S:start/step/retry/abort/complete五动作
 ProjectOnboardingApplicationService.java[AI9L]: F:七步接入向导状态机 | R:code:project/domain/onboarding/OnboardingStep.java | A:ProjectController | S:步骤可回滚；凭据脱敏日志；零明文令牌持久化
@@ -215,8 +215,8 @@ OnboardingSessionStatus.java[DW3T]: F:接入会话状态枚举 | R:code:project/
 OnboardingStepStatus.java[DW3T]: F:接入步骤状态枚举 | R:code:project/domain/onboarding/OnboardingStep.java | A:向导状态机 | S:PENDING/RUNNING/SUCCESS/FAILED/SKIPPED
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/domain/quota/===
-WorkspaceQuotaPolicy.java[DC6S]: F:配额与执行策略定义 | R:code:project/application/WorkspaceQuotaGuard.java | A:工作区写入 | S:默认500MB/5000文件/单文件10MB；调整默认值是安全边界变更
-WorkspaceQuotaUsage.java[DC5S]: F:配额用量聚合 | R:code:project/domain/quota/WorkspaceQuotaPolicy.java | A:配额检查 | S:用量统计输入，不得自行放宽策略
+WorkspaceQuotaPolicy.java[DC6T]: F:配额与执行策略定义 | R:code:project/application/WorkspaceQuotaGuard.java | A:工作区写入 | S:默认500MB/5000文件/单文件10MB；调整默认值是安全边界变更
+WorkspaceQuotaUsage.java[DC5T]: F:配额用量聚合 | R:code:project/domain/quota/WorkspaceQuotaPolicy.java | A:配额检查 | S:用量统计输入，不得自行放宽策略
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/domain/source/===
 GitSourceConfig.java[DI6S]: F:Git来源配置与脱敏 | R:code:project/application/ProjectOnboardingApplicationService.java | A:接入向导 | S:secretRef只存引用；repoUrl与location进入日志前必须脱敏
@@ -231,7 +231,7 @@ WorkspaceFileDetailView.java[DI4T]: F:文件详情DTO | R:code:project/api/Works
 WorkspaceLockStatusView.java[DI4T]: F:锁状态视图DTO | R:code:project/api/WorkspaceController.java | A:前端锁面板 | S:属主与租约投影；不得暴露系统内部线程信息
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/dto/context/===
-ContextSourceView.java[DI5S]: F:上下文源视图DTO | R:code:project/api/ProjectController.java | A:前端与Orchestrator | S:contentFingerprint绑定证据；AOCI状态元数据诚实反映
+ContextSourceView.java[DI5T]: F:上下文源视图DTO | R:code:project/api/ProjectController.java | A:前端与Orchestrator | S:contentFingerprint绑定证据；AOCI状态元数据诚实反映
 RegisterContextSourceCommand.java[DI4T]: F:上下文源注册命令 | R:code:project/application/ContextSourceApplicationService.java | A:ProjectController | S:metadata承载来源版本与安全级别
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/dto/onboarding/===
@@ -242,52 +242,52 @@ ExecuteStepCommand.java[DI4T]: F:执行步骤命令DTO | R:code:project/applicat
 EnvironmentScanResultView.java[DI4T]: F:环境扫描结果视图 | R:code:project/application/ProjectOnboardingApplicationService.java | A:前端向导 | S:推断的构建/测试命令仅为建议；不自动执行
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/infrastructure/entity/===
-ProjectEntity.java[PI6S]: F:项目持久化实体 | R:code:project/infrastructure/repository/ProjectRepository.java | A:JPA | S:对应projects表；owner不可变，归属校验入口
-WorkspaceEntity.java[PI6S]: F:工作区持久化实体 | R:code:project/infrastructure/repository/WorkspaceRepository.java | A:JPA | S:对应workspaces表；gitBaselineCommit冻结基线
+ProjectEntity.java[PI6T]: F:项目持久化实体 | R:code:project/infrastructure/repository/ProjectRepository.java | A:JPA | S:对应projects表；owner不可变，归属校验入口
+WorkspaceEntity.java[PI6T]: F:工作区持久化实体 | R:code:project/infrastructure/repository/WorkspaceRepository.java | A:JPA | S:对应workspaces表；gitBaselineCommit冻结基线
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/infrastructure/repository/===
 ProjectRepository.java[PI4T]: F:项目数据访问 | R:code:project/infrastructure/entity/ProjectEntity.java | A:Application层 | S:findByOwnerId支撑归属链
 WorkspaceRepository.java[PI4T]: F:工作区数据访问 | R:code:project/infrastructure/entity/WorkspaceEntity.java | A:Application层 | S:findByProjectId一项目一工作区主路径
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/api/===
-ApprovalController.java[EI7S]: F:人工审批REST入口 | R:code:orchestration/application/ApprovalApplicationService.java | A:前端 | S:decision/approve/reject三入口；仅协议转换
-WorkflowDefinitionController.java[EI8M]: F:工作流定义/模板/计划REST入口 | R:code:orchestration/application/OrchestratorPlanApplicationService.java | A:前端 | S:validate/实例化/计划生成与confirm/reject；计划未确认不得触发执行
+ApprovalController.java[EI7T]: F:人工审批REST入口 | R:code:orchestration/application/ApprovalApplicationService.java | A:前端 | S:decision/approve/reject三入口；仅协议转换
+WorkflowDefinitionController.java[EI8S]: F:工作流定义/模板/计划REST入口 | R:code:orchestration/application/OrchestratorPlanApplicationService.java | A:前端 | S:validate/实例化/计划生成与confirm/reject；计划未确认不得触发执行
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/application/===
 ApprovalApplication.java[AI5T]: F:审批用例端口 | R:code:orchestration/application/ApprovalApplicationService.java | A:ApprovalController | S:决定与查询接口
-ApprovalApplicationService.java[AI8M]: F:审批决定编排 | R:code:orchestration/domain/approval/ApprovalSignalRegistry.java | A:ApprovalController | S:决定唤醒暂停中的DAG屏障；重复决定必须幂等拒绝
+ApprovalApplicationService.java[AI8S]: F:审批决定编排 | R:code:orchestration/domain/approval/ApprovalSignalRegistry.java | A:ApprovalController | S:决定唤醒暂停中的DAG屏障；重复决定必须幂等拒绝
 OrchestratorPlanApplication.java[AI5T]: F:编排计划用例端口 | R:code:orchestration/application/OrchestratorPlanApplicationService.java | A:WorkflowDefinitionController | S:generate/confirm/reject/query
 OrchestratorPlanApplicationService.java[AI8M]: F:计划生成与确认编排 | R:code:orchestration/domain/plan/OrchestrationPlan.java | A:计划确认链路 | S:计划含影响文件/工具权限/预算预估；确认后快照冻结
 WorkflowOrchestrationApplication.java[AI5T]: F:工作流编排用例端口 | R:code:orchestration/application/WorkflowOrchestrationApplicationService.java | A:执行链路 | S:定义创建/校验/实例化
-WorkflowOrchestrationApplicationService.java[AI7S]: F:工作流定义与实例化编排 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:WorkflowDefinitionController | S:保存前必过Kahn拓扑校验；实例化来自注册表模板
+WorkflowOrchestrationApplicationService.java[AI7M]: F:工作流定义与实例化编排 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:WorkflowDefinitionController | S:保存前必过Kahn拓扑校验；实例化来自注册表模板
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/domain/approval/===
 ApprovalDecision.java[DW4T]: F:审批决定值对象 | R:code:orchestration/domain/approval/ApprovalDecisionResult.java | A:审批链路 | S:决定类型不可变
 ApprovalDecisionResult.java[DW4T]: F:审批结果值对象 | R:code:orchestration/domain/approval/ApprovalSignalRegistry.java | A:审批链路 | S:决定结果与时间戳投影
-ApprovalSignalRegistry.java[DW6S]: F:审批信号注册表 | R:code:orchestration/scheduler/DagStateTransitioner.java | A:DAG暂停屏障 | S:内存信号注册；进程重启后未决审批依赖持久化状态恢复
+ApprovalSignalRegistry.java[DW6T]: F:审批信号注册表 | R:code:orchestration/scheduler/DagStateTransitioner.java | A:DAG暂停屏障 | S:内存信号注册；进程重启后未决审批依赖持久化状态恢复
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/domain/dsl/===
 RetryPolicyDsl.java[DW4T]: F:重试策略DSL | R:code:orchestration/domain/dsl/WorkflowNodeDsl.java | A:DSL解析 | S:重试次数与退避随定义版本化
 TopologicalSortResult.java[DW4T]: F:拓扑排序结果 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:DAG校验 | S:含层级分层与环检测输出
-WorkflowDsl.java[DW8S]: F:工作流DSL根模型 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:定义与执行 | S:schemaVersion v1；Run创建后快照冻结不得改写
+WorkflowDsl.java[DW8T]: F:工作流DSL根模型 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:定义与执行 | S:schemaVersion v1；Run创建后快照冻结不得改写
 WorkflowEdgeDsl.java[DW4T]: F:DAG边DSL | R:code:orchestration/domain/dsl/WorkflowDsl.java | A:DSL解析 | S:含条件表达式，求值走SafeExpressionEvaluator
-WorkflowNodeDsl.java[DW6S]: F:DAG节点DSL | R:code:orchestration/domain/dsl/WorkflowDsl.java | A:DSL解析 | S:agentPlatform/依赖join策略/超时/重试在此声明
+WorkflowNodeDsl.java[DW6T]: F:DAG节点DSL | R:code:orchestration/domain/dsl/WorkflowDsl.java | A:DSL解析 | S:agentPlatform/依赖join策略/超时/重试在此声明
 WorkflowDslValidator.java[DD7S]: F:Kahn拓扑校验器 | R:code:orchestration/domain/dsl/TopologicalSortResult.java | A:定义保存与实例化 | S:环检测+依赖校验；校验不过的定义不得持久化
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/domain/evaluation/===
 WorkflowExecutionContext.java[DW6S]: F:执行上下文 | R:code:orchestration/domain/evaluation/SafeExpressionEvaluator.java | A:DAG执行 | S:承载步骤输入输出与变量作用域
-SafeExpressionEvaluator.java[DD9S]: F:安全表达式求值器 | R:code:orchestration/domain/evaluation/WorkflowExecutionContext.java | A:DAG条件与模板 | S:禁止反射/SpEL/任意代码执行；仅白名单运算
+SafeExpressionEvaluator.java[DD9M]: F:安全表达式求值器 | R:code:orchestration/domain/evaluation/WorkflowExecutionContext.java | A:DAG条件与模板 | S:禁止反射/SpEL/任意代码执行；仅白名单运算
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/domain/plan/===
 EstimatedBudget.java[DW4T]: F:预算预估值对象 | R:code:orchestration/domain/plan/OrchestrationPlan.java | A:计划审查 | S:估算值不承诺实际成本；实际计入token_usages
-OrchestrationPlan.java[DW8S]: F:编排计划聚合 | R:code:orchestration/domain/plan/OrchestrationPlanStatus.java | A:计划确认链路 | S:受影响文件+工具权限+预算；确认后内容冻结进Run快照
+OrchestrationPlan.java[DW8T]: F:编排计划聚合 | R:code:orchestration/domain/plan/OrchestrationPlanStatus.java | A:计划确认链路 | S:受影响文件+工具权限+预算；确认后内容冻结进Run快照
 OrchestrationPlanStatus.java[DW3T]: F:计划状态枚举 | R:code:orchestration/domain/plan/OrchestrationPlan.java | A:计划生命周期 | S:状态迁移只能由后端事实驱动
-ToolPermissionRequest.java[DW5S]: F:工具权限请求 | R:code:orchestration/domain/plan/OrchestrationPlan.java | A:计划审查 | S:高影响工具必须显式出现在计划中供用户确认
+ToolPermissionRequest.java[DW5T]: F:工具权限请求 | R:code:orchestration/domain/plan/OrchestrationPlan.java | A:计划审查 | S:高影响工具必须显式出现在计划中供用户确认
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/domain/template/===
 WorkflowTemplateRegistry.java[DW8M]: F:规范模板注册表 | R:code:orchestration/domain/template/WorkflowTemplateType.java | A:模板实例化 | S:内置规范模板集中注册；无真实旅程的模板不得进生产注册表
 WorkflowTemplateType.java[DW4T]: F:模板类型枚举 | R:code:orchestration/domain/template/WorkflowTemplateRegistry.java | A:模板选择 | S:首批三类受控模板
-WorkflowTemplateView.java[DW5S]: F:模板视图 | R:code:orchestration/domain/template/WorkflowTemplateRegistry.java | A:前端模板列表 | S:暴露输入schema与门禁阈值
+WorkflowTemplateView.java[DW5T]: F:模板视图 | R:code:orchestration/domain/template/WorkflowTemplateRegistry.java | A:前端模板列表 | S:暴露输入schema与门禁阈值
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/dto/===
 ApprovalDecisionCommand.java[DI4T]: F:审批决定命令DTO | R:code:orchestration/application/ApprovalApplicationService.java | A:ApprovalController | S:含决定与意见；重复提交幂等处理
@@ -306,40 +306,40 @@ WorkflowDefinitionRepository.java[PI4T]: F:定义数据访问 | R:code:orchestra
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/scheduler/===
 DagExecutionEngine.java[AW9L]: F:DAG并行执行引擎 | R:code:orchestration/scheduler/DagTopologyPlanner.java | A:执行编排 | S:五个内部缝统一入口；并行度与取消传播集中管控
 DagTopologyPlanner.java[AW8M]: F:拓扑规划与后继触发 | R:code:orchestration/domain/dsl/TopologicalSortResult.java | A:DagExecutionEngine | S:join策略all/any/custom；条件求值走安全求值器
-DagLeaseExecutor.java[AR8M]: F:租约与超时看门狗 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:DagExecutionEngine | S:DB租约心跳+bounded线程池；租约过期可被恢复接管
+DagLeaseExecutor.java[AR8S]: F:租约与超时看门狗 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:DagExecutionEngine | S:DB租约心跳+bounded线程池；租约过期可被恢复接管
 DagStateTransitioner.java[AW8M]: F:状态迁移与审批屏障 | R:code:orchestration/domain/approval/ApprovalSignalRegistry.java | A:DagExecutionEngine | S:WAITING_APPROVAL挂起/恢复；失败传播给兄弟节点
-DagAgentInvoker.java[AI8M]: F:步骤Agent调用器 | R:code:runtime/AgentRuntimeRegistry.java | A:DagExecutionEngine | S:输入与提示词解析+超时+重试退避；运行时经注册表解析
+DagAgentInvoker.java[AI8S]: F:步骤Agent调用器 | R:code:runtime/AgentRuntimeRegistry.java | A:DagExecutionEngine | S:输入与提示词解析+超时+重试退避；运行时经注册表解析
 DagEventRecorder.java[AO7S]: F:DAG事件发布器 | R:code:execution/domain | A:DagExecutionEngine | S:结构化事件经RunEventBroadcaster；SSE回放的事实来源
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/infrastructure/entity/===
-ApprovalEntity.java[PD6S]: F:审批持久化实体 | R:code:orchestration/infrastructure/repository/ApprovalRepository.java | A:JPA | S:审批事实落库；决定不可篡改
-WorkflowDefinitionEntity.java[PD6S]: F:定义持久化实体 | R:code:orchestration/infrastructure/repository/WorkflowDefinitionRepository.java | A:JPA | S:DSL与版本落库
+ApprovalEntity.java[PD6T]: F:审批持久化实体 | R:code:orchestration/infrastructure/repository/ApprovalRepository.java | A:JPA | S:审批事实落库；决定不可篡改
+WorkflowDefinitionEntity.java[PD6T]: F:定义持久化实体 | R:code:orchestration/infrastructure/repository/WorkflowDefinitionRepository.java | A:JPA | S:DSL与版本落库
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/api/===
 ExecutionController.java[EI9M]: F:执行域REST与SSE入口 | R:code:execution/application/ExecutionApplicationService.java | A:前端与SDK | S:runs/steps/events/stream/cancel/pause/resume/retry/evidence全家；幂等键经Idempotency-Key头
 RunAliasController.java[EI5S]: F:旧Run路由兼容别名 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:/api/runs仅转发到v1语义；零调用证据后按退场清单删除
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/application/===
-ExecutionApplication.java[AI6S]: F:执行域用例端口 | R:code:execution/application/ExecutionApplicationService.java | A:ExecutionController | S:门面接口；实现细部分散到四模块
-ExecutionApplicationService.java[AI8M]: F:执行域门面服务 | R:code:execution/application/RunCommandModule.java | A:ExecutionController | S:仅委派Command/Query/EventStream/Evidence四深模块；不承载业务规则
+ExecutionApplication.java[AI6T]: F:执行域用例端口 | R:code:execution/application/ExecutionApplicationService.java | A:ExecutionController | S:门面接口；实现细部分散到四模块
+ExecutionApplicationService.java[AI8S]: F:执行域门面服务 | R:code:execution/application/RunCommandModule.java | A:ExecutionController | S:仅委派Command/Query/EventStream/Evidence四深模块；不承载业务规则
 RunCommandModule.java[AW9M]: F:Run与Step写命令模块 | R:code:execution/service/ExecutionStateMachine.java | A:ExecutionApplicationService | S:startRun幂等+基线冻结+提交后调度；状态跃迁必过状态机
 RunQueryModule.java[AR8M]: F:Run只读查询模块 | R:code:execution/application/ExecutionApplicationService.java | A:ExecutionApplicationService | S:严格项目归属校验；AOCI状态诚实判定从此暴露
-RunEventStreamModule.java[AN7M]: F:事件追加与SSE回放模块 | R:code:execution/service/RunEventBroadcaster.java | A:ExecutionApplicationService | S:游标回放语义；事件序列单调
+RunEventStreamModule.java[AN7T]: F:事件追加与SSE回放模块 | R:code:execution/service/RunEventBroadcaster.java | A:ExecutionApplicationService | S:游标回放语义；事件序列单调
 RunEvidenceModule.java[AO9L]: F:证据包组装模块 | R:code:execution/dto/RunEvidenceBundleView.java | A:证据导出 | S:脱敏+确定性SHA-256校验和；simulated标识不可缺失
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/domain/memory/===
 ContextMemoryCompressor.java[DA9M]: F:长上下文压缩与认知恢复 | R:code:execution/domain/memory/HierarchicalContextMemory.java | A:Agent上下文组装 | S:绝不剥离项目约束/审批/错误/改动路径；AOCI状态判定在此实现
-HierarchicalContextMemory.java[DA8M]: F:三层上下文记忆模型 | R:code:execution/domain/memory/ContextMemoryCompressor.java | A:Agent上下文组装 | S:Project/Run/Step三层；摘要不能替代原始证据
+HierarchicalContextMemory.java[DA8S]: F:三层上下文记忆模型 | R:code:execution/domain/memory/ContextMemoryCompressor.java | A:Agent上下文组装 | S:Project/Run/Step三层；摘要不能替代原始证据
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/domain/model/===
 CancelToken.java[DR6S]: F:协作取消令牌 | R:code:execution/domain/model/CancelTokenRegistry.java | A:运行取消链路 | S:优雅协作取消+硬超时；不依赖线程中断强杀
-CancelTokenRegistry.java[DR5S]: F:取消令牌注册表 | R:code:execution/domain/model/CancelToken.java | A:RunCommandModule | S:并发安全；Run结束必须注销防泄漏
+CancelTokenRegistry.java[DR5T]: F:取消令牌注册表 | R:code:execution/domain/model/CancelToken.java | A:RunCommandModule | S:并发安全；Run结束必须注销防泄漏
 RunCancelledException.java[DR3T]: F:取消异常信号 | R:code:execution/domain/model/CancelToken.java | A:DAG执行 | S:仅表达协作取消；不是失败
-StepRunStatus.java[DW7S]: F:步骤状态枚举与迁移 | R:code:execution/domain/state/UnifiedExecutionStateGraph.java | A:状态机 | S:八态；非法迁移必须被拒绝并审计
-WorkflowRunStatus.java[DW7S]: F:Run状态枚举与迁移 | R:code:execution/domain/state/UnifiedExecutionStateGraph.java | A:状态机 | S:八态；终态不可再迁移
+StepRunStatus.java[DW7T]: F:步骤状态枚举与迁移 | R:code:execution/domain/state/UnifiedExecutionStateGraph.java | A:状态机 | S:八态；非法迁移必须被拒绝并审计
+WorkflowRunStatus.java[DW7T]: F:Run状态枚举与迁移 | R:code:execution/domain/state/UnifiedExecutionStateGraph.java | A:状态机 | S:八态；终态不可再迁移
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/domain/retry/===
-ExecutionErrorClassifier.java[DR7S]: F:执行错误三分类 | R:code:execution/domain/retry/RetryCategory.java | A:重试决策 | S:瞬时可重试/需人工审批/致命不可重试；分类错误会引发错误重试
+ExecutionErrorClassifier.java[DR7T]: F:执行错误三分类 | R:code:execution/domain/retry/RetryCategory.java | A:重试决策 | S:瞬时可重试/需人工审批/致命不可重试；分类错误会引发错误重试
 RetryCategory.java[DR3T]: F:重试类别枚举 | R:code:execution/domain/retry/ExecutionErrorClassifier.java | A:重试决策 | S:三分类输出标记
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/domain/state/===
@@ -351,14 +351,14 @@ LeaseStatusView.java[DI4T]: F:租约状态视图DTO | R:code:execution/api/Execu
 PendingDecisionItem.java[DI4T]: F:待决策项DTO | R:code:execution/dto/RunOperationsView.java | A:前端操作台 | S:人工干预点投影
 RunEventView.java[DI4T]: F:事件视图DTO | R:code:execution/api/ExecutionController.java | A:SSE与前端 | S:实现ContextDomainEvent；sequence单调
 RunEvidenceBundleView.java[DI8M]: F:证据包视图DTO | R:code:execution/application/RunEvidenceModule.java | A:外部审计 | S:schemaVersion固定；DSL快照+校验和可重放验证
-RunOperationsView.java[DI6S]: F:运行操作台视图DTO | R:code:execution/api/ExecutionController.java | A:前端操作台 | S:统一状态+nextAction+待决策+副作用全景
-StartRunCommand.java[DI5S]: F:启动Run命令DTO | R:code:execution/application/RunCommandModule.java | A:ExecutionController | S:idempotencyKey必填语义；输入冻结进快照
+RunOperationsView.java[DI6T]: F:运行操作台视图DTO | R:code:execution/api/ExecutionController.java | A:前端操作台 | S:统一状态+nextAction+待决策+副作用全景
+StartRunCommand.java[DI5T]: F:启动Run命令DTO | R:code:execution/application/RunCommandModule.java | A:ExecutionController | S:idempotencyKey必填语义；输入冻结进快照
 StepRunView.java[DI4T]: F:步骤视图DTO | R:code:execution/dto/RunEvidenceBundleView.java | A:前端与证据 | S:attempt可见；输入输出经引用脱敏
 ToolSideEffectView.java[DI4T]: F:工具副作用视图DTO | R:code:execution/dto/RunOperationsView.java | A:前端审查 | S:高影响工具副作用留痕投影
 WorkflowRunView.java[DI4T]: F:Run视图DTO | R:code:execution/api/ExecutionController.java | A:前端投影 | S:Run事实唯一投影；前端不得自造状态
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/infrastructure/entity/===
-RunEventEntity.java[PS6S]: F:事件持久化实体 | R:code:execution/infrastructure/repository/RunEventRepository.java | A:JPA | S:sequenceNum单调支撑SSE回放
+RunEventEntity.java[PS6T]: F:事件持久化实体 | R:code:execution/infrastructure/repository/RunEventRepository.java | A:JPA | S:sequenceNum单调支撑SSE回放
 StepRunEntity.java[PD7S]: F:步骤持久化实体 | R:code:execution/infrastructure/repository/StepRunRepository.java | A:JPA | S:attempt/租约/输入输出引用；对应step_runs表
 WorkflowRunEntity.java[PD8S]: F:Run持久化实体 | R:code:execution/infrastructure/repository/WorkflowRunRepository.java | A:JPA | S:idempotencyKey唯一；dsl_snapshot冻结；对应workflow_runs表
 
@@ -368,7 +368,7 @@ StepRunRepository.java[PI5T]: F:步骤数据访问 | R:code:execution/infrastruc
 WorkflowRunRepository.java[PI5T]: F:Run数据访问 | R:code:execution/infrastructure/entity/WorkflowRunEntity.java | A:执行链路 | S:租约过期扫描与幂等查询支撑恢复
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/scheduler/===
-ExecutionScheduler.java[AR6S]: F:旧执行调度器 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:历史链路 | S:Phase C起@Deprecated；唯一权威调度是DagExecutionEngine
+ExecutionScheduler.java[AR6M]: F:旧执行调度器 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:历史链路 | S:Phase C起@Deprecated；唯一权威调度是DagExecutionEngine
 PersistentExecutionRecoveryRunner.java[AR8S]: F:启动时执行恢复 | R:code:execution/infrastructure/repository/WorkflowRunRepository.java | A:应用启动 | S:接管过期租约；已SUCCEEDED节点跳过防重复副作用
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/service/===
@@ -376,40 +376,40 @@ ExecutionStateMachine.java[DW8M]: F:Run/Step状态机服务 | R:code:execution/d
 RunEventBroadcaster.java[AN8M]: F:SSE实时广播器 | R:code:execution/service | A:SSE链路 | S:单调序列+Last-Event-ID重连回放+心跳；事件先持久化后广播
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/api/===
-AgentRegistryController.java[EI6S]: F:Agent定义与实例REST入口 | R:code:agent/application/AgentApplicationService.java | A:前端 | S:定义/实例CRUD；仅协议转换
-ProviderController.java[EI7S]: F:Provider管理REST入口 | R:code:agent/application/ProviderApplicationService.java | A:前端运维 | S:注册/更新/探活/熔断视图；凭据只写不回显
-TokenUsageController.java[EI5S]: F:Token用量REST入口 | R:code:agent/application/TokenUsageApplicationService.java | A:成本报表 | S:用量汇总与治理视图查询
+AgentRegistryController.java[EI6T]: F:Agent定义与实例REST入口 | R:code:agent/application/AgentApplicationService.java | A:前端 | S:定义/实例CRUD；仅协议转换
+ProviderController.java[EI7T]: F:Provider管理REST入口 | R:code:agent/application/ProviderApplicationService.java | A:前端运维 | S:注册/更新/探活/熔断视图；凭据只写不回显
+TokenUsageController.java[EI5T]: F:Token用量REST入口 | R:code:agent/application/TokenUsageApplicationService.java | A:成本报表 | S:用量汇总与治理视图查询
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/application/===
 AgentApplication.java[AI5T]: F:Agent用例端口 | R:code:agent/application/AgentApplicationService.java | A:AgentRegistryController | S:定义/实例/查询接口
 AgentApplicationService.java[AI8M]: F:Agent定义与实例编排 | R:code:agent/domain/definition/AgentDefinitionManifest.java | A:AgentRegistryController | S:定义版本化注册；实例创建绑定定义快照
 BudgetGovernanceGuard.java[SB8S]: F:Token与成本预算治理 | R:code:agent/domain/provider/model/ModelPricing.java | A:Run执行链路 | S:硬上限阻断无绕过路径；告警阈值可配；成本汇总多维度
 OfflineEvaluationApplication.java[AI4T]: F:离线评测端口 | R:code:agent/application/OfflineEvaluationApplicationService.java | A:评测触发方 | S:离线评测不等于生产承诺
-OfflineEvaluationApplicationService.java[AV7M]: F:离线评测编排 | R:code:agent/domain/evaluation/EvaluationReportView.java | A:评测触发方 | S:结果只用于版本回归比较；不得写成生产成功率
+OfflineEvaluationApplicationService.java[AV7S]: F:离线评测编排 | R:code:agent/domain/evaluation/EvaluationReportView.java | A:评测触发方 | S:结果只用于版本回归比较；不得写成生产成功率
 ProviderApplication.java[AI5T]: F:Provider用例端口 | R:code:agent/application/ProviderApplicationService.java | A:ProviderController | S:注册/探活/熔断查询接口
 ProviderApplicationService.java[AI8M]: F:Provider生命周期编排 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:ProviderController | S:凭据脱敏存储；探活结果进健康视图
 TokenUsageApplication.java[AI4T]: F:用量用例端口 | R:code:agent/application/TokenUsageApplicationService.java | A:TokenUsageController | S:记录与汇总接口
-TokenUsageApplicationService.java[AO7M]: F:Token用量审计编排 | R:code:agent/infrastructure/repository/TokenUsageAuditRepository.java | A:Run执行链路 | S:按Run/Step/Provider落审计；汇总驱动成本报表
+TokenUsageApplicationService.java[AO7S]: F:Token用量审计编排 | R:code:agent/infrastructure/repository/TokenUsageAuditRepository.java | A:Run执行链路 | S:按Run/Step/Provider落审计；汇总驱动成本报表
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/domain/context/===
 AssembledContext.java[DA5T]: F:组装后上下文值对象 | R:code:agent/domain/context/ContextAssemblyEngine.java | A:AgentRuntime | S:携带层来源与token计数
-ContextAssemblyEngine.java[DA8M]: F:上下文组装引擎 | R:code:agent/domain/context/ContextLayer.java | A:AgentRuntime | S:按层类型与预算组装；截断理由必须可解释
-ContextLayer.java[DA5S]: F:上下文层值对象 | R:code:agent/domain/context/ContextLayerType.java | A:上下文组装 | S:内容+层级+token预算
+ContextAssemblyEngine.java[DA8S]: F:上下文组装引擎 | R:code:agent/domain/context/ContextLayer.java | A:AgentRuntime | S:按层类型与预算组装；截断理由必须可解释
+ContextLayer.java[DA5T]: F:上下文层值对象 | R:code:agent/domain/context/ContextLayerType.java | A:上下文组装 | S:内容+层级+token预算
 ContextLayerType.java[DC3T]: F:上下文层级类型枚举 | R:code:agent/domain/context/ContextLayer.java | A:上下文组装 | S:层级决定优先保留顺序
 ContextTruncationStrategy.java[DC2T]: F:截断策略契约 | R:code:agent/domain/context/ContextAssemblyEngine.java | A:上下文组装 | S:截断必须记录理由
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/domain/definition/===
 AgentBudget.java[DC4T]: F:Agent预算值对象 | R:code:agent/domain/definition/AgentDefinitionManifest.java | A:预算治理 | S:token上限随定义版本化
-AgentDefinitionManifest.java[DC7S]: F:Agent定义清单 | R:code:agent/application/AgentApplicationService.java | A:定义注册 | S:角色/提示词/工具allowlist/预算/停止条件快照；Run创建后冻结
+AgentDefinitionManifest.java[DC7T]: F:Agent定义清单 | R:code:agent/application/AgentApplicationService.java | A:定义注册 | S:角色/提示词/工具allowlist/预算/停止条件快照；Run创建后冻结
 AgentToolCategory.java[DC3T]: F:工具类别枚举 | R:code:agent/domain/definition/AgentToolDefinition.java | A:工具注册 | S:高影响类别必须走确认门禁
-AgentToolDefinition.java[DC5S]: F:工具定义 | R:code:agent/domain/definition/ToolRegistry.java | A:工具注册 | S:参数schema+权限级别+超时+回滚声明
-ProviderPolicy.java[DC5S]: F:Provider策略值对象 | R:code:agent/domain/definition/AgentDefinitionManifest.java | A:路由决策 | S:模式隔离偏好与能力要求
+AgentToolDefinition.java[DC5T]: F:工具定义 | R:code:agent/domain/definition/ToolRegistry.java | A:工具注册 | S:参数schema+权限级别+超时+回滚声明
+ProviderPolicy.java[DC5T]: F:Provider策略值对象 | R:code:agent/domain/definition/AgentDefinitionManifest.java | A:路由决策 | S:模式隔离偏好与能力要求
 ToolRegistry.java[DC7S]: F:工具注册表 | R:code:agent/domain/definition/AgentToolDefinition.java | A:AgentRuntime | S:仅注册显式声明的工具；allowlist外的工具调用必须拒绝
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/domain/evaluation/===
-EvaluationReportView.java[DQ5S]: F:评测报告视图 | R:code:agent/application/OfflineEvaluationApplicationService.java | A:版本回归 | S:区分计划/代码/测试/风险误报/成本维度
+EvaluationReportView.java[DQ5T]: F:评测报告视图 | R:code:agent/application/OfflineEvaluationApplicationService.java | A:版本回归 | S:区分计划/代码/测试/风险误报/成本维度
 EvaluationTaskCategory.java[DQ3T]: F:评测任务类别枚举 | R:code:agent/domain/evaluation/EvaluationTaskResult.java | A:离线评测 | S:类别边界固定
-EvaluationTaskResult.java[DQ5S]: F:评测任务结果 | R:code:agent/domain/evaluation/EvaluationReportView.java | A:离线评测 | S:单任务得分与对比基线
+EvaluationTaskResult.java[DQ5T]: F:评测任务结果 | R:code:agent/domain/evaluation/EvaluationReportView.java | A:离线评测 | S:单任务得分与对比基线
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/exception/===
 NoAvailableProviderException.java[DE4T]: F:无可用Provider异常 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:路由失败 | S:触发降级决策而非静默Mock
@@ -420,17 +420,17 @@ ProviderUnavailableException.java[DE4T]: F:Provider不可用异常 | R:code:agen
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/model/===
 ChatChunk.java[DN5T]: F:流式分片值对象 | R:code:agent/domain/provider/model/ChatResponse.java | A:流式调用 | S:分片拼接组成完整响应
 ChatMessage.java[DN5T]: F:对话消息值对象 | R:code:agent/domain/provider/model/ChatRequest.java | A:Provider调用 | S:role+content；系统提示与用户输入区分
-ChatRequest.java[DN6S]: F:模型请求值对象 | R:code:agent/infrastructure/provider/AbstractHttpLlmProvider.java | A:Provider调用 | S:模型/温度/token上限随Run策略冻结
-ChatResponse.java[DN5S]: F:模型响应值对象 | R:code:agent/domain/provider/model/TokenUsage.java | A:Provider调用 | S:内容+用量；不携带凭据
+ChatRequest.java[DN6T]: F:模型请求值对象 | R:code:agent/infrastructure/provider/AbstractHttpLlmProvider.java | A:Provider调用 | S:模型/温度/token上限随Run策略冻结
+ChatResponse.java[DN5T]: F:模型响应值对象 | R:code:agent/domain/provider/model/TokenUsage.java | A:Provider调用 | S:内容+用量；不携带凭据
 CircuitBreaker.java[DR8S]: F:线程安全熔断器 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:Provider容灾 | S:CLOSED/OPEN/HALF_OPEN状态机；恢复探测通过才关闭
 CircuitStatus.java[DR3T]: F:熔断状态枚举 | R:code:agent/domain/provider/model/CircuitBreaker.java | A:容灾 | S:三态
 FallbackEvent.java[DR5T]: F:降级事件值对象 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:容灾审计 | S:降级必须留痕，不得静默
-ProviderExecutionMode.java[DC5S]: F:Provider执行模式枚举 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:模式隔离 | S:DEMO/LIVE_SELF_HOSTED/LIVE_TEAM严格隔离不得静默互转
+ProviderExecutionMode.java[DC5T]: F:Provider执行模式枚举 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:模式隔离 | S:DEMO/LIVE_SELF_HOSTED/LIVE_TEAM严格隔离不得静默互转
 ProviderHealth.java[DR5T]: F:Provider健康值对象 | R:code:agent/application/ProviderApplicationService.java | A:健康视图 | S:延迟/可用性测量投影
 TokenUsage.java[DO5T]: F:Token用量值对象 | R:code:agent/application/TokenUsageApplicationService.java | A:用量审计 | S:输入/输出/总量分列
 ToolCall.java[DN5T]: F:工具调用值对象 | R:code:agent/domain/provider/model/ToolDefinition.java | A:Provider协议 | S:名称+参数JSON；执行前过权限门禁
 ToolDefinition.java[DN5T]: F:工具协议定义 | R:code:agent/domain/provider/model/ToolCall.java | A:Provider协议 | S:面向模型暴露的工具schema
-ModelPricing.java[DA8M]: F:模型定价与成本计算 | R:code:agent/application/BudgetGovernanceGuard.java | A:预算治理 | S:主流模型价格表+自定义覆盖+缓存折扣；改价格影响成本统计口径
+ModelPricing.java[DA8S]: F:模型定价与成本计算 | R:code:agent/application/BudgetGovernanceGuard.java | A:预算治理 | S:主流模型价格表+自定义覆盖+缓存折扣；改价格影响成本统计口径
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/domain/provider/router/===
 DynamicProviderRouter.java[AN9L]: F:动态Provider路由与容灾 | R:code:agent/domain/provider/model/CircuitBreaker.java | A:AgentRuntime | S:优先级/权重/能力/延迟/成本综合选路；模式隔离权威；失败自动降级留痕
@@ -455,13 +455,13 @@ ProviderTestResultView.java[DI4T]: F:Provider连通测试DTO | R:code:agent/api/
 ProviderUpdateCommand.java[DI4T]: F:更新Provider命令DTO | R:code:agent/application/ProviderApplicationService.java | A:ProviderController | S:空凭据表示不更换密钥
 ProviderView.java[DI4T]: F:Provider视图DTO | R:code:agent/api/ProviderController.java | A:前端投影 | S:绝不回显apiKey明文
 RouteDecisionView.java[DI4T]: F:路由决策视图DTO | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:可观测 | S:候选矩阵与落选原因投影
-TokenGovernanceView.java[DO5S]: F:Token治理视图DTO | R:code:agent/application/BudgetGovernanceGuard.java | A:治理面板 | S:预算消耗与告警阈值全景
+TokenGovernanceView.java[DO5T]: F:Token治理视图DTO | R:code:agent/application/BudgetGovernanceGuard.java | A:治理面板 | S:预算消耗与告警阈值全景
 TokenSummaryView.java[DO4T]: F:Token汇总DTO | R:code:agent/application/TokenUsageApplicationService.java | A:成本报表 | S:聚合口径固定
 TokenUsageAuditView.java[DO4T]: F:用量审计视图DTO | R:code:agent/infrastructure/repository/TokenUsageAuditRepository.java | A:审计查询 | S:审计事实只读投影
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/entity/===
-AgentDefinitionEntity.java[PD6S]: F:Agent定义实体 | R:code:agent/infrastructure/repository/AgentDefinitionRepository.java | A:JPA | S:manifest JSON含版本；对应agent_definitions表
-AgentInstanceEntity.java[PD5S]: F:Agent实例实体 | R:code:agent/infrastructure/repository/AgentInstanceRepository.java | A:JPA | S:实例引用定义；对应agent_instances表
+AgentDefinitionEntity.java[PD6T]: F:Agent定义实体 | R:code:agent/infrastructure/repository/AgentDefinitionRepository.java | A:JPA | S:manifest JSON含版本；对应agent_definitions表
+AgentInstanceEntity.java[PD5T]: F:Agent实例实体 | R:code:agent/infrastructure/repository/AgentInstanceRepository.java | A:JPA | S:实例引用定义；对应agent_instances表
 ProviderEntity.java[PD7S]: F:Provider实体 | R:code:agent/infrastructure/repository/ProviderRepository.java | A:JPA | S:凭据脱敏存储；优先级/权重/熔断状态落库；对应providers表
 TokenUsageAuditEntity.java[PL6S]: F:用量审计实体 | R:code:agent/infrastructure/repository/TokenUsageAuditRepository.java | A:JPA | S:对应token_usages表；成本审计事实来源
 
@@ -477,23 +477,23 @@ OpenAiCompatibleProvider.java[IN7M]: F:OpenAI兼容协议适配 | R:code:agent/i
 AgentDefinitionRepository.java[PI4T]: F:定义数据访问 | R:code:agent/infrastructure/entity/AgentDefinitionEntity.java | A:Application层 | S:defKey+版本定位
 AgentInstanceRepository.java[PI4T]: F:实例数据访问 | R:code:agent/infrastructure/entity/AgentInstanceEntity.java | A:Application层 | S:实例生命周期存取
 ProviderRepository.java[PI5T]: F:Provider数据访问 | R:code:agent/infrastructure/entity/ProviderEntity.java | A:路由与应用层 | S:启动时装载路由候选矩阵
-TokenUsageAuditRepository.java[PI5S]: F:用量审计数据访问 | R:code:agent/infrastructure/entity/TokenUsageAuditEntity.java | A:汇总报表 | S:按Run/Provider/模型聚合查询
+TokenUsageAuditRepository.java[PI5T]: F:用量审计数据访问 | R:code:agent/infrastructure/entity/TokenUsageAuditEntity.java | A:汇总报表 | S:按Run/Provider/模型聚合查询
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/security/===
-SecretMasker.java[SS9M]: F:全链路凭据脱敏 | R:code:agent/infrastructure/provider/AbstractHttpLlmProvider.java | A:日志与响应管道 | S:保证日志/错误/REST/URL零凭据泄漏；新输出通道必须先接脱敏
+SecretMasker.java[SS9S]: F:全链路凭据脱敏 | R:code:agent/infrastructure/provider/AbstractHttpLlmProvider.java | A:日志与响应管道 | S:保证日志/错误/REST/URL零凭据泄漏；新输出通道必须先接脱敏
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/adapter/web/===
 IMController.java[EI4S]: F:旧IM路由兼容入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:Phase 10删除候选；零调用证据后按退场清单移除
-SandboxController.java[EI4S]: F:旧沙箱路由兼容入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:Phase 10删除候选；替代路径为/api/deployments
-WorkflowAndDiffController.java[EI4S]: F:旧工作流与Diff路径入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:生产profile下严格禁用；强制走workspaceId边界
+SandboxController.java[EI4T]: F:旧沙箱路由兼容入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:Phase 10删除候选；替代路径为/api/deployments
+WorkflowAndDiffController.java[EI4T]: F:旧工作流与Diff路径入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:生产profile下严格禁用；强制走workspaceId边界
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/application/service/===
 IMCollaborationService.java[AB5S]: F:旧IM协作兼容服务 | R:code:conversation/application/ConversationApplicationService.java | A:IMController | S:仅委派会话服务；Phase 10随IMController一并退场
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/agent/model/===
 AgentCapability.java[DE3T]: F:Agent能力标记枚举 | R:code:domain/agent/model/AgentExecutionRequest.java | A:执行请求 | S:能力声明驱动适配器选择
-AgentExecutionRequest.java[DE5T]: F:Agent执行请求值对象 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:执行链路 | S:提示词+上下文+工具约束
-AgentExecutionResult.java[DE5T]: F:Agent执行结果值对象 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:执行链路 | S:输出+用量+simulated标识
+AgentExecutionRequest.java[DE5S]: F:Agent执行请求值对象 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:执行链路 | S:提示词+上下文+工具约束
+AgentExecutionResult.java[DE5S]: F:Agent执行结果值对象 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:执行链路 | S:输出+用量+simulated标识
 AgentPlatformType.java[DC4T]: F:Agent平台类型枚举 | R:code:domain/agent/service/AgentAdapterFactory.java | A:适配器选择 | S:MOCK/CLI/API平台；决定运行时路由
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/agent/service/===
@@ -525,10 +525,10 @@ WorkflowEngineService.java[DE5S]: F:旧工作流引擎 | R:code:orchestration/sc
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/workspace/model/===
 FileDiffEntry.java[DE4T]: F:文件Diff条目值对象 | R:code:domain/workspace/model/StructuredDiff.java | A:Diff展示 | S:行级增删与文件路径
-StructuredDiff.java[DE5S]: F:结构化Diff值对象 | R:code:domain/workspace/service/JGitWorkspaceManager.java | A:审查界面 | S:Tree-to-Tree结构化结果；替代行级旧Diff
+StructuredDiff.java[DE5T]: F:结构化Diff值对象 | R:code:domain/workspace/service/JGitWorkspaceManager.java | A:审查界面 | S:Tree-to-Tree结构化结果；替代行级旧Diff
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/===
-DefaultWorkspaceResolver.java[DR8S]: F:受控路径解析实现 | R:code:domain/workspace/service/WorkspaceResolver.java | A:全文件链路 | S:阻断../与绝对路径与符号链接逃逸；.git只读；安全边界不容放宽
+DefaultWorkspaceResolver.java[DR8M]: F:受控路径解析实现 | R:code:domain/workspace/service/WorkspaceResolver.java | A:全文件链路 | S:阻断../与绝对路径与符号链接逃逸；.git只读；安全边界不容放宽
 JGitWorkspaceManager.java[DP9L]: F:JGit工作区操作 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:工作区链路 | S:基线/快照/结构化Diff/Revert；大文件与锁行为需真实Git远端验证
 WorkspaceResolver.java[DR6T]: F:受控路径解析端口 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:全文件链路 | S:所有文件访问必须经此解析，禁止旁路拼接路径
 
@@ -536,10 +536,10 @@ WorkspaceResolver.java[DR6T]: F:受控路径解析端口 | R:code:domain/workspa
 CliProcessAdapter.java[IN7S]: F:CLI子进程适配器 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:CLI运行时 | S:进程看门狗+流脱敏+强制终止；防僵尸进程
 CodexCliAdapter.java[IN4T]: F:Codex CLI适配 | R:code:infrastructure/adapter/CliProcessAdapter.java | A:CLI运行时 | S:命令与参数差异封装
 OpenClawCliAdapter.java[IN4T]: F:OpenClaw CLI适配 | R:code:infrastructure/adapter/CliProcessAdapter.java | A:CLI运行时 | S:命令与参数差异封装；无真实使用者时进删除候选
-SpringAiApiAdapter.java[IN6S]: F:Spring AI API适配 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:旧API链路 | S:旧适配端口实现；与runtime/openai并存属历史分叉
+SpringAiApiAdapter.java[IN6M]: F:Spring AI API适配 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:旧API链路 | S:旧适配端口实现；与runtime/openai并存属历史分叉
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/infrastructure/concurrency/===
-WorkspaceLockManager.java[DR9M]: F:工作区双层锁管理 | R:code:project/application/WorkspaceApplicationService.java | A:并发写入链路 | S:JVM+OS文件锁双层；租约与属主服务端派生；跨实例需DB层配合
+WorkspaceLockManager.java[DR9L]: F:工作区双层锁管理 | R:code:project/application/WorkspaceApplicationService.java | A:并发写入链路 | S:JVM+OS文件锁双层；租约与属主服务端派生；跨实例需DB层配合
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/infrastructure/config/===
 CorsConfig.java[SC4T]: F:CORS配置 | R:code:identity/infrastructure/security/AuthFilter.java | A:Web安全 | S:允许来源需显式收紧，不得放宽为通配
@@ -548,7 +548,7 @@ CorsConfig.java[SC4T]: F:CORS配置 | R:code:identity/infrastructure/security/Au
 AgentHubMetricsCollector.java[AO8M]: F:Micrometer指标采集 | R:code:identity/infrastructure/security/ResourceOwnershipVerifier.java | A:观测 | S:执行延迟/SSE连接/资源争用高频指标；命名是面板契约
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/infrastructure/repository/===
-ConversationRepository.java[PI5S]: F:会话数据访问 | R:code:infrastructure/repository/entity/ConversationEntity.java | A:会话应用层 | S:参与者与消息联查支撑会话视图
+ConversationRepository.java[PI5T]: F:会话数据访问 | R:code:infrastructure/repository/entity/ConversationEntity.java | A:会话应用层 | S:参与者与消息联查支撑会话视图
 MessageRepository.java[PI5T]: F:消息数据访问 | R:code:infrastructure/repository/entity/MessageEntity.java | A:会话应用层 | S:序列冲突检测依赖此层查询
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/infrastructure/repository/entity/===
@@ -556,7 +556,7 @@ ConversationEntity.java[PD6S]: F:会话持久化实体 | R:code:infrastructure/r
 MessageEntity.java[PD6S]: F:消息持久化实体 | R:code:infrastructure/repository/MessageRepository.java | A:JPA | S:序列号+发送者+协议类型
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/runtime/===
-AgentRuntimeRegistry.java[AE7S]: F:Agent运行时注册表 | R:code:orchestration/scheduler/DagAgentInvoker.java | A:DAG执行 | S:按平台/运行时描述解析实现；descriptor.simulated必须真实
+AgentRuntimeRegistry.java[AE7T]: F:Agent运行时注册表 | R:code:orchestration/scheduler/DagAgentInvoker.java | A:DAG执行 | S:按平台/运行时描述解析实现；descriptor.simulated必须真实
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/runtime/cli/===
 CliAgentRuntime.java[AI7S]: F:CLI进程运行时 | R:code:infrastructure/adapter/CliProcessAdapter.java | A:执行链路 | S:子进程生命周期+流脱敏+强杀；退出码语义不可吞
@@ -578,7 +578,7 @@ RuntimeEventSink.java[AN4T]: F:运行时事件接收器 | R:code:execution/servi
 RuntimeHealth.java[AR4T]: F:运行时健康报告 | R:code:runtime/port/AgentRuntime.java | A:健康检查 | S:可用性与延迟投影
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/api/===
-ArtifactController.java[EI8M]: F:产物审查REST入口 | R:code:audit/application/ArtifactApplicationService.java | A:前端审查界面 | S:accept/reject/revert/revert-file/质量门禁/PR草稿/血缘；仅协议转换
+ArtifactController.java[EI8S]: F:产物审查REST入口 | R:code:audit/application/ArtifactApplicationService.java | A:前端审查界面 | S:accept/reject/revert/revert-file/质量门禁/PR草稿/血缘；仅协议转换
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/application/===
 ArtifactApplication.java[AI5T]: F:产物用例端口 | R:code:audit/application/ArtifactApplicationService.java | A:ArtifactController | S:审查/门禁/回滚/血缘接口
@@ -586,25 +586,25 @@ ArtifactApplicationService.java[AO9L]: F:产物生命周期与审查编排 | R:c
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/===
 QualityGateCheckItem.java[DQ4T]: F:门禁检查项 | R:code:audit/domain/quality/QualityGateReport.java | A:门禁评估 | S:单项规则结果与证据
-QualityGateEngine.java[DQ9M]: F:质量门禁引擎 | R:code:audit/domain/quality/QualityGateReport.java | A:交付审查 | S:构建/回归测试/静态分析/禁用构造等策略检查；门禁不过不得进入交付
+QualityGateEngine.java[DQ9L]: F:质量门禁引擎 | R:code:audit/domain/quality/QualityGateReport.java | A:交付审查 | S:构建/回归测试/静态分析/禁用构造等策略检查；门禁不过不得进入交付
 QualityGateReport.java[DQ5S]: F:门禁报告值对象 | R:code:audit/api/ArtifactController.java | A:审查界面 | S:整报告结论+逐项证据
 QualityGateRuleType.java[DQ4T]: F:门禁规则类型枚举 | R:code:audit/domain/quality/QualityGateEngine.java | A:门禁评估 | S:规则类别固定；新增规则需契约测试
 QualityGateStatus.java[DQ3T]: F:门禁状态枚举 | R:code:audit/domain/quality/QualityGateReport.java | A:门禁评估 | S:通过/失败/未评估
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/dto/===
-ArtifactLineageView.java[DI5S]: F:产物血缘视图DTO | R:code:audit/api/ArtifactController.java | A:审查界面 | S:Step节点到产物的依赖链投影
+ArtifactLineageView.java[DI5T]: F:产物血缘视图DTO | R:code:audit/api/ArtifactController.java | A:审查界面 | S:Step节点到产物的依赖链投影
 ArtifactView.java[DI4T]: F:产物视图DTO | R:code:audit/api/ArtifactController.java | A:前端投影 | S:审查状态与校验和投影
-PullRequestDraftView.java[DI5S]: F:PR草稿视图DTO | R:code:audit/api/ArtifactController.java | A:外部交付草稿 | S:草稿性质；真实外部交付需用户确认目标与描述
+PullRequestDraftView.java[DI5M]: F:PR草稿视图DTO | R:code:audit/api/ArtifactController.java | A:外部交付草稿 | S:草稿性质；真实外部交付需用户确认目标与描述
 StepLineageNode.java[DI4T]: F:血缘节点DTO | R:code:audit/dto/ArtifactLineageView.java | A:血缘展示 | S:步骤输入输出引用链
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/infrastructure/entity/===
-ArtifactEntity.java[PD6S]: F:产物持久化实体 | R:code:audit/infrastructure/repository/ArtifactRepository.java | A:JPA | S:review_status字段支撑审查流；对应artifacts表
+ArtifactEntity.java[PD6T]: F:产物持久化实体 | R:code:audit/infrastructure/repository/ArtifactRepository.java | A:JPA | S:review_status字段支撑审查流；对应artifacts表
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/infrastructure/repository/===
 ArtifactRepository.java[PI4T]: F:产物数据访问 | R:code:audit/infrastructure/entity/ArtifactEntity.java | A:Application层 | S:findByRunId支撑血缘组装
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/conversation/api/===
-ConversationController.java[EI7M]: F:会话REST与SSE入口 | R:code:conversation/application/ConversationApplicationService.java | A:前端 | S:会话/消息/流/上下文/摘要/coordinate；仅服务主线协作不扩展成IM产品
+ConversationController.java[EI7S]: F:会话REST与SSE入口 | R:code:conversation/application/ConversationApplicationService.java | A:前端 | S:会话/消息/流/上下文/摘要/coordinate；仅服务主线协作不扩展成IM产品
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/conversation/application/===
 ConversationApplication.java[AI5T]: F:会话用例端口 | R:code:conversation/application/ConversationApplicationService.java | A:ConversationController | S:会话与消息用例接口
@@ -620,7 +620,7 @@ MessageProtocolType.java[DN3T]: F:消息协议类型枚举 | R:code:conversation
 MessageType.java[DN3T]: F:消息类型枚举 | R:code:conversation/dto/MessageView.java | A:会话消息 | S:文本/卡片/系统等
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/conversation/domain/service/===
-ConversationSequenceManager.java[DR7S]: F:消息序列管理器 | R:code:conversation/application/ConversationApplicationService.java | A:并发消息 | S:JVM内条锁+跨实例DB行锁；序列严格单调无空洞；冲突抛MESSAGE_SEQUENCE_CONFLICT
+ConversationSequenceManager.java[DR7T]: F:消息序列管理器 | R:code:conversation/application/ConversationApplicationService.java | A:并发消息 | S:JVM内条锁+跨实例DB行锁；序列严格单调无空洞；冲突抛MESSAGE_SEQUENCE_CONFLICT
 LoopDetector.java[DA7S]: F:多Agent环路检测 | R:code:conversation/domain/model/LoopDetectionResult.java | A:团队会话 | S:检测重复/乒乓震荡；触发即中断保护token预算
 MessageVisibilityFilter.java[DS4T]: F:消息可见性过滤 | R:code:conversation/domain/sse/ConversationEventBroadcaster.java | A:SSE | S:按观察者过滤可见消息
 RollingSummaryService.java[DA4T]: F:滚动摘要服务 | R:code:conversation/domain/service/TokenBudgetContextManager.java | A:上下文压缩 | S:摘要不能替代原始消息证据
@@ -645,11 +645,11 @@ ConversationParticipantEntity.java[PD5T]: F:参与者持久化实体 | R:code:co
 ConversationParticipantRepository.java[PI4T]: F:参与者数据访问 | R:code:conversation/infrastructure/entity/ConversationParticipantEntity.java | A:会话应用层 | S:成员查询支撑路由
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/team/api/===
-TeamController.java[EI7M]: F:团队与项目RBAC REST入口 | R:code:team/application/TeamApplicationService.java | A:前端 | S:团队CRUD/成员/coordinate/项目成员角色管理；权限矩阵唯一入口
+TeamController.java[EI7T]: F:团队与项目RBAC REST入口 | R:code:team/application/TeamApplicationService.java | A:前端 | S:团队CRUD/成员/coordinate/项目成员角色管理；权限矩阵唯一入口
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/team/application/===
 TeamApplication.java[AI5T]: F:团队用例端口 | R:code:team/application/TeamApplicationService.java | A:TeamController | S:团队/成员/协调/项目角色接口
-TeamApplicationService.java[AI9M]: F:团队协作与RBAC编排 | R:code:team/domain/rbac/ProjectRbacRole.java | A:TeamController | S:成员生命周期+项目角色授权+拓扑协调；全部资源动作走同一权限矩阵
+TeamApplicationService.java[AI9L]: F:团队协作与RBAC编排 | R:code:team/domain/rbac/ProjectRbacRole.java | A:TeamController | S:成员生命周期+项目角色授权+拓扑协调；全部资源动作走同一权限矩阵
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/team/domain/model/===
 NextSpeakerDecision.java[DW4T]: F:下一位发言者决策值对象 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:拓扑策略输出
@@ -658,13 +658,13 @@ TeamRole.java[DI4T]: F:团队角色枚举 | R:code:team/domain/model/TeamTopolog
 TeamTopology.java[DW4T]: F:团队拓扑枚举 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:协调策略选择 | S:HIERARCHICAL/PEER_TO_PEER/ROUND_ROBIN
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/team/domain/rbac/===
-ProjectPermission.java[SI5S]: F:项目权限枚举 | R:code:team/domain/rbac/ProjectRbacRole.java | A:授权检查 | S:细粒度动作权限；新增权限必须映射到角色
+ProjectPermission.java[SI5T]: F:项目权限枚举 | R:code:team/domain/rbac/ProjectRbacRole.java | A:授权检查 | S:细粒度动作权限；新增权限必须映射到角色
 ProjectRbacRole.java[SI6S]: F:项目RBAC角色枚举 | R:code:identity/infrastructure/security/ResourceOwnershipVerifier.java | A:授权检查 | S:OWNER到AUDITOR六角色；角色-权限矩阵是越权判断权威
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/team/domain/strategy/===
-HierarchicalTopologyCoordinator.java[AW6M]: F:层级拓扑协调器 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:领导Agent分派+汇总；轮次上限防失控
-PeerToPeerTopologyCoordinator.java[AW5M]: F:点对点拓扑协调器 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:平权轮转；依赖环路检测防乒乓
-RoundRobinTopologyCoordinator.java[AW4S]: F:轮询拓扑协调器 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:固定轮转顺序
+HierarchicalTopologyCoordinator.java[AW6S]: F:层级拓扑协调器 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:领导Agent分派+汇总；轮次上限防失控
+PeerToPeerTopologyCoordinator.java[AW5S]: F:点对点拓扑协调器 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:平权轮转；依赖环路检测防乒乓
+RoundRobinTopologyCoordinator.java[AW4T]: F:轮询拓扑协调器 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:固定轮转顺序
 TeamTopologyStrategy.java[AE5T]: F:拓扑协调SPI | R:code:team/domain/strategy/TeamTopologyStrategyFactory.java | A:协调器实现 | S:决策下一位发言者
 TeamTopologyStrategyFactory.java[AE4T]: F:拓扑策略工厂 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协调 | S:按拓扑枚举解析策略
 
@@ -681,19 +681,19 @@ TeamView.java[DI4T]: F:团队视图DTO | R:code:team/api/TeamController.java | A
 UpdateMemberRoleCommand.java[DI4T]: F:改角色命令DTO | R:code:team/application/TeamApplicationService.java | A:TeamController | S:降权/升权需ADMIN以上
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/team/infrastructure/entity/===
-TeamEntity.java[PD6S]: F:团队持久化实体 | R:code:team/infrastructure/repository/TeamRepository.java | A:JPA | S:拓扑/领导/轮次上限落库；对应teams表
-TeamMemberEntity.java[PD5S]: F:成员持久化实体 | R:code:team/infrastructure/repository/TeamMemberRepository.java | A:JPA | S:成员角色类型；对应team_members表
+TeamEntity.java[PD6T]: F:团队持久化实体 | R:code:team/infrastructure/repository/TeamRepository.java | A:JPA | S:拓扑/领导/轮次上限落库；对应teams表
+TeamMemberEntity.java[PD5T]: F:成员持久化实体 | R:code:team/infrastructure/repository/TeamMemberRepository.java | A:JPA | S:成员角色类型；对应team_members表
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/team/infrastructure/repository/===
 TeamMemberRepository.java[PI4T]: F:成员数据访问 | R:code:team/infrastructure/entity/TeamMemberEntity.java | A:Application层 | S:按团队查成员支撑授权
 TeamRepository.java[PI4T]: F:团队数据访问 | R:code:team/infrastructure/entity/TeamEntity.java | A:Application层 | S:团队存取
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/api/===
-DeploymentController.java[EI6S]: F:部署REST入口 | R:code:sandbox/application/DeploymentApplicationService.java | A:前端 | S:创建/查询/日志/停止/探针；仅接受ACCEPTED产物
+DeploymentController.java[EI6T]: F:部署REST入口 | R:code:sandbox/application/DeploymentApplicationService.java | A:前端 | S:创建/查询/日志/停止/探针；仅接受ACCEPTED产物
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/api/dto/===
 CreateDeploymentRequest.java[DI4T]: F:创建部署请求DTO | R:code:sandbox/application/DeploymentApplicationService.java | A:DeploymentController | S:模板类型+产物绑定
-DeploymentResponse.java[DI4T]: F:部署视图DTO | R:code:sandbox/api/DeploymentController.java | A:前端投影 | S:生命周期轨迹投影
+DeploymentResponse.java[DI4S]: F:部署视图DTO | R:code:sandbox/api/DeploymentController.java | A:前端投影 | S:生命周期轨迹投影
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/application/===
 DeploymentApplication.java[AI5T]: F:部署用例端口 | R:code:sandbox/application/DeploymentApplicationService.java | A:DeploymentController | S:创建/停止/探针接口
@@ -702,27 +702,27 @@ SandboxApplication.java[AE4T]: F:旧沙箱端口 | R:code:domain/sandbox/service
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/===
 DeploymentSpec.java[DW5T]: F:部署规格值对象 | R:code:sandbox/domain/model/DeploymentManifest.java | A:部署链路 | S:构建/启动/健康检查/端口声明
-DeploymentStatus.java[DW5S]: F:部署状态枚举 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:部署状态机 | S:CREATED到STOPPED/FAILED全生命周期
+DeploymentStatus.java[DW5T]: F:部署状态枚举 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:部署状态机 | S:CREATED到STOPPED/FAILED全生命周期
 DeploymentTarget.java[DW4T]: F:部署目标枚举 | R:code:sandbox/domain/model/DeploymentSpec.java | A:部署链路 | S:本地进程/容器目标
 DeploymentTemplateType.java[DW4T]: F:部署模板类型枚举 | R:code:sandbox/domain/model/DeploymentSpec.java | A:部署链路 | S:STATIC_WEB/JAVA_SPRING等首批模板
-SandboxExecutionRequest.java[DW5T]: F:沙箱执行请求值对象 | R:code:sandbox/domain/provider/SandboxProvider.java | A:沙箱执行 | S:命令+配额+工作目录约束
-SandboxExecutionResult.java[DW4T]: F:沙箱执行结果值对象 | R:code:sandbox/domain/provider/SandboxProvider.java | A:沙箱执行 | S:退出码+有界输出
-SandboxResourceQuota.java[DP5S]: F:沙箱资源配额值对象 | R:code:sandbox/domain/provider/DockerSandbox.java | A:沙箱执行 | S:CPU/内存/PID/超时上限；默认值是安全边界
+SandboxExecutionRequest.java[DW5S]: F:沙箱执行请求值对象 | R:code:sandbox/domain/provider/SandboxProvider.java | A:沙箱执行 | S:命令+配额+工作目录约束
+SandboxExecutionResult.java[DW4S]: F:沙箱执行结果值对象 | R:code:sandbox/domain/provider/SandboxProvider.java | A:沙箱执行 | S:退出码+有界输出
+SandboxResourceQuota.java[DP5T]: F:沙箱资源配额值对象 | R:code:sandbox/domain/provider/DockerSandbox.java | A:沙箱执行 | S:CPU/内存/PID/超时上限；默认值是安全边界
 SandboxType.java[DW3T]: F:沙箱类型枚举 | R:code:sandbox/domain/provider/SandboxProviderFactory.java | A:沙箱选择 | S:LOCAL_PROCESS/DOCKER
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/domain/provider/===
 DockerSandbox.java[IP8L]: F:容器化沙箱 | R:code:sandbox/domain/provider/SandboxProvider.java | A:容器执行 | S:非特权UID/只读根fs/能力drop/仅挂受控工作区；生产拒绝无隔离守护假设；需Docker目标环境验证
-LocalProcessSandbox.java[IP7M]: F:受限子进程沙箱 | R:code:sandbox/domain/security/CommandSecurityGuard.java | A:本地执行 | S:命令防火墙+环境隔离+看门狗进程树终止+有界输出
+LocalProcessSandbox.java[IP7L]: F:受限子进程沙箱 | R:code:sandbox/domain/security/CommandSecurityGuard.java | A:本地执行 | S:命令防火墙+环境隔离+看门狗进程树终止+有界输出
 SandboxProvider.java[AE5T]: F:沙箱提供者SPI | R:code:sandbox/domain/provider/SandboxProviderFactory.java | A:沙箱实现 | S:执行/清理标准端口
 SandboxProviderFactory.java[AE5T]: F:沙箱工厂 | R:code:sandbox/domain/model/SandboxType.java | A:沙箱选择 | S:按类型解析实现；生产默认拒绝本地无隔离
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/domain/security/===
 CommandSecurityGuard.java[SS8S]: F:命令安全防火墙 | R:code:sandbox/domain/provider/LocalProcessSandbox.java | A:命令执行前 | S:拒绝破坏性文件操作/注入/链式命令；可执行文件白名单；防线不可为便利放宽
-EnvironmentSanitizer.java[SS7S]: F:环境变量净化器 | R:code:sandbox/domain/provider/LocalProcessSandbox.java | A:子进程启动 | S:阻断宿主凭据继承与LD_PRELOAD等危险注入
+EnvironmentSanitizer.java[SS7T]: F:环境变量净化器 | R:code:sandbox/domain/provider/LocalProcessSandbox.java | A:子进程启动 | S:阻断宿主凭据继承与LD_PRELOAD等危险注入
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/domain/service/===
-DeploymentLifecycleWorker.java[AR9M]: F:部署生命周期Worker | R:code:sandbox/domain/model/DeploymentStatus.java | A:部署执行 | S:BUILD/START/HEALTH_CHECK到STOP/CLEANUP全监督；RUNNING必须真实可达；孤儿回收
-HealthCheckProbeService.java[AR5S]: F:HTTP健康探针 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:部署状态机 | S:真实TCP/HTTP探测判定就绪；不做假成功
+DeploymentLifecycleWorker.java[AR9L]: F:部署生命周期Worker | R:code:sandbox/domain/model/DeploymentStatus.java | A:部署执行 | S:BUILD/START/HEALTH_CHECK到STOP/CLEANUP全监督；RUNNING必须真实可达；孤儿回收
+HealthCheckProbeService.java[AR5T]: F:HTTP健康探针 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:部署状态机 | S:真实TCP/HTTP探测判定就绪；不做假成功
 PortAllocationService.java[DR6S]: F:端口分配器 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:本地预览 | S:真实TCP可用性验证+端口绑定追踪防冲突
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/infrastructure/entity/===
@@ -732,7 +732,7 @@ DeploymentEntity.java[PD7S]: F:部署持久化实体 | R:code:sandbox/infrastruc
 DeploymentRepository.java[PI4T]: F:部署数据访问 | R:code:sandbox/infrastructure/entity/DeploymentEntity.java | A:Application层 | S:按项目与状态查询支撑Worker
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/ops/api/===
-SystemHealthController.java[EO8M]: F:运维REST入口 | R:code:ops/application/OpsApplicationService.java | A:运维与监控 | S:health/contracts/audit-logs/metrics/backup-verify-restore；恢复类端点必须强鉴权
+SystemHealthController.java[EO8S]: F:运维REST入口 | R:code:ops/application/OpsApplicationService.java | A:运维与监控 | S:health/contracts/audit-logs/metrics/backup-verify-restore；恢复类端点必须强鉴权
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/ops/application/===
 OpsApplication.java[AI5T]: F:运维用例端口 | R:code:ops/application/OpsApplicationService.java | A:SystemHealthController | S:健康/指标/灾备用例接口
@@ -754,43 +754,43 @@ robots.txt[SZ1T]: F:爬虫规则 | R:- | A:搜索引擎 | S:静态声明
 
 ===D:/work/agenthub/agenthub-frontend/src/components/dashboard/===
 OperationsConsolePanel.tsx[CO8L]: F:运维控制台界面 | R:code:agenthub-frontend/src/services/api/deployments.ts | A:运维 | S:健康/指标/备份验证恢复操作入口
-ProviderCostDashboard.tsx[CO7M]: F:Provider成本仪表盘 | R:code:agenthub-frontend/src/services/api/runs.ts | A:成本视图 | S:用量/成本/熔断健康投影
-ApprovalActionCard.tsx[CI5M]: F:审批操作卡片 | R:code:agenthub-frontend/src/services/api/approvals.ts | A:审批界面 | S:approve/reject直连审批API
+ProviderCostDashboard.tsx[CO7L]: F:Provider成本仪表盘 | R:code:agenthub-frontend/src/services/api/runs.ts | A:成本视图 | S:用量/成本/熔断健康投影
+ApprovalActionCard.tsx[CI5S]: F:审批操作卡片 | R:code:agenthub-frontend/src/services/api/approvals.ts | A:审批界面 | S:approve/reject直连审批API
 DagTopologyVisualizer.tsx[CW7L]: F:DAG拓扑可视化 | R:code:agenthub-frontend/src/components/WorkflowCanvas.tsx | A:运行视图 | S:按Run事件高亮节点状态；只投影后端事实
 DeploymentPanel.tsx[CI3T]: F:部署面板入口 | R:code:agenthub-frontend/src/services/api/deployments.ts | A:部署视图 | S:组合沙箱预览
 DiffArtifactReviewer.tsx[CQ9L]: F:Diff与产物审查界面 | R:code:agenthub-frontend/src/services/api/artifacts.ts | A:审查者 | S:结构化Diff+质量门禁+PR草稿+回滚操作
-HeaderNav.tsx[CU4T]: F:顶部导航 | R:code:agenthub-frontend/src/app/page.tsx | A:全站 | S:导航与登录态展示
-LiveExecutionTerminal.tsx[CN6M]: F:实时执行终端 | R:code:agenthub-frontend/src/services/api/stream.ts | A:运行视图 | S:SSE事件流渲染；断线用Last-Event-ID重连
-MetricBentoGrid.tsx[CZ3T]: F:指标网格容器 | R:code:agenthub-frontend/src/components/common/MetricCard.tsx | A:仪表盘 | S:纯布局组合
-MultiAgentSwarmChat.tsx[CU7M]: F:多Agent协作会话界面 | R:code:agenthub-frontend/src/services/api/runs.ts | A:协作视图 | S:会话消息+SSE；只服务主线不扩展IM玩法
+HeaderNav.tsx[CU4M]: F:顶部导航 | R:code:agenthub-frontend/src/app/page.tsx | A:全站 | S:导航与登录态展示
+LiveExecutionTerminal.tsx[CN6L]: F:实时执行终端 | R:code:agenthub-frontend/src/services/api/stream.ts | A:运行视图 | S:SSE事件流渲染；断线用Last-Event-ID重连
+MetricBentoGrid.tsx[CZ3S]: F:指标网格容器 | R:code:agenthub-frontend/src/components/common/MetricCard.tsx | A:仪表盘 | S:纯布局组合
+MultiAgentSwarmChat.tsx[CU7L]: F:多Agent协作会话界面 | R:code:agenthub-frontend/src/services/api/runs.ts | A:协作视图 | S:会话消息+SSE；只服务主线不扩展IM玩法
 ProjectShell.tsx[CO7M]: F:项目主壳布局 | R:code:agenthub-frontend/src/app/page.tsx | A:主界面 | S:项目选择+面板切换骨架
 ReviewSidebar.tsx[CI3T]: F:审查侧栏 | R:code:agenthub-frontend/src/components/dashboard/DiffArtifactReviewer.tsx | A:审查者 | S:产物列表导航
 RunOperationsPanel.tsx[CW9L]: F:运行操作台界面 | R:code:agenthub-frontend/src/services/api/runs.ts | A:运行视图 | S:统一状态+步骤+事件+取消/暂停/重试操作；不自造状态
 RunWorkspacePanel.tsx[CI3T]: F:Run工作区面板入口 | R:code:agenthub-frontend/src/components/WorkspaceExplorer.tsx | A:运行视图 | S:组合工作区浏览
-SandboxPreviewPanel.tsx[CI7M]: F:沙箱预览面板 | R:code:agenthub-frontend/src/services/api/deployments.ts | A:预览 | S:iframe加载预览URL；仅展示后端确认的部署
-StructuredDiffReviewModal.tsx[CQ7M]: F:结构化Diff审查弹窗 | R:code:agenthub-frontend/src/components/dashboard/DiffArtifactReviewer.tsx | A:审查者 | S:行级Diff+审查决定
-TeamRbacPanel.tsx[CI7M]: F:团队与RBAC面板 | R:code:agenthub-frontend/src/services/api/runs.ts | A:管理界面 | S:成员/角色管理走统一权限矩阵API
+SandboxPreviewPanel.tsx[CI7L]: F:沙箱预览面板 | R:code:agenthub-frontend/src/services/api/deployments.ts | A:预览 | S:iframe加载预览URL；仅展示后端确认的部署
+StructuredDiffReviewModal.tsx[CQ7L]: F:结构化Diff审查弹窗 | R:code:agenthub-frontend/src/components/dashboard/DiffArtifactReviewer.tsx | A:审查者 | S:行级Diff+审查决定
+TeamRbacPanel.tsx[CI7L]: F:团队与RBAC面板 | R:code:agenthub-frontend/src/services/api/runs.ts | A:管理界面 | S:成员/角色管理走统一权限矩阵API
 
 ===D:/work/agenthub/agenthub-frontend/src/services/api/===
 errors.ts[EN5S]: F:API基础与错误处理 | R:code:agenthub-frontend/src/services/api.ts | A:全部模块 | S:API_BASE唯一来源；空态工厂防undefined渲染
 approvals.ts[EN5T]: F:审批资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:审批界面 | S:仅v1契约DTO
 artifacts.ts[EN6S]: F:产物资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:审查界面 | S:含MOCK质量门禁/PR草稿样例，仅demo模式可用
 auth.ts[EN6S]: F:认证资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:认证界面 | S:令牌存取+demo模式开关；生产禁用绕过
-deployments.ts[EN5T]: F:部署与运维资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:部署与运维界面 | S:部署+ops端点包装
-projects.ts[EN5T]: F:项目资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:项目界面 | S:CRUD+onboarding+上下文源包装
-runs.ts[EN8M]: F:执行与团队资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:运行界面 | S:runs/approvals/providers/teams聚合；MOCK样例仅demo模式
+deployments.ts[EN5S]: F:部署与运维资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:部署与运维界面 | S:部署+ops端点包装
+projects.ts[EN5S]: F:项目资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:项目界面 | S:CRUD+onboarding+上下文源包装
+runs.ts[EN8L]: F:执行与团队资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:运行界面 | S:runs/approvals/providers/teams聚合；MOCK样例仅demo模式
 stream.ts[EN5T]: F:SSE流模块 | R:code:agenthub-frontend/src/services/api.ts | A:实时视图 | S:stream-ticket换票连接；断线Last-Event-ID重放
-workflows.ts[EN5T]: F:工作流资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:定义与计划 | S:定义/模板/计划包装
+workflows.ts[EN5S]: F:工作流资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:定义与计划 | S:定义/模板/计划包装
 workspaces.ts[EN5T]: F:工作区资源模块 | R:code:agenthub-frontend/src/services/api.ts | A:文件面板 | S:文件/Diff/锁包装；不含旧/api/workspace/调用
 
 ===D:/work/agenthub/agenthub-frontend/src/app/===
 globals.css[CZ2T]: F:全局样式与主题变量 | R:code:agenthub-frontend/tailwind.config.ts | A:全站 | S:CSS变量供Tailwind hsl主题引用
 layout.tsx[EO3T]: F:根布局与元数据 | R:code:agenthub-frontend/src/app/page.tsx | A:全站 | S:Next根布局
-page.tsx[EO7M]: F:主控台页面编排 | R:code:agenthub-frontend/src/components/dashboard/ProjectShell.tsx | A:主界面 | S:组合仪表盘组件；状态全部来自后端投影
+page.tsx[EO7L]: F:主控台页面编排 | R:code:agenthub-frontend/src/components/dashboard/ProjectShell.tsx | A:主界面 | S:组合仪表盘组件；状态全部来自后端投影
 
 ===D:/work/agenthub/agenthub-frontend/src/components/===
 WorkflowCanvas.tsx[CW6M]: F:工作流DAG画布 | R:code:agenthub-frontend/src/components/dashboard/DagTopologyVisualizer.tsx | A:定义编辑 | S:基于xyflow；节点连接即DSL边
-WorkspaceExplorer.tsx[CW7M]: F:工作区文件浏览与编辑 | R:code:agenthub-frontend/src/services/api/workspaces.ts | A:文件面板 | S:文件树+配额展示；路径只传受控相对路径
+WorkspaceExplorer.tsx[CW7L]: F:工作区文件浏览与编辑 | R:code:agenthub-frontend/src/services/api/workspaces.ts | A:文件面板 | S:文件树+配额展示；路径只传受控相对路径
 
 ===D:/work/agenthub/agenthub-frontend/src/components/auth/===
 AuthModal.tsx[CI6M]: F:登录注册弹窗 | R:code:agenthub-frontend/src/services/api/auth.ts | A:认证入口 | S:令牌仅入storage；demo模式显式开关
@@ -798,16 +798,16 @@ AuthModal.tsx[CI6M]: F:登录注册弹窗 | R:code:agenthub-frontend/src/service
 ===D:/work/agenthub/agenthub-frontend/src/components/common/===
 BentoCard.tsx[CZ2T]: F:卡片容器组件 | R:code:agenthub-frontend/src/app/globals.css | A:仪表盘 | S:纯展示
 MetricCard.tsx[CZ2T]: F:指标卡片组件 | R:code:agenthub-frontend/src/components/common/BentoCard.tsx | A:仪表盘 | S:数值+趋势展示
-StatusBadge.tsx[CZ2T]: F:状态徽章组件 | R:code:agenthub-frontend/src/types/index.ts | A:全站 | S:枚举到视觉映射；不制造状态
+StatusBadge.tsx[CZ2S]: F:状态徽章组件 | R:code:agenthub-frontend/src/types/index.ts | A:全站 | S:枚举到视觉映射；不制造状态
 
 ===D:/work/agenthub/agenthub-frontend/src/components/project/===
 CreateProjectModal.tsx[CO8L]: F:项目接入向导界面 | R:code:agenthub-frontend/src/services/api/projects.ts | A:接入用户 | S:七步向导投影；凭据只在内存提交
 
 ===D:/work/agenthub/agenthub-frontend/src/components/workflow/===
-OrchestratorPlanModal.tsx[CW8M]: F:编排计划审查弹窗 | R:code:agenthub-frontend/src/services/api/workflows.ts | A:计划确认 | S:影响文件/工具权限/预算完整呈现后才能confirm
+OrchestratorPlanModal.tsx[CW8L]: F:编排计划审查弹窗 | R:code:agenthub-frontend/src/services/api/workflows.ts | A:计划确认 | S:影响文件/工具权限/预算完整呈现后才能confirm
 
 ===D:/work/agenthub/agenthub-frontend/src/services/===
-api.ts[EN7S]: F:统一API客户端桶 | R:code:agenthub-frontend/src/services/api/errors.ts | A:全部组件 | S:Phase 1收敛后唯一API包装出口；禁止组件旁路fetch
+api.ts[EN7T]: F:统一API客户端桶 | R:code:agenthub-frontend/src/services/api/errors.ts | A:全部组件 | S:Phase 1收敛后唯一API包装出口；禁止组件旁路fetch
 
 ===D:/work/agenthub/agenthub-frontend/src/types/===
 index.ts[CD9L]: F:前端类型投影总表 | R:code:agenthub-frontend/src/services/api.ts | A:全部组件 | S:类型必须镜像后端v1 DTO；文件偏大属收敛候选
@@ -817,49 +817,49 @@ agenthub.conf[OV6S]: F:生产Nginx反代配置 | R:code:docker-compose.prod.yml 
 agenthub-tls.conf[OV6S]: F:TLS反代配置 | R:code:docker-compose.prod.yml | A:nginx | S:HTTPS 443入口；证书挂载路径不可指向宿主任意目录
 
 ===D:/work/agenthub/docker/prometheus/===
-prometheus.yml[OO6S]: F:Prometheus抓取配置 | R:code:docker/prometheus/agenthub-alerts.yml | A:监控栈 | S:带令牌抓取/actuator/prometheus；15s评估周期
-agenthub-alerts.yml[OO7M]: F:核心告警规则 | R:code:docs/ops/ALERTING_RULES.md | A:值班运维 | S:积压/失败率/恢复等阈值；改阈值需演练验证
+prometheus.yml[OO6T]: F:Prometheus抓取配置 | R:code:docker/prometheus/agenthub-alerts.yml | A:监控栈 | S:带令牌抓取/actuator/prometheus；15s评估周期
+agenthub-alerts.yml[OO7T]: F:核心告警规则 | R:code:docs/ops/ALERTING_RULES.md | A:值班运维 | S:积压/失败率/恢复等阈值；改阈值需演练验证
 
 ===D:/work/agenthub/agenthub-backend/src/test/java/com/agenthub/===
-ActuatorAndMetricsIntegrationTest.java[TQ5S]: F:验证health端点与指标暴露 | R:code:identity/infrastructure/security/ActuatorSecurityFilter.java | A:mvn test | S:health开放而prometheus受限的组合行为回归
+ActuatorAndMetricsIntegrationTest.java[TQ5T]: F:验证health端点与指标暴露 | R:code:identity/infrastructure/security/ActuatorSecurityFilter.java | A:mvn test | S:health开放而prometheus受限的组合行为回归
 AgentAdapterTest.java[TQ4T]: F:验证平台适配器工厂解析 | R:code:domain/agent/service/AgentAdapterFactory.java | A:mvn test | S:每种平台类型必须能解析出适配器
-AociCognitionVerificationTest.java[TQ7S]: F:验证AOCI认知状态机诚实性 | R:code:execution/domain/memory/ContextMemoryCompressor.java | A:mvn test | S:杜绝无凭据默认ALIGNED；NOT_CONFIGURED/UNAVAILABLE矩阵回归
-ArchUnitArchitectureTest.java[TQ9M]: F:架构分层守护 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:Controller禁依赖Repository等10条规则；违例即构建失败
+AociCognitionVerificationTest.java[TQ7M]: F:验证AOCI认知状态机诚实性 | R:code:execution/domain/memory/ContextMemoryCompressor.java | A:mvn test | S:杜绝无凭据默认ALIGNED；NOT_CONFIGURED/UNAVAILABLE矩阵回归
+ArchUnitArchitectureTest.java[TQ9S]: F:架构分层守护 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:Controller禁依赖Repository等10条规则；违例即构建失败
 AuthenticationAndResourceGuardTest.java[TI6S]: F:验证注册登录与令牌签发 | R:code:identity/application/AuthApplicationService.java | A:mvn test | S:BCrypt存储与JWT签发行为回归
 ContextWindowAndRollingSummaryTest.java[TQ5S]: F:验证滑窗裁剪与滚动摘要 | R:code:conversation/domain/service/SlidingWindowContextTrimmer.java | A:mvn test | S:窗口划分与归档历史精确性
 ConversationEntityRelationAndMessageSchemaTest.java[TQ5S]: F:验证会话参与者表结构 | R:code:conversation/infrastructure/entity/ConversationParticipantEntity.java | A:mvn test | S:多Agent参与者入库，禁止逗号字符串回潮
-ConversationMonotonicSequenceAndConcurrencyTest.java[TQ7S]: F:验证消息序列单调并发 | R:code:conversation/domain/service/ConversationSequenceManager.java | A:mvn test | S:并发下sequence严格递增无间隙；CI必跑
-ConversationSseStreamAndReconnectionTest.java[TQ5S]: F:验证会话SSE断线重放 | R:code:conversation/domain/sse/ConversationEventBroadcaster.java | A:mvn test | S:Last-Event-ID续传语义
+ConversationMonotonicSequenceAndConcurrencyTest.java[TQ7M]: F:验证消息序列单调并发 | R:code:conversation/domain/service/ConversationSequenceManager.java | A:mvn test | S:并发下sequence严格递增无间隙；CI必跑
+ConversationSseStreamAndReconnectionTest.java[TQ5T]: F:验证会话SSE断线重放 | R:code:conversation/domain/sse/ConversationEventBroadcaster.java | A:mvn test | S:Last-Event-ID续传语义
 CrossAgentProtocolAndLoopDetectionTest.java[TQ5S]: F:验证跨Agent协议与环路检测 | R:code:conversation/domain/service/LoopDetector.java | A:mvn test | S:REQUEST_REPLY与inReplyToId闭环
 DeploymentLifecycleAndControllerIntegrationTest.java[TQ6S]: F:验证部署生命周期与列表 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:创建后必须停止清理，防后台线程跨测试泄漏
-DynamicProviderRouterAndRoutingPolicyTest.java[TQ7M]: F:验证动态路由策略 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:mvn test | S:优先级/能力/降级选路回归
-ExecutionEnginePersistenceAndReplayTest.java[TQ7S]: F:验证Run持久化与幂等键 | R:code:execution/infrastructure/entity/WorkflowRunEntity.java | A:mvn test | S:同幂等键重复提交不得新建Run
+DynamicProviderRouterAndRoutingPolicyTest.java[TQ7S]: F:验证动态路由策略 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:mvn test | S:优先级/能力/降级选路回归
+ExecutionEnginePersistenceAndReplayTest.java[TQ7T]: F:验证Run持久化与幂等键 | R:code:execution/infrastructure/entity/WorkflowRunEntity.java | A:mvn test | S:同幂等键重复提交不得新建Run
 ExecutionSchedulerAndRuntimeIntegrationTest.java[TQ5S]: F:验证调度器与运行时解耦 | R:code:runtime/mock/MockAgentRuntime.java | A:mvn test | S:调度只编排状态，执行委派运行时
 ExecutionSseStreamAndReconnectionTest.java[TQ6S]: F:验证执行SSE单调与持久化 | R:code:execution/service/RunEventBroadcaster.java | A:mvn test | S:sequenceId严格递增且落run_events
-ExecutionStateMachineAndConcurrencyTest.java[TQ7S]: F:验证状态机流转与并发 | R:code:execution/service/ExecutionStateMachine.java | A:mvn test | S:合法流转回归；非法迁移拒绝
+ExecutionStateMachineAndConcurrencyTest.java[TQ7M]: F:验证状态机流转与并发 | R:code:execution/service/ExecutionStateMachine.java | A:mvn test | S:合法流转回归；非法迁移拒绝
 FlywayMigrationAndSchemaTest.java[TQ8S]: F:验证Flyway全量迁移与Schema | R:code:agenthub-backend/src/main/resources/db/migration/V1__init_schema.sql | A:mvn test | S:真实MySQL Empty-DB迁移在CI执行；本地H2为预检
 FullLifecycleEndToEndIntegrationTest.java[TQ8M]: F:验证全生命周期E2E场景 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:mvn test | S:Project到Evidence全链路；@TempDir清理曾现Windows句柄抖动
-HighConcurrencyStressIntegrationTest.java[TQ7S]: F:验证高并发锁竞争 | R:code:infrastructure/concurrency/WorkspaceLockManager.java | A:mvn test | S:20线程争抢互斥无死锁
-HumanInTheLoopApprovalIntegrationTest.java[TQ7S]: F:验证审批挂起与恢复 | R:code:orchestration/scheduler/DagStateTransitioner.java | A:mvn test | S:WAITING_APPROVAL挂起后审批恢复DAG
+HighConcurrencyStressIntegrationTest.java[TQ7M]: F:验证高并发锁竞争 | R:code:infrastructure/concurrency/WorkspaceLockManager.java | A:mvn test | S:20线程争抢互斥无死锁
+HumanInTheLoopApprovalIntegrationTest.java[TQ7M]: F:验证审批挂起与恢复 | R:code:orchestration/scheduler/DagStateTransitioner.java | A:mvn test | S:WAITING_APPROVAL挂起后审批恢复DAG
 IMCollaborationTest.java[TQ4T]: F:验证@Mention解析 | R:code:domain/conversation/service/MentionParser.java | A:mvn test | S:多目标提及解析
 MessageRoutingAndVisibilityIsolationTest.java[TQ5S]: F:验证私聊可见性隔离 | R:code:conversation/domain/service/MessageVisibilityFilter.java | A:mvn test | S:第三方严格不可见
-OpenInViewTransactionBoundaryTest.java[TQ5S]: F:验证open-in-view关闭 | R:code:agenthub-backend/src/main/resources/application.yml | A:mvn test | S:杜绝长事务与连接池泄漏
-PersistentExecutionRecoveryAndLeaseTest.java[TQ8S]: F:验证租约争抢与恢复 | R:code:execution/scheduler/PersistentExecutionRecoveryRunner.java | A:mvn test | S:两Worker仅首个成功；过期可接管；CI必跑
-Phase1ModuleConvergenceAndContractTest.java[TQ6M]: F:验证限界上下文与深模块拆分 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:Execution四模块+DAG五Seam结构守护
-Phase2ControlledWorkspaceAndOnboardingTest.java[TQ6M]: F:验证受控工作区与接入边界 | R:code:project/application/WorkspaceQuotaGuard.java | A:mvn test | S:路径穿越/明文凭据/配额超限拦截
-Phase3WorkflowTemplatesAndOrchestratorPlanTest.java[TQ6M]: F:验证模板与计划门禁 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:mvn test | S:环路/自环/孤岛拦截
-Phase4RunOperationsAndArtifactLineageTest.java[TQ6M]: F:验证状态图与产物血缘 | R:code:execution/domain/state/UnifiedExecutionStateGraph.java | A:mvn test | S:防循环盲退；血缘链完整
-Phase5QualityGateAndDeliveryTest.java[TQ6M]: F:验证质量门禁与交付 | R:code:audit/domain/quality/QualityGateEngine.java | A:mvn test | S:五维度评测与确定性指纹
-Phase6TeamRbacAndOperationsTest.java[TQ6M]: F:验证RBAC与运维体系 | R:code:team/domain/rbac/ProjectRbacRole.java | A:mvn test | S:角色-权限矩阵回归
-Phase7LiveProvidersAndBudgetGovernanceTest.java[TQ6M]: F:验证Provider适配与预算治理 | R:code:agent/application/BudgetGovernanceGuard.java | A:mvn test | S:tools payload构建与结构化解析
-Phase8PerformanceBenchmarkAndE2ETest.java[TQ6M]: F:验证E2E与性能基准 | R:code:docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md | A:mvn test | S:十阶段闭环；延迟门禁已按真实环境校准
-Phase9BaselineAndGovernanceGuardTest.java[TQ9M]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹/AOCI资产存在性五重守护
-PhaseASecurityAndResourceBoundaryIntegrationTest.java[TQ7M]: F:验证生产安全边界 | R:code:identity/infrastructure/security/TokenProvider.java | A:mvn test | S:prod弱密钥拒绝启动；越权阻断
-PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java[TQ7M]: F:验证沙箱交付真实可达 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:真实HTTP访问+目录穿越拦截+停止真下线
-PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java[TQ7M]: F:验证生产预检与灾备演练 | R:code:infrastructure/ops/DisasterRecoveryBackupService.java | A:mvn test | S:占位符拦截+篡改档拒绝恢复；CI真实MySQL必跑
-PhaseFProductQualityAndEvidenceBundleIntegrationTest.java[TQ7M]: F:验证E2E契约与证据包 | R:code:execution/application/RunEvidenceModule.java | A:mvn test | S:脱敏+确定性SHA-256
+OpenInViewTransactionBoundaryTest.java[TQ5T]: F:验证open-in-view关闭 | R:code:agenthub-backend/src/main/resources/application.yml | A:mvn test | S:杜绝长事务与连接池泄漏
+PersistentExecutionRecoveryAndLeaseTest.java[TQ8M]: F:验证租约争抢与恢复 | R:code:execution/scheduler/PersistentExecutionRecoveryRunner.java | A:mvn test | S:两Worker仅首个成功；过期可接管；CI必跑
+Phase1ModuleConvergenceAndContractTest.java[TQ6L]: F:验证限界上下文与深模块拆分 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:Execution四模块+DAG五Seam结构守护
+Phase2ControlledWorkspaceAndOnboardingTest.java[TQ6L]: F:验证受控工作区与接入边界 | R:code:project/application/WorkspaceQuotaGuard.java | A:mvn test | S:路径穿越/明文凭据/配额超限拦截
+Phase3WorkflowTemplatesAndOrchestratorPlanTest.java[TQ6L]: F:验证模板与计划门禁 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:mvn test | S:环路/自环/孤岛拦截
+Phase4RunOperationsAndArtifactLineageTest.java[TQ6L]: F:验证状态图与产物血缘 | R:code:execution/domain/state/UnifiedExecutionStateGraph.java | A:mvn test | S:防循环盲退；血缘链完整
+Phase5QualityGateAndDeliveryTest.java[TQ6L]: F:验证质量门禁与交付 | R:code:audit/domain/quality/QualityGateEngine.java | A:mvn test | S:五维度评测与确定性指纹
+Phase6TeamRbacAndOperationsTest.java[TQ6L]: F:验证RBAC与运维体系 | R:code:team/domain/rbac/ProjectRbacRole.java | A:mvn test | S:角色-权限矩阵回归
+Phase7LiveProvidersAndBudgetGovernanceTest.java[TQ6L]: F:验证Provider适配与预算治理 | R:code:agent/application/BudgetGovernanceGuard.java | A:mvn test | S:tools payload构建与结构化解析
+Phase8PerformanceBenchmarkAndE2ETest.java[TQ6L]: F:验证E2E与性能基准 | R:code:docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md | A:mvn test | S:十阶段闭环；延迟门禁已按真实环境校准
+Phase9BaselineAndGovernanceGuardTest.java[TQ9L]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹/AOCI资产存在性五重守护
+PhaseASecurityAndResourceBoundaryIntegrationTest.java[TQ7L]: F:验证生产安全边界 | R:code:identity/infrastructure/security/TokenProvider.java | A:mvn test | S:prod弱密钥拒绝启动；越权阻断
+PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java[TQ7L]: F:验证沙箱交付真实可达 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:真实HTTP访问+目录穿越拦截+停止真下线
+PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java[TQ7L]: F:验证生产预检与灾备演练 | R:code:infrastructure/ops/DisasterRecoveryBackupService.java | A:mvn test | S:占位符拦截+篡改档拒绝恢复；CI真实MySQL必跑
+PhaseFProductQualityAndEvidenceBundleIntegrationTest.java[TQ7L]: F:验证E2E契约与证据包 | R:code:execution/application/RunEvidenceModule.java | A:mvn test | S:脱敏+确定性SHA-256
 PortAllocationAndHealthCheckTest.java[TQ5S]: F:验证端口分配边界 | R:code:sandbox/domain/service/PortAllocationService.java | A:mvn test | S:严格落在[18000,18999]且真实可用
-ProfileIsolationTest.java[TQ4T]: F:验证test profile隔离 | R:code:agenthub-backend/src/main/resources/application-test.yml | A:mvn test | S:防止测试误激活生产配置
+ProfileIsolationTest.java[TQ4S]: F:验证test profile隔离 | R:code:agenthub-backend/src/main/resources/application-test.yml | A:mvn test | S:防止测试误激活生产配置
 ProviderAndTokenUsageControllerIntegrationTest.java[TQ5S]: F:验证Provider列表脱敏 | R:code:agent/api/ProviderController.java | A:mvn test | S:API Key绝不回显
 ProviderDrivenAgentRuntimeIntegrationTest.java[TQ7S]: F:验证Provider运行时闭环 | R:code:runtime/provider/ProviderDrivenAgentRuntime.java | A:mvn test | S:流式+用量核算+审计落库
 ProviderFaultToleranceAndFallbackTest.java[TQ7M]: F:验证429降级切换 | R:code:agent/domain/provider/router/DynamicProviderRouter.java | A:mvn test | S:主备无缝切换+降级留痕
@@ -868,8 +868,8 @@ RestApiSecurityAndMultiTenancyIntegrationTest.java[TQ7M]: F:验证认证全生�
 SafeExpressionEvaluatorAndDataFlowTest.java[TQ6S]: F:验证安全求值与数据流 | R:code:orchestration/domain/evaluation/SafeExpressionEvaluator.java | A:mvn test | S:步骤输出引用传递；反射注入被拒
 SandboxAndDeployTest.java[TQ4T]: F:验证预览接口输出 | R:code:domain/sandbox/service/PreviewSandboxService.java | A:mvn test | S:HTML预览内容正确
 SandboxProviderAndExecutionTest.java[TQ5S]: F:验证进程沙箱执行 | R:code:sandbox/domain/provider/LocalProcessSandbox.java | A:mvn test | S:合规命令exitCode 0
-SandboxSecurityGuardAndFirewallTest.java[TQ7S]: F:验证命令防火墙 | R:code:sandbox/domain/security/CommandSecurityGuard.java | A:mvn test | S:破坏性命令严格阻断
-SecretMaskingAndCredentialSecurityTest.java[TQ6S]: F:验证脱敏算法 | R:code:agent/infrastructure/security/SecretMasker.java | A:mvn test | S:sk-格式密钥中间脱敏
+SandboxSecurityGuardAndFirewallTest.java[TQ7M]: F:验证命令防火墙 | R:code:sandbox/domain/security/CommandSecurityGuard.java | A:mvn test | S:破坏性命令严格阻断
+SecretMaskingAndCredentialSecurityTest.java[TQ6T]: F:验证脱敏算法 | R:code:agent/infrastructure/security/SecretMasker.java | A:mvn test | S:sk-格式密钥中间脱敏
 SystemHealthTest.java[TQ4T]: F:验证健康接口元信息 | R:code:ops/api/SystemHealthController.java | A:mvn test | S:UP状态与系统信息
 TeamAndConversationControllerIntegrationTest.java[TQ5S]: F:验证团队REST接口 | R:code:team/api/TeamController.java | A:mvn test | S:团队创建/查询/拓扑决策
 TeamTopologyAndCoordinationTest.java[TQ6S]: F:验证层级拓扑协调 | R:code:team/domain/strategy/HierarchicalTopologyCoordinator.java | A:mvn test | S:控制权严格回摆Leader
@@ -877,9 +877,9 @@ TokenCostAccountingAndAuditingTest.java[TQ6S]: F:验证定价核算 | R:code:age
 WorkflowAndJGitTest.java[TQ5S]: F:验证JGit初始化与Diff | R:code:domain/workspace/service/JGitWorkspaceManager.java | A:mvn test | S:行级Diff准确性
 WorkflowBranchingAndSkipPruningTest.java[TQ6S]: F:验证条件分支与剪枝 | R:code:orchestration/scheduler/DagTopologyPlanner.java | A:mvn test | S:未命中分支SKIPPED级联剪枝
 WorkflowCancellationAndTimeoutTest.java[TQ6S]: F:验证取消令牌与超时 | R:code:execution/domain/model/CancelToken.java | A:mvn test | S:优雅协作取消+回调执行
-WorkflowDagSchedulingAndParallelExecutionTest.java[TQ7S]: F:验证菱形DAG并行汇聚 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:mvn test | S:真并行+汇聚等待全量成功
+WorkflowDagSchedulingAndParallelExecutionTest.java[TQ7M]: F:验证菱形DAG并行汇聚 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:mvn test | S:真并行+汇聚等待全量成功
 WorkflowDefinitionAndApprovalControllerIntegrationTest.java[TQ5S]: F:验证定义与审批REST | R:code:orchestration/api/WorkflowDefinitionController.java | A:mvn test | S:创建/校验/查询契约
-WorkflowDslValidationAndCycleDetectionTest.java[TQ5S]: F:验证拓扑排序 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:mvn test | S:线性DAG排序正确
-WorkspaceAdversarialChallengeTest.java[TQ7S]: F:验证对抗路径攻击 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:深层穿越与系统目录访问必须阻断
-WorkspacePathGuardTest.java[TQ6S]: F:验证路径穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:错误码3004
-WorkspaceSecurityAndJGitAuditIntegrationTest.java[TQ6S]: F:验证读写边界拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:读写双向穿越拦截
+WorkflowDslValidationAndCycleDetectionTest.java[TQ5M]: F:验证拓扑排序 | R:code:orchestration/domain/dsl/WorkflowDslValidator.java | A:mvn test | S:线性DAG排序正确
+WorkspaceAdversarialChallengeTest.java[TQ7M]: F:验证对抗路径攻击 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:深层穿越与系统目录访问必须阻断
+WorkspacePathGuardTest.java[TQ6M]: F:验证路径穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:错误码3004
+WorkspaceSecurityAndJGitAuditIntegrationTest.java[TQ6L]: F:验证读写边界拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:读写双向穿越拦截

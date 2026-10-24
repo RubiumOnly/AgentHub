@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T04:23:20Z",
+  "updated_at": "2026-10-24T04:44:29Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -3257,9 +3257,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "73de388df71b37e029fb8c32428f5fcea030266686bc4e0005c63d7184c656bc",
+      "sha256": "9cda8824e67862f252677deecc86f329a48ef58bf8f1e6a8de22fe7a686b7183",
       "size": 119004,
-      "normalized_sha256": "73de388df71b37e029fb8c32428f5fcea030266686bc4e0005c63d7184c656bc"
+      "normalized_sha256": "9cda8824e67862f252677deecc86f329a48ef58bf8f1e6a8de22fe7a686b7183"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -3311,9 +3311,9 @@
     },
     "docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md": {
       "role": "index",
-      "sha256": "792aeb1d495594fa6f6a967845bf28b412933187853be27c761cc77bd7d1c0dd",
-      "size": 27725,
-      "normalized_sha256": "792aeb1d495594fa6f6a967845bf28b412933187853be27c761cc77bd7d1c0dd"
+      "sha256": "d0db1511a365d047173bdaedebb9314ba659272f3b7bbb94c2369d4b731b4de3",
+      "size": 28533,
+      "normalized_sha256": "d0db1511a365d047173bdaedebb9314ba659272f3b7bbb94c2369d4b731b4de3"
     },
     "docs/AOCI_COGNITION.md": {
       "role": "index",
@@ -3533,7 +3533,7 @@
       "normalized_sha256": "d96a24c8d344706d54c9b81978f9e426d87693233da9906dfdbb044a4e4f35ab"
     },
     "scripts/test-ci-local.sh": {
-      "role": "index",
+      "role": "observe",
       "sha256": "59d75607f9be2944134b3fac691a73a1a88a6c068b962dea6f580234b871597e",
       "size": 4022,
       "normalized_sha256": "59d75607f9be2944134b3fac691a73a1a88a6c068b962dea6f580234b871597e"
@@ -3541,8 +3541,8 @@
   },
   "managed_scope": {
     "version": "managed-scope-baseline/v1",
-    "policy_identity": "3b029307ca9a998f7863146b9aae29089dbd7d695d8e543a5334a9ba32f41394",
-    "observe_change_policy": "review_required",
+    "policy_identity": "40e6795fe347feab73cfdc1ec22756bdd32e71e68e964f1b1e296b391067a82c",
+    "observe_change_policy": "informational",
     "budget_policy_identity": "15e9b37a6c57e9bf03c9df3d0d049eb5b9a7f5540f9d34960408114e2538a32d",
     "budget_policy": {
       "version": "cognition-budget-policy/v1",
