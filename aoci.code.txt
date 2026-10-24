@@ -194,7 +194,7 @@ WorkspaceController.java[EI8M]: F:受控工作区REST入口 | R:code:project/app
 ProjectApplication.java[AI5T]: F:项目用例端口 | R:code:project/application/ProjectApplicationService.java | A:ProjectController | S:创建/查询用例接口
 ProjectApplicationService.java[AI7S]: F:项目创建与查询编排 | R:code:project/infrastructure/repository/ProjectRepository.java | A:ProjectController | S:创建时初始化工作区基线；ETag乐观并发
 WorkspaceApplication.java[AI6T]: F:工作区用例端口 | R:code:project/application/WorkspaceApplicationService.java | A:WorkspaceController | S:含@Deprecated旧路径签名；新调用必须用workspaceId+相对路径
-WorkspaceApplicationService.java[AI9L]: F:工作区文件Git与锁编排 | R:code:project/application/WorkspaceQuotaGuard.java | A:WorkspaceController | S:JGit快照/Diff/单文件回滚/锁租约集中地；锁属主由服务端派生不信任客户端
+WorkspaceApplicationService.java[AW8M]: F:工作区用例编排与访问校验 | R:code:project/application/workspace/WorkspaceGitOperations.java | A:WorkspaceController | S:读写访问校验保留在门面；文件/锁/JGit已外移到workspace缝
 ProjectOnboardingApplication.java[AI5T]: F:接入向导用例端口 | R:code:project/application/ProjectOnboardingApplicationService.java | A:ProjectController | S:start/step/retry/abort/complete五动作
 ProjectOnboardingApplicationService.java[AI9L]: F:七步接入向导状态机 | R:code:project/domain/onboarding/OnboardingStep.java | A:ProjectController | S:步骤可回滚；凭据脱敏日志；零明文令牌持久化
 ContextSourceApplication.java[AI5T]: F:上下文源用例端口 | R:code:project/application/ContextSourceApplicationService.java | A:ProjectController | S:注册/列表/自动发现接口
@@ -885,3 +885,8 @@ DeploymentProbeCoordinator.java[AR6S]: F:执行真实HTTP探针 | R:code:sandbox
 ContextWindowManager.java[DA6S]: F:上下文窗口投影与滚动摘要 | R:code:conversation/domain/service/SlidingWindowContextTrimmer.java | A:ConversationController | S:摘要刷新含广播副作用；窗口与预算默认值8/4000集中于此
 LegacyMentionPipeline.java[AI6S]: F:旧版提及代理调用管线 | R:code:domain/agent/service/AgentAdapterFactory.java | A:ConversationApplicationService | S:继承自被豁免的会话服务调用链；非团队会话专用
 TeamTurnCoordinator.java[AW7S]: F:团队拓扑轮次协调 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:ConversationApplicationService | S:TERMINATE/SUMMARIZE语义集中；SUMMARIZE先刷新摘要再沿用入口快照
+
+===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/application/workspace/===
+WorkspaceFileOperations.java[DW8S]: F:工作区文件读写与打包 | R:code:domain/workspace/service/WorkspaceResolver.java | A:WorkspaceApplicationService | S:写路径做配额校验；预览2MB/写入下载10MB上限集中于此
+WorkspaceGitOperations.java[DG7S]: F:JGit快照与基线操作 | R:code:domain/workspace/service/JGitWorkspaceManager.java | A:WorkspaceApplicationService | S:改基线/丢弃/恢复必须confirmed=true；审计留痕随操作落库
+WorkspaceLockLeaseService.java[DR6S]: F:工作区锁租约操作 | R:code:infrastructure/concurrency/WorkspaceLockManager.java | A:WorkspaceApplicationService | S:属主优先取认证主体；锁管理器缺省时安全降级

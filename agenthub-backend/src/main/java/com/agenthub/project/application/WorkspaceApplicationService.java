@@ -37,12 +37,23 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @Service
 public class WorkspaceApplicationService implements WorkspaceApplication {
+
+    @Autowired
+    private com.agenthub.project.application.workspace.WorkspaceFileOperations fileOperations;
+
+    @Autowired
+    private com.agenthub.project.application.workspace.WorkspaceLockLeaseService lockLeaseService;
+
+    @Autowired
+    private com.agenthub.project.application.workspace.WorkspaceGitOperations gitOperations;
+
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceApplicationService.class);
     private static final long MAX_WRITE_BYTES = 10 * 1024 * 1024L; // 10 MB
@@ -204,8 +215,8 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     @Override
     public StructuredDiff computeStructuredDiff(String workspaceIdOrPath) throws Exception {
         checkWorkspaceAccess(workspaceIdOrPath);
-        Path safeDir = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
-        return gitManager.computeStructuredDiff(safeDir.toFile());
+        // Phase 10 R8 深模块拆分：JGit 操作由 WorkspaceGitOperations 承载
+        return gitOperations.computeStructuredDiff(workspaceIdOrPath).diff();
     }
 
     @Override
@@ -221,300 +232,91 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     @Override
     public List<WorkspaceFileNode> listFiles(String workspaceIdOrPath, String relativeDirectoryPath) {
         checkWorkspaceAccess(workspaceIdOrPath);
-        Path root = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
-        Path targetDir = root;
-        if (relativeDirectoryPath != null && !relativeDirectoryPath.isBlank()) {
-            targetDir = workspaceResolver.resolvePathForRead(workspaceIdOrPath, relativeDirectoryPath);
-        }
-
-        File current = targetDir.toFile();
-        List<WorkspaceFileNode> fileNodes = new ArrayList<>();
-        if (!current.exists() || !current.isDirectory()) {
-            return fileNodes;
-        }
-
-        scanFiles(current, root.toFile(), fileNodes);
-        return fileNodes;
+        // Phase 10 R8 深模块拆分：文件读写由 WorkspaceFileOperations 承载
+        return fileOperations.listFiles(workspaceIdOrPath, relativeDirectoryPath);
     }
 
     @Override
     public String getFileContent(String filePath) throws Exception {
-        Path safeFile = workspaceResolver.resolveLegacyPath(filePath, false);
-        File file = safeFile.toFile();
-        if (!file.exists() || file.isDirectory()) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + filePath);
-        }
-        if (file.length() > MAX_PREVIEW_BYTES) {
-            throw new BusinessException(ErrorCode.WORKSPACE_FILE_TOO_LARGE,
-                    "File size exceeds maximum preview limit of 2MB: " + file.length() + " bytes");
-        }
-        if (JGitWorkspaceManager.isBinaryFile(file)) {
-            throw new BusinessException(ErrorCode.WORKSPACE_BINARY_PREVIEW_DENIED,
-                    "Binary file preview is not supported: " + file.getName());
-        }
-        return Files.readString(safeFile, StandardCharsets.UTF_8);
+        return fileOperations.getFileContentLegacy(filePath);
     }
 
     @Override
     public String getFileContent(String workspaceIdOrPath, String relativePath) throws Exception {
         checkWorkspaceAccess(workspaceIdOrPath);
-        Path safeFile = workspaceResolver.resolvePathForRead(workspaceIdOrPath, relativePath);
-        File file = safeFile.toFile();
-        if (!file.exists() || file.isDirectory()) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + relativePath);
-        }
-        if (file.length() > MAX_PREVIEW_BYTES) {
-            throw new BusinessException(ErrorCode.WORKSPACE_FILE_TOO_LARGE,
-                    "File size exceeds maximum preview limit of 2MB: " + file.length() + " bytes");
-        }
-        if (JGitWorkspaceManager.isBinaryFile(file)) {
-            throw new BusinessException(ErrorCode.WORKSPACE_BINARY_PREVIEW_DENIED,
-                    "Binary file preview is not supported: " + file.getName());
-        }
-        return Files.readString(safeFile, StandardCharsets.UTF_8);
+        return fileOperations.getFileContent(workspaceIdOrPath, relativePath);
     }
 
     @Override
     public WorkspaceFileDetailView getFileDetail(String workspaceIdOrPath, String relativePath) throws Exception {
         checkWorkspaceAccess(workspaceIdOrPath);
-        Path safeFile = workspaceResolver.resolvePathForRead(workspaceIdOrPath, relativePath);
-        File file = safeFile.toFile();
-        if (!file.exists() || file.isDirectory()) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + relativePath);
-        }
-
-        boolean isBinary = JGitWorkspaceManager.isBinaryFile(file);
-        long size = file.length();
-        long lastModified = file.lastModified();
-        String name = file.getName();
-
-        if (isBinary) {
-            return new WorkspaceFileDetailView(name, relativePath, null, true, size, false, lastModified);
-        }
-
-        if (size > MAX_PREVIEW_BYTES) {
-            byte[] bytes = new byte[(int) MAX_PREVIEW_BYTES];
-            try (var in = Files.newInputStream(safeFile)) {
-                int read = in.read(bytes);
-                String truncatedContent = new String(bytes, 0, Math.max(0, read), StandardCharsets.UTF_8);
-                return new WorkspaceFileDetailView(name, relativePath, truncatedContent, false, size, true, lastModified);
-            }
-        }
-
-        String content = Files.readString(safeFile, StandardCharsets.UTF_8);
-        return new WorkspaceFileDetailView(name, relativePath, content, false, size, false, lastModified);
+        return fileOperations.getFileDetail(workspaceIdOrPath, relativePath);
     }
 
     @Override
     public void saveFile(String filePath, String content) throws Exception {
-        validateWriteSize(content);
-        Path safeFile = workspaceResolver.resolveLegacyPath(filePath, true);
-        if (safeFile.getParent() != null && !Files.exists(safeFile.getParent())) {
-            Files.createDirectories(safeFile.getParent());
-        }
-        Files.writeString(safeFile, content != null ? content : "", StandardCharsets.UTF_8);
+        fileOperations.saveFileLegacy(filePath, content);
     }
 
     @Override
     public void saveFile(String workspaceIdOrPath, String relativePath, String content) throws Exception {
         checkWorkspaceWriteAccess(workspaceIdOrPath);
-        validateWriteSize(content);
-        Path safeFile = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, relativePath);
-        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
-
-        byte[] bytes = (content != null) ? content.getBytes(StandardCharsets.UTF_8) : new byte[0];
-        if (quotaGuard != null) {
-            quotaGuard.validateFileWrite(wsRoot, safeFile, bytes, WorkspaceQuotaPolicy.defaultPolicy());
-        }
-
-        if (safeFile.getParent() != null && !Files.exists(safeFile.getParent())) {
-            Files.createDirectories(safeFile.getParent());
-        }
-        Files.writeString(safeFile, content != null ? content : "", StandardCharsets.UTF_8);
+        fileOperations.saveFile(workspaceIdOrPath, relativePath, content);
     }
 
     @Override
     public void renameFile(String workspaceIdOrPath, String oldRelativePath, String newRelativePath) throws Exception {
         checkWorkspaceWriteAccess(workspaceIdOrPath);
-        Path src = workspaceResolver.resolvePathForRead(workspaceIdOrPath, oldRelativePath);
-        Path dest = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, newRelativePath);
-
-        if (!Files.exists(src)) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "Source file not found: " + oldRelativePath);
-        }
-        if (Files.exists(dest)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Target file already exists: " + newRelativePath);
-        }
-        if (dest.getParent() != null && !Files.exists(dest.getParent())) {
-            Files.createDirectories(dest.getParent());
-        }
-        Files.move(src, dest);
-        log.info("Renamed file in workspace [{}] from [{}] to [{}]", workspaceIdOrPath, oldRelativePath, newRelativePath);
+        fileOperations.renameFile(workspaceIdOrPath, oldRelativePath, newRelativePath);
     }
 
     @Override
     public void deleteFile(String workspaceIdOrPath, String relativePath) throws Exception {
         checkWorkspaceWriteAccess(workspaceIdOrPath);
-        Path target = workspaceResolver.resolvePathForWrite(workspaceIdOrPath, relativePath);
-        if (!Files.exists(target)) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + relativePath);
-        }
-
-        if (Files.isDirectory(target)) {
-            try (var stream = Files.walk(target)) {
-                stream.sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
-            }
-        } else {
-            Files.delete(target);
-        }
-        log.info("Deleted file in workspace [{}]: [{}]", workspaceIdOrPath, relativePath);
+        fileOperations.deleteFile(workspaceIdOrPath, relativePath);
     }
 
     @Override
     public byte[] downloadFile(String workspaceIdOrPath, String relativePath) throws Exception {
         checkWorkspaceAccess(workspaceIdOrPath);
-        Path safeFile = workspaceResolver.resolvePathForRead(workspaceIdOrPath, relativePath);
-        File file = safeFile.toFile();
-        if (!file.exists() || file.isDirectory()) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "File not found: " + relativePath);
-        }
-        if (file.length() > MAX_WRITE_BYTES) {
-            throw new BusinessException(ErrorCode.WORKSPACE_FILE_TOO_LARGE,
-                    "File size exceeds maximum download limit of 10MB: " + file.length() + " bytes");
-        }
-        return Files.readAllBytes(safeFile);
-    }
-
-    @Override
-    public String extractFilename(String relativePath) {
-        if (relativePath == null || relativePath.isBlank()) {
-            return "download.bin";
-        }
-        Path fileName = Path.of(relativePath).getFileName();
-        return fileName != null ? fileName.toString() : "download.bin";
+        return fileOperations.downloadFile(workspaceIdOrPath, relativePath);
     }
 
     @Override
     public byte[] archiveWorkspace(String workspaceIdOrPath) throws Exception {
         checkWorkspaceAccess(workspaceIdOrPath);
-        Path root = workspaceResolver.getWorkspaceRoot(workspaceIdOrPath);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
-            try (var stream = Files.walk(root)) {
-                for (Path path : stream.toList()) {
-                    if (Files.isDirectory(path)) continue;
-                    Path rel = root.relativize(path);
-                    String relStr = rel.toString().replace('\\', '/');
-                    if (relStr.startsWith(".git/") || relStr.equals(".git")) continue;
-                    zos.putNextEntry(new ZipEntry(relStr));
-                    Files.copy(path, zos);
-                    zos.closeEntry();
-                }
-            }
-        }
-        return baos.toByteArray();
+        return fileOperations.archiveWorkspace(workspaceIdOrPath);
     }
 
     @Override
-    public Map<String, Object> createGitSnapshot(String workspaceId, String runId, String stepRunId, String message, String author) throws Exception {
-        checkWorkspaceAccess(workspaceId);
-        if (gitManager == null || workspaceResolver == null) {
-            throw new IllegalStateException("JGitWorkspaceManager or WorkspaceResolver is not configured");
-        }
-        if (runId != null && !runId.isBlank() && artifactApplication != null) {
-            artifactApplication.validateRunWorkspaceBinding(runId, workspaceId);
-        }
-        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
-        String effectiveRunId = (runId != null && !runId.isBlank()) ? runId : "manual-" + workspaceId;
-        String effectiveStepId = (stepRunId != null && !stepRunId.isBlank()) ? stepRunId : "step-" + System.currentTimeMillis();
-        String effectiveMessage = (message != null && !message.isBlank()) ? message : "Workspace snapshot commit";
-        String effectiveAuthor = (author != null && !author.isBlank()) ? author : "operator@agenthub.local";
-
-        JGitWorkspaceManager.StepSnapshotResult snap = gitManager.createStepSnapshot(
-                wsRoot.toFile(), effectiveRunId, effectiveStepId, effectiveMessage, effectiveAuthor);
-
-        ArtifactView recordedArtifact = null;
-        if (runId != null && !runId.isBlank() && artifactApplication != null) {
-            recordedArtifact = artifactApplication.recordStepSnapshot(
-                    runId, effectiveStepId, workspaceId,
-                    snap.getCommitHash(), snap.getTagName(),
-                    snap.getChangedFiles(), snap.getFileChecksums(), effectiveAuthor);
-        }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("commitHash", snap.getCommitHash());
-        result.put("tagName", snap.getTagName());
-        result.put("changedFiles", snap.getChangedFiles());
-        result.put("fileChecksums", snap.getFileChecksums());
-        if (recordedArtifact != null) {
-            result.put("artifactId", recordedArtifact.getId());
-        }
-        return result;
+    public String extractFilename(String relativePath) {
+        return fileOperations.extractFilename(relativePath);
     }
 
     @Override
     public boolean acquireLock(String workspaceId, String requestedOwnerId, long waitTimeoutMs, long leaseTtlMs) {
         checkWorkspaceAccess(workspaceId);
-        if (lockManager == null) {
-            return false;
-        }
-        String lockOwner = resolveLockOwner(requestedOwnerId);
-        long waitTimeout = waitTimeoutMs > 0 ? waitTimeoutMs : 3000;
-        long leaseTtl = leaseTtlMs > 0 ? leaseTtlMs : 60000;
-        return lockManager.tryAcquireLock(workspaceId, lockOwner, waitTimeout, leaseTtl);
+        return lockLeaseService.acquireLock(workspaceId, requestedOwnerId, waitTimeoutMs, leaseTtlMs);
     }
 
     @Override
     public boolean renewLock(String workspaceId, String requestedOwnerId, long additionalTtlMs) {
         checkWorkspaceAccess(workspaceId);
-        if (lockManager == null) {
-            return false;
-        }
-        String lockOwner = resolveLockOwner(requestedOwnerId);
-        long additionalTtl = additionalTtlMs > 0 ? additionalTtlMs : 60000;
-        return lockManager.renewLease(workspaceId, lockOwner, additionalTtl);
+        return lockLeaseService.renewLock(workspaceId, requestedOwnerId, additionalTtlMs);
     }
 
     @Override
     public boolean releaseLock(String workspaceId, String requestedOwnerId) {
         checkWorkspaceAccess(workspaceId);
-        if (lockManager == null) {
-            return false;
-        }
-        String lockOwner = resolveLockOwner(requestedOwnerId);
-        return lockManager.releaseLock(workspaceId, lockOwner);
+        return lockLeaseService.releaseLock(workspaceId, requestedOwnerId);
     }
 
     @Override
     public WorkspaceLockStatusView getLockStatus(String workspaceId) {
         checkWorkspaceAccess(workspaceId);
-        if (lockManager == null) {
-            return new WorkspaceLockStatusView(workspaceId, workspaceId, null, false, 0, 0, 0);
-        }
-        return lockManager.getLockInfo(workspaceId)
-                .map(info -> new WorkspaceLockStatusView(
-                        workspaceId,
-                        info.getWorkspaceKey(),
-                        info.getOwnerId(),
-                        info.isLocked(),
-                        info.getAcquiredAt(),
-                        info.getExpiresAt(),
-                        info.getRemainingTtlMs()
-                ))
-                .orElse(new WorkspaceLockStatusView(workspaceId, workspaceId, null, false, 0, 0, 0));
+        return lockLeaseService.getLockStatus(workspaceId);
     }
 
-    private String resolveLockOwner(String requestedOwnerId) {
-        String currentUserId = RequestContext.get().getUserId();
-        if (currentUserId != null && !currentUserId.isBlank()) {
-            return currentUserId;
-        }
-        return (requestedOwnerId != null && !requestedOwnerId.isBlank()) ? requestedOwnerId : "anonymous";
-    }
-
-    @Override
     public WorkflowExecutionResult executeWorkflow(WorkflowDefinition workflow, String workspacePath, String taskPrompt) {
         String targetPath = (workspacePath != null && !workspacePath.isBlank())
                 ? workspacePath : workspaceBaseDir + "/default";
@@ -550,82 +352,39 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
     @Override
     public WorkspaceView resyncWorkspace(String workspaceId) throws Exception {
         checkWorkspaceWriteAccess(workspaceId);
-        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
-        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
-        gitManager.resyncWorkspace(wsRoot.toFile(), entity.getGitBaselineCommit());
-        if (auditService != null) {
-            auditService.record("WORKSPACE_RESYNC", RequestContext.get().getUserId(), null, null,
-                    "Resynced workspace [" + workspaceId + "] to baseline commit [" + entity.getGitBaselineCommit() + "]");
-        }
-        return toWorkspaceView(entity);
+        return gitOperations.resyncWorkspace(workspaceId);
     }
 
     @Override
     public WorkspaceView changeBaseline(String workspaceId, String targetCommitHash, boolean confirmed) throws Exception {
         checkWorkspaceWriteAccess(workspaceId);
-        if (!confirmed) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Baseline change requires explicit user confirmation (confirmed=true)");
-        }
-        if (targetCommitHash == null || targetCommitHash.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Target commit hash must not be blank");
-        }
-        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
-        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
-        String committedHash = gitManager.changeBaseline(wsRoot.toFile(), targetCommitHash.trim());
-        entity.setGitBaselineCommit(committedHash);
-        entity.setUpdatedAt(java.time.LocalDateTime.now());
-        workspaceRepository.save(entity);
-        if (auditService != null) {
-            auditService.record("WORKSPACE_CHANGE_BASELINE", RequestContext.get().getUserId(), null, null,
-                    "Changed baseline for workspace [" + workspaceId + "] to commit [" + committedHash + "]");
-        }
-        return toWorkspaceView(entity);
+        return gitOperations.changeBaseline(workspaceId, targetCommitHash, confirmed);
     }
 
     @Override
     public WorkspaceView discardWorkspace(String workspaceId, boolean confirmed, String reason) throws Exception {
         checkWorkspaceWriteAccess(workspaceId);
-        if (!confirmed) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Discard workspace changes requires explicit user confirmation (confirmed=true)");
-        }
-        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
-        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
-        gitManager.discardWorkspaceChanges(wsRoot.toFile(), entity.getGitBaselineCommit());
-        if (auditService != null) {
-            auditService.record("WORKSPACE_DISCARD", RequestContext.get().getUserId(), null, null,
-                    "Discarded changes in workspace [" + workspaceId + "], reason: " + (reason != null ? reason : "user initiated"));
-        }
-        return toWorkspaceView(entity);
+        return gitOperations.discardWorkspace(workspaceId, confirmed, reason);
     }
 
     @Override
     public WorkspaceView restoreSnapshot(String workspaceId, String snapshotCommitOrTag, boolean confirmed) throws Exception {
         checkWorkspaceWriteAccess(workspaceId);
-        if (!confirmed) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Restoring snapshot requires explicit user confirmation (confirmed=true)");
-        }
-        if (snapshotCommitOrTag == null || snapshotCommitOrTag.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Snapshot commit hash or tag must not be blank");
-        }
-        WorkspaceEntity entity = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.WORKSPACE_NOT_FOUND, "Workspace not found: " + workspaceId));
-        Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
-        String restoredCommit = gitManager.restoreSnapshot(wsRoot.toFile(), snapshotCommitOrTag.trim());
-        if (auditService != null) {
-            auditService.record("WORKSPACE_RESTORE_SNAPSHOT", RequestContext.get().getUserId(), null, null,
-                    "Restored snapshot in workspace [" + workspaceId + "] to [" + restoredCommit + "]");
-        }
-        return toWorkspaceView(entity);
+        return gitOperations.restoreSnapshot(workspaceId, snapshotCommitOrTag, confirmed);
+    }
+
+    @Override
+    public Map<String, Object> createGitSnapshot(String workspaceId, String runId, String stepRunId, String message, String author) throws Exception {
+        checkWorkspaceAccess(workspaceId);
+        // Phase 10 R8 深模块拆分：步骤快照与产物登记由 WorkspaceGitOperations 承载
+        return gitOperations.createGitSnapshot(workspaceId, runId, stepRunId, message, author);
     }
 
     @Override
     public WorkspaceQuotaUsage getWorkspaceQuota(String workspaceId) {
         checkWorkspaceAccess(workspaceId);
         Path wsRoot = workspaceResolver.getWorkspaceRoot(workspaceId);
-        int concurrentLocks = (lockManager != null ? lockManager.getLockInfo(workspaceId).map(info -> info.isLocked() ? 1 : 0).orElse(0) : 0);
+        int concurrentLocks = lockLeaseService.concurrentLockCount(workspaceId);
         if (quotaGuard != null) {
             return quotaGuard.computeUsage(workspaceId, wsRoot, WorkspaceQuotaPolicy.defaultPolicy(), concurrentLocks);
         }
@@ -636,17 +395,6 @@ public class WorkspaceApplicationService implements WorkspaceApplication {
                 0L, WorkspaceQuotaPolicy.DEFAULT_MAX_EXECUTION_DURATION_SECONDS,
                 WorkspaceQuotaPolicy.DEFAULT_ALLOW_NETWORK_ACCESS,
                 concurrentLocks, WorkspaceQuotaPolicy.DEFAULT_MAX_CONCURRENT_LOCKS
-        );
-    }
-
-    private WorkspaceView toWorkspaceView(WorkspaceEntity entity) {
-        return new WorkspaceView(
-                entity.getId(),
-                entity.getProjectId(),
-                entity.getRelativeRoot(),
-                entity.getGitBaselineCommit(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
         );
     }
 }
