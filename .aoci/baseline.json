@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T06:34:01Z",
+  "updated_at": "2026-10-24T06:43:24Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -623,9 +623,27 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/audit/application/ArtifactApplicationService.java": {
       "role": "index",
-      "sha256": "ef66381eeb3395b24e4f404a9a9b26a1dfb184cc38eca1fe53ee0e348d1d9a2d",
-      "size": 42457,
-      "normalized_sha256": "ef66381eeb3395b24e4f404a9a9b26a1dfb184cc38eca1fe53ee0e348d1d9a2d"
+      "sha256": "a187d1924c54df98e61ba0c4e4dc46021a4118e5044683e91337496f01b67d25",
+      "size": 33609,
+      "normalized_sha256": "a187d1924c54df98e61ba0c4e4dc46021a4118e5044683e91337496f01b67d25"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/application/artifact/ArtifactLineageAssembler.java": {
+      "role": "index",
+      "sha256": "df2da642a0dad820113ee252caf864f92999dbec282fc00da0ff5f3d3f990c13",
+      "size": 5819,
+      "normalized_sha256": "df2da642a0dad820113ee252caf864f92999dbec282fc00da0ff5f3d3f990c13"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/application/artifact/ArtifactMetadataExtractor.java": {
+      "role": "index",
+      "sha256": "80879861ff369b5ab22dd86182050e853e9219343fb91094962817a42d53a268",
+      "size": 2491,
+      "normalized_sha256": "80879861ff369b5ab22dd86182050e853e9219343fb91094962817a42d53a268"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/audit/application/artifact/PullRequestDraftComposer.java": {
+      "role": "index",
+      "sha256": "b7a6983da2f4954b56ef97de1c76efcbe379103573619beeaa0c514579d8bd37",
+      "size": 5593,
+      "normalized_sha256": "b7a6983da2f4954b56ef97de1c76efcbe379103573619beeaa0c514579d8bd37"
     },
     "agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/QualityGateCheckItem.java": {
       "role": "index",
@@ -3281,9 +3299,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "302bcc58436373daf7acdb2984c20b1b31a9fc99eed6c60d5d1073d111875c57",
-      "size": 117635,
-      "normalized_sha256": "302bcc58436373daf7acdb2984c20b1b31a9fc99eed6c60d5d1073d111875c57"
+      "sha256": "4aa725b17b99e37ccfadcbe5c9cfc3c7715db4868b7ce8035db1396ee365fe0a",
+      "size": 118463,
+      "normalized_sha256": "4aa725b17b99e37ccfadcbe5c9cfc3c7715db4868b7ce8035db1396ee365fe0a"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3359,9 +3377,9 @@
     },
     "docs/ARCHITECTURE.md": {
       "role": "index",
-      "sha256": "12f262f976db6d6b0e6d0e750cb523f0ce34114ec5e899f90c604acab42fe46a",
-      "size": 38233,
-      "normalized_sha256": "12f262f976db6d6b0e6d0e750cb523f0ce34114ec5e899f90c604acab42fe46a"
+      "sha256": "5118baca00b97f4b23fd2fab8d7231b8ad6b34c585a2e9b92f0871247d3d8a4e",
+      "size": 38361,
+      "normalized_sha256": "5118baca00b97f4b23fd2fab8d7231b8ad6b34c585a2e9b92f0871247d3d8a4e"
     },
     "docs/CURRENT_CAPABILITY_BOUNDARIES.md": {
       "role": "index",

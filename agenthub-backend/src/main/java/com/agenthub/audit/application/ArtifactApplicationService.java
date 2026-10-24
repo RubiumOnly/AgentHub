@@ -1,7 +1,12 @@
 package com.agenthub.audit.application;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
+import com.agenthub.audit.application.artifact.ArtifactLineageAssembler;
+import com.agenthub.audit.application.artifact.ArtifactMetadataExtractor;
+import com.agenthub.audit.application.artifact.PullRequestDraftComposer;
 import com.agenthub.audit.dto.ArtifactLineageView;
 import com.agenthub.audit.dto.ArtifactView;
 import com.agenthub.audit.dto.StepLineageNode;
@@ -41,6 +46,13 @@ import java.util.stream.Collectors;
 
 @Service
 public class ArtifactApplicationService implements ArtifactApplication {
+
+    @Autowired
+    private ArtifactLineageAssembler lineageAssembler;
+
+    @Autowired
+    private PullRequestDraftComposer pullRequestDraftComposer;
+
 
     private static final Logger log = LoggerFactory.getLogger(ArtifactApplicationService.class);
 
@@ -376,51 +388,11 @@ public class ArtifactApplicationService implements ArtifactApplication {
     }
 
     private List<String> extractFilesFromMetadata(String metadataJson) {
-        List<String> files = new ArrayList<>();
-        if (metadataJson == null || metadataJson.isBlank()) {
-            return files;
-        }
-        try {
-            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(metadataJson);
-            com.fasterxml.jackson.databind.JsonNode filesNode = root.get("files");
-            if (filesNode == null || !filesNode.isArray()) {
-                filesNode = root.get("changedFiles");
-            }
-            if (filesNode != null && filesNode.isArray()) {
-                for (com.fasterxml.jackson.databind.JsonNode f : filesNode) {
-                    if (f.isTextual() && !f.asText().isBlank()) {
-                        files.add(f.asText().trim());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse files from artifact metadata JSON: {}", e.getMessage());
-        }
-        return files;
+        return ArtifactMetadataExtractor.extractFilesFromMetadata(metadataJson);
     }
 
     private Map<String, String> extractChecksumsFromMetadata(String metadataJson) {
-        Map<String, String> checksums = new HashMap<>();
-        if (metadataJson == null || metadataJson.isBlank()) {
-            return checksums;
-        }
-        try {
-            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(metadataJson);
-            com.fasterxml.jackson.databind.JsonNode sumsNode = root.get("fileChecksums");
-            if (sumsNode == null || !sumsNode.isObject()) {
-                sumsNode = root.get("checksums");
-            }
-            if (sumsNode != null && sumsNode.isObject()) {
-                sumsNode.fields().forEachRemaining(entry -> {
-                    if (entry.getValue().isTextual()) {
-                        checksums.put(entry.getKey(), entry.getValue().asText());
-                    }
-                });
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse fileChecksums from artifact metadata: {}", e.getMessage());
-        }
-        return checksums;
+        return ArtifactMetadataExtractor.extractChecksumsFromMetadata(metadataJson);
     }
 
     @Override
@@ -443,90 +415,9 @@ public class ArtifactApplicationService implements ArtifactApplication {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Workflow run not found: " + runId));
 
         List<ArtifactEntity> artifacts = artifactRepository.findByRunIdOrderByCreatedAtDesc(runId);
-        String baselineCommit = null;
-        for (ArtifactEntity art : artifacts) {
-            if ("BASELINE".equalsIgnoreCase(art.getArtifactType())) {
-                baselineCommit = art.getPathOrRef();
-                break;
-            }
-        }
-
-        WorkspaceEntity ws = workspaceRepository.findByProjectId(run.getProjectId()).orElse(null);
-        if (baselineCommit == null && ws != null && ws.getGitBaselineCommit() != null) {
-            baselineCommit = ws.getGitBaselineCommit();
-        }
-
-        String currentCommit = baselineCommit;
-        boolean isReverted = false;
-        for (ArtifactEntity art : artifacts) {
-            if ("REVERTED".equalsIgnoreCase(art.getReviewStatus())) {
-                isReverted = true;
-            }
-            if ("SNAPSHOT".equalsIgnoreCase(art.getArtifactType()) && currentCommit == null) {
-                currentCommit = art.getPathOrRef();
-            }
-        }
-
-        List<StepLineageNode> stepNodes = new ArrayList<>();
-        if (stepRunRepository != null) {
-            List<StepRunEntity> steps = stepRunRepository.findByRunIdOrderByCreatedAtAsc(runId);
-            Map<String, ApprovalEntity> approvalMap = new HashMap<>();
-            if (approvalRepository != null) {
-                List<ApprovalEntity> apprs = approvalRepository.findByRunId(runId);
-                for (ApprovalEntity a : apprs) {
-                    if (a.getStepRunId() != null) {
-                        approvalMap.put(a.getStepRunId(), a);
-                    }
-                }
-            }
-            Map<String, ArtifactEntity> snapshotMap = new HashMap<>();
-            for (ArtifactEntity a : artifacts) {
-                if (a.getStepRunId() != null) {
-                    snapshotMap.put(a.getStepRunId(), a);
-                }
-            }
-
-            for (StepRunEntity s : steps) {
-                ArtifactEntity art = snapshotMap.get(s.getId());
-                ApprovalEntity appr = approvalMap.get(s.getId());
-                List<String> files = art != null ? extractFilesFromMetadata(art.getMetadataJson()) : List.of();
-                Map<String, String> checksums = art != null ? extractChecksumsFromMetadata(art.getMetadataJson()) : Map.of();
-
-                stepNodes.add(new StepLineageNode(
-                        s.getId(),
-                        s.getNodeId(),
-                        s.getStatus(),
-                        art != null ? art.getId() : null,
-                        art != null ? art.getPathOrRef() : null,
-                        "snapshot-" + s.getId(),
-                        files,
-                        checksums,
-                        art != null ? art.getReviewStatus() : "NONE",
-                        appr != null ? appr.getId() : null,
-                        appr != null ? appr.getStatus() : null
-                ));
-            }
-        }
-
-        int totalFiles = 0;
-        for (StepLineageNode sn : stepNodes) {
-            if (sn.getChangedFiles() != null) {
-                totalFiles += sn.getChangedFiles().size();
-            }
-        }
-
-        return new ArtifactLineageView(
-                runId,
-                run.getProjectId(),
-                ws != null ? ws.getId() : null,
-                baselineCommit,
-                currentCommit,
-                stepNodes,
-                artifacts.stream().map(this::toView).toList(),
-                artifacts.size(),
-                totalFiles,
-                isReverted
-        );
+        List<ArtifactView> artifactViews = artifacts.stream().map(this::toView).toList();
+        // Phase 10 R5 深模块拆分：血缘图组装由 ArtifactLineageAssembler 承载
+        return lineageAssembler.assemble(run, artifacts, artifactViews);
     }
 
     @Override
@@ -676,72 +567,8 @@ public class ArtifactApplicationService implements ArtifactApplication {
         QualityGateReport gateReport = getQualityGateReport(artifactId);
         StructuredDiff diff = getArtifactDiff(artifactId);
 
-        PullRequestDraftView draft = new PullRequestDraftView();
-        draft.setDraftId("pr-draft-" + UUID.randomUUID().toString().substring(0, 8));
-        draft.setArtifactId(artifactId);
-        draft.setRunId(entity.getRunId());
-        String mainTarget = (diff.getEntries() != null && !diff.getEntries().isEmpty() && diff.getEntries().get(0).getNewPath() != null)
-                ? diff.getEntries().get(0).getNewPath()
-                : entity.getArtifactType();
-        draft.setTitle(String.format("feat(agent-delivery): %s (Run %s)", mainTarget, entity.getRunId()));
-        draft.setSourceBranch("feature/run-" + entity.getRunId());
-        draft.setTargetBranch("main");
-        draft.setQualityGateReport(gateReport);
-
-        List<String> changedFilesList = new ArrayList<>();
-        if (diff.getEntries() != null) {
-            for (FileDiffEntry entry : diff.getEntries()) {
-                String p = entry.getNewPath() != null && !"/dev/null".equals(entry.getNewPath())
-                        ? entry.getNewPath() : entry.getOldPath();
-                if (p != null && !p.isBlank()) {
-                    changedFilesList.add(p);
-                }
-            }
-        }
-        draft.setChangedFiles(changedFilesList);
-        draft.setChangedFilesCount(changedFilesList.size());
-        draft.setAddedLines(diff.getTotalLinesAdded());
-        draft.setDeletedLines(diff.getTotalLinesDeleted());
-        draft.setTotalLinesAdded(diff.getTotalLinesAdded());
-        draft.setTotalLinesDeleted(diff.getTotalLinesDeleted());
-        draft.setQualityGateStatus(gateReport.getOverallStatus() != null ? gateReport.getOverallStatus().name() : "UNKNOWN");
-        draft.setQualityGateScore(gateReport.getCompositeScore());
-        draft.setSummary(String.format("本变更包含 %d 个文件的代码修改（+%d/-%d 行），经由受控工作区自动化流水线构建，已通过质量门禁评测。",
-                changedFilesList.size(), diff.getTotalLinesAdded(), diff.getTotalLinesDeleted()));
-        draft.setRiskAssessment(gateReport.getOverallStatus() == QualityGateStatus.PASSED
-                ? "LOW_RISK: 无破坏性改动，未检测到敏感密钥泄漏，已通过 5 大维度质量门禁验证。"
-                : (gateReport.getOverallStatus() == QualityGateStatus.WARNING
-                ? "MEDIUM_RISK: 变更规模较大或触发建议审查项，建议人工二次复核。"
-                : "HIGH_RISK: 触发质量门禁阻断项，必须修复违规项后方可合并。"));
-        draft.setCanMergeSafely(gateReport.getOverallStatus() == QualityGateStatus.PASSED && "ACCEPTED".equalsIgnoreCase(entity.getReviewStatus()));
-        LocalDateTime now = LocalDateTime.now();
-        draft.setCreatedAt(now);
-        draft.setGeneratedAt(now);
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("## Automated Change Delivery Summary\n\n");
-        sb.append("- **Run ID**: `").append(entity.getRunId()).append("`\n");
-        sb.append("- **Artifact**: `").append(artifactId).append("` (Status: ").append(entity.getReviewStatus()).append(")\n");
-        sb.append("- **Quality Gate**: **").append(gateReport.getOverallStatus()).append("** (Score: ").append(gateReport.getCompositeScore()).append("/100)\n");
-        sb.append("- **Diff Scale**: `+").append(diff.getTotalLinesAdded()).append(" / -").append(diff.getTotalLinesDeleted()).append("` lines across ")
-                .append(draft.getChangedFilesCount()).append(" file(s)\n\n");
-        sb.append("### Quality Gate Check Matrix\n\n");
-        sb.append("| Gate Dimension | Status | Score | Findings |\n");
-        sb.append("|---|---|---|---|\n");
-        if (gateReport.getCheckItems() != null) {
-            for (QualityGateCheckItem item : gateReport.getCheckItems()) {
-                sb.append("| `").append(item.getRuleType()).append("` | ").append(item.getStatus()).append(" | ")
-                        .append(item.getScore()).append(" | ").append(item.getMessage()).append(" |\n");
-            }
-        }
-        sb.append("\n### Safety & Security Verification\n\n");
-        sb.append("- Zero leaked API keys or credentials detected via automated secret scanner\n");
-        sb.append("- Change strictly verified under controlled workspace boundaries\n");
-        sb.append("- SHA-256 Fingerprint: `").append(gateReport.getSha256Fingerprint()).append("`\n");
-
-        draft.setSummaryMarkdown(sb.toString());
-        draft.setAuditChecksum(gateReport.getSha256Fingerprint());
-        return draft;
+        // Phase 10 R5 深模块拆分：草稿组装与呈现由 PullRequestDraftComposer 承载，不执行任何外部交付
+        return pullRequestDraftComposer.compose(entity, gateReport, diff);
     }
 
     @Override

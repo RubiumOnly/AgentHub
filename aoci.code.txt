@@ -563,7 +563,7 @@ ArtifactController.java[EI8S]: F:产物审查REST入口 | R:code:audit/applicati
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/application/===
 ArtifactApplication.java[AI5T]: F:产物用例端口 | R:code:audit/application/ArtifactApplicationService.java | A:ArtifactController | S:审查/门禁/回滚/血缘接口
-ArtifactApplicationService.java[AO9L]: F:产物生命周期与审查编排 | R:code:audit/domain/quality/QualityGateEngine.java | A:ArtifactController | S:质量门禁/血缘/PR草稿/单文件与整包回滚集中地；产物状态跃迁必过统一状态图
+ArtifactApplicationService.java[AO9M]: F:产物审查与回滚编排 | R:code:audit/application/artifact/ArtifactLineageAssembler.java | A:ArtifactController | S:血缘组装与PR草稿已外移；回滚保留非破坏语义，禁止重复revert(3011)
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/domain/quality/===
 QualityGateCheckItem.java[DQ4T]: F:门禁检查项 | R:code:audit/domain/quality/QualityGateReport.java | A:门禁评估 | S:单项规则结果与证据
@@ -869,3 +869,8 @@ DemoBaselineSeedFixture.java[TQ7S]: F:重灌demo/test演示基线 | R:code:V13__
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/application/evidence/===
 EvidenceChecksumCalculator.java[DD8S]: F:证据包确定性校验和 | R:code:execution/application/RunEvidenceModule.java | A:证据导出与重放验证 | S:规范化JSON+SHA-256；字段顺序或脱敏输出变化即改变校验和
 EvidenceUsageAggregator.java[AA8S]: F:聚合Provider用量与simulated判定 | R:code:agent/infrastructure/entity/TokenUsageAuditEntity.java | A:证据导出 | S:LIVE与DEMO统计隔离语义集中于此；审计缺行时回退USAGE事件
+
+===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/audit/application/artifact/===
+ArtifactLineageAssembler.java[AA7S]: F:组装Run步骤产物血缘图 | R:code:audit/application/artifact/ArtifactMetadataExtractor.java | A:ArtifactApplicationService | S:归属校验由调用方完成；产物顺序按createdAt降序为基线语义
+ArtifactMetadataExtractor.java[DD5S]: F:解析产物metadata清单与校验和 | R:code:audit/application/ArtifactApplicationService.java | A:血缘与回滚 | S:兼容files/changedFiles与fileChecksums/checksums双键名；解析失败宽松降级
+PullRequestDraftComposer.java[AO6S]: F:组装PR草稿与风险评级 | R:code:audit/domain/quality/QualityGateReport.java | A:ArtifactApplicationService | S:仅草稿不执行外部交付；canMergeSafely要求门禁PASSED且产物ACCEPTED
