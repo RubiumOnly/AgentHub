@@ -12,6 +12,8 @@ import com.agenthub.domain.workspace.model.StructuredDiff;
 import com.agenthub.domain.workspace.service.JGitWorkspaceManager;
 import com.agenthub.domain.workspace.service.WorkspaceResolver;
 import com.agenthub.execution.dto.RunEventView;
+import com.agenthub.execution.application.evidence.EvidenceChecksumCalculator;
+import com.agenthub.execution.application.evidence.EvidenceUsageAggregator;
 import com.agenthub.execution.dto.RunEvidenceBundleView;
 import com.agenthub.execution.dto.StepRunView;
 import com.agenthub.execution.dto.WorkflowRunView;
@@ -39,11 +41,7 @@ import com.agenthub.shared.context.RequestContext;
 import com.agenthub.shared.exception.BusinessException;
 import com.agenthub.shared.exception.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +50,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -71,14 +68,10 @@ import java.util.stream.Collectors;
 @Component
 public class RunEvidenceModule {
 
-    private static final Logger log = LoggerFactory.getLogger(RunEvidenceModule.class);
+    @Autowired
+    private EvidenceUsageAggregator usageAggregator;
 
-    private static final ObjectMapper EVIDENCE_MAPPER = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-            .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
-            .build();
+    private static final Logger log = LoggerFactory.getLogger(RunEvidenceModule.class);
 
     private final WorkflowRunRepository workflowRunRepository;
     private final StepRunRepository stepRunRepository;
@@ -269,7 +262,7 @@ public class RunEvidenceModule {
         bundle.setEvents(sanitizedEvents);
 
         Set<String> runtimeTypes = new LinkedHashSet<>();
-        ObjectMapper mapper = objectMapper != null ? objectMapper : EVIDENCE_MAPPER;
+        ObjectMapper mapper = objectMapper != null ? objectMapper : EvidenceChecksumCalculator.evidenceMapper();
         if (rawDslSnapshot != null && !rawDslSnapshot.isBlank()) {
             try {
                 WorkflowDsl parsedDsl = mapper.readValue(rawDslSnapshot, WorkflowDsl.class);
@@ -286,138 +279,13 @@ public class RunEvidenceModule {
             } catch (Exception ignored) {}
         }
 
-        Boolean anyEventSimulated = null;
-        long eventPromptTokens = 0L;
-        long eventCompletionTokens = 0L;
-        double eventCost = 0.0;
-        List<String> verificationLogs = new ArrayList<>();
-
-        for (RunEventView ev : sanitizedEvents) {
-            String payload = ev.getPayload();
-            if (payload == null || payload.isBlank()) continue;
-            if ("STEP_STARTED".equalsIgnoreCase(ev.getEventType()) || "STEP_COMPLETED".equalsIgnoreCase(ev.getEventType())) {
-                try {
-                    JsonNode node = mapper.readTree(payload);
-                    if (node.hasNonNull("runtimeType")) {
-                        runtimeTypes.add(node.get("runtimeType").asText().trim().toUpperCase());
-                    }
-                    if (node.hasNonNull("simulated")) {
-                        boolean sim = node.get("simulated").asBoolean();
-                        anyEventSimulated = (anyEventSimulated == null) ? sim : (anyEventSimulated || sim);
-                    }
-                } catch (Exception ignored) {}
-            } else if ("USAGE".equalsIgnoreCase(ev.getEventType())) {
-                try {
-                    JsonNode node = mapper.readTree(payload);
-                    eventPromptTokens += node.path("promptTokens").asLong(0L);
-                    eventCompletionTokens += node.path("completionTokens").asLong(0L);
-                    eventCost += node.path("cost").asDouble(0.0);
-                } catch (Exception ignored) {}
-            } else if ("LOG".equalsIgnoreCase(ev.getEventType()) || "TOOL_CALL".equalsIgnoreCase(ev.getEventType())) {
-                verificationLogs.add("[" + ev.getEventType() + "#" + ev.getSequenceNum() + "] " + payload);
-            }
-        }
-
-        List<TokenUsageAuditView> usageViews = new ArrayList<>();
-        Set<String> providerTypes = new LinkedHashSet<>();
-        Set<String> models = new LinkedHashSet<>();
-        long totalPrompt = 0L;
-        long totalCompletion = 0L;
-        long totalTokens = 0L;
-        double totalCost = 0.0;
-
-        if (tokenUsageAuditRepository != null) {
-            Map<String, TokenUsageAuditEntity> usageById = new LinkedHashMap<>();
-            for (TokenUsageAuditEntity u : tokenUsageAuditRepository.findByRunIdOrderByCreatedAtAsc(runId)) {
-                usageById.put(u.getId(), u);
-            }
-            for (StepRunEntity se : stepEntities) {
-                for (TokenUsageAuditEntity u : tokenUsageAuditRepository.findByStepRunIdOrderByCreatedAtAsc(se.getId())) {
-                    usageById.putIfAbsent(u.getId(), u);
-                }
-            }
-            for (TokenUsageAuditEntity u : usageById.values()) {
-                if (u.getProviderType() != null && !u.getProviderType().isBlank()) {
-                    providerTypes.add(u.getProviderType());
-                }
-                if (u.getModel() != null && !u.getModel().isBlank()) {
-                    models.add(u.getModel());
-                }
-                totalPrompt += u.getPromptTokens();
-                totalCompletion += u.getCompletionTokens();
-                totalTokens += u.getTotalTokens();
-                totalCost += u.getEstimatedCost();
-                usageViews.add(new TokenUsageAuditView(
-                        u.getId(),
-                        u.getRunId(),
-                        u.getStepRunId(),
-                        u.getProviderId(),
-                        u.getProviderType(),
-                        u.getModel(),
-                        u.getPromptTokens(),
-                        u.getCompletionTokens(),
-                        u.getTotalTokens(),
-                        u.getLatencyMs(),
-                        u.getEstimatedCost(),
-                        u.getStatus(),
-                        u.getErrorMessage() != null ? SecretMasker.maskInText(u.getErrorMessage()) : null,
-                        u.getCreatedAt()
-                ));
-            }
-        }
-
-        if (usageViews.isEmpty() && (eventPromptTokens > 0 || eventCompletionTokens > 0)) {
-            totalPrompt = eventPromptTokens;
-            totalCompletion = eventCompletionTokens;
-            totalTokens = eventPromptTokens + eventCompletionTokens;
-            totalCost = Math.round(eventCost * 1_000_000.0) / 1_000_000.0;
-        }
-
-        boolean hasLiveTokenUsage = usageViews.stream()
-                .anyMatch(u -> "SUCCESS".equalsIgnoreCase(u.getStatus())
-                        && u.getTotalTokens() > 0
-                        && u.getProviderType() != null
-                        && !"MOCK".equalsIgnoreCase(u.getProviderType())
-                        && !"SIMULATED".equalsIgnoreCase(u.getProviderType())
-                        && !"ROUTER".equalsIgnoreCase(u.getProviderType())
-                        && (u.getProviderId() == null || !"prov-mock".equalsIgnoreCase(u.getProviderId())));
-        boolean hasSimulatedTokenUsage = usageViews.stream()
-                .anyMatch(u -> (u.getProviderType() != null
-                        && ("MOCK".equalsIgnoreCase(u.getProviderType())
-                            || "SIMULATED".equalsIgnoreCase(u.getProviderType())))
-                        || "prov-mock".equalsIgnoreCase(u.getProviderId()));
-        boolean hasMockRuntime = runtimeTypes.stream()
-                .anyMatch(rt -> "MOCK".equalsIgnoreCase(rt));
-
-        boolean isSimulated = !hasLiveTokenUsage
-                || hasSimulatedTokenUsage
-                || hasMockRuntime
-                || Boolean.TRUE.equals(anyEventSimulated);
-
-        if (runtimeTypes.isEmpty()) {
-            runtimeTypes.add(isSimulated ? "MOCK" : "PROVIDER_DRIVEN");
-        }
-        if (providerTypes.isEmpty()) {
-            providerTypes.add(isSimulated ? "MOCK_SIMULATOR" : "DYNAMIC_ROUTER");
-        }
-        if (models.isEmpty()) {
-            models.add(isSimulated ? "mock-offline-v1" : "router-default");
-        }
-
-        RunEvidenceBundleView.ProviderRuntimeEvidence providerEvidence = new RunEvidenceBundleView.ProviderRuntimeEvidence();
-        providerEvidence.setRuntimeTypes(new ArrayList<>(runtimeTypes));
-        providerEvidence.setProviderTypes(new ArrayList<>(providerTypes));
-        providerEvidence.setModels(new ArrayList<>(models));
-        providerEvidence.setSimulated(isSimulated);
-        providerEvidence.setTotalPromptTokens(totalPrompt);
-        providerEvidence.setTotalCompletionTokens(totalCompletion);
-        providerEvidence.setTotalTokens(totalTokens);
-        providerEvidence.setTotalEstimatedCost(Math.round(totalCost * 1_000_000.0) / 1_000_000.0);
-        providerEvidence.setTokenUsageRecords(usageViews);
-
-        bundle.setSimulated(isSimulated);
-        bundle.setExecutionMode(isSimulated ? "DEMO_SIMULATED" : "LIVE_PROVIDER");
-        bundle.setProviderRuntime(providerEvidence);
+        // Phase 10 R4 深模块拆分：用量聚合、simulated 判定与验证日志由 EvidenceUsageAggregator 承载
+        EvidenceUsageAggregator.EvidenceUsageAggregate usageAggregate =
+                usageAggregator.aggregate(runId, stepEntities, sanitizedEvents, runtimeTypes, mapper);
+        bundle.setSimulated(usageAggregate.simulated());
+        bundle.setExecutionMode(usageAggregate.simulated() ? "DEMO_SIMULATED" : "LIVE_PROVIDER");
+        bundle.setProviderRuntime(usageAggregate.providerEvidence());
+        List<String> verificationLogs = usageAggregate.verificationLogs();
 
         bundle.setArtifacts(sanitizedArtifacts);
 
@@ -574,46 +442,11 @@ public class RunEvidenceModule {
     }
 
     public boolean verifyEvidenceBundleChecksum(RunEvidenceBundleView bundle) {
-        if (bundle == null || bundle.getChecksum() == null || bundle.getChecksum().isBlank()) {
-            return false;
-        }
-        String expected = computeDeterministicChecksum(bundle);
-        return MessageDigest.isEqual(
-                expected.getBytes(StandardCharsets.UTF_8),
-                bundle.getChecksum().trim().toLowerCase().getBytes(StandardCharsets.UTF_8)
-        );
+        return EvidenceChecksumCalculator.verifyEvidenceBundleChecksum(bundle);
     }
 
     public static String computeDeterministicChecksum(RunEvidenceBundleView bundle) {
-        try {
-            Map<String, Object> canonical = new LinkedHashMap<>();
-            canonical.put("schemaVersion", bundle.getSchemaVersion());
-            canonical.put("bundleId", bundle.getBundleId());
-            canonical.put("simulated", bundle.isSimulated());
-            canonical.put("executionMode", bundle.getExecutionMode());
-            canonical.put("project", bundle.getProject());
-            canonical.put("workflowDslSnapshot", bundle.getWorkflowDslSnapshot());
-            canonical.put("run", bundle.getRun());
-            canonical.put("steps", bundle.getSteps());
-            canonical.put("events", bundle.getEvents());
-            canonical.put("providerRuntime", bundle.getProviderRuntime());
-            canonical.put("gitDiff", bundle.getGitDiff());
-            canonical.put("artifacts", bundle.getArtifacts());
-            canonical.put("testReportSummary", bundle.getTestReportSummary());
-            canonical.put("approvals", bundle.getApprovals());
-            canonical.put("deployments", bundle.getDeployments());
-
-            String json = EVIDENCE_MAPPER.writeValueAsString(canonical);
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(json.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(hash.length * 2);
-            for (byte b : hash) {
-                hex.append(String.format("%02x", b));
-            }
-            return hex.toString();
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to compute deterministic SHA-256 checksum for RunEvidenceBundleView", e);
-        }
+        return EvidenceChecksumCalculator.computeDeterministicChecksum(bundle);
     }
 
     private WorkflowRunEntity verifyRunAccessFallback(String runId, String currentUserId) {

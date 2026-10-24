@@ -320,7 +320,7 @@ ExecutionApplicationService.java[AI8S]: F:执行域门面服务 | R:code:executi
 RunCommandModule.java[AW9M]: F:Run与Step写命令模块 | R:code:execution/service/ExecutionStateMachine.java | A:ExecutionApplicationService | S:startRun幂等+基线冻结+提交后调度；状态跃迁必过状态机
 RunQueryModule.java[AR8M]: F:Run只读查询模块 | R:code:execution/application/ExecutionApplicationService.java | A:ExecutionApplicationService | S:严格项目归属校验；AOCI状态诚实判定从此暴露
 RunEventStreamModule.java[AN7T]: F:事件追加与SSE回放模块 | R:code:execution/service/RunEventBroadcaster.java | A:ExecutionApplicationService | S:游标回放语义；事件序列单调
-RunEvidenceModule.java[AO9L]: F:证据包组装模块 | R:code:execution/dto/RunEvidenceBundleView.java | A:证据导出 | S:脱敏+确定性SHA-256校验和；simulated标识不可缺失
+RunEvidenceModule.java[AR9M]: F:证据包组装编排 | R:code:execution/application/evidence/EvidenceUsageAggregator.java | A:ExecutionApplicationService | S:脱敏与校验和已外移；simulated标识判定集中在聚合器，禁止别处重复判定
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/domain/memory/===
 ContextMemoryCompressor.java[DA9M]: F:长上下文压缩与认知恢复 | R:code:execution/domain/memory/HierarchicalContextMemory.java | A:Agent上下文组装 | S:绝不剥离项目约束/审批/错误/改动路径；AOCI状态判定在此实现
@@ -865,3 +865,7 @@ WorkspaceSecurityAndJGitAuditIntegrationTest.java[TQ6S]: F:验证读写边界与
 
 ===D:/work/agenthub/agenthub-backend/src/test/java/com/agenthub/fixture/===
 DemoBaselineSeedFixture.java[TQ7S]: F:重灌demo/test演示基线 | R:code:V13__phase10_remove_demo_seed_subjects.sql | A:Spring测试上下文 | S:幂等可重入；@Profile门保证prod永不加载
+
+===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/application/evidence/===
+EvidenceChecksumCalculator.java[DD8S]: F:证据包确定性校验和 | R:code:execution/application/RunEvidenceModule.java | A:证据导出与重放验证 | S:规范化JSON+SHA-256；字段顺序或脱敏输出变化即改变校验和
+EvidenceUsageAggregator.java[AA8S]: F:聚合Provider用量与simulated判定 | R:code:agent/infrastructure/entity/TokenUsageAuditEntity.java | A:证据导出 | S:LIVE与DEMO统计隔离语义集中于此；审计缺行时回退USAGE事件

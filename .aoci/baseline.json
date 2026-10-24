@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T06:26:28Z",
+  "updated_at": "2026-10-24T06:34:01Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -1001,15 +1001,27 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/execution/application/RunEvidenceModule.java": {
       "role": "index",
-      "sha256": "ac7d7d06283499e3030748f2a297029f9e3faeecfe2824174dc207acdef48c32",
-      "size": 32457,
-      "normalized_sha256": "ac7d7d06283499e3030748f2a297029f9e3faeecfe2824174dc207acdef48c32"
+      "sha256": "e03faaaf26f83f7604ca87081d52b971803b27a18f8a68819fa882e2bee1dddd",
+      "size": 24001,
+      "normalized_sha256": "e03faaaf26f83f7604ca87081d52b971803b27a18f8a68819fa882e2bee1dddd"
     },
     "agenthub-backend/src/main/java/com/agenthub/execution/application/RunQueryModule.java": {
       "role": "index",
       "sha256": "5220b653b1b1b5895379ee060cc2b5e37290cdf4a5812a9a0ea4c88028e1ec9c",
       "size": 18557,
       "normalized_sha256": "5220b653b1b1b5895379ee060cc2b5e37290cdf4a5812a9a0ea4c88028e1ec9c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/evidence/EvidenceChecksumCalculator.java": {
+      "role": "index",
+      "sha256": "e7beb04164504d20c762d7e01193b72120a3a7cd7885be37c6073b89af746528",
+      "size": 3518,
+      "normalized_sha256": "e7beb04164504d20c762d7e01193b72120a3a7cd7885be37c6073b89af746528"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/execution/application/evidence/EvidenceUsageAggregator.java": {
+      "role": "index",
+      "sha256": "0a5362bdb901db359cc7a4c8de22b1f6c7179ad1ee32c524e5ea50198454e45e",
+      "size": 8851,
+      "normalized_sha256": "0a5362bdb901db359cc7a4c8de22b1f6c7179ad1ee32c524e5ea50198454e45e"
     },
     "agenthub-backend/src/main/java/com/agenthub/execution/domain/memory/ContextMemoryCompressor.java": {
       "role": "index",
@@ -3269,9 +3281,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "adc8099671854b6127b54f99b648fc4548db937817600391fcdbfb6df8522b4d",
-      "size": 116993,
-      "normalized_sha256": "adc8099671854b6127b54f99b648fc4548db937817600391fcdbfb6df8522b4d"
+      "sha256": "302bcc58436373daf7acdb2984c20b1b31a9fc99eed6c60d5d1073d111875c57",
+      "size": 117635,
+      "normalized_sha256": "302bcc58436373daf7acdb2984c20b1b31a9fc99eed6c60d5d1073d111875c57"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3347,9 +3359,9 @@
     },
     "docs/ARCHITECTURE.md": {
       "role": "index",
-      "sha256": "07f243e31190807141ffc114728c4f8d1cd7f5cf5d4d9b24c70dcd2629efbabe",
-      "size": 38039,
-      "normalized_sha256": "07f243e31190807141ffc114728c4f8d1cd7f5cf5d4d9b24c70dcd2629efbabe"
+      "sha256": "12f262f976db6d6b0e6d0e750cb523f0ce34114ec5e899f90c604acab42fe46a",
+      "size": 38233,
+      "normalized_sha256": "12f262f976db6d6b0e6d0e750cb523f0ce34114ec5e899f90c604acab42fe46a"
     },
     "docs/CURRENT_CAPABILITY_BOUNDARIES.md": {
       "role": "index",

@@ -13,7 +13,7 @@ AgentHub 当前采用 Java 17 + Spring Boot 3.3.4 的模块化单体。所有核
 | `identity` | 登录、令牌、资源授权（`ResourceOwnershipVerifier`）、认证审计 | User、Token、AuthAudit |
 | `project` | Project、Workspace、单一 `/api/workspaces/{workspaceId}` 资源族和项目归属 | Project、Workspace |
 | `orchestration` | Workflow DSL、拓扑校验、审批门禁 | WorkflowDefinition、Approval |
-| `execution` | Run/Step 状态、租约、恢复、事件流与证据包（内部拆分为 `RunCommandModule`、`RunQueryModule`、`RunEventStreamModule`、`RunEvidenceModule`） | WorkflowRun、StepRun、RunEvent |
+| `execution` | Run/Step 状态、租约、恢复、事件流与证据包（内部拆分为 `RunCommandModule`、`RunQueryModule`、`RunEventStreamModule`、`RunEvidenceModule`；Phase 10 R4 将证据包进一步拆出 `evidence/EvidenceChecksumCalculator` 与 `evidence/EvidenceUsageAggregator` 深模块缝，行为由 PhaseF 证据包契约测试作拆分前后对照） | WorkflowRun、StepRun、RunEvent |
 | `agent` / `runtime` | Agent 注册、Provider 路由、Runtime SPI、用量和脱敏 | AgentDefinition、Provider、TokenUsage |
 | `audit` | Artifact、JGit 结构化 Diff、审查和回滚 | Artifact、Evidence |
 | `sandbox` | 受控构建、启动、探针、停止和清理 | Deployment |
