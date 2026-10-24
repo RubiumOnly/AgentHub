@@ -510,7 +510,7 @@ StructuredDiff.java[DE5T]: F:结构化Diff值对象 | R:code:domain/workspace/se
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/===
 DefaultWorkspaceResolver.java[DR8S]: F:受控路径解析实现 | R:code:domain/workspace/service/WorkspaceResolver.java | A:全文件链路 | S:阻断../与绝对路径与符号链接逃逸；.git只读；安全边界不容放宽
-JGitWorkspaceManager.java[DP9L]: F:JGit工作区操作 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:工作区链路 | S:基线/快照/结构化Diff/Revert；大文件与锁行为需真实Git远端验证
+JGitWorkspaceManager.java[DG8M]: F:JGit工作区管理门面 | R:code:domain/workspace/service/jgit/JGitSnapshotOperations.java | A:工作区与接入向导 | S:公开API全部委托jgit四缝；cloneOrInit凭据脱敏与分支检出留此
 WorkspaceResolver.java[DR6T]: F:受控路径解析端口 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:全文件链路 | S:所有文件访问必须经此解析，禁止旁路拼接路径
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/infrastructure/adapter/===
@@ -890,3 +890,9 @@ TeamTurnCoordinator.java[AW7S]: F:团队拓扑轮次协调 | R:code:team/domain/
 WorkspaceFileOperations.java[DW8S]: F:工作区文件读写与打包 | R:code:domain/workspace/service/WorkspaceResolver.java | A:WorkspaceApplicationService | S:写路径做配额校验；预览2MB/写入下载10MB上限集中于此
 WorkspaceGitOperations.java[DG7S]: F:JGit快照与基线操作 | R:code:domain/workspace/service/JGitWorkspaceManager.java | A:WorkspaceApplicationService | S:改基线/丢弃/恢复必须confirmed=true；审计留痕随操作落库
 WorkspaceLockLeaseService.java[DR6S]: F:工作区锁租约操作 | R:code:infrastructure/concurrency/WorkspaceLockManager.java | A:WorkspaceApplicationService | S:属主优先取认证主体；锁管理器缺省时安全降级
+
+===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/jgit/===
+JGitDiffOperations.java[DG8S]: F:Tree-to-Tree结构化Diff | R:code:domain/workspace/model/StructuredDiff.java | A:Diff审查与证据包 | S:行数统计与冲突检测语义集中；基线缺省回退工作区HEAD
+JGitRevertOperations.java[DR8S]: F:回滚与基线族操作 | R:code:project/application/workspace/WorkspaceGitOperations.java | A:回滚与基线链路 | S:resync/改基线/丢弃/恢复与步骤回滚统一走JGitSupport清理
+JGitSnapshotOperations.java[DG8S]: F:工作区初始化与快照 | R:code:project/application/workspace/WorkspaceGitOperations.java | A:快照链路 | S:标签语义snapshot-{stepRunId}；clean树直接复用HEAD不产生空提交
+JGitSupport.java[DG7S]: F:JGit共享工具 | R:code:domain/workspace/service/jgit/JGitSnapshotOperations.java | A:四缝共用 | S:closeRepositoryQuietly含RepositoryCache清理与git目录可写恢复，勿绕过

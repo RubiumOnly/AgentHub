@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T07:44:15Z",
+  "updated_at": "2026-10-24T08:06:16Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -989,15 +989,39 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/JGitWorkspaceManager.java": {
       "role": "index",
-      "sha256": "b2ccb109021408908c5b4ede6dd049289af647e7014959fcfb6029d2be48914d",
-      "size": 43613,
-      "normalized_sha256": "b2ccb109021408908c5b4ede6dd049289af647e7014959fcfb6029d2be48914d"
+      "sha256": "2ca00c0a37b25ff6e0f10b4dd35f0b2f902bbff5a7f50157b9a3946badcece17",
+      "size": 17790,
+      "normalized_sha256": "2ca00c0a37b25ff6e0f10b4dd35f0b2f902bbff5a7f50157b9a3946badcece17"
     },
     "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/WorkspaceResolver.java": {
       "role": "index",
       "sha256": "6fd7f096fa156340e456889e780fb4525315582bb73cf19e479d80c7f0b18ac2",
       "size": 1113,
       "normalized_sha256": "6fd7f096fa156340e456889e780fb4525315582bb73cf19e479d80c7f0b18ac2"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/jgit/JGitDiffOperations.java": {
+      "role": "index",
+      "sha256": "05aad376bd8d67fe0caa0389690f90c3e7e5dba1a4bfbabf9ef5d08cfdfc23a8",
+      "size": 12088,
+      "normalized_sha256": "05aad376bd8d67fe0caa0389690f90c3e7e5dba1a4bfbabf9ef5d08cfdfc23a8"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/jgit/JGitRevertOperations.java": {
+      "role": "index",
+      "sha256": "7e963586bd244dc45e888817dd810eca36add484ec1cf252b4b3436d96800c13",
+      "size": 12724,
+      "normalized_sha256": "7e963586bd244dc45e888817dd810eca36add484ec1cf252b4b3436d96800c13"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/jgit/JGitSnapshotOperations.java": {
+      "role": "index",
+      "sha256": "03aaacbb54cb1997b8f69214ca45a17b1e7399e9bc460f071afcdd6af2b680ae",
+      "size": 8349,
+      "normalized_sha256": "03aaacbb54cb1997b8f69214ca45a17b1e7399e9bc460f071afcdd6af2b680ae"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/domain/workspace/service/jgit/JGitSupport.java": {
+      "role": "index",
+      "sha256": "ef5722e14b68e2d76d659936b611b0edc13d7881a7a6cc8ba907428f60b0b8ef",
+      "size": 5642,
+      "normalized_sha256": "ef5722e14b68e2d76d659936b611b0edc13d7881a7a6cc8ba907428f60b0b8ef"
     },
     "agenthub-backend/src/main/java/com/agenthub/execution/api/ExecutionController.java": {
       "role": "index",
@@ -3359,9 +3383,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "e7a2808f700e8f4b0175e658bfa986d2d05a325d59cab4f7d71f07dde291c14a",
-      "size": 121200,
-      "normalized_sha256": "e7a2808f700e8f4b0175e658bfa986d2d05a325d59cab4f7d71f07dde291c14a"
+      "sha256": "9c741e085cdae4ded3fc2768003bf7aad51aa15e60854150e432f09ce6e70d52",
+      "size": 122203,
+      "normalized_sha256": "9c741e085cdae4ded3fc2768003bf7aad51aa15e60854150e432f09ce6e70d52"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3437,9 +3461,9 @@
     },
     "docs/ARCHITECTURE.md": {
       "role": "index",
-      "sha256": "ed2580138436bf3a86c64d9a0b3ad792304619cbcdd7b80cbf7998bc178a69ed",
-      "size": 39032,
-      "normalized_sha256": "ed2580138436bf3a86c64d9a0b3ad792304619cbcdd7b80cbf7998bc178a69ed"
+      "sha256": "4170fd611c82d3ca6aad66c645d0f7a799458ab03edcf50084804b5d15a43219",
+      "size": 39329,
+      "normalized_sha256": "4170fd611c82d3ca6aad66c645d0f7a799458ab03edcf50084804b5d15a43219"
     },
     "docs/CURRENT_CAPABILITY_BOUNDARIES.md": {
       "role": "index",
