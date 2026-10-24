@@ -42,6 +42,7 @@ V9__phase_a_security_revocation_and_audit.sql[PS7T]: F:令牌吊销与认证审�
 V10__phase_c_scheduling_leases_and_recovery.sql[PR8T]: F:租约与恢复调度字段 | R:code:V1__init_schema.sql | A:Flyway | S:lease_owner/attempt/dsl_snapshot支撑at-least-once幂等
 V11__phase_d_sandbox_lifecycle_and_isolation.sql[PD5T]: F:部署生命周期与隔离字段 | R:code:V1__init_schema.sql | A:Flyway | S:进程ID/日志游标/终止原因进入deployments表
 V12__phase_e_production_ops_and_lock_precision.sql[PR5T]: F:工作区锁毫秒精度过期 | R:code:V1__init_schema.sql | A:Flyway | S:expires_at_epoch_ms消除秒级锁精度误差
+V13__phase10_remove_demo_seed_subjects.sql[PD6S]: F:退出演示种子到夹具 | R:code:V2__seed_system_baseline.sql | A:Flyway | S:仅DML删除不改结构；回滚为按V2/V6/V7原文反向INSERT
 
 ===D:/work/agenthub/scripts/===
 backup-prod.sh[OR7S]: F:生产一致性加密备份 | R:code:scripts/restore-prod.sh | A:运维 | S:single-transaction快照+SHA256SUMS；默认保留14天最少3份
@@ -816,7 +817,7 @@ ExecutionEnginePersistenceAndReplayTest.java[TQ7T]: F:验证Run持久化与幂�
 ExecutionSchedulerAndRuntimeIntegrationTest.java[TQ5S]: F:验证调度器与运行时解耦 | R:code:runtime/mock/MockAgentRuntime.java | A:mvn test | S:调度只编排状态，执行委派运行时
 ExecutionSseStreamAndReconnectionTest.java[TQ6S]: F:验证执行SSE单调与持久化 | R:code:execution/service/RunEventBroadcaster.java | A:mvn test | S:sequenceId严格递增且落run_events
 ExecutionStateMachineAndConcurrencyTest.java[TQ7M]: F:验证状态机流转与并发 | R:code:execution/service/ExecutionStateMachine.java | A:mvn test | S:合法流转回归；非法迁移拒绝
-FlywayMigrationAndSchemaTest.java[TQ8S]: F:验证Flyway全量迁移与Schema | R:code:agenthub-backend/src/main/resources/db/migration/V1__init_schema.sql | A:mvn test | S:真实MySQL Empty-DB迁移在CI执行；本地H2为预检
+FlywayMigrationAndSchemaTest.java[TQ8S]: F:验证迁移与净零演示主体 | R:code:V13__phase10_remove_demo_seed_subjects.sql | A:mvn test | S:隔离Schema直跑V1-V13断言零种子；真实MySQL空库迁移在CI执行
 FullLifecycleEndToEndIntegrationTest.java[TQ8M]: F:验证全生命周期E2E场景 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:mvn test | S:Project到Evidence全链路；@TempDir清理曾现Windows句柄抖动
 HighConcurrencyStressIntegrationTest.java[TQ7M]: F:验证高并发锁竞争 | R:code:infrastructure/concurrency/WorkspaceLockManager.java | A:mvn test | S:20线程争抢互斥无死锁
 HumanInTheLoopApprovalIntegrationTest.java[TQ7M]: F:验证审批挂起与恢复 | R:code:orchestration/scheduler/DagStateTransitioner.java | A:mvn test | S:WAITING_APPROVAL挂起后审批恢复DAG
@@ -832,7 +833,7 @@ Phase5QualityGateAndDeliveryTest.java[TQ6L]: F:验证质量门禁与交付 | R:c
 Phase6TeamRbacAndOperationsTest.java[TQ6L]: F:验证RBAC与运维体系 | R:code:team/domain/rbac/ProjectRbacRole.java | A:mvn test | S:角色-权限矩阵回归
 Phase7LiveProvidersAndBudgetGovernanceTest.java[TQ6L]: F:验证Provider适配与预算治理 | R:code:agent/application/BudgetGovernanceGuard.java | A:mvn test | S:tools payload构建与结构化解析
 Phase8PerformanceBenchmarkAndE2ETest.java[TQ6L]: F:验证E2E与性能基准 | R:code:docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md | A:mvn test | S:十阶段闭环；延迟门禁已按真实环境校准
-Phase9BaselineAndGovernanceGuardTest.java[TQ9M]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹/AOCI资产与旧路由410六重守护
+Phase9BaselineAndGovernanceGuardTest.java[TQ9M]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹V1-V13/AOCI资产与旧路由410守护
 PhaseASecurityAndResourceBoundaryIntegrationTest.java[TQ7L]: F:验证生产安全边界 | R:code:identity/infrastructure/security/TokenProvider.java | A:mvn test | S:prod弱密钥拒绝启动；越权阻断
 PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java[TQ7M]: F:验证沙箱交付真实可达 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:真实HTTP访问+停止真下线；旧preview路由已退场，Dockerfile守护保留
 PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java[TQ7L]: F:验证生产预检与灾备演练 | R:code:infrastructure/ops/DisasterRecoveryBackupService.java | A:mvn test | S:占位符拦截+篡改档拒绝恢复；CI真实MySQL必跑
@@ -861,3 +862,6 @@ WorkflowDslValidationAndCycleDetectionTest.java[TQ5M]: F:验证拓扑排序 | R:
 WorkspaceAdversarialChallengeTest.java[TQ7S]: F:验证对抗路径攻击 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:深层穿越与系统目录访问必须阻断
 WorkspacePathGuardTest.java[TQ6S]: F:验证路径穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:错误码3004
 WorkspaceSecurityAndJGitAuditIntegrationTest.java[TQ6S]: F:验证读写边界与REST穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:读写双向穿越拦截；Phase10承接Web层对抗覆盖
+
+===D:/work/agenthub/agenthub-backend/src/test/java/com/agenthub/fixture/===
+DemoBaselineSeedFixture.java[TQ7S]: F:重灌demo/test演示基线 | R:code:V13__phase10_remove_demo_seed_subjects.sql | A:Spring测试上下文 | S:幂等可重入；@Profile门保证prod永不加载

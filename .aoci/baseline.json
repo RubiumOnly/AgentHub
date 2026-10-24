@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T06:17:20Z",
+  "updated_at": "2026-10-24T06:26:28Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -2535,6 +2535,12 @@
       "size": 541,
       "normalized_sha256": "fe48a123e581a88ef2fb50e276bd77f8286f6a81ed000fb0fb6f2236a4bf209b"
     },
+    "agenthub-backend/src/main/resources/db/migration/V13__phase10_remove_demo_seed_subjects.sql": {
+      "role": "index",
+      "sha256": "2926fbac86558b10518ffde332caf78b66a39814bb46b4629182d2a3c9cf1698",
+      "size": 1260,
+      "normalized_sha256": "2926fbac86558b10518ffde332caf78b66a39814bb46b4629182d2a3c9cf1698"
+    },
     "agenthub-backend/src/main/resources/db/migration/V1__init_schema.sql": {
       "role": "index",
       "sha256": "4494f50553cc572083af09345b1a4abab7a099f287c0e41aaa6b9ac8535f18aa",
@@ -2687,9 +2693,9 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/FlywayMigrationAndSchemaTest.java": {
       "role": "index",
-      "sha256": "b938824236a19168b28901b6daa82f19d98ac291dfc9179b6f756631b34281b8",
-      "size": 4929,
-      "normalized_sha256": "b938824236a19168b28901b6daa82f19d98ac291dfc9179b6f756631b34281b8"
+      "sha256": "2a2048650736b4cf9afcb8d0fe30c1b8007c61f5c5137076a21c435987da84f7",
+      "size": 6820,
+      "normalized_sha256": "2a2048650736b4cf9afcb8d0fe30c1b8007c61f5c5137076a21c435987da84f7"
     },
     "agenthub-backend/src/test/java/com/agenthub/FullLifecycleEndToEndIntegrationTest.java": {
       "role": "index",
@@ -2783,9 +2789,9 @@
     },
     "agenthub-backend/src/test/java/com/agenthub/Phase9BaselineAndGovernanceGuardTest.java": {
       "role": "index",
-      "sha256": "986ea34713ab543dc2ecaa0734930b911ac8ad1432e4ed2a220c260a63599609",
-      "size": 27989,
-      "normalized_sha256": "986ea34713ab543dc2ecaa0734930b911ac8ad1432e4ed2a220c260a63599609"
+      "sha256": "e93f9ae91d9b6a536f738b3b9b8e71d04408cf58a8b232dc4336b41b18b618f0",
+      "size": 28120,
+      "normalized_sha256": "e93f9ae91d9b6a536f738b3b9b8e71d04408cf58a8b232dc4336b41b18b618f0"
     },
     "agenthub-backend/src/test/java/com/agenthub/PhaseASecurityAndResourceBoundaryIntegrationTest.java": {
       "role": "index",
@@ -2960,6 +2966,12 @@
       "sha256": "e3d1eb8b4c2d6911de4722b049466c3ab5e788dc321a99fcae8b7f343ae4622f",
       "size": 35349,
       "normalized_sha256": "e3d1eb8b4c2d6911de4722b049466c3ab5e788dc321a99fcae8b7f343ae4622f"
+    },
+    "agenthub-backend/src/test/java/com/agenthub/fixture/DemoBaselineSeedFixture.java": {
+      "role": "index",
+      "sha256": "6bf13292bdbd288de892efa473118a5a3e0aa3389a227cfe2fe14d331138bbe8",
+      "size": 8257,
+      "normalized_sha256": "6bf13292bdbd288de892efa473118a5a3e0aa3389a227cfe2fe14d331138bbe8"
     },
     "agenthub-frontend/Dockerfile": {
       "role": "index",
@@ -3257,9 +3269,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "5760aa35812e901bbfda4e0620fd1359cc9d6724b7f1d7bf8917fdad285ff2f6",
-      "size": 116524,
-      "normalized_sha256": "5760aa35812e901bbfda4e0620fd1359cc9d6724b7f1d7bf8917fdad285ff2f6"
+      "sha256": "adc8099671854b6127b54f99b648fc4548db937817600391fcdbfb6df8522b4d",
+      "size": 116993,
+      "normalized_sha256": "adc8099671854b6127b54f99b648fc4548db937817600391fcdbfb6df8522b4d"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3335,9 +3347,9 @@
     },
     "docs/ARCHITECTURE.md": {
       "role": "index",
-      "sha256": "c6ac27ad6bea8c4917dc79fd1de2202296d6189f427f0169c08c29d2f7eb3cb2",
-      "size": 37868,
-      "normalized_sha256": "c6ac27ad6bea8c4917dc79fd1de2202296d6189f427f0169c08c29d2f7eb3cb2"
+      "sha256": "07f243e31190807141ffc114728c4f8d1cd7f5cf5d4d9b24c70dcd2629efbabe",
+      "size": 38039,
+      "normalized_sha256": "07f243e31190807141ffc114728c4f8d1cd7f5cf5d4d9b24c70dcd2629efbabe"
     },
     "docs/CURRENT_CAPABILITY_BOUNDARIES.md": {
       "role": "index",

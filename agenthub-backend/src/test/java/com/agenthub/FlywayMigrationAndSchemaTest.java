@@ -28,7 +28,7 @@ class FlywayMigrationAndSchemaTest {
     void shouldSuccessfullyApplyFlywayMigrations() {
         MigrationInfo[] applied = flyway.info().applied();
         assertThat(applied).isNotEmpty();
-        assertThat(applied.length).isGreaterThanOrEqualTo(12);
+        assertThat(applied.length).isGreaterThanOrEqualTo(13);
 
         assertThat(applied[0].getVersion().getVersion()).isEqualTo("1");
         assertThat(applied[0].getDescription()).contains("init schema");
@@ -47,6 +47,32 @@ class FlywayMigrationAndSchemaTest {
 
         assertThat(applied[7].getVersion().getVersion()).isEqualTo("8");
         assertThat(applied[7].getDescription()).contains("phase7 sandbox and deployments");
+
+        assertThat(applied[12].getVersion().getVersion()).isEqualTo("13");
+        assertThat(applied[12].getDescription()).contains("remove demo seed subjects");
+    }
+
+    @Test
+    @DisplayName("Phase 10 R3：隔离 Schema 直跑 V1-V13 后生产迁移路径净零演示主体")
+    void shouldLeaveZeroDemoSubjectsAfterV13OnIsolatedSchema() {
+        String url = "jdbc:h2:mem:phase10_netzero;MODE=MySQL;DB_CLOSE_DELAY=-1";
+        Flyway isolated = Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration")
+                .load();
+        isolated.migrate();
+
+        org.springframework.jdbc.datasource.SimpleDriverDataSource dataSource =
+                new org.springframework.jdbc.datasource.SimpleDriverDataSource(new org.h2.Driver(), url, "sa", "");
+        org.springframework.jdbc.core.JdbcTemplate isolatedJdbc = new org.springframework.jdbc.core.JdbcTemplate(dataSource);
+
+        assertThat(isolatedJdbc.queryForObject("SELECT COUNT(*) FROM users WHERE id IN ('user-1','user-dev')", Integer.class)).isZero();
+        assertThat(isolatedJdbc.queryForObject("SELECT COUNT(*) FROM agent_definitions WHERE id = 'def-orch'", Integer.class)).isZero();
+        assertThat(isolatedJdbc.queryForObject("SELECT COUNT(*) FROM projects WHERE id = 'proj-default'", Integer.class)).isZero();
+        assertThat(isolatedJdbc.queryForObject("SELECT COUNT(*) FROM workspaces WHERE id = 'ws-default'", Integer.class)).isZero();
+        assertThat(isolatedJdbc.queryForObject("SELECT COUNT(*) FROM providers WHERE id = 'prov-openai'", Integer.class)).isZero();
+        assertThat(isolatedJdbc.queryForObject("SELECT COUNT(*) FROM teams WHERE id = 'team-dev-swarm'", Integer.class)).isZero();
+        assertThat(isolatedJdbc.queryForObject("SELECT COUNT(*) FROM team_members WHERE team_id = 'team-dev-swarm'", Integer.class)).isZero();
     }
 
     @Test

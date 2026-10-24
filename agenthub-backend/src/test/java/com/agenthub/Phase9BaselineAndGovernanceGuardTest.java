@@ -103,6 +103,7 @@ class Phase9BaselineAndGovernanceGuardTest {
         map.put("V10__phase_c_scheduling_leases_and_recovery.sql", "20a083d3abe365adc9f0169c01f02b7e926354b5f6885c3c7e865e8f0b5a4a79");
         map.put("V11__phase_d_sandbox_lifecycle_and_isolation.sql", "44ee1c979be0786055a0d098af33e989deda448e4a6530df1354a780de0968df");
         map.put("V12__phase_e_production_ops_and_lock_precision.sql", "fe48a123e581a88ef2fb50e276bd77f8286f6a81ed000fb0fb6f2236a4bf209b");
+        map.put("V13__phase10_remove_demo_seed_subjects.sql", "2926fbac86558b10518ffde332caf78b66a39814bb46b4629182d2a3c9cf1698");
         EXPECTED_12_MIGRATION_SHA256 = Map.copyOf(map);
     }
 
@@ -449,7 +450,7 @@ class Phase9BaselineAndGovernanceGuardTest {
         // 2) 校验 Flyway validate 通过，已成功应用全部 12 个版本，且无 pending / failed 迁移
         flyway.validate();
         MigrationInfo[] applied = flyway.info().applied();
-        assertThat(applied).hasSize(12);
+        assertThat(applied).hasSize(13);
         assertThat(flyway.info().pending()).isEmpty();
 
         // 3) AOCI 正式认知与治理资产已由官方 aoci CLI init/scan 生成并随 Phase 9 提交入库；
