@@ -9,6 +9,10 @@ import com.agenthub.identity.infrastructure.security.ResourceAccessGuard;
 import com.agenthub.project.infrastructure.entity.ProjectEntity;
 import com.agenthub.project.infrastructure.repository.ProjectRepository;
 import com.agenthub.sandbox.api.dto.CreateDeploymentRequest;
+import com.agenthub.sandbox.application.deployment.DeploymentAccessGuard;
+import com.agenthub.sandbox.application.deployment.DeploymentLifecycleSupport;
+import com.agenthub.sandbox.application.deployment.DeploymentOrphanReconciler;
+import com.agenthub.sandbox.application.deployment.DeploymentProbeCoordinator;
 import com.agenthub.sandbox.api.dto.DeploymentResponse;
 import com.agenthub.sandbox.domain.model.*;
 import com.agenthub.sandbox.domain.provider.SandboxProvider;
@@ -25,10 +29,6 @@ import com.agenthub.shared.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,18 +44,20 @@ import java.util.stream.Collectors;
 @Service
 public class DeploymentApplicationService implements DeploymentApplication {
 
-    private static final Logger log = LoggerFactory.getLogger(DeploymentApplicationService.class);
+    @Autowired
+    private DeploymentLifecycleSupport lifecycleSupport;
 
-    private static final List<String> ACTIVE_LIFECYCLE_STATUSES = List.of(
-            DeploymentStatus.CREATED.name(),
-            DeploymentStatus.BUILD.name(),
-            DeploymentStatus.BUILDING.name(),
-            DeploymentStatus.START.name(),
-            DeploymentStatus.HEALTH_CHECK.name(),
-            DeploymentStatus.RUNNING.name(),
-            DeploymentStatus.STOP.name(),
-            DeploymentStatus.CLEANUP.name()
-    );
+    @Autowired
+    private DeploymentAccessGuard deploymentAccessGuard;
+
+    @Autowired
+    private DeploymentOrphanReconciler orphanReconciler;
+
+    @Autowired
+    private DeploymentProbeCoordinator probeCoordinator;
+
+
+    private static final Logger log = LoggerFactory.getLogger(DeploymentApplicationService.class);
 
     private final DeploymentRepository deploymentRepository;
     private final WorkspaceResolver workspaceResolver;
@@ -68,12 +70,6 @@ public class DeploymentApplicationService implements DeploymentApplication {
     private final ArtifactRepository artifactRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final CommandSecurityGuard commandSecurityGuard = new CommandSecurityGuard();
-
-    @Value("${agenthub.sandbox.preview-host:localhost}")
-    private String previewHost = "localhost";
-
-    @Value("${agenthub.sandbox.external-base-url:}")
-    private String externalBaseUrl = "";
 
     @Autowired(required = false)
     private com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier ownershipVerifier;
@@ -138,54 +134,6 @@ public class DeploymentApplicationService implements DeploymentApplication {
                 : (accessGuard != null ? new com.agenthub.identity.infrastructure.security.ResourceOwnershipVerifier(accessGuard, projectRepository, null, null, workflowRunRepository, artifactRepository, deploymentRepository) : null);
     }
 
-    private void checkProjectAccess(String projectId) {
-        if (RequestContext.get().isSystem()) {
-            return;
-        }
-        if (projectRepository != null && accessGuard != null && projectId != null) {
-            ProjectEntity project = projectRepository.findById(projectId).orElse(null);
-            if (project != null) {
-                if (ownershipVerifier != null) {
-                    ownershipVerifier.verifyProjectAccess(projectId);
-                } else {
-                    accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
-                }
-            } else if (accessGuard.isAllowSuperuserBypass()) {
-                return;
-            } else if (ownershipVerifier != null) {
-                ownershipVerifier.verifyProjectAccess(projectId);
-            } else {
-                throw new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId);
-            }
-        } else if (ownershipVerifier != null && projectId != null) {
-            ownershipVerifier.verifyProjectAccess(projectId);
-        }
-    }
-
-    private void checkDeploymentManageAccess(String projectId) {
-        if (RequestContext.get().isSystem()) {
-            return;
-        }
-        if (projectRepository != null && accessGuard != null && projectId != null) {
-            ProjectEntity project = projectRepository.findById(projectId).orElse(null);
-            if (project != null) {
-                if (ownershipVerifier != null) {
-                    ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), com.agenthub.team.domain.rbac.ProjectPermission.DEPLOYMENT_MANAGE);
-                } else {
-                    accessGuard.checkOwnership(project.getOwnerId(), RequestContext.get().getUserId());
-                }
-            } else if (accessGuard.isAllowSuperuserBypass()) {
-                return;
-            } else if (ownershipVerifier != null) {
-                ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), com.agenthub.team.domain.rbac.ProjectPermission.DEPLOYMENT_MANAGE);
-            } else {
-                throw new BusinessException(ErrorCode.PROJECT_NOT_FOUND, "Project not found: " + projectId);
-            }
-        } else if (ownershipVerifier != null && projectId != null) {
-            ownershipVerifier.verifyProjectAccess(projectId, RequestContext.get().getUserId(), com.agenthub.team.domain.rbac.ProjectPermission.DEPLOYMENT_MANAGE);
-        }
-    }
-
     private String resolveAndValidateArtifact(String projectId, String requestedArtifactId, String deployId) {
         if (requestedArtifactId != null && !requestedArtifactId.isBlank()) {
             if (artifactRepository != null) {
@@ -234,32 +182,6 @@ public class DeploymentApplicationService implements DeploymentApplication {
         return DeploymentTemplateType.fromStringOrDefault(requestedTemplate, target);
     }
 
-    private void transitionState(DeploymentEntity entity, DeploymentStatus nextStatus) {
-        entity.setStatus(nextStatus.name());
-        String currentTrace = entity.getLifecycleTrace();
-        if (currentTrace == null || currentTrace.isBlank()) {
-            entity.setLifecycleTrace(nextStatus.name());
-        } else if (!currentTrace.endsWith("->" + nextStatus.name()) && !currentTrace.equals(nextStatus.name())) {
-            entity.setLifecycleTrace(currentTrace + "->" + nextStatus.name());
-        }
-        entity.setUpdatedAt(LocalDateTime.now());
-    }
-
-    private String buildPreviewUrl(String target, int port, String projectId, String healthPath) {
-        if (externalBaseUrl != null && !externalBaseUrl.isBlank()) {
-            String base = externalBaseUrl.trim().replaceAll("/+$", "");
-            return base + "/api/sandbox/preview/" + projectId;
-        }
-        String host = (previewHost != null && !previewHost.isBlank()) ? previewHost.trim() : "localhost";
-        if ("STATIC_PREVIEW".equalsIgnoreCase(target) || "DOCKER_NGINX".equalsIgnoreCase(target)) {
-            return "http://" + host + ":" + port + "/api/sandbox/preview/" + projectId;
-        }
-        String normalizedPath = (healthPath != null && !healthPath.isBlank())
-                ? (healthPath.startsWith("/") ? healthPath : "/" + healthPath)
-                : "/";
-        return "http://" + host + ":" + port + normalizedPath;
-    }
-
     @Override
     public DeploymentResponse createAndDeploy(CreateDeploymentRequest request) {
         if (request == null || request.getProjectId() == null || request.getProjectId().isBlank()) {
@@ -267,7 +189,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
         }
 
         String projectId = request.getProjectId().trim();
-        checkDeploymentManageAccess(projectId);
+        deploymentAccessGuard.checkDeploymentManageAccess(projectId);
         Path workspaceRoot = workspaceResolver.getWorkspaceRoot(projectId);
 
         String deployId = "dep-" + UUID.randomUUID().toString().substring(0, 8);
@@ -286,14 +208,14 @@ public class DeploymentApplicationService implements DeploymentApplication {
 
         // Defensively validate commands against security firewall before allocating resources
         if (request.getBuildCommand() != null && !request.getBuildCommand().isBlank()) {
-            List<String> buildTokens = parseCommandTokens(request.getBuildCommand());
+            List<String> buildTokens = lifecycleSupport.parseCommandTokens(request.getBuildCommand());
             commandSecurityGuard.validateCommand(
                     buildTokens.get(0),
                     buildTokens.size() > 1 ? buildTokens.subList(1, buildTokens.size()) : Collections.emptyList()
             );
         }
         if (request.getStartCommand() != null && !request.getStartCommand().isBlank()) {
-            List<String> startTokens = parseCommandTokens(request.getStartCommand());
+            List<String> startTokens = lifecycleSupport.parseCommandTokens(request.getStartCommand());
             commandSecurityGuard.validateCommand(
                     startTokens.get(0),
                     startTokens.size() > 1 ? startTokens.subList(1, startTokens.size()) : Collections.emptyList()
@@ -319,9 +241,9 @@ public class DeploymentApplicationService implements DeploymentApplication {
         entity.setStartedAt(LocalDateTime.now());
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
-        transitionState(entity, DeploymentStatus.CREATED);
+        lifecycleSupport.transitionState(entity, DeploymentStatus.CREATED);
 
-        String previewUrl = buildPreviewUrl(target, port, projectId, healthPath);
+        String previewUrl = lifecycleSupport.buildPreviewUrl(target, port, projectId, healthPath);
         entity.setUrl(previewUrl);
 
         StringBuilder logAccumulator = new StringBuilder();
@@ -332,10 +254,10 @@ public class DeploymentApplicationService implements DeploymentApplication {
                 .append(", port=").append(port).append("\n");
 
         // 3. BUILD phase execution in sandbox
-        transitionState(entity, DeploymentStatus.BUILD);
+        lifecycleSupport.transitionState(entity, DeploymentStatus.BUILD);
         if (request.getBuildCommand() != null && !request.getBuildCommand().isBlank()) {
             log.info("Executing deployment build command [{}] for project [{}]", request.getBuildCommand(), projectId);
-            List<String> tokens = parseCommandTokens(request.getBuildCommand());
+            List<String> tokens = lifecycleSupport.parseCommandTokens(request.getBuildCommand());
             String baseCmd = tokens.get(0);
             List<String> args = tokens.size() > 1 ? tokens.subList(1, tokens.size()) : Collections.emptyList();
 
@@ -358,42 +280,42 @@ public class DeploymentApplicationService implements DeploymentApplication {
                 portAllocationService.releasePort(port);
                 throw be;
             } catch (Exception ex) {
-                transitionState(entity, DeploymentStatus.CLEANUP);
+                lifecycleSupport.transitionState(entity, DeploymentStatus.CLEANUP);
                 portAllocationService.releasePort(port);
-                transitionState(entity, DeploymentStatus.FAILED);
+                lifecycleSupport.transitionState(entity, DeploymentStatus.FAILED);
                 entity.setTerminationReason("BUILD_FAILED");
                 entity.setErrorMessage("Build execution error: " + ex.getMessage());
                 entity.setFinishedAt(LocalDateTime.now());
                 logAccumulator.append("=== BUILD EXCEPTION ===\n").append(ex.getMessage()).append("\n");
                 entity.setLogOutput(logAccumulator.toString());
                 deploymentRepository.save(entity);
-                return toResponse(entity);
+                return lifecycleSupport.toResponse(entity);
             }
             logAccumulator.append("=== BUILD OUTPUT ===\n").append(buildResult.getCombinedOutput()).append("\n");
 
             if (!buildResult.isSuccess()) {
                 log.warn("Deployment build failed for [{}]: exitCode={}, error={}", deployId,
                         buildResult.getExitCode(), buildResult.getErrorMessage());
-                transitionState(entity, DeploymentStatus.CLEANUP);
+                lifecycleSupport.transitionState(entity, DeploymentStatus.CLEANUP);
                 portAllocationService.releasePort(port);
-                transitionState(entity, DeploymentStatus.FAILED);
+                lifecycleSupport.transitionState(entity, DeploymentStatus.FAILED);
                 entity.setTerminationReason("BUILD_FAILED");
                 entity.setErrorMessage("Build failed: " + (buildResult.getErrorMessage() != null ? buildResult.getErrorMessage() : "exit code " + buildResult.getExitCode()));
                 entity.setFinishedAt(LocalDateTime.now());
                 entity.setLogOutput(logAccumulator.toString());
                 deploymentRepository.save(entity);
-                return toResponse(entity);
+                return lifecycleSupport.toResponse(entity);
             }
         } else {
             logAccumulator.append("=== BUILD PHASE SKIPPED (Direct static preview) ===\n");
         }
 
         // 4. START phase: launch dedicated runtime worker instance
-        transitionState(entity, DeploymentStatus.START);
+        lifecycleSupport.transitionState(entity, DeploymentStatus.START);
         DeploymentLifecycleWorker.LiveRuntimeInstance runtimeInstance = null;
         try {
             if ("DOCKER_CONTAINER".equalsIgnoreCase(target) || "DOCKER".equalsIgnoreCase(sandboxType)) {
-                List<String> startTokens = parseCommandTokens(request.getStartCommand());
+                List<String> startTokens = lifecycleSupport.parseCommandTokens(request.getStartCommand());
                 String cmd = startTokens.isEmpty() ? null : startTokens.get(0);
                 List<String> args = startTokens.size() > 1 ? startTokens.subList(1, startTokens.size()) : Collections.emptyList();
                 runtimeInstance = lifecycleWorker.startDockerContainerService(
@@ -405,7 +327,7 @@ public class DeploymentApplicationService implements DeploymentApplication {
                         deployId, projectId, artifactId, port, workspaceRoot
                 );
             } else if (request.getStartCommand() != null && !request.getStartCommand().isBlank()) {
-                List<String> startTokens = parseCommandTokens(request.getStartCommand());
+                List<String> startTokens = lifecycleSupport.parseCommandTokens(request.getStartCommand());
                 String baseCmd = startTokens.get(0);
                 List<String> args = startTokens.size() > 1 ? startTokens.subList(1, startTokens.size()) : Collections.emptyList();
                 runtimeInstance = lifecycleWorker.startLocalProcessService(
@@ -431,10 +353,10 @@ public class DeploymentApplicationService implements DeploymentApplication {
                         .append(")\n");
             }
         } catch (BusinessException be) {
-            transitionState(entity, DeploymentStatus.CLEANUP);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.CLEANUP);
             lifecycleWorker.stopRuntime(deployId, entity.getProcessId(), entity.getSandboxType());
             portAllocationService.releasePort(port);
-            transitionState(entity, DeploymentStatus.FAILED);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.FAILED);
             entity.setTerminationReason("START_SECURITY_OR_ISOLATION_REJECTED");
             entity.setErrorMessage(be.getMessage());
             entity.setFinishedAt(LocalDateTime.now());
@@ -443,21 +365,21 @@ public class DeploymentApplicationService implements DeploymentApplication {
             throw be;
         } catch (Exception e) {
             log.warn("Deployment start failed for [{}]: {}", deployId, e.getMessage());
-            transitionState(entity, DeploymentStatus.CLEANUP);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.CLEANUP);
             lifecycleWorker.stopRuntime(deployId, entity.getProcessId(), entity.getSandboxType());
             portAllocationService.releasePort(port);
-            transitionState(entity, DeploymentStatus.FAILED);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.FAILED);
             entity.setTerminationReason("START_FAILED");
             entity.setErrorMessage("Start phase failed: " + e.getMessage());
             entity.setFinishedAt(LocalDateTime.now());
             logAccumulator.append("=== START FAILED ===\n").append(e.getMessage()).append("\n");
             entity.setLogOutput(logAccumulator.toString());
             deploymentRepository.save(entity);
-            return toResponse(entity);
+            return lifecycleSupport.toResponse(entity);
         }
 
         // 5. HEALTH_CHECK phase: verify HTTP endpoint reachability and runtime liveness
-        transitionState(entity, DeploymentStatus.HEALTH_CHECK);
+        lifecycleSupport.transitionState(entity, DeploymentStatus.HEALTH_CHECK);
         String localProbeUrl;
         if ("STATIC_PREVIEW".equalsIgnoreCase(target) || "DOCKER_NGINX".equalsIgnoreCase(target)) {
             localProbeUrl = "http://127.0.0.1:" + port + "/api/sandbox/preview/" + projectId;
@@ -474,19 +396,19 @@ public class DeploymentApplicationService implements DeploymentApplication {
         }
 
         if (healthy) {
-            transitionState(entity, DeploymentStatus.RUNNING);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.RUNNING);
             entity.setFinishedAt(LocalDateTime.now());
             logAccumulator.append("=== DEPLOYMENT READY ===\nPreview active at: ").append(previewUrl).append("\n");
         } else {
-            transitionState(entity, DeploymentStatus.STOP);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.STOP);
             String liveLogs = lifecycleWorker.getLiveProcessLogs(deployId);
             if (liveLogs != null && !liveLogs.isBlank()) {
                 logAccumulator.append("=== RUNTIME LOGS BEFORE FAILURE ===\n").append(liveLogs).append("\n");
             }
             lifecycleWorker.stopRuntime(deployId, entity.getProcessId(), entity.getSandboxType());
-            transitionState(entity, DeploymentStatus.CLEANUP);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.CLEANUP);
             portAllocationService.releasePort(port);
-            transitionState(entity, DeploymentStatus.FAILED);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.FAILED);
             entity.setTerminationReason("HEALTH_CHECK_FAILED");
             entity.setErrorMessage("Deployment health check probe failed for " + previewUrl);
             entity.setFinishedAt(LocalDateTime.now());
@@ -496,27 +418,27 @@ public class DeploymentApplicationService implements DeploymentApplication {
         entity.setLogOutput(logAccumulator.toString());
         entity.setUpdatedAt(LocalDateTime.now());
         deploymentRepository.save(entity);
-        return toResponse(entity);
+        return lifecycleSupport.toResponse(entity);
     }
 
     @Override
     public DeploymentResponse stopDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
-        checkDeploymentManageAccess(entity.getProjectId());
+        deploymentAccessGuard.checkDeploymentManageAccess(entity.getProjectId());
 
-        if (ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())) {
-            transitionState(entity, DeploymentStatus.STOP);
+        if (DeploymentLifecycleSupport.ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())) {
+            lifecycleSupport.transitionState(entity, DeploymentStatus.STOP);
 
             String liveLogs = lifecycleWorker.getLiveProcessLogs(deploymentId);
             lifecycleWorker.stopRuntime(deploymentId, entity.getProcessId(), entity.getSandboxType());
 
-            transitionState(entity, DeploymentStatus.CLEANUP);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.CLEANUP);
             if (entity.getPort() != null) {
                 portAllocationService.releasePort(entity.getPort());
             }
 
-            transitionState(entity, DeploymentStatus.STOPPED);
+            lifecycleSupport.transitionState(entity, DeploymentStatus.STOPPED);
             entity.setTerminationReason("USER_STOPPED");
             entity.setFinishedAt(LocalDateTime.now());
 
@@ -532,84 +454,41 @@ public class DeploymentApplicationService implements DeploymentApplication {
             deploymentRepository.save(entity);
             log.info("Stopped and cleaned up deployment [{}]", deploymentId);
         }
-        return toResponse(entity);
+        return lifecycleSupport.toResponse(entity);
     }
 
-    /**
-     * Reconciles orphaned deployments left in active states whose runtime process/server/container is no longer alive.
-     * Automatically invoked on application startup, periodically via @Scheduled watchdog, and on-demand.
-     */
     @Override
-    @EventListener(ApplicationReadyEvent.class)
-    @Scheduled(
-            initialDelayString = "${agenthub.sandbox.orphan-reconcile-initial-delay-ms:30000}",
-            fixedDelayString = "${agenthub.sandbox.orphan-reconcile-interval-ms:30000}"
-    )
     public int reconcileOrphanDeployments() {
-        List<DeploymentEntity> candidates = deploymentRepository.findByStatusIn(ACTIVE_LIFECYCLE_STATUSES);
-        int reconciled = 0;
-        for (DeploymentEntity entity : candidates) {
-            if (!lifecycleWorker.isRuntimeAlive(entity.getId())) {
-                reconcileSingleOrphan(entity);
-                reconciled++;
-            }
-        }
-        if (reconciled > 0) {
-            log.info("Reconciled {} orphaned deployment(s)", reconciled);
-        }
-        return reconciled;
-    }
-
-    private void reconcileSingleOrphan(DeploymentEntity entity) {
-        log.warn("Reconciling orphaned deployment [{}] (previous status={})", entity.getId(), entity.getStatus());
-        String liveLogs = lifecycleWorker.getLiveProcessLogs(entity.getId());
-        transitionState(entity, DeploymentStatus.STOP);
-        lifecycleWorker.stopRuntime(entity.getId(), entity.getProcessId(), entity.getSandboxType());
-        transitionState(entity, DeploymentStatus.CLEANUP);
-        if (entity.getPort() != null) {
-            portAllocationService.releasePort(entity.getPort());
-        }
-        transitionState(entity, DeploymentStatus.FAILED);
-        entity.setTerminationReason("ORPHAN_RECONCILED");
-        entity.setErrorMessage("Orphaned deployment reconciled: runtime worker or child process is no longer alive");
-        entity.setFinishedAt(LocalDateTime.now());
-        String prevLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
-        StringBuilder sb = new StringBuilder(prevLogs);
-        if (liveLogs != null && !liveLogs.isBlank() && !prevLogs.contains(liveLogs)) {
-            sb.append("\n=== PROCESS OUTPUT BEFORE EXIT ===\n").append(liveLogs);
-        }
-        sb.append("\n=== ORPHAN RECONCILIATION: Runtime not alive, port and process tree cleaned up ===\n");
-        entity.setLogOutput(sb.toString());
-        entity.setUpdatedAt(LocalDateTime.now());
-        deploymentRepository.save(entity);
+        // Phase 10 R6：孤儿回收语义由 DeploymentOrphanReconciler 唯一承载
+        return orphanReconciler.reconcileOrphanDeployments();
     }
 
     @Override
     public DeploymentResponse getDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
-        checkProjectAccess(entity.getProjectId());
-        if (ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())
+        deploymentAccessGuard.checkProjectAccess(entity.getProjectId());
+        if (DeploymentLifecycleSupport.ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())
                 && lifecycleWorker.hasTrackedRuntime(entity.getId())
                 && !lifecycleWorker.isRuntimeAlive(entity.getId())) {
-            reconcileSingleOrphan(entity);
+            orphanReconciler.reconcileIfOrphaned(entity);
         }
-        return toResponse(entity);
+        return lifecycleSupport.toResponse(entity);
     }
 
     @Override
     public List<DeploymentResponse> listDeployments(String projectId) {
-        checkProjectAccess(projectId);
+        deploymentAccessGuard.checkProjectAccess(projectId);
         List<DeploymentEntity> list = deploymentRepository.findByProjectIdOrderByStartedAtDesc(projectId);
         for (DeploymentEntity entity : list) {
-            if (ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())
+            if (DeploymentLifecycleSupport.ACTIVE_LIFECYCLE_STATUSES.contains(entity.getStatus())
                     && lifecycleWorker.hasTrackedRuntime(entity.getId())
                     && !lifecycleWorker.isRuntimeAlive(entity.getId())) {
-                reconcileSingleOrphan(entity);
+                orphanReconciler.reconcileIfOrphaned(entity);
             }
         }
         return list.stream()
-                .map(this::toResponse)
+                .map(lifecycleSupport::toResponse)
                 .collect(Collectors.toList());
     }
 
@@ -624,9 +503,9 @@ public class DeploymentApplicationService implements DeploymentApplication {
     public String getDeploymentLogs(String deploymentId, Long fromCursor) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
-        checkProjectAccess(entity.getProjectId());
+        deploymentAccessGuard.checkProjectAccess(entity.getProjectId());
 
-        String combined = buildCombinedLogs(entity);
+        String combined = lifecycleSupport.buildCombinedLogs(entity);
 
         if (fromCursor != null && fromCursor > 0) {
             if (fromCursor >= combined.length()) {
@@ -637,116 +516,17 @@ public class DeploymentApplicationService implements DeploymentApplication {
         return combined;
     }
 
-    private String buildCombinedLogs(DeploymentEntity entity) {
-        String baseLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
-        String liveLogs = lifecycleWorker.getLiveProcessLogs(entity.getId());
-        if (liveLogs != null && !liveLogs.isBlank() && !baseLogs.contains(liveLogs)) {
-            return baseLogs + "\n" + liveLogs;
-        }
-        return baseLogs;
-    }
-
-    private List<String> parseCommandTokens(String commandLine) {
-        List<String> tokens = new ArrayList<>();
-        if (commandLine == null || commandLine.isBlank()) {
-            return tokens;
-        }
-        StringBuilder current = new StringBuilder();
-        boolean inQuotes = false;
-        char quoteChar = 0;
-
-        for (int i = 0; i < commandLine.length(); i++) {
-            char c = commandLine.charAt(i);
-            if ((c == '"' || c == '\'') && (!inQuotes || c == quoteChar)) {
-                inQuotes = !inQuotes;
-                quoteChar = inQuotes ? c : 0;
-            } else if (Character.isWhitespace(c) && !inQuotes) {
-                if (current.length() > 0) {
-                    tokens.add(current.toString());
-                    current.setLength(0);
-                }
-            } else {
-                current.append(c);
-            }
-        }
-        if (current.length() > 0) {
-            tokens.add(current.toString());
-        }
-        return tokens;
-    }
-
-    private DeploymentResponse toResponse(DeploymentEntity entity) {
-        String combinedLogs = buildCombinedLogs(entity);
-        long effectiveCursor = Math.max(
-                entity.getLogCursor() != null ? entity.getLogCursor() : 0L,
-                combinedLogs.length()
-        );
-
-        DeploymentResponse resp = new DeploymentResponse();
-        resp.setId(entity.getId());
-        resp.setProjectId(entity.getProjectId());
-        resp.setArtifactId(entity.getArtifactId());
-        resp.setStatus(entity.getStatus());
-        resp.setTarget(entity.getTarget());
-        resp.setSandboxType(entity.getSandboxType());
-        resp.setPort(entity.getPort());
-        resp.setUrl(entity.getUrl());
-        resp.setBuildCommand(entity.getBuildCommand());
-        resp.setStartCommand(entity.getStartCommand());
-        resp.setStartedAt(entity.getStartedAt());
-        resp.setFinishedAt(entity.getFinishedAt());
-        resp.setCreatedAt(entity.getCreatedAt());
-        resp.setErrorMessage(entity.getErrorMessage());
-        resp.setHasLogs(!combinedLogs.isBlank());
-        resp.setProcessId(entity.getProcessId());
-        resp.setContainerId(entity.getContainerId());
-        resp.setWorkingDirectory(entity.getWorkingDirectory());
-        resp.setLogCursor(effectiveCursor);
-        resp.setTerminationReason(entity.getTerminationReason());
-        resp.setTemplateType(entity.getTemplateType());
-        resp.setLifecycleTrace(entity.getLifecycleTrace());
-        return resp;
-    }
-
     @Override
     public DeploymentResponse probeDeployment(String deploymentId) {
         DeploymentEntity entity = deploymentRepository.findById(deploymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEPLOYMENT_NOT_FOUND, "Deployment [" + deploymentId + "] not found"));
-        checkProjectAccess(entity.getProjectId());
+        deploymentAccessGuard.checkProjectAccess(entity.getProjectId());
 
-        if (entity.getPort() == null) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "Deployment [" + deploymentId + "] does not have an allocated port");
-        }
-
-        String localProbeUrl;
-        if ("STATIC_PREVIEW".equalsIgnoreCase(entity.getTarget()) || "DOCKER_NGINX".equalsIgnoreCase(entity.getTarget())) {
-            localProbeUrl = "http://127.0.0.1:" + entity.getPort() + "/api/sandbox/preview/" + entity.getProjectId();
-        } else {
-            String path = (entity.getHealthCheckPath() != null && !entity.getHealthCheckPath().isBlank())
-                    ? entity.getHealthCheckPath() : "/";
-            String normalizedPath = path.startsWith("/") ? path : "/" + path;
-            localProbeUrl = "http://127.0.0.1:" + entity.getPort() + normalizedPath;
-        }
-
-        long start = System.currentTimeMillis();
-        boolean healthy = healthCheckProbeService.probe(localProbeUrl, 2, 200);
-        long elapsed = System.currentTimeMillis() - start;
-
-        String logAppend = String.format("\n[PROBE AT %s] URL: %s, Result: %s (latency: %dms)\n",
-                LocalDateTime.now(), localProbeUrl, (healthy ? "HEALTHY" : "UNHEALTHY"), elapsed);
-        String currentLogs = entity.getLogOutput() != null ? entity.getLogOutput() : "";
-        entity.setLogOutput(currentLogs + logAppend);
-        if (healthy && !DeploymentStatus.RUNNING.name().equals(entity.getStatus())) {
-            transitionState(entity, DeploymentStatus.RUNNING);
-        } else if (!healthy && DeploymentStatus.RUNNING.name().equals(entity.getStatus())) {
-            entity.setErrorMessage("Health check probe failed: " + localProbeUrl + " is unresponsive (latency: " + elapsed + "ms)");
-        }
-        entity.setUpdatedAt(LocalDateTime.now());
-        deploymentRepository.save(entity);
-
-        DeploymentResponse resp = toResponse(entity);
-        resp.setProbeLatencyMs(elapsed);
-        resp.setHealthy(healthy);
+        // Phase 10 R6 深模块拆分：探针执行、日志留痕与 RUNNING 回迁由 DeploymentProbeCoordinator 承载
+        DeploymentProbeCoordinator.ProbeOutcome outcome = probeCoordinator.probe(entity);
+        DeploymentResponse resp = lifecycleSupport.toResponse(entity);
+        resp.setProbeLatencyMs(outcome.elapsedMs());
+        resp.setHealthy(outcome.healthy());
         return resp;
     }
 }

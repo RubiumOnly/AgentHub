@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-17T04:44:54Z",
-  "updated_at": "2026-10-24T06:43:24Z",
+  "updated_at": "2026-10-24T06:54:14Z",
   "files": {
     ".env.example": {
       "role": "index",
@@ -2051,15 +2051,39 @@
     },
     "agenthub-backend/src/main/java/com/agenthub/sandbox/application/DeploymentApplicationService.java": {
       "role": "index",
-      "sha256": "b35cdc4fbe60e8ff19ad5134dd6f5cd93ceb0d3ad4f2accb7dbfa092835f21fd",
-      "size": 40893,
-      "normalized_sha256": "b35cdc4fbe60e8ff19ad5134dd6f5cd93ceb0d3ad4f2accb7dbfa092835f21fd"
+      "sha256": "e6ea2a685fb10040b49988fe56d3838d4a02bb968f06895e3bd9427fad6605bc",
+      "size": 30678,
+      "normalized_sha256": "e6ea2a685fb10040b49988fe56d3838d4a02bb968f06895e3bd9427fad6605bc"
     },
     "agenthub-backend/src/main/java/com/agenthub/sandbox/application/SandboxApplication.java": {
       "role": "index",
       "sha256": "d6e884faac1b61345ac89ce7441a36625dc75ede310c390f945593d8ea772c34",
       "size": 249,
       "normalized_sha256": "d6e884faac1b61345ac89ce7441a36625dc75ede310c390f945593d8ea772c34"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/application/deployment/DeploymentAccessGuard.java": {
+      "role": "index",
+      "sha256": "70576479922770e3f0935c476e1f6c5282253160e6090b43771c5c7ae332497c",
+      "size": 3985,
+      "normalized_sha256": "70576479922770e3f0935c476e1f6c5282253160e6090b43771c5c7ae332497c"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/application/deployment/DeploymentLifecycleSupport.java": {
+      "role": "index",
+      "sha256": "5bf660194e178e84fc3c27d8f6f85fe64e550987ee500b328479d400c0428178",
+      "size": 6105,
+      "normalized_sha256": "5bf660194e178e84fc3c27d8f6f85fe64e550987ee500b328479d400c0428178"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/application/deployment/DeploymentOrphanReconciler.java": {
+      "role": "index",
+      "sha256": "4b5cffe3055eaf875ce781035b06065bc7868386fc8f26f1fc15429954edfd63",
+      "size": 5017,
+      "normalized_sha256": "4b5cffe3055eaf875ce781035b06065bc7868386fc8f26f1fc15429954edfd63"
+    },
+    "agenthub-backend/src/main/java/com/agenthub/sandbox/application/deployment/DeploymentProbeCoordinator.java": {
+      "role": "index",
+      "sha256": "73c6a669181951fb9c9982551781a1b27d3d113e01462ea0aab596df9ceb68ac",
+      "size": 3574,
+      "normalized_sha256": "73c6a669181951fb9c9982551781a1b27d3d113e01462ea0aab596df9ceb68ac"
     },
     "agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/DeploymentSpec.java": {
       "role": "index",
@@ -3299,9 +3323,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "4aa725b17b99e37ccfadcbe5c9cfc3c7715db4868b7ce8035db1396ee365fe0a",
-      "size": 118463,
-      "normalized_sha256": "4aa725b17b99e37ccfadcbe5c9cfc3c7715db4868b7ce8035db1396ee365fe0a"
+      "sha256": "e68a2b1d1b6392f43ddf700fdc71b00401c36976196ed12f5f0dc3123d79b368",
+      "size": 119573,
+      "normalized_sha256": "e68a2b1d1b6392f43ddf700fdc71b00401c36976196ed12f5f0dc3123d79b368"
     },
     "aoci.database.txt": {
       "role": "index",
@@ -3377,9 +3401,9 @@
     },
     "docs/ARCHITECTURE.md": {
       "role": "index",
-      "sha256": "5118baca00b97f4b23fd2fab8d7231b8ad6b34c585a2e9b92f0871247d3d8a4e",
-      "size": 38361,
-      "normalized_sha256": "5118baca00b97f4b23fd2fab8d7231b8ad6b34c585a2e9b92f0871247d3d8a4e"
+      "sha256": "c40e8af60b49f3cfdd1747f339da12eaefb5ed964bb8a0bec4f0bec54a8ee726",
+      "size": 38620,
+      "normalized_sha256": "c40e8af60b49f3cfdd1747f339da12eaefb5ed964bb8a0bec4f0bec54a8ee726"
     },
     "docs/CURRENT_CAPABILITY_BOUNDARIES.md": {
       "role": "index",
