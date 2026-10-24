@@ -52,7 +52,7 @@ Run 创建时必须冻结模式、DSL、AgentDefinition、Prompt/Tool 版本、P
 | 后端生产 Java | 400 个文件 | 已具备较完整的模块化单体，文件数量冻结收敛 |
 | 后端测试 | 62 个测试类 | 实测 387 个测试用例全部通过（含 AOCI 诚实性状态机校验） |
 | 前端 | 39 个 TS/TSX、1 个 CSS | 生产构建通过，静态生成 4/4 路由；`types/index.ts` 仍偏大 |
-| Web 层 | 18 个 Controller | 13 个 ACTIVE，1 个 COMPATIBILITY，4 个 DELETE_CANDIDATE，已建立退场清单 |
+| Web 层 | 14 个 Controller | 13 个 ACTIVE，1 个 COMPATIBILITY；Phase 9 登记的 4 个 DELETE_CANDIDATE 已于 2026-10-24（Phase 10 R1）物理退场 |
 | 数据库 | 12 个 Flyway 迁移 | 22 张业务表的历史演进已较完整，全部处于 ACTIVE 状态 |
 | Markdown | 23 个受管文件 | 13 个 ADR、API/E2E/架构/能力/运维/白皮书等职责已明确收敛归位 |
 | 外部参考 | `reference-shrimp-crab/` 为被忽略的参考仓库 | 不进入 AgentHub 构建、AOCI Managed Scope 或发布包；不因为参考存在就复制功能 |

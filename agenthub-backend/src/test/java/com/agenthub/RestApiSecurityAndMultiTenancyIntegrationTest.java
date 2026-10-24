@@ -127,7 +127,7 @@ class RestApiSecurityAndMultiTenancyIntegrationTest {
                 .andExpect(jsonPath("$.code").value(1001));
 
         // 未传 Token 获取会话列表
-        mockMvc.perform(get("/api/im/conversations"))
+        mockMvc.perform(get("/api/conversations"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1001));
 
@@ -194,7 +194,7 @@ class RestApiSecurityAndMultiTenancyIntegrationTest {
         String tokenB = registerAndGetToken("bob_im_" + System.currentTimeMillis() + "@agenthub.local");
 
         // Alice 创建私密会话
-        MvcResult createConvResult = mockMvc.perform(post("/api/im/conversations")
+        MvcResult createConvResult = mockMvc.perform(post("/api/conversations")
                         .header("Authorization", "Bearer " + tokenA)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Alice Private Room\",\"type\":\"DIRECT_CHAT\",\"agentIds\":[\"BackendArchitect\"]}"))
@@ -205,7 +205,7 @@ class RestApiSecurityAndMultiTenancyIntegrationTest {
         String aliceConvId = extractJsonField(createConvResult, "/data/id");
 
         // Alice 发送消息
-        mockMvc.perform(post("/api/im/conversations/" + aliceConvId + "/messages")
+        mockMvc.perform(post("/api/conversations/" + aliceConvId + "/messages")
                         .header("Authorization", "Bearer " + tokenA)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"Top secret architecture plan\"}"))
@@ -213,7 +213,7 @@ class RestApiSecurityAndMultiTenancyIntegrationTest {
                 .andExpect(jsonPath("$.code").value(0));
 
         // Bob 查询自身会话列表，不应包含 Alice 的会话
-        MvcResult bobConvListResult = mockMvc.perform(get("/api/im/conversations")
+        MvcResult bobConvListResult = mockMvc.perform(get("/api/conversations")
                         .header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
@@ -222,19 +222,19 @@ class RestApiSecurityAndMultiTenancyIntegrationTest {
         assertThat(bobConvListResult.getResponse().getContentAsString()).doesNotContain(aliceConvId);
 
         // Bob 尝试强行读取 Alice 的会话详情 -> 拦截 1002 (FORBIDDEN)
-        mockMvc.perform(get("/api/im/conversations/" + aliceConvId)
+        mockMvc.perform(get("/api/conversations/" + aliceConvId)
                         .header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1002));
 
         // Bob 尝试强行读取 Alice 的消息列表 -> 拦截 1002 (FORBIDDEN)
-        mockMvc.perform(get("/api/im/conversations/" + aliceConvId + "/messages")
+        mockMvc.perform(get("/api/conversations/" + aliceConvId + "/messages")
                         .header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1002));
 
         // Bob 尝试强行向 Alice 的会话发送消息 -> 拦截 1002 (FORBIDDEN)
-        mockMvc.perform(post("/api/im/conversations/" + aliceConvId + "/messages")
+        mockMvc.perform(post("/api/conversations/" + aliceConvId + "/messages")
                         .header("Authorization", "Bearer " + tokenB)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"Malicious injected message\"}"))

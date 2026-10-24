@@ -56,9 +56,9 @@ test-ci-local.ps1[TV6S]: F:Windows本地门禁脚本 | R:code:scripts/test-ci-lo
 
 ===D:/work/agenthub/docs/===
 AGENTHUB_PRODUCT_LONG_TERM_PLAN.md[SG9M]: F:唯一长期路线与阶段验收 | R:code:docs/ARCHITECTURE.md | A:每个Run开始时读取 | S:唯一计划；阶段验收只追加本文；禁止另建平行计划
-AOCI_COGNITION.md[SO7T]: F:AOCI资产与运维唯一文档 | R:code:.mcp.json | A:运维与会话恢复 | S:版本/接入/恢复唯一权威；未对齐不得宣称aligned
+AOCI_COGNITION.md[SO7S]: F:AOCI资产与运维唯一文档 | R:code:.mcp.json | A:运维与会话恢复 | S:版本/接入/恢复唯一权威；未对齐不得宣称aligned
 API.md[SN9L]: F:REST/SSE接口契约全景 | R:code:docs/openapi-v1.json | A:前后端契约对齐 | S:Controller矩阵唯一权威；新增Controller必须登记
-ARCHITECTURE.md[SA8M]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与22表矩阵是守卫测试断言来源
+ARCHITECTURE.md[SA8L]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与22表矩阵是守卫测试断言来源
 CURRENT_CAPABILITY_BOUNDARIES.md[SQ8S]: F:能力真相与未实现边界 | R:code:docs/ARCHITECTURE.md | A:表述能力前必读 | S:能力矩阵唯一权威；禁止超前宣称
 TECH_WHITEPAPER_AND_DEFENSE.md[SS4T]: F:技术答辩要点 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:答辩交流 | S:非能力证明；超出证据范围不得承诺
 openapi-v1.json[SN8L]: F:OpenAPI v1静态快照 | R:code:docs/API.md | A:契约消费方 | S:与/api/v1/openapi.json对齐；漂移需重新生成
@@ -317,7 +317,6 @@ WorkflowDefinitionEntity.java[PD6T]: F:定义持久化实体 | R:code:orchestrat
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/api/===
 ExecutionController.java[EI9M]: F:执行域REST与SSE入口 | R:code:execution/application/ExecutionApplicationService.java | A:前端与SDK | S:runs/steps/events/stream/cancel/pause/resume/retry/evidence全家；幂等键经Idempotency-Key头
-RunAliasController.java[EI5S]: F:旧Run路由兼容别名 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:/api/runs仅转发到v1语义；零调用证据后按退场清单删除
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/execution/application/===
 ExecutionApplication.java[AI6T]: F:执行域用例端口 | R:code:execution/application/ExecutionApplicationService.java | A:ExecutionController | S:门面接口；实现细部分散到四模块
@@ -482,14 +481,6 @@ TokenUsageAuditRepository.java[PI5T]: F:用量审计数据访问 | R:code:agent/
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/agent/infrastructure/security/===
 SecretMasker.java[SS9S]: F:全链路凭据脱敏 | R:code:agent/infrastructure/provider/AbstractHttpLlmProvider.java | A:日志与响应管道 | S:保证日志/错误/REST/URL零凭据泄漏；新输出通道必须先接脱敏
 
-===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/adapter/web/===
-IMController.java[EI4S]: F:旧IM路由兼容入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:Phase 10删除候选；零调用证据后按退场清单移除
-SandboxController.java[EI4T]: F:旧沙箱路由兼容入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:Phase 10删除候选；替代路径为/api/deployments
-WorkflowAndDiffController.java[EI4T]: F:旧工作流与Diff路径入口 | R:code:shared/filter/LegacyEndpointCallTracker.java | A:旧调用方迁移期 | S:生产profile下严格禁用；强制走workspaceId边界
-
-===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/application/service/===
-IMCollaborationService.java[AB5S]: F:旧IM协作兼容服务 | R:code:conversation/application/ConversationApplicationService.java | A:IMController | S:仅委派会话服务；Phase 10随IMController一并退场
-
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/agent/model/===
 AgentCapability.java[DE3T]: F:Agent能力标记枚举 | R:code:domain/agent/model/AgentExecutionRequest.java | A:执行请求 | S:能力声明驱动适配器选择
 AgentExecutionRequest.java[DE5S]: F:Agent执行请求值对象 | R:code:domain/agent/spi/UnifiedAgentAdapter.java | A:执行链路 | S:提示词+上下文+工具约束
@@ -510,12 +501,6 @@ SenderType.java[DE2T]: F:发送者类型枚举 | R:code:conversation/domain/mode
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/conversation/service/===
 MentionParser.java[DA3T]: F:提及解析器 | R:code:conversation/domain/service/LoopDetector.java | A:会话消息处理 | S:@提及决定消息路由目标
 OrchestratorTaskDecomposer.java[DA5T]: F:任务分解器 | R:code:team/domain/strategy/TeamTopologyStrategy.java | A:团队协作 | S:把需求拆为团队可执行子任务
-
-===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/sandbox/model/===
-DeploymentManifest.java[DE5T]: F:部署清单值对象 | R:code:sandbox/domain/model/DeploymentSpec.java | A:部署链路 | S:构建/启动/探针声明来源
-
-===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/sandbox/service/===
-PreviewSandboxService.java[DE6S]: F:预览沙箱旧服务 | R:code:sandbox/application/DeploymentApplicationService.java | A:历史链路 | S:实现旧SandboxApplication端口；新链路走Deployment生命周期
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/domain/workflow/model/===
 WorkflowModels.java[DE5S]: F:旧工作流模型集合 | R:code:orchestration/domain/dsl/WorkflowDsl.java | A:历史兼容 | S:旧模型聚合类；新代码引用orchestration域DSL
@@ -698,7 +683,6 @@ DeploymentResponse.java[DI4S]: F:部署视图DTO | R:code:sandbox/api/Deployment
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/application/===
 DeploymentApplication.java[AI5T]: F:部署用例端口 | R:code:sandbox/application/DeploymentApplicationService.java | A:DeploymentController | S:创建/停止/探针接口
 DeploymentApplicationService.java[AW9L]: F:部署生命周期编排 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:DeploymentController | S:产物ACCEPTED门禁+状态机+孤儿回收；真实进程与容器副作用集中地
-SandboxApplication.java[AE4T]: F:旧沙箱端口 | R:code:domain/sandbox/service/PreviewSandboxService.java | A:历史链路 | S:旧预览端口；新链路走DeploymentApplication
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/sandbox/domain/model/===
 DeploymentSpec.java[DW5T]: F:部署规格值对象 | R:code:sandbox/domain/model/DeploymentManifest.java | A:部署链路 | S:构建/启动/健康检查/端口声明
@@ -824,7 +808,7 @@ agenthub-alerts.yml[OO7T]: F:核心告警规则 | R:code:docs/ops/ALERTING_RULES
 ActuatorAndMetricsIntegrationTest.java[TQ5T]: F:验证health端点与指标暴露 | R:code:identity/infrastructure/security/ActuatorSecurityFilter.java | A:mvn test | S:health开放而prometheus受限的组合行为回归
 AgentAdapterTest.java[TQ4T]: F:验证平台适配器工厂解析 | R:code:domain/agent/service/AgentAdapterFactory.java | A:mvn test | S:每种平台类型必须能解析出适配器
 AociCognitionVerificationTest.java[TQ7M]: F:验证AOCI认知状态机诚实性 | R:code:execution/domain/memory/ContextMemoryCompressor.java | A:mvn test | S:杜绝无凭据默认ALIGNED；NOT_CONFIGURED/UNAVAILABLE矩阵回归
-ArchUnitArchitectureTest.java[TQ9S]: F:架构分层守护 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:Controller禁依赖Repository等10条规则；违例即构建失败
+ArchUnitArchitectureTest.java[TQ9M]: F:架构分层守护 | R:code:shared/contract/BoundedContext.java | A:mvn test | S:Controller禁依赖Repository等9条规则；违例即构建失败
 AuthenticationAndResourceGuardTest.java[TI6S]: F:验证注册登录与令牌签发 | R:code:identity/application/AuthApplicationService.java | A:mvn test | S:BCrypt存储与JWT签发行为回归
 ContextWindowAndRollingSummaryTest.java[TQ5S]: F:验证滑窗裁剪与滚动摘要 | R:code:conversation/domain/service/SlidingWindowContextTrimmer.java | A:mvn test | S:窗口划分与归档历史精确性
 ConversationEntityRelationAndMessageSchemaTest.java[TQ5S]: F:验证会话参与者表结构 | R:code:conversation/infrastructure/entity/ConversationParticipantEntity.java | A:mvn test | S:多Agent参与者入库，禁止逗号字符串回潮
@@ -841,7 +825,7 @@ FlywayMigrationAndSchemaTest.java[TQ8S]: F:验证Flyway全量迁移与Schema | R
 FullLifecycleEndToEndIntegrationTest.java[TQ8M]: F:验证全生命周期E2E场景 | R:code:orchestration/scheduler/DagExecutionEngine.java | A:mvn test | S:Project到Evidence全链路；@TempDir清理曾现Windows句柄抖动
 HighConcurrencyStressIntegrationTest.java[TQ7M]: F:验证高并发锁竞争 | R:code:infrastructure/concurrency/WorkspaceLockManager.java | A:mvn test | S:20线程争抢互斥无死锁
 HumanInTheLoopApprovalIntegrationTest.java[TQ7M]: F:验证审批挂起与恢复 | R:code:orchestration/scheduler/DagStateTransitioner.java | A:mvn test | S:WAITING_APPROVAL挂起后审批恢复DAG
-IMCollaborationTest.java[TQ4T]: F:验证@Mention解析 | R:code:domain/conversation/service/MentionParser.java | A:mvn test | S:多目标提及解析
+IMCollaborationTest.java[TQ4T]: F:验证提及解析与群聊协作流 | R:code:conversation/application/ConversationApplicationService.java | A:mvn test | S:Phase10原型删除后群聊断言由生产端口承载
 MessageRoutingAndVisibilityIsolationTest.java[TQ5S]: F:验证私聊可见性隔离 | R:code:conversation/domain/service/MessageVisibilityFilter.java | A:mvn test | S:第三方严格不可见
 OpenInViewTransactionBoundaryTest.java[TQ5T]: F:验证open-in-view关闭 | R:code:agenthub-backend/src/main/resources/application.yml | A:mvn test | S:杜绝长事务与连接池泄漏
 PersistentExecutionRecoveryAndLeaseTest.java[TQ8M]: F:验证租约争抢与恢复 | R:code:execution/scheduler/PersistentExecutionRecoveryRunner.java | A:mvn test | S:两Worker仅首个成功；过期可接管；CI必跑
@@ -853,7 +837,7 @@ Phase5QualityGateAndDeliveryTest.java[TQ6L]: F:验证质量门禁与交付 | R:c
 Phase6TeamRbacAndOperationsTest.java[TQ6L]: F:验证RBAC与运维体系 | R:code:team/domain/rbac/ProjectRbacRole.java | A:mvn test | S:角色-权限矩阵回归
 Phase7LiveProvidersAndBudgetGovernanceTest.java[TQ6L]: F:验证Provider适配与预算治理 | R:code:agent/application/BudgetGovernanceGuard.java | A:mvn test | S:tools payload构建与结构化解析
 Phase8PerformanceBenchmarkAndE2ETest.java[TQ6L]: F:验证E2E与性能基准 | R:code:docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md | A:mvn test | S:十阶段闭环；延迟门禁已按真实环境校准
-Phase9BaselineAndGovernanceGuardTest.java[TQ9L]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹/AOCI资产存在性五重守护
+Phase9BaselineAndGovernanceGuardTest.java[TQ9M]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹/AOCI资产与旧路由410六重守护
 PhaseASecurityAndResourceBoundaryIntegrationTest.java[TQ7L]: F:验证生产安全边界 | R:code:identity/infrastructure/security/TokenProvider.java | A:mvn test | S:prod弱密钥拒绝启动；越权阻断
 PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java[TQ7L]: F:验证沙箱交付真实可达 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:真实HTTP访问+目录穿越拦截+停止真下线
 PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java[TQ7L]: F:验证生产预检与灾备演练 | R:code:infrastructure/ops/DisasterRecoveryBackupService.java | A:mvn test | S:占位符拦截+篡改档拒绝恢复；CI真实MySQL必跑
@@ -866,7 +850,6 @@ ProviderFaultToleranceAndFallbackTest.java[TQ7M]: F:验证429降级切换 | R:co
 ProviderSpiAndPolymorphismContractTest.java[TQ5S]: F:验证Provider适配契约 | R:code:agent/infrastructure/provider/OpenAiCompatibleProvider.java | A:mvn test | S:消息转换+token统计契约
 RestApiSecurityAndMultiTenancyIntegrationTest.java[TQ7M]: F:验证认证全生命周期 | R:code:identity/api/AuthController.java | A:mvn test | S:注册/登录/刷新/注销/吊销闭环
 SafeExpressionEvaluatorAndDataFlowTest.java[TQ6S]: F:验证安全求值与数据流 | R:code:orchestration/domain/evaluation/SafeExpressionEvaluator.java | A:mvn test | S:步骤输出引用传递；反射注入被拒
-SandboxAndDeployTest.java[TQ4T]: F:验证预览接口输出 | R:code:domain/sandbox/service/PreviewSandboxService.java | A:mvn test | S:HTML预览内容正确
 SandboxProviderAndExecutionTest.java[TQ5S]: F:验证进程沙箱执行 | R:code:sandbox/domain/provider/LocalProcessSandbox.java | A:mvn test | S:合规命令exitCode 0
 SandboxSecurityGuardAndFirewallTest.java[TQ7M]: F:验证命令防火墙 | R:code:sandbox/domain/security/CommandSecurityGuard.java | A:mvn test | S:破坏性命令严格阻断
 SecretMaskingAndCredentialSecurityTest.java[TQ6T]: F:验证脱敏算法 | R:code:agent/infrastructure/security/SecretMasker.java | A:mvn test | S:sk-格式密钥中间脱敏

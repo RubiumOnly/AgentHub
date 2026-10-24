@@ -466,29 +466,8 @@ class PhaseDSandboxLifecycleAndDeliveryIntegrationTest {
     // =========================================================================
 
     @Test
-    @DisplayName("阶段D测试6：预览接口 (/api/sandbox/preview/{projectId}) 严格校验项目 Owner 权限，且前端 Dockerfile 消除非法 shell COPY 语法")
+    @DisplayName("阶段D测试6：前端 Dockerfile 消除非法 shell COPY 语法（旧 /api/sandbox/preview 路由已随 Phase 10 退场，部署 Owner 校验由测试 1-5 的 /api/deployments 链路覆盖）")
     void shouldEnforcePreviewOwnershipAndVerifyFrontendDockerfile() throws Exception {
-        String tokenAlice = registerAndGetToken("alice_preview_d_" + System.currentTimeMillis() + "@agenthub.local");
-        String tokenBob = registerAndGetToken("bob_preview_d_" + System.currentTimeMillis() + "@agenthub.local");
-
-        MvcResult projRes = mockMvc.perform(post("/api/projects")
-                        .header("Authorization", "Bearer " + tokenAlice)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Alice Private Preview Proj\"}"))
-                .andReturn();
-        String aliceProjId = extractJsonField(projRes, "/data/id");
-
-        // Bob 试图访问 Alice 项目的预览页面 -> 被 1002 (FORBIDDEN) 拦截
-        mockMvc.perform(get("/api/sandbox/preview/" + aliceProjId)
-                        .header("Authorization", "Bearer " + tokenBob))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(1002));
-
-        // Alice 自己访问预览页面 -> 200 OK
-        mockMvc.perform(get("/api/sandbox/preview/" + aliceProjId)
-                        .header("Authorization", "Bearer " + tokenAlice))
-                .andExpect(status().isOk());
-
         // 校验前端 Dockerfile 已修复非法 COPY ... 2>/dev/null || true 语法且 public 目录存在
         Path frontendDockerfile = Path.of("../agenthub-frontend/Dockerfile").normalize();
         if (Files.exists(frontendDockerfile)) {

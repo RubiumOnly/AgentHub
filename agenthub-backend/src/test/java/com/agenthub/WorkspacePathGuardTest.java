@@ -224,34 +224,4 @@ public class WorkspacePathGuardTest {
         Files.deleteIfExists(writePath);
     }
 
-    @Test
-    @DisplayName("测试 Web 接口层面路径穿越与 .git 拦截")
-    void shouldBlockTraversalAndGitAccessAtWebController() throws Exception {
-        // Traversal blocked on file content read -> code 3004
-        mockMvc.perform(get("/api/workspace/file/content").param("filePath", "../outside.txt"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3004));
-
-        // .git blocked on file content read -> code 3005
-        mockMvc.perform(get("/api/workspace/file/content").param("filePath", "default/.git/config"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3005));
-
-        // .git blocked on file save -> code 3005
-        mockMvc.perform(post("/api/workspace/file/save")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"filePath\":\"default/.git/hooks/pre-commit\",\"content\":\"echo pwned\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3005));
-
-        // Traversal blocked on diff -> code 3004
-        mockMvc.perform(get("/api/workspace/diff").param("path", "../outside"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3004));
-
-        // Traversal blocked on files -> code 3004
-        mockMvc.perform(get("/api/workspace/files").param("path", "../outside"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3004));
-    }
 }

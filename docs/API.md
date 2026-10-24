@@ -170,11 +170,7 @@
 - `GET /api/agents/instances`：查询当前可调度的智能体实例列表与运行时配置。
 
 ### 5. 即时通讯协同总线 (IM & Collaboration)
-- `GET /api/im/conversations`：获取协同会话列表（返回 `ConversationView`，含参会成员 `participantIds`）；
-- `POST /api/im/conversations`：创建会话（入参 `CreateConversationCommand`：title, type, participantIds）；
-- `GET /api/im/conversations/{id}/messages`：查询历史消息列表（返回 `MessageView`，具备单调递增 `sequenceNum` 与 `schemaVersion: "v1"`）；
-- `POST /api/im/conversations/{id}/messages`：发送消息与触发智能体路由（入参 `SendMessageCommand`）；
-- `GET /api/im/conversations/{id}/stream`：**SSE 实时事件流通道**。
+- 旧 `/api/im/*` 兼容路由已随 `IMController` 在 Phase 10 物理删除；对旧前缀的请求由 `LegacyEndpointMigrationFilter` 统一返回 `410 Gone` 并附带 `X-Deprecated-Migration-Target: /api/conversations` 迁移头。会话能力全部由第 7 节 `/api/conversations` 承载。
 
 ### 6. 工作流定义、模板、Orchestrator 计划、执行引擎与脱敏证据包 (Workflow Execution & Evidence Bundle)
 - `GET /api/workflows/templates`：获取版本化工作流模板列表（`BUG_FIX_WITH_TESTS`, `NEW_FEATURE_ENDPOINT`，内置 7 阶段 Kahn DAG 与 4 大 Agent 角色）；
@@ -188,10 +184,10 @@
 - `POST /api/workflows/orchestrator/plans/{planId}/confirm`：用户审查并确认计划（入参 `ConfirmPlanCommand`：confirmed, allowedHighImpactTools, decisionNote；确认后解锁高影响工具执行权限）；
 - `POST /api/workflows/orchestrator/plans/{planId}/reject`：用户驳回计划（入参 `RejectPlanRequest`：reason）；
 - `GET /api/workflows/projects/{projectId}/plans`：按项目查询历史规划列表；
-- `POST /api/executions/runs`（或 `POST /api/runs`）：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
+- `POST /api/executions/runs`：启动工作流运行实例（支持幂等键 `idempotencyKey` 防重，自动建立 JGit 基线 commit 与 Baseline Tag）
   - Request: `{"projectId": "<project-id>", "definitionId": "<definition-id>", "idempotencyKey": "idemp-uuid"}`
   - Response: `Result<WorkflowRunView>`
-- `GET /api/executions/runs/{runId}`（或 `GET /api/runs/{runId}`）：查询指定工作流运行实例详情与执行状态
+- `GET /api/executions/runs/{runId}`：查询指定工作流运行实例详情与执行状态
   - Response: `Result<WorkflowRunView>`
 - `GET /api/executions/projects/{projectId}/runs`：获取项目下所有运行实例列表
   - Response: `Result<List<WorkflowRunView>>`
@@ -202,13 +198,13 @@
 - `POST /api/executions/runs/{runId}/events`：向运行实例追加持久化审计事件
   - Request: `{"eventType": "STEP_COMPLETED", "payload": "..."}`
   - Response: `Result<RunEventView>`
-- `GET /api/executions/runs/{runId}/stream`（或 `GET /api/runs/{runId}/stream`）：**Run 专属 SSE 实时事件流通道**
+- `GET /api/executions/runs/{runId}/stream`：**Run 专属 SSE 实时事件流通道**
   - 请求头：支持 `Last-Event-ID: <seq>`；亦支持查询参数 `?lastEventId=<seq>&ticket=<streamTicket>`；
   - 特性：自动按单调递增 `sequenceNum` 补发断点遗漏事件，并持续流式推送运行过程中的实时事件。
-- `GET /api/executions/runs/{runId}/evidence`（或 `GET /api/runs/{runId}/evidence`）：**导出脱敏运行证据包 (`Result<RunEvidenceBundleView>`)**
+- `GET /api/executions/runs/{runId}/evidence`：**导出脱敏运行证据包 (`Result<RunEvidenceBundleView>`)**
   - 包含脱敏 DSL 快照、Run/Step 状态、单调事件序列、Provider/Runtime 审计、`simulated` 标识、JGit 结构化 Diff、审批记录、部署健康轨迹与确定性 SHA-256 `checksum`。
-- `GET /api/executions/runs/{runId}/evidence/download`（或 `GET /api/runs/{runId}/evidence/download`）：下载独立 JSON 附件格式脱敏运行证据包（附带 `X-Evidence-Checksum` 与 `X-Execution-Mode` 响应头）。
-- `POST /api/executions/runs/{runId}/cancel`（或 `POST /api/runs/{runId}/cancel`）：取消运行实例
+- `GET /api/executions/runs/{runId}/evidence/download`：下载独立 JSON 附件格式脱敏运行证据包（附带 `X-Evidence-Checksum` 与 `X-Execution-Mode` 响应头）。
+- `POST /api/executions/runs/{runId}/cancel`：取消运行实例
   - Request: `{"reason": "用户手动终止"}`
   - 级联触发 CancelToken，强平子进程与中断执行线程，将 Run 及未完成 Step 状态收敛为 `CANCELLED`。
 - `POST /api/executions/runs/{runId}/pause`：暂停运行实例
@@ -247,11 +243,9 @@
 - `POST /api/audit/artifacts/{artifactId}/revert`：安全非破坏性全量回滚产物（严格还原目标 Step 所影响的文件至基线 commit，杜绝 `git reset --hard` 硬重置，生成可追踪 Revert Commit 并更新状态为 `REVERTED`）。
 
 ### 8. 历史非受控工作区接口退役说明 (`ADR-003`)
-- 生产 profile 不注册早期接收客户端工作区路径参数的 `/api/workspace/*` 接口；开发兼容路径只用于迁移诊断，不得产生新的产品数据。所有正式工作区读写、Diff 与快照操作均使用基于服务端 `workspaceId` 解析的 `/api/workspaces/{workspaceId}/*`（见第 3 节）。
+- `/api/workspace/*` 旧控制器已于 Phase 10 物理删除；所有旧前缀请求由 `LegacyEndpointMigrationFilter` 返回 `410 Gone` 并附带迁移头，不得产生新的产品数据。所有正式工作区读写、Diff 与快照操作均使用基于服务端 `workspaceId` 解析的 `/api/workspaces/{workspaceId}/*`（见第 3 节）。
 
 ### 9. 模版预览与部署清单生成 (Sandbox & Deploy)
-- `GET /api/sandbox/preview/{id}`：挂载并实时预览 Agent 协同生成的 Web 静态模版页面；
-- `POST /api/sandbox/deploy/{id}`：自动化导出 Nginx Dockerfile 镜像构建配置与部署清单。
 
 ### 10. 系统探针 (Health Check)
 - `GET /api/system/health`：获取系统状态、Java 运行时版本、操作系统与应用版本。
@@ -288,14 +282,14 @@
 - `POST /api/teams/{id}/coordinate`：依据当前团队拓扑策略（Hierarchical / P2P / Round-Robin）推演下一协作发言人决策（返回 `NextSpeakerDecision`: CONTINUE, HANDOFF, SUMMARIZE, TERMINATE）。
 
 ### 14. 对话消息总线与上下文治理 (Conversation Message Bus & Context Governance)
-- `POST /api/im/conversations` 与 `POST /api/conversations`：创建协同会话（支持绑定 `teamId`、单聊/群聊 `type` 与参与者）；
-- `GET /api/im/conversations` 与 `GET /api/conversations`：获取会话列表（按最近更新排序）；
-- `GET /api/im/conversations/{id}` 与 `GET /api/conversations/{id}`：获取会话详情（包含滚动历史摘要与累计 Token 消耗）；
-- `GET /api/im/conversations/{id}/messages` 与 `GET /api/conversations/{id}/messages`：查询会话消息历史（支持游标增量查询 `?sinceSeq=...` 与私信隔离过滤 `?viewerId=...`）；
-- `POST /api/im/conversations/{id}/messages` 与 `POST /api/conversations/{id}/messages`：发送消息（支持 `messageType: BROADCAST / DIRECT / SYSTEM`、`protocolType: NORMAL / REQUEST_REPLY / HANDOFF / SUMMARIZE` 与严格单调递增 `sequence_num`，内置死循环检测拦截）；
-- `GET /api/im/conversations/{id}/context` 与 `GET /api/conversations/{id}/context`：获取经过滑动窗口 (`windowSize`) 与 Token 预算控制 (`maxTokens`) 裁剪后的上下文窗口 `ContextWindowView`；
-- `POST /api/im/conversations/{id}/summarize` 与 `POST /api/conversations/{id}/summarize`：手动或自动触发滚动历史摘要浓缩，将老消息压缩为紧凑前情要点；
-- `POST /api/im/conversations/{id}/coordinate` 与 `POST /api/conversations/{id}/coordinate`：驱动团队拓扑执行下一协作轮次。
+- `POST /api/conversations`：创建协同会话（支持绑定 `teamId`、单聊/群聊 `type` 与参与者）；
+- `GET /api/conversations`：获取会话列表（按最近更新排序）；
+- `GET /api/conversations/{id}`：获取会话详情（包含滚动历史摘要与累计 Token 消耗）；
+- `GET /api/conversations/{id}/messages`：查询会话消息历史（支持游标增量查询 `?sinceSeq=...` 与私信隔离过滤 `?viewerId=...`）；
+- `POST /api/conversations/{id}/messages`：发送消息（支持 `messageType: BROADCAST / DIRECT / SYSTEM`、`protocolType: NORMAL / REQUEST_REPLY / HANDOFF / SUMMARIZE` 与严格单调递增 `sequence_num`，内置死循环检测拦截）；
+- `GET /api/conversations/{id}/context`：获取经过滑动窗口 (`windowSize`) 与 Token 预算控制 (`maxTokens`) 裁剪后的上下文窗口 `ContextWindowView`；
+- `POST /api/conversations/{id}/summarize`：手动或自动触发滚动历史摘要浓缩，将老消息压缩为紧凑前情要点；
+- `POST /api/conversations/{id}/coordinate`：驱动团队拓扑执行下一协作轮次。
 
 ### 15. 工作区沙箱与部署自动化 (Sandbox & Deployment Automation)
 - `POST /api/deployments`：创建并启动项目构建与部署
@@ -312,9 +306,7 @@
   - 向预览环境的健康检查路径（如 `/`）发起真实 HTTP GET 探测，记录响应 HTTP 状态码与往返延迟（ms），更新探针时间戳并在响应中反馈健康详情。
 - `GET /api/deployments?projectId={projectId}`：按项目分页或全量查询历史部署列表
   - Response: `Result<List<DeploymentResponse>>`
-- `GET /api/sandbox/preview/{projectId}`：渲染并返回项目实时前端静态预览 HTML 页面
   - Response: `text/html`
-- `POST /api/sandbox/deploy/{projectId}`：一键部署并生成容器镜像交付清单与 Dockerfile
   - Response: `Result<DeploymentManifest>`
 
 ### 16. Agent 注册表、工具体系、上下文装配与离线评测 (Agent Registry, Tools, Context & Evaluation)
@@ -387,7 +379,7 @@
 
 ## 三、 SSE 事件类型定义
 
-### 1. IM 协同会话流 (`/api/im/conversations/{id}/stream` 或 `/api/conversations/{id}/stream` / `/events`)
+### 1. IM 协同会话流 (`/api/conversations/{id}/stream` / `/events`)
 支持 `Last-Event-ID` 请求头或 `?sinceSeq=...` 参数进行断点续传历史补发：
 | 事件名称 | 数据载荷格式 | 场景说明 |
 | :--- | :--- | :--- |
@@ -426,7 +418,7 @@
 #
 ## 四、 REST/SSE 接口与前端调用全景矩阵 (Phase 9 治理盘点与分类)
 
-以下矩阵覆盖当前后端全部 18 个 `@RestController` 与前端 `agenthub-frontend/src/services/api.ts` 调用映射及 Phase 9 治理分类（`ACTIVE` / `COMPATIBILITY` / `DELETE_CANDIDATE`）：
+以下矩阵覆盖当前后端全部 14 个 `@RestController` 与前端 `agenthub-frontend/src/services/api.ts` 调用映射及 Phase 9 治理分类（`ACTIVE` / `COMPATIBILITY` / `DELETE_CANDIDATE`）：
 
 | 接口路径族 | Owner 模块 | 来源 Controller | 前端调用入口 (`services/api.ts`) | 认证与资源归属校验 | 幂等与并发语义 | 状态 | 核心验证测试 | 治理与退场说明 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -435,7 +427,6 @@
 | `/api/workspaces/{workspaceId}/*` (`tree`, `file`, `files`, `file/rename`, `download`, `archive`, `diff`, `git/snapshot`, `lock/*`) | `project` | `WorkspaceController` | `listFiles`, `getFileContent`, `saveFile`, `getStructuredDiff`, `getDiff`, `getLockStatus` | 强制登录 + 服务端解析 `workspaceId` 并校验所属 `Project.ownerId` | `workspace_locks` 毫秒级租约互斥 + JGit commit 树快照 | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留（唯一权威受控工作区接口） |
 | `/api/workflows/definitions`, `/api/workflows/definitions/validate` | `orchestration` | `WorkflowDefinitionController` | `listDefinitions`, `validateDsl` | 强制登录；关联项目时校验 `Project.ownerId` | `validate` 纯函数无副作用；定义按 `id + version` 存储 | `ACTIVE` | `WorkflowDefinitionAndApprovalControllerIntegrationTest` | 长期保留；模板与 DAG 编排入口 |
 | `/api/executions/runs*`, `/api/executions/projects/{projectId}/runs`, `/api/executions/steps/{stepRunId}/retry`, `/api/executions/runs/{runId}/operations`, `/rework`, `/reject`, `/evidence/export` | `execution` | `ExecutionController` | `startRun`, `getRun`, `listRunsByProject`, `listStepRuns`, `listEvents`, `cancelRun`, `getRunEvidence`, `exportRunEvidenceFile`, `getRunOperations`, `reworkStep`, `rejectRun`, `exportRunEvidence`, `LiveExecutionTerminal` (SSE) | 强制登录 + `Project.ownerId` 归属校验；SSE 支持一次性 `ticket` 或 Cookie | `startRun` 支持 `idempotencyKey` 防重；SSE 支持 `Last-Event-ID` 断点续传；`evidence` 含确定性 SHA-256 `checksum` | `ACTIVE` | `PersistentExecutionRecoveryAndLeaseTest`, `PhaseFProductQualityAndEvidenceBundleIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（唯一权威执行入口） |
-| `/api/runs*` (`POST /api/runs`, `GET /api/runs/{runId}`, `/cancel`, `/stream`, `/evidence`, `/evidence/download`) | `execution` | `RunAliasController` | 0 前端调用（兼容别名） | 同 `ExecutionController` | 委托 `ExecutionApplication`；`prod` 返回 `410 Gone` | `DELETE_CANDIDATE` | `ExecutionSseStreamAndReconnectionTest`, `PhaseFProductQualityAndEvidenceBundleIntegrationTest` | Phase 9 冻结登记删除候选；Phase 10 正式物理删除 |
 | `/api/approvals/runs/{runId}`, `/api/approvals/{id}/approve`, `/api/approvals/{id}/reject` | `orchestration` | `ApprovalController` | `listApprovals`, `approve`, `reject` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | 状态机限制仅 `PENDING` 可转换至 `APPROVED`/`REJECTED` | `ACTIVE` | `HumanInTheLoopApprovalIntegrationTest` | 长期保留（人工审批主链路） |
 | `/api/audit/artifacts/run/{runId}`, `/api/audit/artifacts/{id}` (`/accept`, `/reject`, `/revert`, `/diff`), `/api/audit/artifacts/lineage/{runId}`, `/quality-gate*`, `/pr-draft`, `/revert-file` | `audit` | `ArtifactController` | `revertArtifact`, `getArtifactLineage`, `getArtifactDiff`, `acceptArtifact`, `rejectArtifact`, `getQualityGateReport`, `evaluateQualityGate`, `getPullRequestDraft`, `revertSingleFile` | 强制登录 + 关联 `Run -> Project.ownerId` 校验 | `accept`/`reject`/`revert` 状态校验，单文件/全量非破坏性精准回滚，禁止重复 `revert`（错误码 `3011`） | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest`, `Phase4RunOperationsAndArtifactLineageTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（制品审计与血缘主链路） |
 | `/api/deployments*` (`POST`, `GET /{id}`, `GET /{id}/logs`, `POST /{id}/stop`, `POST /{id}/probe`, `GET ?projectId=`) | `sandbox` | `DeploymentController` | `listDeployments`, `createDeployment`, `stopDeployment`, `getDeploymentLogs`, `probeDeployment` | 强制登录 + `Project.ownerId` 校验 + 强制绑定已通过质量门禁 (`!GATE_FAILED`) 与审查的 `Artifact` | 端口池原子分配；`stop` 幂等收敛至 `STOPPED`；探针执行真实 HTTP 延迟探测 | `ACTIVE` | `PhaseDSandboxLifecycleAndDeliveryIntegrationTest`, `Phase5QualityGateAndDeliveryTest` | 长期保留（受控部署主链路） |
@@ -444,21 +435,17 @@
 | `/api/agents`, `/api/agents/platforms`, `/api/agents/execute` | `agent` | `AgentRegistryController` | 后端内部/管理查询 | `AuthFilter` 统一鉴权 | `GET` 幂等 | `ACTIVE` | `AgentAdapterTest`, `Phase1ModuleConvergenceAndContractTest` | 长期保留（智能体注册主链路） |
 | `/api/teams*` (`POST`, `GET`, `GET /{id}`, `/members`, `/coordinate`, `/projects/{projectId}/role`, `/projects/{projectId}/members`, `/projects/{projectId}/members/{userId}/role`, `DELETE /projects/{projectId}/members/{userId}`) | `team` | `TeamController` | `workflowsApi.getTeam`, `projectsApi.getCurrentUserRole`, `listProjectMembers`, `addProjectMember`, `updateMemberRole`, `removeProjectMember` | 强制登录 + `ResourceOwnershipVerifier` 校验细粒度 RBAC 权限（`MEMBER_MANAGE` 等） | 查询幂等；成员添加 `UNIQUE(team_id, user_id)`；禁止移除唯一 OWNER | `ACTIVE` | `Phase6TeamRbacAndOperationsTest`, `TeamAndConversationControllerIntegrationTest` | 长期保留（团队协作与 RBAC 主链路） |
 | `/api/conversations*` (`POST`, `GET`, `/{id}/messages`, `/{id}/stream`, `/{id}/context`, `/{id}/summarize`, `/{id}/coordinate`) | `conversation` | `ConversationController` | `workflowsApi.listConversations`, `getMessages`, `sendMessage` | 强制登录 + `Conversation.ownerId` 与 `MessageVisibilityFilter` | 消息通过 128 分段锁 + 悲观写锁保证 `sequence_num` 单调递增 | `COMPATIBILITY` | `TeamAndConversationControllerIntegrationTest`, `ConversationSseStreamAndReconnectionTest` | 收敛为 Run 审查与执行上下文讨论，停止独立通用 IM 扩张 |
-| `/api/im/conversations*` | `adapter.web` | `IMController` | **0 前端调用**（已迁至 `/api/conversations`） | `@Deprecated` + `@Profile("!prod")`；`prod` 返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DELETE_CANDIDATE` | `Phase1ModuleConvergenceAndContractTest` | Phase 9 冻结登记删除候选；Phase 10 正式物理删除 |
-| `/api/sandbox/preview/{projectId}`, `/api/sandbox/deploy/{projectId}` | `adapter.web` | `SandboxController` | **0 前端调用**（已迁至 `/api/deployments`） | `@Deprecated` + `@Profile("!prod")`；`prod` 返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DELETE_CANDIDATE` | `Phase1ModuleConvergenceAndContractTest` | Phase 9 冻结登记删除候选；Phase 10 正式物理删除 |
 | `/api/system/health`, `/api/system/contracts/v1`, `/api/v1/openapi.json`, `/api/system/legacy-endpoints`, `/api/system/audit-logs`, `/api/system/metrics/summary`, `/api/system/backup*` (`/verify`, `/restore`) | `ops` | `SystemHealthController` | `authApi.getHealth`, `opsApi.getMetricsSummary`, `queryAuditLogs`, `triggerBackup`, `verifyBackup`, `restoreBackup` | 公开探针无权限；安全审计/灾备操作强制登录 + `AUDIT_VIEW` / 管理员权限 | 快照生成防篡改 SHA-256 校验；还原操作具备幂等事务保障与基线对比 | `ACTIVE` | `SystemHealthTest`, `Phase1ModuleConvergenceAndContractTest`, `Phase6TeamRbacAndOperationsTest` | 长期保留（全景指标、安全审计与灾备运维控制台） |
-| `/api/workspace/*` (`diff`, `workflow/execute`, `files`, `file/content`, `file/save`) | `adapter.web` | `WorkflowAndDiffController` | **0 前端调用** | `@Deprecated` + `@Profile("!prod")`；`prod` 强制阻断并返回 `410 Gone` | `LegacyEndpointMigrationFilter` 统计调用计数 | `DELETE_CANDIDATE` | `WorkspacePathGuardTest`, `Phase9BaselineAndGovernanceGuardTest`, `Phase1ModuleConvergenceAndContractTest` | Phase 9 冻结登记删除候选；Phase 10 正式物理删除 |
 
 ---
 
 ## 五、 Phase 9 删除与收敛候选清单 (Delete Candidates & Retirement Manifest)
 
-依据长期计划 v4.0 与工程规范，Phase 9 **只制定删除清单、owner、调用证据与回滚顺序，不执行 Phase 10 的实际代码删除**。以下为首批退场候选清单：
+依据长期计划 v4.0 与工程规范，Phase 9 制定删除清单、owner、调用证据与回滚顺序；Phase 10 第一轮（2026-10-24）已按清单原子执行下列退场，回滚方式为 `git revert` 对应提交：
 
 | 候选对象 | 物理位置 | Owner 模块 | 当前状态 | 调用证据 (Call Evidence) | 替代生产路径 (Replacement Path) | 回滚方式与顺序 (Rollback Sequence) | 目标退场阶段 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `IMController` | `agenthub-backend/src/main/java/com/agenthub/adapter/web/IMController.java` | `conversation` | `DELETE_CANDIDATE` | 前端 `services/api.ts` 0 调用；`prod` 环境已配置 `410 Gone` 拦截；仅有兼容过渡测试 | 唯一正式接口：`/api/conversations*`（由 `ConversationController` 承接） | 单一原子 Commit 删除控制器与内部 DTO；若需回滚直接 `git revert <commit>` 先恢复代码再还原路由表 | Phase 10 |
-| `RunAliasController` | `agenthub-backend/src/main/java/com/agenthub/execution/api/RunAliasController.java` | `execution` | `DELETE_CANDIDATE` | 前端已全量迁移至 `/api/executions/runs*`；生产环境已被 ArchUnit 冻结禁止新依赖 | 唯一正式接口：`/api/executions/runs*`（由 `ExecutionController` 承接） | 单一原子 Commit 删除该类；若发生外部旧客户端集成问题，`git revert` 一键恢复别名映射 | Phase 10 |
-| `SandboxController` | `agenthub-backend/src/main/java/com/agenthub/adapter/web/SandboxController.java` | `sandbox` | `DELETE_CANDIDATE` | 前端 0 调用；生产环境返回 `410 Gone`；已被 `DeploymentController` 完整取代 | 唯一正式接口：`/api/deployments*`（由 `DeploymentController` 承接） | 单一原子 Commit 删除控制器；`git revert` 恢复 | Phase 10 |
-| `WorkflowAndDiffController` | `agenthub-backend/src/main/java/com/agenthub/adapter/web/WorkflowAndDiffController.java` | `project` / `audit` | `DELETE_CANDIDATE` | 前端 0 调用；生产环境返回 `410 Gone`；受控工作区和 Diff 均已迁至安全架构 | 替代路径：`/api/workspaces/{workspaceId}/*` 与 `/api/audit/artifacts/{id}/diff` | 单一原子 Commit 删除；`git revert` 恢复 | Phase 10 |
+| `IMController`（已删除） | 原 `adapter/web/IMController.java` | `conversation` | `RETIRED` | 前端 `services/api.ts` 0 调用；`prod` 环境已配置 `410 Gone` 拦截；仅有兼容过渡测试 | 唯一正式接口：`/api/conversations*`（由 `ConversationController` 承接） | 单一原子 Commit 删除控制器与内部 DTO；若需回滚直接 `git revert <commit>` 先恢复代码再还原路由表 | Phase 10 |
+| `SandboxController`（已删除，连同 `SandboxApplication`/`PreviewSandboxService`/`DeploymentManifest`） | 原 `adapter/web/SandboxController.java` | `sandbox` | `RETIRED` | 前端 0 调用；生产环境返回 `410 Gone`；已被 `DeploymentController` 完整取代 | 唯一正式接口：`/api/deployments*`（由 `DeploymentController` 承接） | 单一原子 Commit 删除控制器；`git revert` 恢复 | Phase 10 |
+| `WorkflowAndDiffController`（已删除） | 原 `adapter/web/WorkflowAndDiffController.java` | `project` / `audit` | `RETIRED` | 前端 0 调用；生产环境返回 `410 Gone`；受控工作区和 Diff 均已迁至安全架构 | 替代路径：`/api/workspaces/{workspaceId}/*` 与 `/api/audit/artifacts/{id}/diff` | 单一原子 Commit 删除；`git revert` 恢复 | Phase 10 |
 | 早期原型适配器 | `com.agenthub.domain.agent.service.AgentAdapterFactory`, `UnifiedAgentAdapter`, `com.agenthub.infrastructure.adapter.*` | `agent` | `DELETE_CANDIDATE` | ArchUnit 规则 7 已硬编码锁定零外部调用；已被 `AgentRuntimeRegistry` 与 `LlmProvider` SPI 取代 | 唯一扩展规范：`LlmProvider` SPI + `DynamicProviderRouter` | Phase 10 在确认 SPI 覆盖后批量移除废弃类 | Phase 10 |

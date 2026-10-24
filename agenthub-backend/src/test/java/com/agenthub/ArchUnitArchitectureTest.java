@@ -66,11 +66,6 @@ class ArchUnitArchitectureTest {
                 .because("Legacy com.agenthub.adapter.web controllers and inner DTOs are frozen for Phase 1 convergence and must not gain external callers")
                 .check(importedClasses);
 
-        noClasses().that().doNotHaveFullyQualifiedName("com.agenthub.execution.api.RunAliasController")
-                .should().dependOnClassesThat().haveFullyQualifiedName("com.agenthub.execution.api.RunAliasController")
-                .because("Compatibility alias RunAliasController is frozen and must not be depended on by other classes")
-                .check(importedClasses);
-
         noClasses().that().resideOutsideOfPackages(
                         "com.agenthub.domain.workflow..",
                         "com.agenthub.adapter.web.."
@@ -84,11 +79,6 @@ class ArchUnitArchitectureTest {
         noClasses().that().haveNameNotMatching("com\\.agenthub\\.execution\\.scheduler\\.ExecutionScheduler(\\$.*)?")
                 .should().dependOnClassesThat().haveNameMatching("com\\.agenthub\\.execution\\.scheduler\\.ExecutionScheduler(\\$.*)?")
                 .because("Deprecated linear ExecutionScheduler is frozen in favor of DagExecutionEngine and must have zero external callers")
-                .check(importedClasses);
-
-        noClasses().that().haveNameNotMatching("com\\.agenthub\\.application\\.service\\.IMCollaborationService(\\$.*)?")
-                .should().dependOnClassesThat().haveNameMatching("com\\.agenthub\\.application\\.service\\.IMCollaborationService(\\$.*)?")
-                .because("Legacy IMCollaborationService prototype is frozen for removal and must not gain new callers")
                 .check(importedClasses);
     }
 
@@ -157,18 +147,6 @@ class ArchUnitArchitectureTest {
                 .orShould().dependOnClassesThat().haveFullyQualifiedName("com.agenthub.domain.workspace.service.WorkspaceResolver")
                 .orShould().dependOnClassesThat().haveFullyQualifiedName("com.agenthub.infrastructure.concurrency.WorkspaceLockManager")
                 .because("Controllers must only exchange DTOs with Application services and never manipulate host file paths, JGit, or locks directly")
-                .check(importedClasses);
-    }
-
-    @Test
-    @DisplayName("架构守护 10（Phase 1 遗留控制器隔离）：所有旧版兼容控制器必须同时标注 @Deprecated 与 @Profile(\"!prod\")")
-    void legacyControllersMustBeDeprecatedAndExcludedFromProdProfile() {
-        classes().that().areAnnotatedWith(RestController.class)
-                .and().resideInAPackage("com.agenthub.adapter.web..")
-                .or().haveFullyQualifiedName("com.agenthub.execution.api.RunAliasController")
-                .should().beAnnotatedWith(Deprecated.class)
-                .andShould().beAnnotatedWith(org.springframework.context.annotation.Profile.class)
-                .because("Legacy compatibility controllers must be marked @Deprecated and @Profile(\"!prod\") so production profile registers zero legacy controllers")
                 .check(importedClasses);
     }
 }

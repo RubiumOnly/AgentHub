@@ -112,7 +112,7 @@ class TeamAndConversationControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("测试 /api/im/conversations 与 /api/conversations 端点完整交互链路")
+    @DisplayName("测试 /api/conversations 与 /api/conversations 端点完整交互链路")
     void shouldTestConversationRestEndpoints() throws Exception {
         Map<String, Object> convReq = Map.of(
                 "title", "REST端到端测试会话",
@@ -121,7 +121,7 @@ class TeamAndConversationControllerIntegrationTest {
                 "projectId", "proj-default"
         );
 
-        String convRes = mockMvc.perform(post("/api/im/conversations")
+        String convRes = mockMvc.perform(post("/api/conversations")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(convReq)))
@@ -140,7 +140,7 @@ class TeamAndConversationControllerIntegrationTest {
                 "protocolType", "NORMAL",
                 "content", "第一条需求指令"
         );
-        mockMvc.perform(post("/api/im/conversations/" + convId + "/messages")
+        mockMvc.perform(post("/api/conversations/" + convId + "/messages")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(msgReq1)))
@@ -157,7 +157,7 @@ class TeamAndConversationControllerIntegrationTest {
                 "protocolType", "REQUEST_REPLY",
                 "content", "第二条私聊消息"
         );
-        mockMvc.perform(post("/api/im/conversations/" + convId + "/messages")
+        mockMvc.perform(post("/api/conversations/" + convId + "/messages")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(msgReq2)))
@@ -166,14 +166,14 @@ class TeamAndConversationControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.sequenceNum").value(2));
 
         // GET messages as FrontendEngineer (should see both)
-        mockMvc.perform(get("/api/im/conversations/" + convId + "/messages")
+        mockMvc.perform(get("/api/conversations/" + convId + "/messages")
                         .header("Authorization", "Bearer " + token)
                         .param("viewerId", "FrontendEngineer"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(2)));
 
         // GET context window
-        mockMvc.perform(get("/api/im/conversations/" + convId + "/context")
+        mockMvc.perform(get("/api/conversations/" + convId + "/context")
                         .header("Authorization", "Bearer " + token)
                         .param("windowSize", "5")
                         .param("maxTokens", "2000"))
@@ -182,7 +182,7 @@ class TeamAndConversationControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.activeMessages", hasSize(2)));
 
         // POST summarize
-        mockMvc.perform(post("/api/im/conversations/" + convId + "/summarize")
+        mockMvc.perform(post("/api/conversations/" + convId + "/summarize")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0));

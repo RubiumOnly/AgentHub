@@ -485,6 +485,19 @@ public class WorkspaceSecurityAndJGitAuditIntegrationTest {
                 .andExpect(jsonPath("$.data.content").value("API Test Content"))
                 .andExpect(jsonPath("$.data.binary").value(false));
 
+        // Phase 10: 旧 /api/workspace/* 对抗性覆盖迁移到唯一权威路由——穿越与 .git 拦截在 REST 层保持 200+错误码语义
+        mockMvc.perform(get("/api/workspaces/" + testWorkspaceId + "/file").param("path", "../outside.txt"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(3004));
+        mockMvc.perform(get("/api/workspaces/" + testWorkspaceId + "/file").param("path", ".git/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(3005));
+        mockMvc.perform(post("/api/workspaces/" + testWorkspaceId + "/file")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"path\":\".git/hooks/pre-commit\",\"content\":\"echo pwned\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(3005));
+
         // Acquire lock via REST
         mockMvc.perform(post("/api/workspaces/" + testWorkspaceId + "/lock/acquire")
                         .contentType(MediaType.APPLICATION_JSON)

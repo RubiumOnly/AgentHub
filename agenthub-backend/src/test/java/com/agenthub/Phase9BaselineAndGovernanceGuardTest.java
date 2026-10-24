@@ -1,9 +1,9 @@
 package com.agenthub;
 
-import com.agenthub.adapter.web.WorkflowAndDiffController;
 import com.agenthub.identity.infrastructure.security.TokenProvider;
-import com.agenthub.shared.exception.BusinessException;
-import com.agenthub.shared.exception.ErrorCode;
+import com.agenthub.shared.filter.LegacyEndpointCallTracker;
+import com.agenthub.shared.filter.LegacyEndpointMigrationFilter;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.io.IOException;
@@ -243,7 +246,7 @@ class Phase9BaselineAndGovernanceGuardTest {
 
     @Test
     @DisplayName("3. 后端源码默认 ID（user-1 / proj-default / run-default）按相对路径+次数上限冻结及生产环境阻断 /api/workspace/* 校验")
-    void shouldFreezeBackendDefaultLiteralsAndBlockLegacyWorkspaceInProd() throws IOException {
+    void shouldFreezeBackendDefaultLiteralsAndBlockLegacyWorkspaceInProd() throws IOException, jakarta.servlet.ServletException {
         Path repoRoot = resolveRepositoryRoot();
         Path backendMainJava = repoRoot.resolve("agenthub-backend/src/main/java");
         assertThat(Files.isDirectory(backendMainJava)).isTrue();
@@ -310,7 +313,8 @@ class Phase9BaselineAndGovernanceGuardTest {
                 .as("No backend classes may hardcode host path d:/work/agenthub")
                 .isEmpty();
 
-        // 验证 WorkflowAndDiffController 在 prod profile 下严格拒绝所有 /api/workspace/* 调用
+        // Phase 10 兼容退场：旧 /api/workspace/*、/api/im、/api/sandbox、/api/runs 控制器已物理删除，
+        // 生产边界由 LegacyEndpointMigrationFilter 承担——prod 下旧路由一律 410 Gone 并附带迁移目标。
         MockEnvironment prodEnv = new MockEnvironment();
         prodEnv.setActiveProfiles("prod");
         TokenProvider prodTokenProvider = new TokenProvider(
@@ -319,28 +323,22 @@ class Phase9BaselineAndGovernanceGuardTest {
                 prodEnv,
                 null
         );
-        WorkflowAndDiffController controller = new WorkflowAndDiffController(null, prodTokenProvider);
+        LegacyEndpointMigrationFilter migrationFilter = new LegacyEndpointMigrationFilter(
+                new LegacyEndpointCallTracker(new SimpleMeterRegistry()), prodTokenProvider);
 
-        assertThatThrownBy(() -> controller.getDiff("any"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
-                .isEqualTo(ErrorCode.FORBIDDEN);
-        assertThatThrownBy(() -> controller.executeWorkflow(new WorkflowAndDiffController.ExecuteWorkflowRequest()))
-                .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
-                .isEqualTo(ErrorCode.FORBIDDEN);
-        assertThatThrownBy(() -> controller.listFiles("any"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
-                .isEqualTo(ErrorCode.FORBIDDEN);
-        assertThatThrownBy(() -> controller.getFileContent("any"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
-                .isEqualTo(ErrorCode.FORBIDDEN);
-        assertThatThrownBy(() -> controller.saveFile(new WorkflowAndDiffController.SaveFileRequest()))
-                .isInstanceOf(BusinessException.class)
-                .extracting(ex -> ((BusinessException) ex).getErrorCode())
-                .isEqualTo(ErrorCode.FORBIDDEN);
+        for (String legacyPath : List.of("/api/workspace/diff", "/api/im/conversations",
+                "/api/sandbox/preview/proj-demo", "/api/runs/run-1")) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", legacyPath);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+            migrationFilter.doFilter(request, response, chain);
+            assertThat(response.getStatus())
+                    .as("Legacy route %s must be rejected with 410 Gone in production profile", legacyPath)
+                    .isEqualTo(410);
+            assertThat(response.getHeader("X-Deprecated-Migration-Target"))
+                    .as("Legacy route %s must advertise its migration target", legacyPath)
+                    .isNotBlank();
+        }
     }
 
     @Test

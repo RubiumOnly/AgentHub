@@ -195,41 +195,4 @@ public class WorkspaceAdversarialChallengeTest {
         workspaceLockManager.unlock(upperPath);
     }
 
-    @Test
-    @DisplayName("Adversarial: Web REST endpoints penetration test")
-    void testWebControllerPenetration() throws Exception {
-        // Deep traversal
-        mockMvc.perform(get("/api/workspace/files").param("path", "../../../../Windows/System32"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3004));
-
-        // default/../../sensitive.txt
-        mockMvc.perform(get("/api/workspace/file/content").param("filePath", "default/../../sensitive.txt"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3004));
-
-        // .git\config via web
-        mockMvc.perform(get("/api/workspace/file/content").param("filePath", "default/.git\\config"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3005));
-
-        // .GIT/config via web
-        mockMvc.perform(get("/api/workspace/file/content").param("filePath", "default/.GIT/config"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3005));
-
-        // .git/hooks/pre-commit save
-        mockMvc.perform(post("/api/workspace/file/save")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"filePath\":\"default/.git/hooks/pre-commit\",\"content\":\"rm -rf /\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3005));
-
-        // .git\\hooks\\pre-commit save
-        mockMvc.perform(post("/api/workspace/file/save")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"filePath\":\"default/.git\\\\hooks\\\\pre-commit\",\"content\":\"rm -rf /\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(3005));
-    }
 }

@@ -258,7 +258,7 @@ ArchUnit（`ArchUnitArchitectureTest`）与 Phase 9 基线与治理守卫（`Pha
 - `DEMO_ONLY` / `TEST_ONLY`：测试夹具或确定性演示专用，生产环境严格隔离；
 - `DELETE_CANDIDATE`：无前端调用、生产已切断（410 Gone）或已被新架构替代，排定 Phase 10 退场。
 
-### 13.1 控制器与 Web 接入层 Inventory (18 个 @RestController)
+### 13.1 控制器与 Web 接入层 Inventory (14 个 @RestController)
 
 | 控制器名称 | 归属包路径 | 治理状态 | 职责与收敛去向 |
 | :--- | :--- | :--- | :--- |
@@ -276,10 +276,8 @@ ArchUnit（`ArchUnitArchitectureTest`）与 Phase 9 基线与治理守卫（`Pha
 | `TeamController` | `com.agenthub.team.api` | `ACTIVE` | 团队成员生命周期与 RBAC 权限矩阵校验 |
 | `SystemHealthController` | `com.agenthub.ops.api` | `ACTIVE` | 探针、v1 契约、OpenAPI、安全审计检索、指标与灾备备份还原 |
 | `ConversationController` | `com.agenthub.conversation.api` | `COMPATIBILITY` | 收敛为 Run 审查与执行上下文讨论，停止通用 IM 扩张 |
-| `RunAliasController` | `com.agenthub.execution.api` | `DELETE_CANDIDATE` | `/api/runs/*` 别名，前端零调用，Phase 10 正式物理删除 |
-| `IMController` | `com.agenthub.adapter.web` | `DELETE_CANDIDATE` | 早期原型 IM 接口，prod 返回 410 Gone，Phase 10 物理删除 |
-| `SandboxController` | `com.agenthub.adapter.web` | `DELETE_CANDIDATE` | 早期沙箱接口，prod 返回 410 Gone，已被 DeploymentController 替代 |
-| `WorkflowAndDiffController` | `com.agenthub.adapter.web` | `DELETE_CANDIDATE` | 早期工作区与 Diff，prod 拦截 410 Gone，Phase 10 物理删除 |
+
+> Phase 10 第一轮（2026-10-24）已物理删除 `RunAliasController`、`IMController`、`SandboxController`（连同 `SandboxApplication`/`PreviewSandboxService`/`DeploymentManifest`）与 `WorkflowAndDiffController`；旧前缀请求由 `LegacyEndpointMigrationFilter` 统一返回 `410 Gone` 并附带迁移头。
 
 ### 13.2 智能体提供商 (Provider)、运行时 (Runtime) 与沙箱 (Sandbox) Inventory
 

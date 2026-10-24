@@ -425,7 +425,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
 
         Thread.sleep(15L); // 确保 exportedAt 时间戳发生变化
         String safeFileName = "evidence-bundle-" + runId.replaceAll("[^a-zA-Z0-9_-]", "") + ".json";
-        MvcResult downloadRes = mockMvc.perform(get("/api/runs/{runId}/evidence/download", runId)
+        MvcResult downloadRes = mockMvc.perform(get("/api/executions/runs/{runId}/evidence/download", runId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFileName + "\""))
@@ -818,7 +818,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
         mockMvc.perform(get("/api/executions/runs/{runId}/evidence", runIdA))
                 .andExpect(jsonPath("$.code").value(1001));
 
-        mockMvc.perform(get("/api/runs/{runId}/evidence/download", runIdA))
+        mockMvc.perform(get("/api/executions/runs/{runId}/evidence/download", runIdA))
                 .andExpect(jsonPath("$.code").value(1001));
 
         // 2) 租户 B 越权访问租户 A 的运行证据包 -> code = 1002 (FORBIDDEN)
@@ -826,7 +826,7 @@ public class PhaseFProductQualityAndEvidenceBundleIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB))
                 .andExpect(jsonPath("$.code").value(1002));
 
-        mockMvc.perform(get("/api/runs/{runId}/evidence/download", runIdA)
+        mockMvc.perform(get("/api/executions/runs/{runId}/evidence/download", runIdA)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB))
                 .andExpect(jsonPath("$.code").value(1002));
 
