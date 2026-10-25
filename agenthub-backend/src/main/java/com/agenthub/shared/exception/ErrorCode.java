@@ -25,6 +25,8 @@ public enum ErrorCode {
     ONBOARDING_FAILED(2003, "Project onboarding step failed"),
     ONBOARDING_SESSION_NOT_FOUND(2004, "Project onboarding session not found"),
     CONTEXT_SOURCE_NOT_FOUND(2005, "Context source not found"),
+    GIT_CONNECTION_NOT_FOUND(2006, "Git provider connection not found"),
+    GIT_CONNECTION_REVOKED(2007, "Git provider connection has been revoked"),
     WORKSPACE_NOT_FOUND(3001, "Workspace not found"),
     WORKSPACE_LOCKED(3002, "Workspace is Currently Locked by Another Task"),
     WORKSPACE_PATH_INVALID(3003, "Invalid workspace path format or illegal characters"),

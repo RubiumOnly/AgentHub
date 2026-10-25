@@ -55,6 +55,9 @@ agenthub:
     allow-trusted-network: ${AGENTHUB_MANAGEMENT_ALLOW_TRUSTED_NETWORK:true}
   cli:
     timeout-ms: ${AGENTHUB_CLI_TIMEOUT_MS:300000}
+  git:
+    allow-local-test-remote: ${AGENTHUB_GIT_ALLOW_LOCAL_TEST_REMOTE:false}
+    test-timeout-seconds: ${AGENTHUB_GIT_TEST_TIMEOUT_SECONDS:15}
   llm:
     deepseek:
       api-key: "${DEEPSEEK_API_KEY:}"

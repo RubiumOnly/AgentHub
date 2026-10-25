@@ -28,6 +28,9 @@ agenthub:
     base-dir: "${AGENTHUB_TEST_WORKSPACE_DIR:./target/test-workspaces}"
   cli:
     timeout-ms: 10000
+  git:
+    allow-local-test-remote: true
+    test-timeout-seconds: 10
   sandbox:
     orphan-reconcile-initial-delay-ms: 3600000
     orphan-reconcile-interval-ms: 3600000

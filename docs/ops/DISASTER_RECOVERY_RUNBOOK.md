@@ -181,7 +181,7 @@ docker builder prune -f
 
 | 演练项 | 注入故障 / 验证操作 | 观测结果与恢复证据 | 实测耗时 |
 | :--- | :--- | :--- | :--- |
-| **1. Flyway 空库全量迁移** | 空库执行 V1–V12 全部 12 个迁移脚本 | 22 张表与索引/唯一约束全部建表成功，`flyway_schema_history` 最新版本为 `12` | `< 150 ms` |
+| **1. Flyway 空库全量迁移** | 空库执行 V1–V14 全部 14 个迁移脚本 | 23 张表与索引/唯一约束全部建表成功，`flyway_schema_history` 最新版本为 `14` | `< 150 ms` |
 | **2. 服务崩溃与未完任务恢复** | 模拟 Worker 崩溃遗留 `RUNNING` 且租约过期的 Run/Step | `PersistentExecutionRecoveryRunner` 自动接管租约并断点续跑至 `SUCCEEDED`，已完成 Step 绝不重跑 | `< 600 ms` |
 | **3. 多节点工作区排他锁过期自愈** | Node A 持锁崩溃未释放，Node B 并发争抢并在 TTL 过期后重试 | 租约期内 Node B 被 `workspace_locks` 严格拦截；TTL 到期后 Node B 毫秒级接管所有权 | `< 450 ms` |
 | **4. Agent 超时与看门狗强平** | 注入慢执行任务并触发超时取消 | Run 状态收敛为 `CANCELLED`/`FAILED`，审计事件完整落库 | `< 300 ms` |

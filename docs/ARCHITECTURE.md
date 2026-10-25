@@ -26,7 +26,7 @@ Controller 只负责协议转换和权限入口；Application 模块编排用例
 
 ## 2. 核心资源与事件词汇表 (Resource & Event Vocabulary)
 
-发现代码与历史文档存在命名差异时，以实际持久化模型（Flyway V1～V12 + JPA Entity）与 REST/SSE 契约为唯一权威基准：
+发现代码与历史文档存在命名差异时，以实际持久化模型（Flyway V1～V14 + JPA Entity）与 REST/SSE 契约为唯一权威基准：
 
 | 词汇概念 | Owner 模块 | 持久化表 / JPA Entity | 权威 API 入口 | 状态枚举 / 核心不变量 | 当前实现与演进说明 |
 | --- | --- | --- | --- | --- | --- |
@@ -41,6 +41,7 @@ Controller 只负责协议转换和权限入口；Application 模块编排用例
 | `Deployment` | `sandbox` | `deployments` / `DeploymentEntity` | `/api/deployments` | `CREATED -> BUILD -> START -> HEALTH_CHECK -> RUNNING -> STOP -> CLEANUP -> STOPPED / FAILED` | 已落地；强制要求 `Artifact` 为 `ACCEPTED` 且通过真实 HTTP 探针才进入 `RUNNING` |
 | `Agent Policy` (`AgentDefinition`) | `agent` / `sandbox` | `agent_definitions` + `providers` + `CommandSecurityGuard` | `/api/agents`, `/api/providers` | 包含 `preferred_provider_type`、`required_capabilities`、`fallback_enabled` 及工具/命令白名单 | 当前分散在 `AgentDefinitionEntity` 与沙箱守卫中；Phase 3 收敛为版本化策略模型 |
 | `Context Source` | `execution` / `conversation` | `workflow_runs.context_data_json` + `conversations.summary` | `/api/conversations/{id}/context` | 包含 DAG 节点输入输出插值、滑动窗口裁剪（`TokenBudgetContextManager`）与滚动摘要 | 当前支持会话窗口与运行上下文；Phase 2/3 将扩展为带版本、安全级别与预算的受控资源 |
+| `Git Connection` | `project` | `git_connections` / `GitConnectionEntity` | `/api/projects/{projectId}/git-connections` | `ACTIVE`, `REVOKED`；凭据仅存引用（`env:`/`prop:`/`secret:`），撤销清除引用且幂等终态 | Phase 11 落地；授权/测试/撤销走 `SECRET_MANAGE` 权限矩阵并全量审计，OAuth 设备流未实现 |
 
 ## 3. 核心数据流
 
@@ -174,7 +175,7 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 5. **前端团队协作与运维灾备控制台（TeamRbacPanel & OperationsConsolePanel）**：
    - Bento Grid 现代美学风格的成员协作卡片、角色授权弹窗、SLO 健康指示灯、灾备快照触发/验证/还原表单与可分页审计日志列表，深度融合于 `ProjectShell` 核心交付大盘。
 
-## 10. 数据库表全景矩阵与可观测性 (Flyway V1～V12 共 22 张表)
+## 10. 数据库表全景矩阵与可观测性 (Flyway V1～V14 共 23 张表)
 
 - Flyway 是唯一 Schema 演进方式；生产使用 `ddl-auto=validate`。
 - Micrometer/Prometheus 暴露 Run、Step、Provider、SSE、锁和 Deployment 指标；日志必须结构化并脱敏。
@@ -188,6 +189,7 @@ Provider 通过 `LlmProvider` SPI 接入，路由按能力、优先级、成本�
 | `projects` | `project` | `ProjectEntity` | `V1`, `V2`, `V13` | `owner_id` (`ResourceAccessGuard`) | `PRIMARY KEY(id)` | `ACTIVE` | `PhaseASecurityAndResourceBoundaryIntegrationTest` | 长期保留；`V13` 已将 `proj-default` 种子退出迁移路径，demo/test 由夹具承载 |
 | `workspaces` | `project` | `WorkspaceEntity` | `V1`, `V2`, `V13` | 经 `project_id -> projects.owner_id` 校验 | `PRIMARY KEY(id)` | `ACTIVE` | `WorkspaceSecurityAndJGitAuditIntegrationTest` | 长期保留；`V13` 已将 `ws-default` 种子退出迁移路径，demo/test 由夹具承载 |
 | `workspace_locks` | `infrastructure` | `WorkspaceLockManager` (JDBC) | `V3`, `V12` | `owner_id` 服务端从认证上下文派生 | `PRIMARY KEY(workspace_key)` + `expires_at_epoch_ms` 条件更新 | `ACTIVE` | `PhaseEProductionOpsAndDisasterRecoveryIntegrationTest` | 长期保留；跨实例毫秒级租约互斥 |
+| `git_connections` | `project` | `GitConnectionEntity` | `V14` | 经 `project_id` 校验归属；授权/测试/撤销要求 `SECRET_MANAGE` | `PRIMARY KEY(id)`；同项目同仓库仅一条 `ACTIVE`（应用层冲突拒绝）；撤销幂等清除 `credential_ref` | `ACTIVE` | `Phase11GitConnectionAuthorizationTest` | 长期保留；Phase 11 外部交付链路的凭据引用与审计基础 |
 | `agent_definitions` | `agent` | `AgentDefinitionEntity` | `V1`, `V2`, `V6`, `V13` | 系统级模板，调用需登录 | `PRIMARY KEY(id)`, `UNIQUE(def_key)` | `ACTIVE` | `ProviderDrivenAgentRuntimeIntegrationTest` | Phase 3 演进为带工具权限、上下文来源与预算的版本化定义 |
 | `agent_instances` | `agent` | `AgentInstanceEntity` | `V1` | `owner_id` + `project_id` | `PRIMARY KEY(id)` | `ACTIVE` | `FlywayMigrationAndSchemaTest` | Phase 3 与版本化 `AgentDefinition` 快照合并收敛 |
 | `providers` | `agent` | `ProviderEntity` | `V1`, `V6`, `V13` | `owner_id` (`ResourceAccessGuard`) | `PRIMARY KEY(id)` | `ACTIVE` | `ProviderAndTokenUsageControllerIntegrationTest` | 长期保留；`secret_ref` 脱敏存储，`V13` 已将 `V6` 默认种子退出迁移路径，demo/test 由夹具承载 |
@@ -296,11 +298,12 @@ ArchUnit（`ArchUnitArchitectureTest`）与 Phase 9 基线与治理守卫（`Pha
 | **Sandbox** | `LocalProcessSandbox` | `ACTIVE` | 本地进程受限执行沙箱（带配额与超时防护） |
 | **Sandbox** | `PreviewSandboxService` | `COMPATIBILITY` | 早期原型适配服务，委托至 DeploymentApplicationService |
 
-### 13.3 核心持久化表结构 Inventory (22 张 Flyway 核心数据库表)
+### 13.3 核心持久化表结构 Inventory (23 张 Flyway 核心数据库表)
 
-当前数据库全部 22 张业务表均处于 `ACTIVE` 状态，由 Flyway V1~V12 严格版本控制，禁止无版本变更操作表结构：
+当前数据库全部 23 张业务表均处于 `ACTIVE` 状态，由 Flyway V1~V14 严格版本控制，禁止无版本变更操作表结构：
 - 用户与权限（4 张）：`users`, `teams`, `team_members`, `invalidated_tokens`
 - 项目与工作区（3 张）：`projects`, `workspaces`, `workspace_locks`
+- 外部 Git 连接（1 张）：`git_connections`（凭据仅存引用，撤销幂等终态）
 - 智能体与模型（4 张）：`agent_definitions`, `agent_instances`, `providers`, `token_usages`
 - 协同会话（3 张，受控收敛）：`conversations`, `conversation_participants`, `messages`
 - 工作流与执行（3 张）：`workflow_definitions`, `workflow_runs`, `step_runs`

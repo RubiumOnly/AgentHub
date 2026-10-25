@@ -42,8 +42,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 1. 唯一权威长期计划（docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md）与废弃计划/旧认知索引零残留及文档口径校准校验；
  * 2. 前端源码（agenthub-frontend/src）零 localhost、零 /api/workspace/ 旧接口调用、零宿主机绝对路径硬编码、零非演示模式静默 Mock 回退及默认 ID 冻结校验；
  * 3. 后端源码（agenthub-backend/src/main/java）默认常量（"user-1" / "proj-default" / "run-default"）按相对路径+出现次数上限双重冻结及生产环境阻断 /api/workspace/* 校验；
- * 4. 22 张 Flyway 核心数据库表、最多 18 个 @RestController 与 docs/ARCHITECTURE.md、docs/API.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md 词汇及矩阵全量对齐校验；
- * 5. 受管范围（Managed Scope）与 Flyway V1-V12 迁移脚本完整性及固定 SHA-256 指纹基线校验。
+ * 4. 23 张 Flyway 核心数据库表、最多 18 个 @RestController 与 docs/ARCHITECTURE.md、docs/API.md、docs/CURRENT_CAPABILITY_BOUNDARIES.md 词汇及矩阵全量对齐校验；
+ * 5. 受管范围（Managed Scope）与 Flyway V1-V14 迁移脚本完整性及固定 SHA-256 指纹基线校验。
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -63,7 +63,7 @@ class Phase9BaselineAndGovernanceGuardTest {
 
     private static final Map<String, Integer> FROZEN_FRONTEND_PROJ_DEFAULT_MAX_COUNTS = Map.of();
 
-    private static final List<String> EXPECTED_22_TABLES = List.of(
+    private static final List<String> EXPECTED_23_TABLES = List.of(
             "users",
             "projects",
             "workspaces",
@@ -85,10 +85,11 @@ class Phase9BaselineAndGovernanceGuardTest {
             "approvals",
             "deployments",
             "invalidated_tokens",
-            "auth_audit_logs"
+            "auth_audit_logs",
+            "git_connections"
     );
 
-    private static final Map<String, String> EXPECTED_12_MIGRATION_SHA256;
+    private static final Map<String, String> EXPECTED_MIGRATION_SHA256;
     static {
         Map<String, String> map = new LinkedHashMap<>();
         map.put("V1__init_schema.sql", "4494f50553cc572083af09345b1a4abab7a099f287c0e41aaa6b9ac8535f18aa");
@@ -104,7 +105,8 @@ class Phase9BaselineAndGovernanceGuardTest {
         map.put("V11__phase_d_sandbox_lifecycle_and_isolation.sql", "44ee1c979be0786055a0d098af33e989deda448e4a6530df1354a780de0968df");
         map.put("V12__phase_e_production_ops_and_lock_precision.sql", "fe48a123e581a88ef2fb50e276bd77f8286f6a81ed000fb0fb6f2236a4bf209b");
         map.put("V13__phase10_remove_demo_seed_subjects.sql", "2926fbac86558b10518ffde332caf78b66a39814bb46b4629182d2a3c9cf1698");
-        EXPECTED_12_MIGRATION_SHA256 = Map.copyOf(map);
+        map.put("V14__phase11_git_connections.sql", "122d0b86d4fc2bfa25a9abdf9f349794dec7b93e2d035d5ee11ac5110152d1fc");
+        EXPECTED_MIGRATION_SHA256 = Map.copyOf(map);
     }
 
     @Test
@@ -343,14 +345,14 @@ class Phase9BaselineAndGovernanceGuardTest {
     }
 
     @Test
-    @DisplayName("4. 核心资源/事件词汇表、22 张 Flyway 表、18 个 RestController 与 API/能力边界矩阵全量对齐校验")
+    @DisplayName("4. 核心资源/事件词汇表、23 张 Flyway 表、18 个 RestController 与 API/能力边界矩阵全量对齐校验")
     void shouldVerifyVocabularyAndAll22FlywayTablesAlignWithDocumentation() throws IOException {
         Path repoRoot = resolveRepositoryRoot();
         String archDoc = Files.readString(repoRoot.resolve("docs/ARCHITECTURE.md"), StandardCharsets.UTF_8);
         String apiDoc = Files.readString(repoRoot.resolve("docs/API.md"), StandardCharsets.UTF_8);
         String capDoc = Files.readString(repoRoot.resolve("docs/CURRENT_CAPABILITY_BOUNDARIES.md"), StandardCharsets.UTF_8);
 
-        // 1) 验证数据库中全部业务表集合与 EXPECTED_22_TABLES 完全一致，且全部登记在 docs/ARCHITECTURE.md 表矩阵中
+        // 1) 验证数据库中全部业务表集合与 EXPECTED_23_TABLES 完全一致，且全部登记在 docs/ARCHITECTURE.md 表矩阵中
         List<String> actualTables = jdbcTemplate.queryForList(
                 "SELECT LOWER(TABLE_NAME) FROM INFORMATION_SCHEMA.TABLES " +
                         "WHERE UPPER(TABLE_SCHEMA) NOT IN ('INFORMATION_SCHEMA', 'MYSQL', 'PERFORMANCE_SCHEMA', 'SYS') " +
@@ -358,10 +360,10 @@ class Phase9BaselineAndGovernanceGuardTest {
                 String.class
         );
         assertThat(Set.copyOf(actualTables))
-                .as("Actual business tables in database must match the 22 Flyway V1-V12 tables")
-                .isEqualTo(Set.copyOf(EXPECTED_22_TABLES));
+                .as("Actual business tables in database must match the 23 Flyway V1-V14 tables")
+                .isEqualTo(Set.copyOf(EXPECTED_23_TABLES));
 
-        for (String table : EXPECTED_22_TABLES) {
+        for (String table : EXPECTED_23_TABLES) {
             assertThat(archDoc).as("docs/ARCHITECTURE.md must document table: %s", table).contains("`" + table + "`");
         }
 
@@ -417,13 +419,13 @@ class Phase9BaselineAndGovernanceGuardTest {
     }
 
     @Test
-    @DisplayName("5. Managed Scope 受管目录、AOCI 诚实记录与 Flyway V1-V12 迁移固定 SHA-256 指纹基线校验")
+    @DisplayName("5. Managed Scope 受管目录、AOCI 诚实记录与 Flyway V1-V14 迁移固定 SHA-256 指纹基线校验")
     void shouldVerifyManagedScopeAndFlywayMigrationFingerprints() throws Exception {
         Path repoRoot = resolveRepositoryRoot();
         Path migrationDir = repoRoot.resolve("agenthub-backend/src/main/resources/db/migration");
         assertThat(Files.isDirectory(migrationDir)).isTrue();
 
-        // 1) 校验迁移目录下仅包含预期的 12 个 V1-V12 脚本文件，且每个脚本 LF 归一化后的 SHA-256 指纹与基线 100% 匹配
+        // 1) 校验迁移目录下仅包含预期的 14 个 V1-V14 脚本文件，且每个脚本 LF 归一化后的 SHA-256 指纹与基线 100% 匹配
         Set<String> actualSqlFiles;
         try (Stream<Path> stream = Files.list(migrationDir)) {
             actualSqlFiles = stream.filter(Files::isRegularFile)
@@ -431,10 +433,10 @@ class Phase9BaselineAndGovernanceGuardTest {
                     .filter(name -> name.endsWith(".sql"))
                     .collect(Collectors.toSet());
         }
-        assertThat(actualSqlFiles).isEqualTo(EXPECTED_12_MIGRATION_SHA256.keySet());
+        assertThat(actualSqlFiles).isEqualTo(EXPECTED_MIGRATION_SHA256.keySet());
 
         MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-        for (Map.Entry<String, String> entry : EXPECTED_12_MIGRATION_SHA256.entrySet()) {
+        for (Map.Entry<String, String> entry : EXPECTED_MIGRATION_SHA256.entrySet()) {
             Path sqlFile = migrationDir.resolve(entry.getKey());
             assertThat(Files.isRegularFile(sqlFile))
                     .as("Flyway migration file must exist: %s", entry.getKey())
@@ -450,7 +452,7 @@ class Phase9BaselineAndGovernanceGuardTest {
         // 2) 校验 Flyway validate 通过，已成功应用全部 12 个版本，且无 pending / failed 迁移
         flyway.validate();
         MigrationInfo[] applied = flyway.info().applied();
-        assertThat(applied).hasSize(13);
+        assertThat(applied).hasSize(14);
         assertThat(flyway.info().pending()).isEmpty();
 
         // 3) AOCI 正式认知与治理资产已由官方 aoci CLI init/scan 生成并随 Phase 9 提交入库；

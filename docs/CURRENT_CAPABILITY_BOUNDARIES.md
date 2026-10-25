@@ -23,6 +23,7 @@
 | **团队协作、RBAC 与运维灾备体系 (Phase 6)** | 6 级细粒度项目角色（`OWNER`/`ADMIN`/`MAINTAINER`/`DEVELOPER`/`VIEWER`/`AUDITOR`）与 10 大权限动作（`ResourceOwnershipVerifier` 防越权拦截与成员管理端点）；不可篡改安全审计流水（`auth_audit_logs` 表，`GET /api/system/audit-logs` 多维分页检索）；确定性灾备快照生成、SHA-256 防篡改校验与幂等全库/租户还原机制（`BackupManifest`、`RestoreVerificationReport`）；运维可观测性指标大盘（`GET /api/system/metrics/summary`）与 SLO 健康度评测引擎（`HEALTHY`/`DEGRADED`/`UNHEALTHY`）；前端 Bento Grid 团队协作与运维灾备控制台（`TeamRbacPanel.tsx`, `OperationsConsolePanel.tsx`） | `ProjectRbacRole`, `ResourceOwnershipVerifier`, `TeamApplicationService`, `AuthAuditService`, `OpsApplicationService`, `AgentHubMetricsCollector` | `Phase6TeamRbacAndOperationsTest` |
 | **真实 Provider 接入、成本治理与生产验证 (Phase 7)** | OpenAI / Anthropic / Gemini / DeepSeek 真实客户端适配与统一 Tool Calling；运行模式强隔离（`DEMO_SIMULATED` / `LIVE_SELF_HOSTED` / `LIVE_TEAM`，生产严禁静默 Mock 降级）；精细化模型牌价字典与 Prompt Cache 折扣计费（`ModelPricing`）；调用前硬预算看门狗拦截（`BudgetGovernanceGuard` 默认 $50.00，80% 预警水位，`5010 BUDGET_EXCEEDED` 阻断）；Provider 主动网络延迟探测（`POST /probe`）与三态熔断器动态运维（`GET/POST /circuit-breaker`）；前端 Provider 成本大盘、探针按钮、熔断器重置与预算进度条 | `DynamicProviderRouter`, `OpenAiCompatibleProvider`, `AnthropicProvider`, `GeminiProvider`, `BudgetGovernanceGuard`, `ModelPricing`, `ProviderCostDashboard` | `Phase7LiveProvidersAndBudgetGovernanceTest` |
 | **端到端验收、性能基准与开源/交付就绪 (Phase 8)** | 10 阶段全流程自动化闭环验证（Project -> JGit Baseline -> WorkflowTemplate -> Orchestrator Plan & Confirm -> Agent Execution -> Quality Gate -> PR Draft -> Controlled Preview & Probe -> Audit Lineage -> Evidence Bundle）；12 线程并发吞吐与 P95/P99 延迟分布；SSE 广播延迟 <100ms 与 `Last-Event-ID` 单调回放；高负载内存稳定性（堆增量 <100MB）；22 种标准化 Webhook 事件类型与 HMAC-SHA256 防篡改/防重放签名规约（`X-AgentHub-Signature`）；1.0.0-RELEASE 发行清单、5 大核心 SDK 客户端与 5 大扩展 SPI 契约；质量门禁准入拦截与防御 | `AgentHubReleaseManifest`, `WebhookSignatureVerifier`, `WebhookEventType`, `AgentHubProjectClient`, `OpsApplicationService`, `QualityGateEngine`, `DeploymentApplicationService` | `Phase8PerformanceBenchmarkAndE2ETest` |
+| **Git 提供商授权连接生命周期 (Phase 11 R1)** | 项目级 GitHub 兼容仓库连接：授权仅持久化凭据引用（`env:`/`prop:`/`secret:`，裸令牌持久化前拒绝）；连接测试经真实 JGit ls-remote 且失败记录掩码可恢复原因；撤销幂等终态并清除凭据引用、阻断后续使用；同项目同仓库唯一 `ACTIVE`（409 冲突）；授权/测试/撤销要求 `SECRET_MANAGE` 权限并全量进入 `auth_audit_logs` 审计 | `GitConnectionApplicationService`, `GitConnectionController`, `GitProviderConnection`, `GitConnectionEntity` | `Phase11GitConnectionAuthorizationTest` |
 
 ---
 
@@ -64,6 +65,10 @@
 ### 4. 数据库物理级多租户隔离（Application-Layer RBAC & Owner Isolation Only）
 * **当前实现**：采用共享 MySQL 数据库，在应用层通过 `ResourceOwnershipVerifier` 实现了细粒度的六级项目 RBAC 权限控制矩阵（`OWNER`, `ADMIN`, `MAINTAINER`, `DEVELOPER`, `VIEWER`, `AUDITOR`）与团队协作管理；对工作区写、工作流执行、人工审批、部署与安全审计实施严格基于角色的防御性拦截。
 * **未实现边界**：**未实现** 物理级 Schema-per-Tenant（每个租户独立数据库 Schema）或 Database-per-Tenant（每个租户独立 MySQL 实例）物理隔离；当前适用于同一组织或受控团队内部的多项目/多角色协同。
+
+### 5. Git 提供商 OAuth 设备流与外部交付闭环（Credential-Reference Connection Only）
+* **当前实现**：项目级 Git 连接生命周期（授权/连接测试/幂等撤销）已落地（Phase 11 R1，`Phase11GitConnectionAuthorizationTest`）；凭据仅保存引用，解析后的令牌只在内存中瞬时用于 JGit ls-remote 连通性探测。
+* **未实现边界**：**未实现** OAuth 设备流/GitHub App 授权（需要所有者提供真实 GitHub OAuth App 凭据，属外部依赖）；**未实现** 远端变更同步（fetch/漂移检测）、入站 Provider Webhook 事件接收端点、以及 PR 草稿之外的受控外部交付（推送分支与真实创建 PR）。以上均属 Phase 11 后续轮次范围，当前 `PullRequestDraftView` 仍仅为草稿组装。
 
 ---
 

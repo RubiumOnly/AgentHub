@@ -22,11 +22,11 @@ Dockerfile[OV7T]: F:构建生产后端镜像 | R:code:docker-compose.prod.yml | 
 pom.xml[FV8S]: F:Maven构建与依赖基线 | R:code:.github/workflows/ci.yml | A:mvn | S:Boot3.3.4/Java17；surefire锁alphabetical保证跨平台确定性
 
 ===D:/work/agenthub/agenthub-backend/src/main/resources/===
-application.yml[CV9T]: F:应用主配置与默认档 | R:code:agenthub-backend/src/main/resources/application-prod.yml | A:Spring Boot启动 | S:默认dev+H2；密钥全靠env注入，内置默认密钥仅限本地
+application.yml[CV9T]: F:应用主配置与默认档 | R:code:agenthub-backend/src/main/resources/application-prod.yml | A:Spring Boot启动 | S:默认dev+H2；密钥全靠env注入，内置默认密钥仅限本地；agenthub.git.allow-local-test-remote默认false生产禁file://远端
 application-prod.yml[CV9T]: F:生产profile配置 | R:code:docker-compose.prod.yml | A:prod部署 | S:强制MySQL与ddl validate；模式默认LIVE_SELF_HOSTED
 application-dev.yml[CV4T]: F:开发profile配置 | R:code:agenthub-backend/src/main/resources/application.yml | A:本地开发 | S:H2内存库+ddl update；仅限本地，不代表生产行为
 application-demo.yml[CV3T]: F:演示profile配置 | R:code:agenthub-backend/src/main/resources/application.yml | A:demo演示 | S:显式DEMO_SIMULATED；演示主体可env覆盖；不得混入LIVE结果
-application-test.yml[CV6T]: F:测试profile配置 | R:code:agenthub-backend/src/test/java | A:mvn test | S:H2 MODE=MySQL；固定主体user-1/proj-default仅限测试夹具
+application-test.yml[CV6T]: F:测试profile配置 | R:code:agenthub-backend/src/test/java | A:mvn test | S:H2 MODE=MySQL；固定主体user-1/proj-default仅限测试夹具；agenthub.git.allow-local-test-remote=true放行file://测试远端
 application-local.yml.example[CV2T]: F:本地私有配置模板 | R:code:.gitignore | A:cp为application-local.yml | S:重命名后即被Git排除；真实Key严禁提交
 
 ===D:/work/agenthub/agenthub-backend/src/main/resources/db/migration/===
@@ -43,6 +43,7 @@ V10__phase_c_scheduling_leases_and_recovery.sql[PR8T]: F:租约与恢复调度�
 V11__phase_d_sandbox_lifecycle_and_isolation.sql[PD5T]: F:部署生命周期与隔离字段 | R:code:V1__init_schema.sql | A:Flyway | S:进程ID/日志游标/终止原因进入deployments表
 V12__phase_e_production_ops_and_lock_precision.sql[PR5T]: F:工作区锁毫秒精度过期 | R:code:V1__init_schema.sql | A:Flyway | S:expires_at_epoch_ms消除秒级锁精度误差
 V13__phase10_remove_demo_seed_subjects.sql[PD6S]: F:退出演示种子到夹具 | R:code:V2__seed_system_baseline.sql | A:Flyway | S:仅DML删除不改结构；回滚为按V2/V6/V7原文反向INSERT
+V14__phase11_git_connections.sql[PD7T]: F:V14建git_connections表(凭据引用+撤销审计列+项目外键) | R:code:project/infrastructure/entity/GitConnectionEntity.java | A:Flyway | S:credential_ref仅存引用；撤销不清行只清引用；MySQL8/H2双兼容DDL
 
 ===D:/work/agenthub/scripts/===
 backup-prod.sh[OR7S]: F:生产一致性加密备份 | R:code:scripts/restore-prod.sh | A:运维 | S:single-transaction快照+SHA256SUMS；默认保留14天最少3份
@@ -58,9 +59,9 @@ test-ci-local.ps1[TV6S]: F:Windows本地门禁脚本 | R:code:scripts/test-ci-lo
 ===D:/work/agenthub/docs/===
 AGENTHUB_PRODUCT_LONG_TERM_PLAN.md[SG9M]: F:唯一长期路线与阶段验收 | R:code:docs/ARCHITECTURE.md | A:每个Run开始时读取 | S:唯一计划；Phase 9/10 验收记录只追加本文；禁止另建平行计划
 AOCI_COGNITION.md[SO7S]: F:AOCI资产与运维唯一文档 | R:code:.mcp.json | A:运维与会话恢复 | S:版本/接入/恢复唯一权威；未对齐不得宣称aligned
-API.md[SN9L]: F:REST/SSE接口契约全景 | R:code:docs/openapi-v1.json | A:前后端契约对齐 | S:Controller矩阵唯一权威；新增Controller必须登记
-ARCHITECTURE.md[SA8L]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与22表矩阵是守卫测试断言来源
-CURRENT_CAPABILITY_BOUNDARIES.md[SQ8S]: F:能力真相与未实现边界 | R:code:docs/ARCHITECTURE.md | A:表述能力前必读 | S:能力矩阵唯一权威；禁止超前宣称
+API.md[SN9L]: F:REST/SSE接口契约全景 | R:code:docs/openapi-v1.json | A:前后端契约对齐 | S:Controller矩阵唯一权威(15个)；新增Controller必须登记
+ARCHITECTURE.md[SA8L]: F:当前架构事实摘要 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:理解系统结构 | S:词汇表与23表矩阵是守卫测试断言来源；Git Connection凭据仅存引用
+CURRENT_CAPABILITY_BOUNDARIES.md[SQ8S]: F:能力真相与未实现边界 | R:code:docs/ARCHITECTURE.md | A:表述能力前必读 | S:能力矩阵唯一权威；禁止超前宣称；Phase 11 Git连接已落地范围与OAuth/变更同步/Webhook/PR交付未实现边界在此登记
 TECH_WHITEPAPER_AND_DEFENSE.md[SS4T]: F:技术答辩要点 | R:code:docs/CURRENT_CAPABILITY_BOUNDARIES.md | A:答辩交流 | S:非能力证明；超出证据范围不得承诺
 openapi-v1.json[SN8L]: F:OpenAPI v1静态快照 | R:code:docs/API.md | A:契约消费方 | S:与/api/v1/openapi.json对齐；漂移需重新生成
 E2E_DEMO_GUIDE.md[SQ6L]: F:E2E演练双平台步骤 | R:code:scripts/run-e2e-demo.sh | A:演练执行者 | S:接口路径与测试对齐；demo/live显式区分
@@ -89,7 +90,7 @@ ADR-013-e2e-benchmarks-and-release-readiness.md[SQ6S]: F:E2E基准与发布就�
 
 ===D:/work/agenthub/docs/ops/===
 ALERTING_RULES.md[SO6S]: F:Prometheus告警规则与策略 | R:code:docker/prometheus/agenthub-alerts.yml | A:值班运维 | S:机器可加载配置为准；规则变更需演练验证
-DISASTER_RECOVERY_RUNBOOK.md[SR8S]: F:灾备演练与恢复SOP | R:code:scripts/restore-prod.sh | A:值班运维 | S:严禁--volumes清理生产数据卷；演练后更新证据
+DISASTER_RECOVERY_RUNBOOK.md[SR8S]: F:灾备演练与恢复SOP | R:code:scripts/restore-prod.sh | A:值班运维 | S:严禁--volumes清理生产数据卷；演练后更新证据；空库迁移门禁为V1-V14共14脚本23表
 
 ===D:/work/agenthub/docs/evidence/===
 sample-run-evidence-bundle.json[SQ4M]: F:证据包结构样例 | R:code:docs/E2E_DEMO_GUIDE.md | A:理解证据结构 | S:simulated=true样例；真实证据以导出接口为准
@@ -113,7 +114,7 @@ Result.java[CG7M]: F:统一响应体包装 | R:code:shared/context/RequestContex
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/exception/===
 BusinessException.java[CG7T]: F:领域与应用层标准业务异常 | R:code:shared/exception/ErrorCode.java | A:Application/Domain层 | S:仅携带ErrorCode；适配层异常不得向领域层回传
-ErrorCode.java[CG9S]: F:企业标准错误码字典 | R:code:shared/contract/BoundedContext.java | A:全后端模块 | S:码段按限界上下文划分；新增码必须落对应码段
+ErrorCode.java[CG9S]: F:企业标准错误码字典 | R:code:shared/contract/BoundedContext.java | A:全后端模块 | S:码段按限界上下文划分；新增码必须落对应码段；2xxx段含Git连接2006/2007
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/shared/context/===
 RequestContext.java[CG8T]: F:ThreadLocal请求上下文 | R:code:shared/filter/RequestCorrelationFilter.java | A:全后端 | S:get()惰性生成req-id；异步线程不自动继承需显式传递
@@ -189,6 +190,7 @@ SecurityConfig.java[SC3T]: F:密码编码器配置 | R:code:identity/application
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/api/===
 ProjectController.java[EI8M]: F:项目与接入向导REST入口 | R:code:project/application/ProjectApplicationService.java | A:前端与SDK | S:覆盖项目CRUD/分页/7步onboarding/上下文源注册；仅协议转换
 WorkspaceController.java[EI8M]: F:受控工作区REST入口 | R:code:project/application/WorkspaceApplicationService.java | A:前端 | S:文件树/读写/Diff/锁/resync单一资源族；路径只收workspaceId+受检相对路径
+GitConnectionController.java[EN7T]: F:Git提供商连接REST入口(授权/列表/测试/撤销) | R:code:project/application/GitConnectionApplication.java | A:/api/projects/{projectId}/git-connections | S:权限校验全在应用层，控制器仅协议转换与ETag
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/application/===
 ProjectApplication.java[AI5T]: F:项目用例端口 | R:code:project/application/ProjectApplicationService.java | A:ProjectController | S:创建/查询用例接口
@@ -200,6 +202,8 @@ ProjectOnboardingApplicationService.java[AI9L]: F:七步接入向导状态机 | 
 ContextSourceApplication.java[AI5T]: F:上下文源用例端口 | R:code:project/application/ContextSourceApplicationService.java | A:ProjectController | S:注册/列表/自动发现接口
 ContextSourceApplicationService.java[AI8M]: F:版本化上下文源管理 | R:code:project/application/ContextSourceApplicationService.java | A:ProjectController | S:AOCI状态诚实判定(NOT_CONFIGURED等)；自动发现含AOCI/规则/构建/测试约定
 WorkspaceQuotaGuard.java[SR7S]: F:工作区配额与安全策略守卫 | R:code:project/domain/quota/WorkspaceQuotaPolicy.java | A:文件写入链路 | S:超限抛BLOCKED_POLICY并给诊断；严禁静默截断
+GitConnectionApplication.java[AN6T]: F:Git连接生命周期用例端口 | R:code:project/application/GitConnectionApplicationService.java | A:GitConnectionController | S:授权/列表/测试/撤销四用例
+GitConnectionApplicationService.java[AN8M]: F:Git连接编排：授权校验、ls-remote连通探测、幂等撤销、全量审计 | R:code:project/infrastructure/repository/GitConnectionRepository.java,code:project/domain/connection/GitProviderConnection.java,code:identity/infrastructure/security/ResourceOwnershipVerifier.java,code:identity/infrastructure/security/AuthAuditService.java | A:GitConnectionApplication | S:解析令牌仅内存瞬时用于ls-remote绝不持久化；同项目同仓库唯一ACTIVE由应用层CONFLICT拒绝；测试失败记录掩码原因不抛错
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/domain/context/===
 ContextSourceType.java[DC3T]: F:上下文源类型枚举 | R:code:project/application/ContextSourceApplicationService.java | A:上下文注册 | S:AOCI/规则/构建/测试四类；扩展需配证据
@@ -240,10 +244,12 @@ EnvironmentScanResultView.java[DI4T]: F:环境扫描结果视图 | R:code:projec
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/infrastructure/entity/===
 ProjectEntity.java[PI6T]: F:项目持久化实体 | R:code:project/infrastructure/repository/ProjectRepository.java | A:JPA | S:对应projects表；owner不可变，归属校验入口
 WorkspaceEntity.java[PI6T]: F:工作区持久化实体 | R:code:project/infrastructure/repository/WorkspaceRepository.java | A:JPA | S:对应workspaces表；gitBaselineCommit冻结基线
+GitConnectionEntity.java[PN6M]: F:git_connections持久化实体 | R:code:project/infrastructure/repository/GitConnectionRepository.java | A:JPA | S:对应git_connections表(V14)；markRevoked清credential_ref置终态保留审计行
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/infrastructure/repository/===
 ProjectRepository.java[PI4T]: F:项目数据访问 | R:code:project/infrastructure/entity/ProjectEntity.java | A:Application层 | S:findByOwnerId支撑归属链
 WorkspaceRepository.java[PI4T]: F:工作区数据访问 | R:code:project/infrastructure/entity/WorkspaceEntity.java | A:Application层 | S:findByProjectId一项目一工作区主路径
+GitConnectionRepository.java[PN5T]: F:git_connections仓储 | R:code:project/infrastructure/entity/GitConnectionEntity.java | A:GitConnectionApplicationService | S:findByIdAndProjectId做跨项目隔离；唯一ACTIVE约束在应用层
 
 ===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/orchestration/api/===
 ApprovalController.java[EI7T]: F:人工审批REST入口 | R:code:orchestration/application/ApprovalApplicationService.java | A:前端 | S:decision/approve/reject三入口；仅协议转换
@@ -833,7 +839,7 @@ Phase5QualityGateAndDeliveryTest.java[TQ6L]: F:验证质量门禁与交付 | R:c
 Phase6TeamRbacAndOperationsTest.java[TQ6L]: F:验证RBAC与运维体系 | R:code:team/domain/rbac/ProjectRbacRole.java | A:mvn test | S:角色-权限矩阵回归
 Phase7LiveProvidersAndBudgetGovernanceTest.java[TQ6L]: F:验证Provider适配与预算治理 | R:code:agent/application/BudgetGovernanceGuard.java | A:mvn test | S:tools payload构建与结构化解析
 Phase8PerformanceBenchmarkAndE2ETest.java[TQ6L]: F:验证E2E与性能基准 | R:code:docs/adr/ADR-013-e2e-benchmarks-and-release-readiness.md | A:mvn test | S:十阶段闭环；延迟门禁已按真实环境校准
-Phase9BaselineAndGovernanceGuardTest.java[TQ9M]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹V1-V13/AOCI资产与旧路由410守护
+Phase9BaselineAndGovernanceGuardTest.java[TQ9M]: F:验证唯一计划与AOCI治理资产 | R:code:docs/AGENTHUB_PRODUCT_LONG_TERM_PLAN.md | A:mvn test | S:文档口径/默认值冻结/迁移指纹V1-V14共14脚本23表/AOCI资产与旧路由410守护
 PhaseASecurityAndResourceBoundaryIntegrationTest.java[TQ7L]: F:验证生产安全边界 | R:code:identity/infrastructure/security/TokenProvider.java | A:mvn test | S:prod弱密钥拒绝启动；越权阻断
 PhaseDSandboxLifecycleAndDeliveryIntegrationTest.java[TQ7M]: F:验证沙箱交付真实可达 | R:code:sandbox/domain/service/DeploymentLifecycleWorker.java | A:mvn test | S:真实HTTP访问+停止真下线；旧preview路由已退场，Dockerfile守护保留
 PhaseEProductionOpsAndDisasterRecoveryIntegrationTest.java[TQ7L]: F:验证生产预检与灾备演练 | R:code:infrastructure/ops/DisasterRecoveryBackupService.java | A:mvn test | S:占位符拦截+篡改档拒绝恢复；CI真实MySQL必跑
@@ -862,6 +868,7 @@ WorkflowDslValidationAndCycleDetectionTest.java[TQ5M]: F:验证拓扑排序 | R:
 WorkspaceAdversarialChallengeTest.java[TQ7S]: F:验证对抗路径攻击 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:深层穿越与系统目录访问必须阻断
 WorkspacePathGuardTest.java[TQ6S]: F:验证路径穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:错误码3004
 WorkspaceSecurityAndJGitAuditIntegrationTest.java[TQ6S]: F:验证读写边界与REST穿越拦截 | R:code:domain/workspace/service/DefaultWorkspaceResolver.java | A:mvn test | S:读写双向穿越拦截；Phase10承接Web层对抗覆盖
+Phase11GitConnectionAuthorizationTest.java[TN7M]: F:Git连接生命周期集成测试(引用不落盘/权限矩阵/幂等撤销/跨项目隔离) | R:code:project/application/GitConnectionApplicationService.java | A:mvn test | S:本地裸仓库file://远端驱动真实ls-remote；@AfterEach级联清git_connections/workspace/team/project/user防跨类污染
 
 ===D:/work/agenthub/agenthub-backend/src/test/java/com/agenthub/fixture/===
 DemoBaselineSeedFixture.java[TQ7S]: F:重灌demo/test演示基线 | R:code:V13__phase10_remove_demo_seed_subjects.sql | A:Spring测试上下文 | S:幂等可重入；@Profile门保证prod永不加载
@@ -896,3 +903,12 @@ JGitDiffOperations.java[DG8S]: F:Tree-to-Tree结构化Diff | R:code:domain/works
 JGitRevertOperations.java[DR8S]: F:回滚与基线族操作 | R:code:project/application/workspace/WorkspaceGitOperations.java | A:回滚与基线链路 | S:resync/改基线/丢弃/恢复与步骤回滚统一走JGitSupport清理
 JGitSnapshotOperations.java[DG8S]: F:工作区初始化与快照 | R:code:project/application/workspace/WorkspaceGitOperations.java | A:快照链路 | S:标签语义snapshot-{stepRunId}；clean树直接复用HEAD不产生空提交
 JGitSupport.java[DG7S]: F:JGit共享工具 | R:code:domain/workspace/service/jgit/JGitSnapshotOperations.java | A:四缝共用 | S:closeRepositoryQuietly含RepositoryCache清理与git目录可写恢复，勿绕过
+
+===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/domain/connection/===
+GitConnectionStatus.java[DD5T]: F:Git连接状态枚举(ACTIVE/REVOKED) | R:code:project/domain/connection/GitProviderConnection.java | A:GitConnectionApplicationService | S:REVOKED为行级终态；重授权生成新行不复活旧行
+GitProviderConnection.java[DN7M]: F:Git连接聚合根：授权校验与URL归一化 | R:code:project/domain/connection/GitProviderType.java,code:shared/exception/ErrorCode.java | A:GitConnectionApplicationService | S:裸令牌(ghp_/github_pat_/sk-)拒绝；https强制，http/file仅allow-local-test-remote开启时放行；credentialRef仅env:/prop:/cfg:/secret:形态
+GitProviderType.java[DN4T]: F:Git提供商枚举(Phase 11仅GITHUB族) | R:code:project/domain/connection/GitProviderConnection.java | A:- | S:-
+
+===D:/work/agenthub/agenthub-backend/src/main/java/com/agenthub/project/dto/connection/===
+AuthorizeGitConnectionCommand.java[DN5T]: F:授权Git连接命令DTO | R:code:project/application/GitConnectionApplication.java | A:GitConnectionController | S:credentialRef仅接受引用形态，裸令牌校验在GitProviderConnection
+GitConnectionView.java[DN5T]: F:Git连接投影DTO | R:code:project/application/GitConnectionApplication.java | A:GitConnectionController | S:credentialRef字段是引用名非令牌值；含last_verify结果与掩码detail
